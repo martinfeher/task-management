@@ -3,11 +3,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BiChevronLeft, BiChevronRight } from "react-icons/bi";
 import { CalendarAddTaskPopover } from "./calendar-add-task-popover";
-import { CalendarTaskPopover } from "./calendar-task-popover";
+import {
+  CalendarTaskModal,
+  getCalendarTaskSnapshot,
+  type CalendarTaskEditorCallbacks,
+} from "./calendar-task-modal";
 import type { TaskListItem, TodoList } from "./todo-app";
 import type { TaskDueTime } from "@/lib/task-due-time";
-import { normalizeDueTimeMinutes, normalizeDueTimeZone } from "@/lib/task-due-time";
+import { normalizeDueTimeMinutes } from "@/lib/task-due-time";
 import { getCalendarShellClassName } from "@/lib/calendar-layout";
+import type { CalendarSidebarSyncProps } from "./calendar-view-sidebar-layout";
 import {
   CALENDAR_TIME_SLOT_MINUTES,
   formatCalendarSlotTimeLabel,
@@ -15,13 +20,22 @@ import {
   getTopForCalendarMinutes,
   type CalendarDropSlot,
 } from "@/lib/calendar-time-grid";
-import { resolveCalendarSlotFromPoint } from "@/lib/calendar-drag";
+import {
+  CalendarTimedTaskBlock,
+  getTaskTiming,
+  type CalendarTaskResizePreview,
+} from "./calendar-timed-task-block";
+import {
+  bindCalendarTaskDrag,
+  calendarTaskDragClassName,
+  getActiveCalendarDropSlot,
+  type CalendarTaskDragState,
+} from "@/lib/calendar-task-drag";
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const HOUR_START = 8;
 const HOUR_END = 20;
 const HOUR_HEIGHT_PX = 52;
-const CALENDAR_TASK_DRAG_THRESHOLD_PX = 5;
 
 type CalendarWeekViewProps = {
   tasks: TaskListItem[];
@@ -30,11 +44,7 @@ type CalendarWeekViewProps = {
   onSelectTask: (taskId: string) => void;
   onSetTaskDueDate?: (taskId: string, dateValue: string | null) => void;
   onSetTaskDueTime?: (taskId: string, dueTime: TaskDueTime) => void;
-  onMoveTaskToList?: (
-    taskId: string,
-    sourceListId: string,
-    targetListId: string,
-  ) => void;
+} & CalendarTaskEditorCallbacks & {
   onAddCalendarTask?: (payload: {
     name: string;
     dueDate: string;
@@ -46,15 +56,8 @@ type CalendarWeekViewProps = {
   fullWidth?: boolean;
   externalDropTargetDateKey?: string | null;
   externalDropTargetTimeMinutes?: number | null;
-};
-
-type CalendarTaskDragState = {
-  taskId: string;
-  sourceDateKey: string;
-  sourceTimeMinutes: number | null;
-  pointerId: number;
-  captureTarget: HTMLElement;
-};
+  onPeriodLabelChange?: (label: string) => void;
+} & CalendarSidebarSyncProps;
 
 function isSlotWithinTimedGrid(
   dueTimeMinutes: number | null,
@@ -130,23 +133,6 @@ function formatCurrentTimeLabel(date: Date) {
   }).format(date);
 }
 
-function getActiveDropSlot(
-  dropTargetSlot: CalendarDropSlot | null,
-  externalDropTargetDateKey: string | null,
-  externalDropTargetTimeMinutes: number | null,
-): CalendarDropSlot | null {
-  if (dropTargetSlot) return dropTargetSlot;
-
-  if (externalDropTargetDateKey) {
-    return {
-      dateKey: externalDropTargetDateKey,
-      dueTimeMinutes: externalDropTargetTimeMinutes,
-    };
-  }
-
-  return null;
-}
-
 export function CalendarWeekView({
   tasks,
   lists,
@@ -154,21 +140,25 @@ export function CalendarWeekView({
   onSelectTask,
   onSetTaskDueDate,
   onSetTaskDueTime,
-  onMoveTaskToList,
+  onDetailsSaved,
+  onTaskHasDetailsKnown,
+  onTaskRenamed,
+  onDueDateUpdated,
   onAddCalendarTask,
   defaultListId = null,
   fullWidth = false,
   externalDropTargetDateKey = null,
   externalDropTargetTimeMinutes = null,
+  onPeriodLabelChange,
+  sidebarFocusDate,
+  sidebarJumpRequestId,
+  onSidebarFocusDateChange,
 }: CalendarWeekViewProps) {
   const [today, setToday] = useState<Date | null>(null);
   const [weekStart, setWeekStart] = useState<Date | null>(null);
   const [now, setNow] = useState<Date | null>(null);
-  const [taskPopover, setTaskPopover] = useState<{
-    task: TaskListItem;
-    x: number;
-    y: number;
-  } | null>(null);
+  const lastSidebarJumpRequestIdRef = useRef(0);
+  const [modalTaskId, setModalTaskId] = useState<string | null>(null);
   const [addTaskPopover, setAddTaskPopover] = useState<{
     date: Date;
     x: number;
@@ -179,8 +169,11 @@ export function CalendarWeekView({
   const [dropTargetSlot, setDropTargetSlot] = useState<CalendarDropSlot | null>(
     null,
   );
+  const [resizePreview, setResizePreview] =
+    useState<CalendarTaskResizePreview | null>(null);
   const dragStateRef = useRef<CalendarTaskDragState | null>(null);
   const suppressTaskClickRef = useRef(false);
+  const canDragTasks = Boolean(onSetTaskDueDate || onSetTaskDueTime);
 
   useEffect(() => {
     const current = startOfDay(new Date());
@@ -195,6 +188,34 @@ export function CalendarWeekView({
     }, 60_000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (!weekStart) return;
+    onPeriodLabelChange?.(formatMonthYear(weekStart));
+  }, [onPeriodLabelChange, weekStart]);
+
+  useEffect(() => {
+    if (!weekStart || !today || !onSidebarFocusDateChange) return;
+
+    const weekDays = getWeekDays(weekStart);
+    const focusDate = weekDays.some((day) => isSameDay(day, today))
+      ? today
+      : weekStart;
+    onSidebarFocusDateChange(focusDate);
+  }, [onSidebarFocusDateChange, today, weekStart]);
+
+  useEffect(() => {
+    if (
+      sidebarJumpRequestId === undefined ||
+      sidebarFocusDate === undefined ||
+      sidebarJumpRequestId === lastSidebarJumpRequestIdRef.current
+    ) {
+      return;
+    }
+
+    lastSidebarJumpRequestIdRef.current = sidebarJumpRequestId;
+    setWeekStart(getWeekStart(sidebarFocusDate));
+  }, [sidebarFocusDate, sidebarJumpRequestId]);
 
   const weekDays = useMemo(
     () => (weekStart ? getWeekDays(weekStart) : []),
@@ -246,10 +267,10 @@ export function CalendarWeekView({
     return map;
   }, [tasks]);
 
-  const popoverTask = useMemo(() => {
-    if (!taskPopover) return null;
-    return tasks.find((item) => item.id === taskPopover.task.id) ?? taskPopover.task;
-  }, [taskPopover, tasks]);
+  const modalTaskSnapshot = useMemo(
+    () => (modalTaskId ? getCalendarTaskSnapshot(modalTaskId, tasks) : null),
+    [modalTaskId, tasks],
+  );
 
   const currentTimeTop =
     now === null
@@ -296,7 +317,7 @@ export function CalendarWeekView({
     event: React.MouseEvent<HTMLElement>,
     day: Date,
   ) {
-    setTaskPopover(null);
+    setModalTaskId(null);
 
     if (!onAddCalendarTask || lists.length === 0) return;
 
@@ -314,7 +335,7 @@ export function CalendarWeekView({
     day: Date,
   ) {
     event.stopPropagation();
-    setTaskPopover(null);
+    setModalTaskId(null);
 
     if (!onAddCalendarTask || lists.length === 0) return;
 
@@ -345,9 +366,8 @@ export function CalendarWeekView({
   }
 
   function handleCalendarTaskClick(
-    event: React.MouseEvent<HTMLButtonElement>,
+    event: React.MouseEvent<HTMLElement>,
     task: TaskListItem,
-    day: Date,
   ) {
     event.stopPropagation();
 
@@ -358,11 +378,7 @@ export function CalendarWeekView({
 
     onSelectTask(task.id);
     closeAddTaskPopover();
-    setTaskPopover({
-      task,
-      x: event.clientX,
-      y: event.clientY,
-    });
+    setModalTaskId(task.id);
   }
 
   function handleCalendarTaskPointerDown(
@@ -370,128 +386,24 @@ export function CalendarWeekView({
     task: TaskListItem,
     day: Date,
   ) {
-    if (event.button !== 0 || (!onSetTaskDueDate && !onSetTaskDueTime)) return;
-
-    const sourceDateKey = toDateKey(day);
-    const sourceTimeMinutes = normalizeDueTimeMinutes(task.dueTimeMinutes);
-    const taskButton = event.currentTarget;
-    const pointerId = event.pointerId;
-    const startX = event.clientX;
-    const startY = event.clientY;
-    let dragStarted = false;
-
-    function clearPendingListeners() {
-      document.removeEventListener("pointermove", onPointerMove);
-      document.removeEventListener("pointerup", onPointerUp);
-      document.removeEventListener("pointercancel", onPointerUp);
-    }
-
-    function finishDrag(upEvent: PointerEvent) {
-      document.body.style.cursor = "";
-      taskButton.classList.remove("opacity-50");
-
-      if (taskButton.hasPointerCapture(pointerId)) {
-        taskButton.releasePointerCapture(pointerId);
-      }
-
-      const dragState = dragStateRef.current;
-      const targetSlot = resolveCalendarSlotFromPoint(
-        upEvent.clientX,
-        upEvent.clientY,
-        HOUR_START,
-        HOUR_HEIGHT_PX,
-      );
-
-      if (dragState && targetSlot) {
-        if (
-          onSetTaskDueDate &&
-          targetSlot.dateKey !== dragState.sourceDateKey
-        ) {
-          onSetTaskDueDate(dragState.taskId, targetSlot.dateKey);
-        }
-
-        if (onSetTaskDueTime) {
-          if (targetSlot.dueTimeMinutes !== null) {
-            onSetTaskDueTime(dragState.taskId, {
-              dueTimeMinutes: targetSlot.dueTimeMinutes,
-              dueDurationMinutes: task.dueDurationMinutes,
-              dueTimeZone: normalizeDueTimeZone(task.dueTimeZone),
-            });
-          } else if (dragState.sourceTimeMinutes !== null) {
-            onSetTaskDueTime(dragState.taskId, {
-              dueTimeMinutes: null,
-              dueDurationMinutes: null,
-              dueTimeZone: normalizeDueTimeZone(task.dueTimeZone),
-            });
-          }
-        }
-      }
-
-      dragStateRef.current = null;
-      setDropTargetSlot(null);
-      suppressTaskClickRef.current = true;
-    }
-
-    function onPointerMove(moveEvent: PointerEvent) {
-      if (moveEvent.pointerId !== pointerId) return;
-
-      if (!dragStarted) {
-        const dx = moveEvent.clientX - startX;
-        const dy = moveEvent.clientY - startY;
-        if (Math.hypot(dx, dy) < CALENDAR_TASK_DRAG_THRESHOLD_PX) return;
-
-        dragStarted = true;
-        clearPendingListeners();
-        setTaskPopover(null);
-        dragStateRef.current = {
-          taskId: task.id,
-          sourceDateKey,
-          sourceTimeMinutes,
-          pointerId,
-          captureTarget: taskButton,
-        };
-        taskButton.setPointerCapture(pointerId);
-        taskButton.classList.add("opacity-50");
-        document.body.style.cursor = "grabbing";
-        document.addEventListener("pointermove", onActivePointerMove);
-        document.addEventListener("pointerup", onActivePointerUp);
-        document.addEventListener("pointercancel", onActivePointerUp);
-      }
-    }
-
-    function onActivePointerMove(moveEvent: PointerEvent) {
-      if (moveEvent.pointerId !== pointerId) return;
-      setDropTargetSlot(
-        resolveCalendarSlotFromPoint(
-          moveEvent.clientX,
-          moveEvent.clientY,
-          HOUR_START,
-          HOUR_HEIGHT_PX,
-        ),
-      );
-    }
-
-    function onActivePointerUp(upEvent: PointerEvent) {
-      if (upEvent.pointerId !== pointerId) return;
-      document.removeEventListener("pointermove", onActivePointerMove);
-      document.removeEventListener("pointerup", onActivePointerUp);
-      document.removeEventListener("pointercancel", onActivePointerUp);
-      finishDrag(upEvent);
-    }
-
-    function onPointerUp(upEvent: PointerEvent) {
-      if (upEvent.pointerId !== pointerId) return;
-      clearPendingListeners();
-    }
-
-    document.addEventListener("pointermove", onPointerMove);
-    document.addEventListener("pointerup", onPointerUp);
-    document.addEventListener("pointercancel", onPointerUp);
+    event.stopPropagation();
+    bindCalendarTaskDrag(event, {
+      task,
+      sourceDateKey: toDateKey(day),
+      hourStart: HOUR_START,
+      hourHeightPx: HOUR_HEIGHT_PX,
+      onSetTaskDueDate,
+      onSetTaskDueTime,
+      dragStateRef,
+      suppressTaskClickRef,
+      setDropTargetSlot,
+      onDragStart: () => setModalTaskId(null),
+    });
   }
 
   useEffect(() => {
     if (!weekStart) return;
-    setTaskPopover(null);
+    setModalTaskId(null);
     closeAddTaskPopover();
   }, [weekStart]);
 
@@ -504,40 +416,37 @@ export function CalendarWeekView({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col p-4">
+    <div className="flex min-h-0 flex-1 flex-col px-4 pb-4 pt-0">
       <div className={getCalendarShellClassName(fullWidth)}>
-        <div className="mb-4 flex shrink-0 items-center justify-between">
-          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-            {formatMonthYear(weekStart)}
-          </h2>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={goToToday}
-              className="mr-1 rounded-md px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
-            >
-              Today
-            </button>
-            <button
-              type="button"
-              aria-label="Previous week"
-              onClick={goToPreviousWeek}
-              className="flex size-8 items-center justify-center rounded-md text-zinc-600 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-            >
-              <BiChevronLeft className="size-5" />
-            </button>
-            <button
-              type="button"
-              aria-label="Next week"
-              onClick={goToNextWeek}
-              className="flex size-8 items-center justify-center rounded-md text-zinc-600 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-            >
-              <BiChevronRight className="size-5" />
-            </button>
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+          <div className="flex shrink-0 items-center justify-start border-b border-zinc-200 px-3 py-2 dark:border-zinc-800">
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={goToToday}
+                className="mr-1 rounded-md px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+              >
+                Today
+              </button>
+              <button
+                type="button"
+                aria-label="Previous week"
+                onClick={goToPreviousWeek}
+                className="flex size-8 items-center justify-center rounded-md text-zinc-600 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              >
+                <BiChevronLeft className="size-5" />
+              </button>
+              <button
+                type="button"
+                aria-label="Next week"
+                onClick={goToNextWeek}
+                className="flex size-8 items-center justify-center rounded-md text-zinc-600 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              >
+                <BiChevronRight className="size-5" />
+              </button>
+            </div>
           </div>
-        </div>
-
-        <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+          <div className="min-h-0 flex-1 overflow-auto">
           <div className="grid min-w-[760px] grid-cols-[56px_repeat(7,minmax(0,1fr))]">
             <div className="sticky top-0 z-20 border-b border-r border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950" />
             {weekDays.map((day) => {
@@ -569,7 +478,7 @@ export function CalendarWeekView({
             {weekDays.map((day) => {
               const dateKey = toDateKey(day);
               const dayTasks = tasksByDate.get(dateKey)?.allDay ?? [];
-              const activeDropSlot = getActiveDropSlot(
+              const activeDropSlot = getActiveCalendarDropSlot(
                 dropTargetSlot,
                 externalDropTargetDateKey,
                 externalDropTargetTimeMinutes,
@@ -602,33 +511,20 @@ export function CalendarWeekView({
                         type="button"
                         onClick={(event) => {
                           event.stopPropagation();
-                          handleCalendarTaskClick(event, task, day);
+                          handleCalendarTaskClick(event, task);
                         }}
                         onPointerDown={(event) => {
                           event.stopPropagation();
                           handleCalendarTaskPointerDown(event, task, day);
                         }}
-                        className={`block w-full truncate rounded px-1.5 py-0.5 text-left text-[11px] transition-colors touch-none ${
-                          onSetTaskDueDate
-                            ? "cursor-grab active:cursor-grabbing"
-                            : ""
-                        } ${
-                          task.id === selectedTaskId
-                            ? "bg-[#4873c7] text-white"
-                            : "bg-[#dbeafe] text-[#1e3a8a] hover:bg-[#bfdbfe] dark:bg-blue-950/50 dark:text-blue-100"
-                        }`}
+                        className={`block w-full truncate rounded px-1.5 py-0.5 text-left text-[11px] transition-colors ${calendarTaskDragClassName(
+                          canDragTasks,
+                          task.id === selectedTaskId,
+                        )}`}
                       >
                         {task.name}
                       </button>
                     ))}
-                    {isActiveDay ? (
-                      <div
-                        aria-hidden="true"
-                        className="block h-4 truncate rounded bg-zinc-200/50 px-1.5 text-[11px] text-zinc-400 dark:bg-zinc-700"
-                      >
-                        {draftTaskName.trim() || ""}
-                      </div>
-                    ) : null}
                   </div>
                 </div>
               );
@@ -658,7 +554,7 @@ export function CalendarWeekView({
             {weekDays.map((day) => {
               const dateKey = toDateKey(day);
               const timedTasks = tasksByDate.get(dateKey)?.timed ?? [];
-              const activeDropSlot = getActiveDropSlot(
+              const activeDropSlot = getActiveCalendarDropSlot(
                 dropTargetSlot,
                 externalDropTargetDateKey,
                 externalDropTargetTimeMinutes,
@@ -723,18 +619,13 @@ export function CalendarWeekView({
                   ))}
 
                   {timedTasks.map((task) => {
-                    const minutes =
-                      normalizeDueTimeMinutes(task.dueTimeMinutes) ?? 0;
+                    const timing = getTaskTiming(task, resizePreview);
                     const top =
                       HOUR_HEIGHT_PX +
-                      (minutes / 60 - HOUR_START) * HOUR_HEIGHT_PX;
-                    const durationMinutes =
-                      task.dueDurationMinutes && task.dueDurationMinutes > 0
-                        ? task.dueDurationMinutes
-                        : 60;
+                      (timing.dueTimeMinutes / 60 - HOUR_START) * HOUR_HEIGHT_PX;
                     const height = Math.max(
                       24,
-                      (durationMinutes / 60) * HOUR_HEIGHT_PX,
+                      (timing.dueDurationMinutes / 60) * HOUR_HEIGHT_PX,
                     );
 
                     if (top < HOUR_HEIGHT_PX || top > (hours.length + 1) * HOUR_HEIGHT_PX) {
@@ -742,30 +633,28 @@ export function CalendarWeekView({
                     }
 
                     return (
-                      <button
+                      <CalendarTimedTaskBlock
                         key={task.id}
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          handleCalendarTaskClick(event, task, day);
-                        }}
-                        onPointerDown={(event) => {
-                          event.stopPropagation();
-                          handleCalendarTaskPointerDown(event, task, day);
-                        }}
-                        style={{ top, height }}
-                        className={`absolute inset-x-1 z-10 overflow-hidden rounded px-1.5 py-0.5 text-left text-[11px] leading-tight transition-colors touch-none ${
-                          onSetTaskDueDate
-                            ? "cursor-grab active:cursor-grabbing"
-                            : ""
-                        } ${
-                          task.id === selectedTaskId
-                            ? "bg-[#4873c7] text-white"
-                            : "bg-[#dbeafe] text-[#1e3a8a] hover:bg-[#bfdbfe] dark:bg-blue-950/50 dark:text-blue-100"
-                        }`}
-                      >
-                        <span className="line-clamp-2">{task.name}</span>
-                      </button>
+                        task={task}
+                        day={day}
+                        top={top}
+                        height={height}
+                        startMinutes={timing.dueTimeMinutes}
+                        durationMinutes={timing.dueDurationMinutes}
+                        hourStart={HOUR_START}
+                        hourHeightPx={HOUR_HEIGHT_PX}
+                        selected={task.id === selectedTaskId}
+                        canInteract={canDragTasks}
+                        onTaskClick={handleCalendarTaskClick}
+                        onSetTaskDueDate={onSetTaskDueDate}
+                        onSetTaskDueTime={onSetTaskDueTime}
+                        dragStateRef={dragStateRef}
+                        suppressTaskClickRef={suppressTaskClickRef}
+                        setDropTargetSlot={setDropTargetSlot}
+                        setResizePreview={setResizePreview}
+                        onDragStart={() => setModalTaskId(null)}
+                        toDateKey={toDateKey}
+                      />
                     );
                   })}
 
@@ -821,6 +710,7 @@ export function CalendarWeekView({
               );
             })}
           </div>
+          </div>
         </div>
       </div>
 
@@ -839,16 +729,15 @@ export function CalendarWeekView({
         />
       ) : null}
 
-      {popoverTask && taskPopover ? (
-        <CalendarTaskPopover
-          task={popoverTask}
-          lists={lists}
-          x={taskPopover.x}
-          y={taskPopover.y}
-          onClose={() => setTaskPopover(null)}
-          onSetTaskDueDate={onSetTaskDueDate}
-          onSetTaskDueTime={onSetTaskDueTime}
-          onMoveTaskToList={onMoveTaskToList}
+      {modalTaskId ? (
+        <CalendarTaskModal
+          taskId={modalTaskId}
+          taskSnapshot={modalTaskSnapshot}
+          onClose={() => setModalTaskId(null)}
+          onDetailsSaved={onDetailsSaved}
+          onTaskHasDetailsKnown={onTaskHasDetailsKnown}
+          onTaskRenamed={onTaskRenamed}
+          onDueDateUpdated={onDueDateUpdated}
         />
       ) : null}
     </div>

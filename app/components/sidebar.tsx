@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
+import { BiCheckboxChecked } from "react-icons/bi";
 import { IoIosSearch } from "react-icons/io";
 import { IoPricetagOutline } from "react-icons/io5";
 import { LuArrowRight, LuPlus, LuStar } from "react-icons/lu";
@@ -906,10 +907,16 @@ export function Sidebar({
           <div className="mt-3 flex flex-col border-t border-zinc-150">
             <button
               type="button"
-              className={`${getItemClassName(isCompletedOpen)} pl-6 pr-4`}
+              className={`${getItemClassName(isCompletedOpen)} gap-1 px-4 `}
               onClick={() => setIsCompletedOpen((open) => !open)}
             >
-              Completed
+              <BiCheckboxChecked
+                className={`size-[21px] shrink-0 ${
+                  isCompletedOpen ? "text-[#111111]" : "text-[#b5bcc1]"
+                }`}
+                aria-hidden="true"
+              />
+              <span className="text-[#777b7e]">Completed</span>
             </button>
 
             {isCompletedOpen &&

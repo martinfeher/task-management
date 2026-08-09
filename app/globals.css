@@ -320,6 +320,30 @@ body {
   }
 }
 
+@keyframes add-task-form-in {
+  from {
+    opacity: 0;
+    filter: blur(8px);
+  }
+
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+.add-task-form-enter {
+  animation: add-task-form-in 100ms ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .add-task-form-enter {
+    animation: none;
+    opacity: 1;
+    filter: none;
+  }
+}
+
 .nav-hover-arrow {
   opacity: 0;
   transform: translateX(1.5px);

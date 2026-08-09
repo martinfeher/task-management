@@ -2189,7 +2189,7 @@ export function TaskDetailsPanel({
     setIsDateMenuOpen((open) => !open);
   }
 
-  async function handleSelectDueDate(dateValue: string) {
+  async function handleSelectDueDate(dateValue: string | null) {
     if (!task) return;
 
     try {
@@ -2271,19 +2271,18 @@ export function TaskDetailsPanel({
                   aria-haspopup="dialog"
                   aria-expanded={isDateMenuOpen}
                   onClick={handleDateButtonClick}
-                  className="flex cursor-pointer items-center gap-1 rounded-[15px] bg-[#e8eff2] pl-3.5 pr-3 py-[7px] text-[12px] font-semibold uppercase tracking-wide text-zinc-700 transition-colors hover:bg-[#e0e2e5] dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+                  className="flex cursor-pointer items-center gap-1 rounded-full bg-[#eceef0] pl-3.5 pr-3 py-[7px] text-[12px] font-semibold uppercase tracking-wide text-zinc-700 transition-colors hover:bg-[#e0e2e5] dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
                 >
-                  <span>Date</span>
+                  <span className={dueDateLabel ? "text-[11px]" : undefined}>Date</span>
+             
                   {dueDateLabel ? (
-                    <span className="ml-1 flex flex-col items-start normal-case tracking-normal">
-                      <span className="font-medium text-[#5F5F5F] dark:text-zinc-300">
+                    <span 
+                      className="ml-px flex flex-col items-start normal-case tracking-normal"
+                      title={dueTimeLabel ? `${dueDateLabel} • ${dueTimeLabel}` : dueDateLabel || undefined}
+                    >
+                      <span className="font-normal text-[#5F5F5F] dark:text-zinc-300 text-[13px]">
                         {dueDateLabel}
                       </span>
-                      {dueTimeLabel ? (
-                        <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">
-                          {dueTimeLabel}
-                        </span>
-                      ) : null}
                     </span>
                   ) : (
                     <PlusIcon className="ml-1 size-3 text-[#5F5F5F]" />

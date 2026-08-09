@@ -1,17 +1,18 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useRef, useState, type RefObject } from "react";
-import { BiSortAlt2 } from "react-icons/bi";
+import { BiCalendar, BiChevronDown, BiSortAlt2 } from "react-icons/bi";
 import { LuCalendarCheck2, LuCheck, LuPlus, LuX } from "react-icons/lu";
 import { PiArrowBendDownRight } from "react-icons/pi";
 import { createLabel, getLabels } from "@/app/actions/todo";
+import { TaskDatePicker } from "./task-date-picker";
 import { TaskListTaskRow } from "./task-list-task-row";
 import type { Label } from "./task-label-selector";
 import {
   TaskRowContextMenu,
   type TaskRowContextMenuView,
 } from "./task-row-context-menu";
-import type { TaskListItem, TodoList } from "./todo-app";
+import type { TaskListItem, TodoList, AddTaskOptions } from "./todo-app";
 import type { TaskDueTime } from "@/lib/task-due-time";
 import { resolveCalendarSlotFromPoint } from "@/lib/calendar-drag";
 import type { CalendarDropSlot } from "@/lib/calendar-time-grid";
@@ -201,7 +202,7 @@ type TaskListPanelProps = {
   showAddTask?: boolean;
   isLabelFilter?: boolean;
   listId?: string | null;
-  onAddTask: (name: string) => void;
+  onAddTask: (name: string, options?: AddTaskOptions) => void;
   onToggleTask: (taskId: string) => void;
   onSelectTask: (taskId: string) => void;
   onRenameTask: (taskId: string, name: string) => void;
@@ -232,8 +233,11 @@ type TaskListPanelProps = {
   onTaskHoverEnd?: () => void;
   showListCalendarButton?: boolean;
   isListCalendarOpen?: boolean;
+  isListCalendarPreview?: boolean;
   listCalendarButtonRef?: RefObject<HTMLButtonElement | null>;
   onListCalendarClick?: () => void;
+  onListCalendarHoverStart?: () => void;
+  onListCalendarHoverEnd?: () => void;
   enableCalendarDragDrop?: boolean;
   onCalendarDropTargetChange?: (target: CalendarDropSlot | null) => void;
   isListHovered?: boolean;
@@ -273,8 +277,11 @@ export function TaskListPanel({
   onTaskHoverEnd,
   showListCalendarButton = false,
   isListCalendarOpen = false,
+  isListCalendarPreview = false,
   listCalendarButtonRef,
   onListCalendarClick,
+  onListCalendarHoverStart,
+  onListCalendarHoverEnd,
   enableCalendarDragDrop = false,
   onCalendarDropTargetChange,
   isListHovered = false,
@@ -282,6 +289,9 @@ export function TaskListPanel({
 }: TaskListPanelProps) {
   const [newTaskName, setNewTaskName] = useState("");
   const [isAddingTask, setIsAddingTask] = useState(false);
+  const [newTaskDueDate, setNewTaskDueDate] = useState<string | null>(null);
+  const [newTaskDueTime, setNewTaskDueTime] = useState<TaskDueTime | null>(null);
+  const [isAddTaskDatePickerOpen, setIsAddTaskDatePickerOpen] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [titleDraft, setTitleDraft] = useState("");
   const [orderedTasks, setOrderedTasks] = useState(tasks);
@@ -344,6 +354,7 @@ export function TaskListPanel({
   }, [activeLabelMenuTaskId, orderedTasks]);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const newTaskInputRef = useRef<HTMLInputElement>(null);
+  const addTaskDateMenuRef = useRef<HTMLDivElement>(null);
   const keepAddTaskOpenRef = useRef(false);
   const titleEditReadyRef = useRef(false);
   const sortMenuRef = useRef<HTMLDivElement>(null);
@@ -561,13 +572,35 @@ export function TaskListPanel({
     });
   }, [isAddingTask]);
 
+  useEffect(() => {
+    if (!isAddTaskDatePickerOpen) return;
+
+    function handlePointerDown(event: MouseEvent) {
+      const target = event.target as Node;
+      if (addTaskDateMenuRef.current?.contains(target)) return;
+      setIsAddTaskDatePickerOpen(false);
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+    };
+  }, [isAddTaskDatePickerOpen]);
+
   function startAddingTask() {
     setIsAddingTask(true);
+  }
+
+  function resetNewTaskSchedule() {
+    setNewTaskDueDate(null);
+    setNewTaskDueTime(null);
+    setIsAddTaskDatePickerOpen(false);
   }
 
   function cancelAddTask() {
     setIsAddingTask(false);
     setNewTaskName("");
+    resetNewTaskSchedule();
   }
 
   function submitNewTask() {
@@ -576,9 +609,18 @@ export function TaskListPanel({
       return;
     }
 
+    const addOptions: AddTaskOptions | undefined =
+      newTaskDueDate !== null || newTaskDueTime !== null
+        ? {
+            dueDate: newTaskDueDate,
+            dueTime: newTaskDueTime,
+          }
+        : undefined;
+
     keepAddTaskOpenRef.current = true;
-    onAddTask(newTaskName);
+    onAddTask(newTaskName, addOptions);
     setNewTaskName("");
+    resetNewTaskSchedule();
     setActiveSort(null);
 
     requestAnimationFrame(() => {
@@ -835,7 +877,7 @@ export function TaskListPanel({
     closeTaskMenus();
   }
 
-  function handleSelectTaskDueDate(taskId: string, dateValue: string) {
+  function handleSelectTaskDueDate(taskId: string, dateValue: string | null) {
     onSetTaskDueDate?.(taskId, dateValue);
   }
 
@@ -1341,13 +1383,45 @@ export function TaskListPanel({
         >
           {showHeader && (
             <header className="flex items-center justify-between gap-2 border-b border-zinc-200 py-3 pl-[26px] pr-4 dark:border-zinc-800">
-              <h1 className="min-w-0 truncate text-xl font-semibold text-zinc-900 dark:text-zinc-50">
-                {title}
-              </h1>
+              <div className="flex min-w-0 items-center gap-1.5">
+                <h1 className="min-w-0 truncate text-xl font-semibold text-zinc-900 dark:text-zinc-50">
+                  {title}
+                </h1>
+                {showListCalendarButton && hasScheduledTasks ? (
+                  <button
+                    ref={listCalendarButtonRef}
+                    type="button"
+                    onClick={onListCalendarClick}
+                    onMouseEnter={() => onListCalendarHoverStart?.()}
+                    onMouseLeave={() => onListCalendarHoverEnd?.()}
+                    aria-pressed={isListCalendarOpen}
+                    aria-label={`Calendar - ${title}`}
+                    className={`group flex shrink-0 items-center overflow-hidden rounded-lg py-[4px] pl-[9px] ml-1 pr-[9px] transition-[background-color,padding,max-width,opacity] cursor-pointer ${
+                      isListCalendarOpen || isListCalendarPreview
+                        ? "bg-[#4873c7] text-white"
+                        : "bg-[#eceef0] text-zinc-700 hover:bg-zinc-250 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+                    }`}
+                  >
+                    <LuCalendarCheck2
+                      className="size-4 shrink-0"
+                      aria-hidden="true"
+                    />
+                    <span
+                      className={`overflow-hidden whitespace-nowrap text-[12px] font-medium transition-[max-width,opacity,padding] duration-200 ease-out ${
+                        isListCalendarOpen || isListCalendarPreview
+                          ? "max-w-[12rem] pl-1.5 opacity-100"
+                          : "max-w-0 opacity-0 group-hover:max-w-[12rem] group-hover:pl-1.5 group-hover:opacity-100"
+                      }`}
+                    >
+                      Calendar
+                    </span>
+                  </button>
+                ) : null}
+              </div>
               <div className="flex shrink-0 items-center gap-1">
               {orderedTasks.length >= 2 ? (
                 <div
-                  className="relative flex shrink-0 items-center"
+                  className="relative flex shrink-0 items-center rounded-[5px] bg-[#f5f6f7]"
                   ref={sortMenuRef}
                   onMouseEnter={() => setIsSortMenuOpen(true)}
                   onMouseLeave={() => setIsSortMenuOpen(false)}
@@ -1361,7 +1435,7 @@ export function TaskListPanel({
                     }
                     aria-haspopup="menu"
                     aria-expanded={isSortMenuOpen}
-                    className="flex h-[31px] cursor-pointer items-center rounded-lg px-1 text-[14px] text-[#777777] transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+                    className="flex h-[27px] cursor-pointer items-center rounded-lg pl-1 pr-[6px] text-[14px] text-[#777777] transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
                   >
                     <BiSortAlt2
                       className="size-[15px] shrink-0"
@@ -1403,38 +1477,16 @@ export function TaskListPanel({
                   )}
                 </div>
               ) : null}
-                {showListCalendarButton && hasScheduledTasks ? (
-                  <button
-                    ref={listCalendarButtonRef}
-                    type="button"
-                    onClick={onListCalendarClick}
-                    aria-pressed={isListCalendarOpen}
-                    aria-label={`Calendar - ${title}`}
-                    className={`group flex shrink-0 items-center overflow-hidden rounded-lg py-[4px] pl-[9px] pr-[9px] transition-[background-color,padding] cursor-pointer ${
-                      isListCalendarOpen
-                        ? "bg-[#4873c7] text-white"
-                        : "bg-zinc-150 text-zinc-700 hover:bg-zinc-250 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
-                    }`}
-                  >
-                    <LuCalendarCheck2
-                      className="size-4 shrink-0"
-                      aria-hidden="true"
-                    />
-                    <span className="max-w-0 overflow-hidden whitespace-nowrap text-[12px] font-medium opacity-0 transition-[max-width,opacity,padding] duration-200 ease-out group-hover:max-w-[12rem] group-hover:pl-1.5 group-hover:opacity-100">
-                      {title}
-                    </span>
-                  </button>
-                ) : null}
               </div>
             </header>
           )}
 
-          <div className="flex items-center pl-[26px] pr-1.5 py-3">
+          <div className="relative z-20 flex items-center pl-[16px] pr-[6px] py-2 h-[50px]">
             {showAddTask ? (
               isAddingTask ? (
                 <form
                   onSubmit={handleSubmit}
-                  className="flex min-w-0 flex-1 mr-[40px]! items-center rounded-lg border border-[#c8d4f0] bg-white px-2 dark:border-zinc-600 dark:bg-zinc-900"
+                  className="add-task-form-enter flex min-w-0 flex-1 mr-[10px]! items-center rounded-lg border border-[#d8dde8] bg-[#fbfbfb] pl-2 pr-[6.5px] dark:border-zinc-600 dark:bg-zinc-900"
                 >
                   <input
                     ref={newTaskInputRef}
@@ -1463,28 +1515,73 @@ export function TaskListPanel({
                       }, 0);
                     }}
                   />
-                  <button
-                    type="button"
-                    aria-label="Clear task name"
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => {
-                      if (newTaskName.trim()) {
-                        setNewTaskName("");
-                        newTaskInputRef.current?.focus();
-                        return;
-                      }
-
-                      cancelAddTask();
-                    }}
-                    className="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded text-zinc-400 transition-colors hover:text-zinc-600 dark:hover:text-zinc-300"
+                  <div
+                    className="group/date-picker relative shrink-0"
+                    ref={addTaskDateMenuRef}
                   >
-                    <LuX className="size-4" aria-hidden="true" />
-                  </button>
+                    <button
+                      type="button"
+                      aria-label={
+                        newTaskDueDate
+                          ? "Change due date and time"
+                          : "Set due date and time"
+                      }
+                      aria-haspopup="dialog"
+                      aria-expanded={isAddTaskDatePickerOpen}
+                      aria-describedby="add-task-calendar-tooltip"
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() =>
+                        setIsAddTaskDatePickerOpen((open) => !open)
+                      }
+                      className={`flex h-7 shrink-0 cursor-pointer items-center gap-0.5 rounded-[7px] pl-1.5 pr-[4px] mr-2 text-[#656577] transition-colors hover:bg-[#e8e8e8] hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 ${
+                        newTaskDueDate || newTaskDueTime
+                          ? "text-[#4873c7] dark:text-[#7da2ff]"
+                          : ""
+                      }`}
+                    >
+                      <BiCalendar className="size-[17px] text-[#7c7c92]" aria-hidden="true" />
+                      <BiChevronDown
+                        className={`size-3 transition-transform ${
+                          isAddTaskDatePickerOpen ? "rotate-180" : ""
+                        }`}
+                        aria-hidden="true"
+                      />
+                    </button>
+                    <span
+                      id="add-task-calendar-tooltip"
+                      role="tooltip"
+                      className="pointer-events-none absolute bottom-[calc(100%+6px)] left-[2px] z-40 whitespace-nowrap rounded-md bg-[#3f3f46] px-3 py-1.5 text-[11px] font-medium text-white opacity-0 shadow-sm transition-opacity group-hover/date-picker:opacity-100 dark:bg-zinc-700"
+                    >
+                      Set Date
+                    </span>
+                    {isAddTaskDatePickerOpen ? (
+                      <div className="absolute right-0 top-full z-50 mt-1">
+                        <TaskDatePicker
+                          dueDate={newTaskDueDate}
+                          dueTimeMinutes={newTaskDueTime?.dueTimeMinutes ?? null}
+                          dueDurationMinutes={
+                            newTaskDueTime?.dueDurationMinutes ?? null
+                          }
+                          dueTimeZone={newTaskDueTime?.dueTimeZone ?? null}
+                          onSelectDate={(dateValue) => {
+                            setNewTaskDueDate(dateValue);
+                            if (dateValue === null) {
+                              setNewTaskDueTime(null);
+                            }
+                          }}
+                          onSaveDueTime={(dueTime) => {
+                            setNewTaskDueTime(dueTime);
+                          }}
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+               
                   <button
                     type="submit"
                     onMouseDown={(event) => event.preventDefault()}
                     disabled={!newTaskName.trim()}
-                    className="flex h-7 shrink-0 cursor-pointer items-center gap-1 rounded-md bg-zinc-400 px-[9px] text-xs font-medium text-white transition-colors enabled:hover:bg-zinc-500 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="flex h-7 shrink-0 cursor-pointer items-center gap-1 rounded-[10px] bg-zinc-400 px-[9px] text-xs font-medium text-white transition-colors enabled:hover:bg-zinc-500 disabled:cursor-not-allowed"
                   >
                     <LuCheck className="size-3.5" aria-hidden="true" />
                     Add

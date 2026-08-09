@@ -64,7 +64,7 @@ type TaskListTaskRowProps = {
     taskId: string,
   ) => void;
   onToggleDatePicker: (taskId: string) => void;
-  onSelectTaskDueDate: (taskId: string, dateValue: string) => void;
+  onSelectTaskDueDate: (taskId: string, dateValue: string | null) => void;
   onSaveTaskDueTime: (taskId: string, dueTime: TaskDueTime) => void;
   onToggleTaskMenu: (taskId: string) => void;
   onStartTitleEdit: (task: TaskListItem) => void;
@@ -267,11 +267,6 @@ export function TaskListTaskRow({
           >
             {task.name}
           </span>
-          {task.listName && (
-            <span className="block truncate text-xs text-zinc-400 dark:text-zinc-500">
-              {task.listName}
-            </span>
-          )}
         </div>
       )}
 

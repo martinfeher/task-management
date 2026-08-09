@@ -3,11 +3,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BiChevronLeft, BiChevronRight } from "react-icons/bi";
 import { CalendarAddTaskPopover } from "./calendar-add-task-popover";
-import { CalendarTaskPopover } from "./calendar-task-popover";
+import {
+  CalendarTaskModal,
+  getCalendarTaskSnapshot,
+  type CalendarTaskEditorCallbacks,
+} from "./calendar-task-modal";
 import type { TaskListItem, TodoList } from "./todo-app";
 import type { TaskDueTime } from "@/lib/task-due-time";
 import { normalizeDueTimeMinutes } from "@/lib/task-due-time";
 import { getCalendarShellClassName } from "@/lib/calendar-layout";
+import type { CalendarSidebarSyncProps } from "./calendar-view-sidebar-layout";
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const HOUR_START = 8;
@@ -24,11 +29,7 @@ type CalendarMultiDayViewProps = {
   onSelectTask: (taskId: string) => void;
   onSetTaskDueDate?: (taskId: string, dateValue: string | null) => void;
   onSetTaskDueTime?: (taskId: string, dueTime: TaskDueTime) => void;
-  onMoveTaskToList?: (
-    taskId: string,
-    sourceListId: string,
-    targetListId: string,
-  ) => void;
+} & CalendarTaskEditorCallbacks & {
   onAddCalendarTask?: (payload: {
     name: string;
     dueDate: string;
@@ -39,7 +40,8 @@ type CalendarMultiDayViewProps = {
   defaultListId?: string | null;
   fullWidth?: boolean;
   externalDropTargetDateKey?: string | null;
-};
+  onPeriodLabelChange?: (label: string) => void;
+} & CalendarSidebarSyncProps;
 
 type CalendarTaskDragState = {
   taskId: string;
@@ -150,20 +152,24 @@ export function CalendarMultiDayView({
   onSelectTask,
   onSetTaskDueDate,
   onSetTaskDueTime,
-  onMoveTaskToList,
+  onDetailsSaved,
+  onTaskHasDetailsKnown,
+  onTaskRenamed,
+  onDueDateUpdated,
   onAddCalendarTask,
   defaultListId = null,
   fullWidth = false,
   externalDropTargetDateKey = null,
+  onPeriodLabelChange,
+  sidebarFocusDate,
+  sidebarJumpRequestId,
+  onSidebarFocusDateChange,
 }: CalendarMultiDayViewProps) {
   const [today, setToday] = useState<Date | null>(null);
   const [rangeStart, setRangeStart] = useState<Date | null>(null);
   const [now, setNow] = useState<Date | null>(null);
-  const [taskPopover, setTaskPopover] = useState<{
-    task: TaskListItem;
-    x: number;
-    y: number;
-  } | null>(null);
+  const lastSidebarJumpRequestIdRef = useRef(0);
+  const [modalTaskId, setModalTaskId] = useState<string | null>(null);
   const [addTaskPopover, setAddTaskPopover] = useState<{
     date: Date;
     x: number;
@@ -195,6 +201,34 @@ export function CalendarMultiDayView({
     () => (rangeStart ? getVisibleDays(rangeStart, dayCount) : []),
     [rangeStart, dayCount],
   );
+
+  useEffect(() => {
+    if (visibleDays.length === 0) return;
+    onPeriodLabelChange?.(formatRangeHeading(visibleDays));
+  }, [onPeriodLabelChange, visibleDays]);
+
+  useEffect(() => {
+    if (!rangeStart || !today || !onSidebarFocusDateChange) return;
+
+    const days = getVisibleDays(rangeStart, dayCount);
+    const focusDate = days.some((day) => isSameDay(day, today))
+      ? today
+      : rangeStart;
+    onSidebarFocusDateChange(focusDate);
+  }, [dayCount, onSidebarFocusDateChange, rangeStart, today]);
+
+  useEffect(() => {
+    if (
+      sidebarJumpRequestId === undefined ||
+      sidebarFocusDate === undefined ||
+      sidebarJumpRequestId === lastSidebarJumpRequestIdRef.current
+    ) {
+      return;
+    }
+
+    lastSidebarJumpRequestIdRef.current = sidebarJumpRequestId;
+    setRangeStart(startOfDay(sidebarFocusDate));
+  }, [sidebarFocusDate, sidebarJumpRequestId]);
 
   const hours = useMemo(
     () =>
@@ -241,10 +275,10 @@ export function CalendarMultiDayView({
     return map;
   }, [tasks]);
 
-  const popoverTask = useMemo(() => {
-    if (!taskPopover) return null;
-    return tasks.find((item) => item.id === taskPopover.task.id) ?? taskPopover.task;
-  }, [taskPopover, tasks]);
+  const modalTaskSnapshot = useMemo(
+    () => (modalTaskId ? getCalendarTaskSnapshot(modalTaskId, tasks) : null),
+    [modalTaskId, tasks],
+  );
 
   const currentTimeTop =
     now === null
@@ -308,7 +342,7 @@ export function CalendarMultiDayView({
     event: React.MouseEvent<HTMLElement>,
     day: Date,
   ) {
-    setTaskPopover(null);
+    setModalTaskId(null);
 
     if (!onAddCalendarTask || lists.length === 0) return;
 
@@ -326,7 +360,7 @@ export function CalendarMultiDayView({
     day: Date,
   ) {
     event.stopPropagation();
-    setTaskPopover(null);
+    setModalTaskId(null);
 
     if (!onAddCalendarTask || lists.length === 0) return;
 
@@ -361,11 +395,7 @@ export function CalendarMultiDayView({
 
     onSelectTask(task.id);
     closeAddTaskPopover();
-    setTaskPopover({
-      task,
-      x: event.clientX,
-      y: event.clientY,
-    });
+    setModalTaskId(task.id);
   }
 
   function handleCalendarTaskPointerDown(
@@ -426,7 +456,7 @@ export function CalendarMultiDayView({
 
         dragStarted = true;
         clearPendingListeners();
-        setTaskPopover(null);
+        setModalTaskId(null);
         dragStateRef.current = {
           taskId: task.id,
           sourceDateKey,
@@ -469,7 +499,7 @@ export function CalendarMultiDayView({
 
   useEffect(() => {
     if (!rangeStart) return;
-    setTaskPopover(null);
+    setModalTaskId(null);
     closeAddTaskPopover();
   }, [rangeStart, dayCount]);
 
@@ -482,45 +512,40 @@ export function CalendarMultiDayView({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col p-4">
+    <div className="flex min-h-0 flex-1 flex-col px-4 pb-4 pt-0">
       <div className={getCalendarShellClassName(fullWidth)}>
-        <div className="mb-4 flex shrink-0 items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-              {formatRangeHeading(visibleDays)}
-            </h2>
-            <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+          <div className="flex shrink-0 items-center justify-between border-b border-zinc-200 px-3 py-2 dark:border-zinc-800">
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
               {dayCount} {dayCount === 1 ? "day" : "days"}
             </p>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={goToToday}
+                className="mr-1 rounded-md px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+              >
+                Today
+              </button>
+              <button
+                type="button"
+                aria-label={`Previous ${dayCount} days`}
+                onClick={goToPreviousRange}
+                className="flex size-8 items-center justify-center rounded-md text-zinc-600 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              >
+                <BiChevronLeft className="size-5" />
+              </button>
+              <button
+                type="button"
+                aria-label={`Next ${dayCount} days`}
+                onClick={goToNextRange}
+                className="flex size-8 items-center justify-center rounded-md text-zinc-600 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              >
+                <BiChevronRight className="size-5" />
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={goToToday}
-              className="mr-1 rounded-md px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
-            >
-              Today
-            </button>
-            <button
-              type="button"
-              aria-label={`Previous ${dayCount} days`}
-              onClick={goToPreviousRange}
-              className="flex size-8 items-center justify-center rounded-md text-zinc-600 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-            >
-              <BiChevronLeft className="size-5" />
-            </button>
-            <button
-              type="button"
-              aria-label={`Next ${dayCount} days`}
-              onClick={goToNextRange}
-              className="flex size-8 items-center justify-center rounded-md text-zinc-600 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-            >
-              <BiChevronRight className="size-5" />
-            </button>
-          </div>
-        </div>
-
-        <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+          <div className="min-h-0 flex-1 overflow-auto">
           <div
             className="relative grid"
             style={{ gridTemplateColumns, minWidth: minGridWidth }}
@@ -779,6 +804,7 @@ export function CalendarMultiDayView({
               );
             })}
           </div>
+          </div>
         </div>
       </div>
 
@@ -797,16 +823,15 @@ export function CalendarMultiDayView({
         />
       ) : null}
 
-      {popoverTask && taskPopover ? (
-        <CalendarTaskPopover
-          task={popoverTask}
-          lists={lists}
-          x={taskPopover.x}
-          y={taskPopover.y}
-          onClose={() => setTaskPopover(null)}
-          onSetTaskDueDate={onSetTaskDueDate}
-          onSetTaskDueTime={onSetTaskDueTime}
-          onMoveTaskToList={onMoveTaskToList}
+      {modalTaskId ? (
+        <CalendarTaskModal
+          taskId={modalTaskId}
+          taskSnapshot={modalTaskSnapshot}
+          onClose={() => setModalTaskId(null)}
+          onDetailsSaved={onDetailsSaved}
+          onTaskHasDetailsKnown={onTaskHasDetailsKnown}
+          onTaskRenamed={onTaskRenamed}
+          onDueDateUpdated={onDueDateUpdated}
         />
       ) : null}
     </div>

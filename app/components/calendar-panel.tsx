@@ -1,11 +1,28 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { BiChevronDown, BiChevronLeft, BiChevronRight } from "react-icons/bi";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { BiChevronLeft, BiChevronRight } from "react-icons/bi";
 import { CalendarAddTaskPopover } from "./calendar-add-task-popover";
-import { CalendarTaskPopover } from "./calendar-task-popover";
+import {
+  CalendarTaskModal,
+  getCalendarTaskSnapshot,
+  type CalendarTaskEditorCallbacks,
+} from "./calendar-task-modal";
 import { CalendarDayView } from "./calendar-day-view";
-import { CalendarMultiDayView } from "./calendar-multi-day-view";
+import { CalendarMultiDayView } from "./calendar-days-view";
+import {
+  buildTasksByDate,
+  CalendarMiniMonth,
+  formatMonthYear,
+  formatSelectedDay,
+  fromDateKey,
+  getFullMonthDays,
+  isSameDay,
+  startOfDay,
+  toDateKey,
+} from "./calendar-mini-month";
+import { CalendarMultiWeekView } from "./calendar-weeks-view";
+import { CalendarViewSidebarLayout } from "./calendar-view-sidebar-layout";
 import { CalendarWeekView } from "./calendar-week-view";
 import { TaskCompletionCheckbox } from "./task-completion-checkbox";
 import { TaskListPanel } from "./task-list-panel";
@@ -19,9 +36,9 @@ type CalendarViewTab =
   | "day"
   | "week"
   | "month"
-  | "year"
-  | "multi-day"
-  | "multi-week";
+  // | "year"
+  | "days"
+  | "weeks";
 
 export type { CalendarViewTab };
 
@@ -32,18 +49,18 @@ const PRIMARY_CALENDAR_VIEW_TABS: Array<{
   { id: "day", label: "Day" },
   { id: "week", label: "Week" },
   { id: "month", label: "Month" },
-  { id: "year", label: "Year" },
+  // { id: "year", label: "Year" },
 ];
 
 const MULTI_CALENDAR_VIEW_OPTIONS: Array<{
-  id: Extract<CalendarViewTab, "multi-day" | "multi-week">;
+  id: Extract<CalendarViewTab, "days" | "weeks">;
   label: string;
   min: number;
   max: number;
   defaultValue: number;
 }> = [
-  { id: "multi-day", label: "Multi-Day", min: 2, max: 30, defaultValue: 3 },
-  { id: "multi-week", label: "Multi-Week", min: 2, max: 12, defaultValue: 2 },
+  { id: "days", label: "Days", min: 2, max: 30, defaultValue: 3 },
+  { id: "weeks", label: "Weeks", min: 2, max: 12, defaultValue: 2 },
 ];
 
 const CALENDAR_VIEW_TABS = [
@@ -74,6 +91,7 @@ type CalendarPanelProps = {
     sourceListId: string,
     targetListId: string,
   ) => void;
+} & CalendarTaskEditorCallbacks & {
   onAddCalendarTask?: (payload: {
     name: string;
     dueDate: string;
@@ -92,60 +110,6 @@ type CalendarTaskDragState = {
   pointerId: number;
   captureTarget: HTMLElement;
 };
-
-function startOfDay(date: Date) {
-  const next = new Date(date);
-  next.setHours(12, 0, 0, 0);
-  return next;
-}
-
-function isSameDay(a: Date, b: Date) {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
-}
-
-function toDateKey(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function fromDateKey(value: string) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : startOfDay(date);
-}
-
-function getFullMonthDays(year: number, month: number) {
-  const firstDay = new Date(year, month, 1, 12, 0, 0, 0);
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const padding = (firstDay.getDay() + 6) % 7;
-  const cells: (Date | null)[] = Array.from({ length: padding }, () => null);
-
-  for (let day = 1; day <= daysInMonth; day += 1) {
-    cells.push(new Date(year, month, day, 12, 0, 0, 0));
-  }
-
-  return cells;
-}
-
-function formatMonthYear(date: Date) {
-  return new Intl.DateTimeFormat(undefined, {
-    month: "long",
-    year: "numeric",
-  }).format(date);
-}
-
-function formatSelectedDay(date: Date) {
-  return new Intl.DateTimeFormat(undefined, {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  }).format(date);
-}
 
 function CalendarTabs({
   activeTab,
@@ -187,6 +151,7 @@ function CalendarViewCounter({
 }) {
   return (
     <span
+      data-calendar-view-counter
       className="flex items-center gap-2 text-sm tabular-nums text-zinc-600 dark:text-zinc-300"
       onClick={(event) => event.stopPropagation()}
       onKeyDown={(event) => event.stopPropagation()}
@@ -214,123 +179,6 @@ function CalendarViewCounter({
   );
 }
 
-function CalendarMultiViewMenu({
-  activeView,
-  multiDayCount,
-  multiWeekCount,
-  onMultiDayCountChange,
-  onMultiWeekCountChange,
-  onChange,
-}: {
-  activeView: CalendarViewTab;
-  multiDayCount: number;
-  multiWeekCount: number;
-  onMultiDayCountChange: (count: number) => void;
-  onMultiWeekCountChange: (count: number) => void;
-  onChange: (view: CalendarViewTab) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const isMultiActive =
-    activeView === "multi-day" || activeView === "multi-week";
-  const activeMultiOption = MULTI_CALENDAR_VIEW_OPTIONS.find(
-    (option) => option.id === activeView,
-  );
-  const triggerLabel = activeMultiOption?.label ?? "Multi";
-
-  useEffect(() => {
-    if (!open) return;
-
-    function handlePointerDown(event: MouseEvent) {
-      if (!menuRef.current?.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setOpen(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [open]);
-
-  return (
-    <div ref={menuRef} className="relative flex items-center">
-      <span
-        aria-hidden="true"
-        className="mx-1 h-4 w-px shrink-0 bg-zinc-200 dark:bg-zinc-700"
-      />
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-haspopup="menu"
-        onClick={() => setOpen((current) => !current)}
-        className={`inline-flex items-center gap-1 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
-          isMultiActive
-            ? "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50"
-            : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
-        }`}
-      >
-        {triggerLabel}
-        <BiChevronDown
-          className={`size-4 shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
-          aria-hidden="true"
-        />
-      </button>
-
-      {open ? (
-        <div
-          role="menu"
-          className="absolute left-0 top-[calc(100%+0.5rem)] z-20 min-w-[220px] overflow-hidden rounded-2xl border border-zinc-200 bg-white py-1 shadow-[0_8px_24px_rgba(0,0,0,0.12)] dark:border-zinc-700 dark:bg-zinc-900"
-        >
-          {MULTI_CALENDAR_VIEW_OPTIONS.map((option) => {
-            const count =
-              option.id === "multi-day" ? multiDayCount : multiWeekCount;
-            const onCountChange =
-              option.id === "multi-day"
-                ? onMultiDayCountChange
-                : onMultiWeekCountChange;
-
-            return (
-              <button
-                key={option.id}
-                type="button"
-                role="menuitemradio"
-                aria-checked={activeView === option.id}
-                onClick={() => {
-                  onChange(option.id);
-                  setOpen(false);
-                }}
-                className={`flex w-full items-center justify-between gap-4 px-4 py-2.5 text-left text-sm font-medium transition-colors ${
-                  activeView === option.id
-                    ? "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50"
-                    : "text-zinc-900 hover:bg-zinc-50 dark:text-zinc-50 dark:hover:bg-zinc-800/70"
-                }`}
-              >
-                <span>{option.label}</span>
-                <CalendarViewCounter
-                  value={count}
-                  min={option.min}
-                  max={option.max}
-                  onChange={onCountChange}
-                />
-              </button>
-            );
-          })}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
 function CalendarViewTabs({
   activeView,
   multiDayCount,
@@ -338,6 +186,7 @@ function CalendarViewTabs({
   onMultiDayCountChange,
   onMultiWeekCountChange,
   onChange,
+  periodLabel,
 }: {
   activeView: CalendarViewTab;
   multiDayCount: number;
@@ -345,34 +194,81 @@ function CalendarViewTabs({
   onMultiDayCountChange: (count: number) => void;
   onMultiWeekCountChange: (count: number) => void;
   onChange: (view: CalendarViewTab) => void;
+  periodLabel?: string | null;
 }) {
+  const tabButtonClassName = (isActive: boolean) =>
+    `rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
+      isActive
+        ? "bg-slate-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50"
+        : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
+    }`;
+
   return (
-    <div className="mb-4 flex shrink-0 justify-center px-4 pt-4">
-      <div className="inline-flex items-center gap-0.5 rounded-full border border-zinc-200 bg-white px-1 py-1 shadow-[0_1px_3px_rgba(0,0,0,0.06)] dark:border-zinc-700 dark:bg-zinc-900">
+    <div className="mb-4 flex shrink-0 items-center justify-between gap-4 px-4 pt-4">
+       {periodLabel ? (
+        <h2 className="shrink-0 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+          {periodLabel}
+        </h2>
+      ) : null}
+      <div className="inline-flex flex-wrap items-center justify-end gap-0.5 rounded-full border border-zinc-200 bg-white px-1 py-1 shadow-[0_1px_3px_rgba(0,0,0,0.06)] dark:border-zinc-700 dark:bg-zinc-900">
         {PRIMARY_CALENDAR_VIEW_TABS.map((tab) => (
           <button
             key={tab.id}
             type="button"
             onClick={() => onChange(tab.id)}
             aria-pressed={activeView === tab.id}
-            className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
-              activeView === tab.id
-                ? "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50"
-                : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
-            }`}
+            className={tabButtonClassName(activeView === tab.id)}
           >
             {tab.label}
           </button>
         ))}
-        <CalendarMultiViewMenu
-          activeView={activeView}
-          multiDayCount={multiDayCount}
-          multiWeekCount={multiWeekCount}
-          onMultiDayCountChange={onMultiDayCountChange}
-          onMultiWeekCountChange={onMultiWeekCountChange}
-          onChange={onChange}
+
+        <span
+          aria-hidden="true"
+          className="mx-1 h-4 w-px shrink-0 bg-zinc-200 dark:bg-zinc-700"
         />
+
+        {MULTI_CALENDAR_VIEW_OPTIONS.map((option) => {
+          const isActive = activeView === option.id;
+          const count =
+            option.id === "days" ? multiDayCount : multiWeekCount;
+          const onCountChange =
+            option.id === "days"
+              ? onMultiDayCountChange
+              : onMultiWeekCountChange;
+
+          return (
+            <div
+              key={option.id}
+              className={`group inline-flex items-center rounded-full transition-colors ${
+                isActive ? "bg-zinc-100 dark:bg-zinc-800" : ""
+              }`}
+            >
+              <button
+                type="button"
+                onClick={() => onChange(option.id)}
+                aria-pressed={isActive}
+                className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                  isActive
+                    ? "text-zinc-900 ring-2 ring-[#4873c7] ring-offset-1 dark:text-zinc-50 dark:ring-[#7da2ff]"
+                    : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
+                }`}
+              >
+                {option.label}
+              </button>
+              <div className="hidden max-h-8 items-center overflow-hidden pr-1 group-hover:flex group-focus-within:flex">
+                <CalendarViewCounter
+                  value={count}
+                  min={option.min}
+                  max={option.max}
+                  onChange={onCountChange}
+                />
+              </div>
+            </div>
+          );
+        })}
       </div>
+      <div></div>
     </div>
   );
 }
@@ -396,10 +292,15 @@ export function CalendarMonthView({
   onSetTaskDueDate,
   onSetTaskDueTime,
   onMoveTaskToList,
+  onDetailsSaved,
+  onTaskHasDetailsKnown,
+  onTaskRenamed,
+  onDueDateUpdated,
   onAddCalendarTask,
   defaultListId = null,
   fullWidth = false,
   externalDropTargetDateKey = null,
+  onPeriodLabelChange,
 }: {
   tasks: TaskListItem[];
   lists: TodoList[];
@@ -413,6 +314,7 @@ export function CalendarMonthView({
     sourceListId: string,
     targetListId: string,
   ) => void;
+} & CalendarTaskEditorCallbacks & {
   onAddCalendarTask?: (payload: {
     name: string;
     dueDate: string;
@@ -422,15 +324,12 @@ export function CalendarMonthView({
   defaultListId?: string | null;
   fullWidth?: boolean;
   externalDropTargetDateKey?: string | null;
+  onPeriodLabelChange?: (label: string) => void;
 }) {
   const [today, setToday] = useState<Date | null>(null);
   const [monthDate, setMonthDate] = useState<Date | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [taskPopover, setTaskPopover] = useState<{
-    task: TaskListItem;
-    x: number;
-    y: number;
-  } | null>(null);
+  const [modalTaskId, setModalTaskId] = useState<string | null>(null);
   const [addTaskPopover, setAddTaskPopover] = useState<{
     date: Date;
     x: number;
@@ -450,23 +349,7 @@ export function CalendarMonthView({
     setSelectedDate(now);
   }, []);
 
-  const tasksByDate = useMemo(() => {
-    const map = new Map<string, TaskListItem[]>();
-
-    for (const task of tasks) {
-      if (!task.dueDate) continue;
-
-      const date = fromDateKey(task.dueDate.slice(0, 10));
-      if (!date) continue;
-
-      const key = toDateKey(date);
-      const existing = map.get(key) ?? [];
-      existing.push(task);
-      map.set(key, existing);
-    }
-
-    return map;
-  }, [tasks]);
+  const tasksByDate = useMemo(() => buildTasksByDate(tasks), [tasks]);
 
   const monthDays = useMemo(() => {
     if (!monthDate) return [];
@@ -476,10 +359,10 @@ export function CalendarMonthView({
 
   const selectedDateKey = selectedDate ? toDateKey(selectedDate) : "";
   const selectedDayTasks = tasksByDate.get(selectedDateKey) ?? [];
-  const popoverTask = useMemo(() => {
-    if (!taskPopover) return null;
-    return tasks.find((item) => item.id === taskPopover.task.id) ?? taskPopover.task;
-  }, [taskPopover, tasks]);
+  const modalTaskSnapshot = useMemo(
+    () => (modalTaskId ? getCalendarTaskSnapshot(modalTaskId, tasks) : null),
+    [modalTaskId, tasks],
+  );
 
   function goToPreviousMonth() {
     if (!monthDate) return;
@@ -495,6 +378,29 @@ export function CalendarMonthView({
     );
   }
 
+  function goToToday() {
+    if (!today) return;
+    setMonthDate(
+      startOfDay(new Date(today.getFullYear(), today.getMonth(), 1)),
+    );
+    setSelectedDate(today);
+    setModalTaskId(null);
+    closeAddTaskPopover();
+  }
+
+  function selectSidebarDate(day: Date) {
+    setSelectedDate(day);
+    if (
+      monthDate &&
+      (day.getMonth() !== monthDate.getMonth() ||
+        day.getFullYear() !== monthDate.getFullYear())
+    ) {
+      setMonthDate(startOfDay(new Date(day.getFullYear(), day.getMonth(), 1)));
+    }
+    setModalTaskId(null);
+    closeAddTaskPopover();
+  }
+
   function closeAddTaskPopover() {
     setAddTaskPopover(null);
     setDraftTaskName("");
@@ -507,7 +413,7 @@ export function CalendarMonthView({
     day: Date,
   ) {
     setSelectedDate(day);
-    setTaskPopover(null);
+    setModalTaskId(null);
 
     if (!onAddCalendarTask || lists.length === 0) return;
 
@@ -546,11 +452,7 @@ export function CalendarMonthView({
     setSelectedDate(day);
     onSelectTask(task.id);
     closeAddTaskPopover();
-    setTaskPopover({
-      task,
-      x: event.clientX,
-      y: event.clientY,
-    });
+    setModalTaskId(task.id);
   }
 
   function handleCalendarTaskPointerDown(
@@ -615,7 +517,7 @@ export function CalendarMonthView({
 
         dragStarted = true;
         clearPendingListeners();
-        setTaskPopover(null);
+        setModalTaskId(null);
         dragStateRef.current = {
           taskId: task.id,
           sourceDateKey,
@@ -658,36 +560,100 @@ export function CalendarMonthView({
 
   useEffect(() => {
     if (!monthDate) return;
-    setTaskPopover(null);
+    setModalTaskId(null);
     closeAddTaskPopover();
   }, [monthDate]);
+
+  useEffect(() => {
+    if (!monthDate) return;
+    onPeriodLabelChange?.(formatMonthYear(monthDate));
+  }, [monthDate, onPeriodLabelChange]);
 
   if (!monthDate || !selectedDate || !today) {
     return (
       <div className="flex min-h-0 flex-1">
+        <aside className="flex w-[320px] shrink-0 flex-col border-r border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+          <div className="border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
+            <div className="mb-3 h-36 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
+            <div className="h-5 w-32 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
+          </div>
+        </aside>
         <div className="flex min-h-0 min-w-0 flex-1 flex-col p-4">
           <div className={getCalendarShellClassName(fullWidth, "max-w-8xl")}>
             <div className="mb-4 h-8 w-40 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
             <div className="min-h-0 flex-1 animate-pulse rounded-lg bg-zinc-50 dark:bg-zinc-900/40" />
           </div>
         </div>
-        <aside className="flex w-[320px] shrink-0 flex-col border-l border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
-          <div className="border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
-            <div className="h-5 w-32 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
-          </div>
-        </aside>
       </div>
     );
   }
 
+  const sidebar = (
+    <aside className="flex w-[320px] shrink-0 flex-col border-r border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+      <CalendarMiniMonth
+        monthDate={monthDate}
+        selectedDate={selectedDate}
+        today={today}
+        tasksByDate={tasksByDate}
+        onPreviousMonth={goToPreviousMonth}
+        onNextMonth={goToNextMonth}
+        onGoToToday={goToToday}
+        onSelectDate={selectSidebarDate}
+      />
+      <div className="border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
+        <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+          {formatSelectedDay(selectedDate)}
+        </h3>
+      </div>
+
+      <ul className="min-h-0 flex-1 overflow-y-auto">
+        {selectedDayTasks.length === 0 ? (
+          <li className="px-4 py-3 text-sm text-zinc-500 dark:text-zinc-400">
+            No tasks scheduled
+          </li>
+        ) : (
+          selectedDayTasks.map((task) => (
+            <li
+              key={task.id}
+              className={`flex items-center gap-2 border-b border-zinc-100 px-4 py-2 dark:border-zinc-900 ${
+                task.id === selectedTaskId
+                  ? "bg-zinc-100 dark:bg-zinc-900"
+                  : ""
+              }`}
+            >
+              <TaskCompletionCheckbox
+                checked={task.completed}
+                onChange={() => onToggleTask(task.id)}
+                aria-label={`Mark ${task.name} complete`}
+                className="text-[#777777]"
+              />
+              <button
+                type="button"
+                onClick={() => onSelectTask(task.id)}
+                className="min-w-0 flex-1 text-left"
+              >
+                <span className="block truncate text-sm text-zinc-900 dark:text-zinc-50">
+                  {task.name}
+                </span>
+                {task.listName && (
+                  <span className="block truncate text-xs text-zinc-400 dark:text-zinc-500">
+                    {task.listName}
+                  </span>
+                )}
+              </button>
+            </li>
+          ))
+        )}
+      </ul>
+    </aside>
+  );
+
   return (
     <div className="flex min-h-0 flex-1">
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col p-4">
+      {sidebar}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col px-4 pb-4 pt-0">
         <div className={getCalendarShellClassName(fullWidth)}>
-          <div className="mb-4 flex shrink-0 items-center justify-between">
-            <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-              {formatMonthYear(monthDate)}
-            </h2>
+          <div className="flex shrink-0 items-center justify-start pb-2">
             <div className="flex items-center gap-1">
               <button
                 type="button"
@@ -836,54 +802,6 @@ export function CalendarMonthView({
         </div>
       </div>
 
-      <aside className="flex w-[320px] shrink-0 flex-col border-l border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
-          <div className="border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
-            <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
-              {formatSelectedDay(selectedDate)}
-            </h3>
-          </div>
-
-          <ul className="flex-1 overflow-y-auto">
-            {selectedDayTasks.length === 0 ? (
-              <li className="px-4 py-3 text-sm text-zinc-500 dark:text-zinc-400">
-                No tasks scheduled
-              </li>
-            ) : (
-              selectedDayTasks.map((task) => (
-                <li
-                  key={task.id}
-                  className={`flex items-center gap-2 border-b border-zinc-100 px-4 py-2 dark:border-zinc-900 ${
-                    task.id === selectedTaskId
-                      ? "bg-zinc-100 dark:bg-zinc-900"
-                      : ""
-                  }`}
-                >
-                  <TaskCompletionCheckbox
-                    checked={task.completed}
-                    onChange={() => onToggleTask(task.id)}
-                    aria-label={`Mark ${task.name} complete`}
-                    className="text-[#777777]"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => onSelectTask(task.id)}
-                    className="min-w-0 flex-1 text-left"
-                  >
-                    <span className="block truncate text-sm text-zinc-900 dark:text-zinc-50">
-                      {task.name}
-                    </span>
-                    {task.listName && (
-                      <span className="block truncate text-xs text-zinc-400 dark:text-zinc-500">
-                        {task.listName}
-                      </span>
-                    )}
-                  </button>
-                </li>
-              ))
-            )}
-        </ul>
-      </aside>
-
       {addTaskPopover && onAddCalendarTask ? (
         <CalendarAddTaskPopover
           date={addTaskPopover.date}
@@ -898,16 +816,15 @@ export function CalendarMonthView({
         />
       ) : null}
 
-      {popoverTask && taskPopover ? (
-        <CalendarTaskPopover
-          task={popoverTask}
-          lists={lists}
-          x={taskPopover.x}
-          y={taskPopover.y}
-          onClose={() => setTaskPopover(null)}
-          onSetTaskDueDate={onSetTaskDueDate}
-          onSetTaskDueTime={onSetTaskDueTime}
-          onMoveTaskToList={onMoveTaskToList}
+      {modalTaskId ? (
+        <CalendarTaskModal
+          taskId={modalTaskId}
+          taskSnapshot={modalTaskSnapshot}
+          onClose={() => setModalTaskId(null)}
+          onDetailsSaved={onDetailsSaved}
+          onTaskHasDetailsKnown={onTaskHasDetailsKnown}
+          onTaskRenamed={onTaskRenamed}
+          onDueDateUpdated={onDueDateUpdated}
         />
       ) : null}
     </div>
@@ -927,6 +844,7 @@ type CalendarViewsPanelProps = {
     sourceListId: string,
     targetListId: string,
   ) => void;
+} & CalendarTaskEditorCallbacks & {
   onAddCalendarTask?: (payload: {
     name: string;
     dueDate: string;
@@ -950,6 +868,10 @@ export function CalendarViewsPanel({
   onSetTaskDueDate,
   onSetTaskDueTime,
   onMoveTaskToList,
+  onDetailsSaved,
+  onTaskHasDetailsKnown,
+  onTaskRenamed,
+  onDueDateUpdated,
   onAddCalendarTask,
   defaultListId = null,
   defaultView = "month",
@@ -959,20 +881,90 @@ export function CalendarViewsPanel({
 }: CalendarViewsPanelProps) {
   const [activeView, setActiveView] = useState<CalendarViewTab>(defaultView);
   const [multiDayCount, setMultiDayCount] = useState(
-    MULTI_CALENDAR_VIEW_OPTIONS.find((option) => option.id === "multi-day")
+    MULTI_CALENDAR_VIEW_OPTIONS.find((option) => option.id === "days")
       ?.defaultValue ?? 3,
   );
   const [multiWeekCount, setMultiWeekCount] = useState(
-    MULTI_CALENDAR_VIEW_OPTIONS.find((option) => option.id === "multi-week")
+    MULTI_CALENDAR_VIEW_OPTIONS.find((option) => option.id === "weeks")
       ?.defaultValue ?? 2,
   );
+  const [periodLabel, setPeriodLabel] = useState(() =>
+    formatMonthYear(new Date()),
+  );
+  const [sidebarMonthDate, setSidebarMonthDate] = useState(() => {
+    const now = new Date();
+    return startOfDay(new Date(now.getFullYear(), now.getMonth(), 1));
+  });
+  const [sidebarFocusDate, setSidebarFocusDate] = useState(() =>
+    startOfDay(new Date()),
+  );
+  const [sidebarJumpRequestId, setSidebarJumpRequestId] = useState(0);
   const activeViewLabel =
-    activeView === "multi-day"
-      ? `Multi-day (${multiDayCount} days)`
-      : activeView === "multi-week"
-        ? `Multi-week (${multiWeekCount} weeks)`
+    activeView === "days"
+      ? `days (${multiDayCount} days)`
+      : activeView === "weeks"
+        ? `Weeks (${multiWeekCount} weeks)`
         : (CALENDAR_VIEW_TABS.find((tab) => tab.id === activeView)?.label ??
           activeView);
+
+  function handleSidebarFocusDateChange(date: Date) {
+    const normalized = startOfDay(date);
+    setSidebarFocusDate(normalized);
+    setSidebarMonthDate((previous) => {
+      if (
+        normalized.getMonth() !== previous.getMonth() ||
+        normalized.getFullYear() !== previous.getFullYear()
+      ) {
+        return startOfDay(
+          new Date(normalized.getFullYear(), normalized.getMonth(), 1),
+        );
+      }
+      return previous;
+    });
+  }
+
+  function handleSidebarSelectDate(date: Date) {
+    handleSidebarFocusDateChange(date);
+    setSidebarJumpRequestId((requestId) => requestId + 1);
+  }
+
+  function handleSidebarGoToToday() {
+    handleSidebarSelectDate(startOfDay(new Date()));
+  }
+
+  function goToPreviousSidebarMonth() {
+    setSidebarMonthDate((previous) =>
+      startOfDay(new Date(previous.getFullYear(), previous.getMonth() - 1, 1)),
+    );
+  }
+
+  function goToNextSidebarMonth() {
+    setSidebarMonthDate((previous) =>
+      startOfDay(new Date(previous.getFullYear(), previous.getMonth() + 1, 1)),
+    );
+  }
+
+  const sidebarSyncProps = {
+    sidebarFocusDate,
+    sidebarJumpRequestId,
+    onSidebarFocusDateChange: handleSidebarFocusDateChange,
+  };
+
+  function wrapViewWithSidebar(view: ReactNode) {
+    return (
+      <CalendarViewSidebarLayout
+        tasks={tasks}
+        focusDate={sidebarFocusDate}
+        monthDate={sidebarMonthDate}
+        onPreviousMonth={goToPreviousSidebarMonth}
+        onNextMonth={goToNextSidebarMonth}
+        onGoToToday={handleSidebarGoToToday}
+        onSelectDate={handleSidebarSelectDate}
+      >
+        {view}
+      </CalendarViewSidebarLayout>
+    );
+  }
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
@@ -983,6 +975,7 @@ export function CalendarViewsPanel({
         onMultiDayCountChange={setMultiDayCount}
         onMultiWeekCountChange={setMultiWeekCount}
         onChange={setActiveView}
+        periodLabel={periodLabel}
       />
       {activeView === "month" ? (
         <CalendarMonthView
@@ -993,57 +986,104 @@ export function CalendarViewsPanel({
           onToggleTask={onToggleTask}
           onSetTaskDueDate={onSetTaskDueDate}
           onSetTaskDueTime={onSetTaskDueTime}
-          onMoveTaskToList={onMoveTaskToList}
+          onDetailsSaved={onDetailsSaved}
+          onTaskHasDetailsKnown={onTaskHasDetailsKnown}
+          onTaskRenamed={onTaskRenamed}
+          onDueDateUpdated={onDueDateUpdated}
           onAddCalendarTask={onAddCalendarTask}
           defaultListId={defaultListId}
           fullWidth={fullWidth}
           externalDropTargetDateKey={externalDropTargetDateKey}
+          onPeriodLabelChange={setPeriodLabel}
         />
       ) : activeView === "week" ? (
-        <CalendarWeekView
-          tasks={tasks}
-          lists={lists}
-          selectedTaskId={selectedTaskId}
-          onSelectTask={onSelectTask}
-          onSetTaskDueDate={onSetTaskDueDate}
-          onSetTaskDueTime={onSetTaskDueTime}
-          onMoveTaskToList={onMoveTaskToList}
-          onAddCalendarTask={onAddCalendarTask}
-          defaultListId={defaultListId}
-          fullWidth={fullWidth}
-          externalDropTargetDateKey={externalDropTargetDateKey}
-          externalDropTargetTimeMinutes={externalDropTargetTimeMinutes}
-        />
+        wrapViewWithSidebar(
+          <CalendarWeekView
+            tasks={tasks}
+            lists={lists}
+            selectedTaskId={selectedTaskId}
+            onSelectTask={onSelectTask}
+            onSetTaskDueDate={onSetTaskDueDate}
+            onSetTaskDueTime={onSetTaskDueTime}
+            onDetailsSaved={onDetailsSaved}
+            onTaskHasDetailsKnown={onTaskHasDetailsKnown}
+            onTaskRenamed={onTaskRenamed}
+            onDueDateUpdated={onDueDateUpdated}
+            onAddCalendarTask={onAddCalendarTask}
+            defaultListId={defaultListId}
+            fullWidth={fullWidth}
+            externalDropTargetDateKey={externalDropTargetDateKey}
+            externalDropTargetTimeMinutes={externalDropTargetTimeMinutes}
+            onPeriodLabelChange={setPeriodLabel}
+            {...sidebarSyncProps}
+          />,
+        )
       ) : activeView === "day" ? (
-        <CalendarDayView
-          tasks={tasks}
-          lists={lists}
-          selectedTaskId={selectedTaskId}
-          onSelectTask={onSelectTask}
-          onSetTaskDueDate={onSetTaskDueDate}
-          onSetTaskDueTime={onSetTaskDueTime}
-          onMoveTaskToList={onMoveTaskToList}
-          onAddCalendarTask={onAddCalendarTask}
-          defaultListId={defaultListId}
-          fullWidth={fullWidth}
-          externalDropTargetDateKey={externalDropTargetDateKey}
-          externalDropTargetTimeMinutes={externalDropTargetTimeMinutes}
-        />
-      ) : activeView === "multi-day" ? (
-        <CalendarMultiDayView
-          tasks={tasks}
-          lists={lists}
-          selectedTaskId={selectedTaskId}
-          dayCount={multiDayCount}
-          onSelectTask={onSelectTask}
-          onSetTaskDueDate={onSetTaskDueDate}
-          onSetTaskDueTime={onSetTaskDueTime}
-          onMoveTaskToList={onMoveTaskToList}
-          onAddCalendarTask={onAddCalendarTask}
-          defaultListId={defaultListId}
-          fullWidth={fullWidth}
-          externalDropTargetDateKey={externalDropTargetDateKey}
-        />
+        wrapViewWithSidebar(
+          <CalendarDayView
+            tasks={tasks}
+            lists={lists}
+            selectedTaskId={selectedTaskId}
+            onSelectTask={onSelectTask}
+            onSetTaskDueDate={onSetTaskDueDate}
+            onSetTaskDueTime={onSetTaskDueTime}
+            onDetailsSaved={onDetailsSaved}
+            onTaskHasDetailsKnown={onTaskHasDetailsKnown}
+            onTaskRenamed={onTaskRenamed}
+            onDueDateUpdated={onDueDateUpdated}
+            onAddCalendarTask={onAddCalendarTask}
+            defaultListId={defaultListId}
+            fullWidth={fullWidth}
+            externalDropTargetDateKey={externalDropTargetDateKey}
+            externalDropTargetTimeMinutes={externalDropTargetTimeMinutes}
+            onPeriodLabelChange={setPeriodLabel}
+            {...sidebarSyncProps}
+          />,
+        )
+      ) : activeView === "days" ? (
+        wrapViewWithSidebar(
+          <CalendarMultiDayView
+            tasks={tasks}
+            lists={lists}
+            selectedTaskId={selectedTaskId}
+            dayCount={multiDayCount}
+            onSelectTask={onSelectTask}
+            onSetTaskDueDate={onSetTaskDueDate}
+            onSetTaskDueTime={onSetTaskDueTime}
+            onDetailsSaved={onDetailsSaved}
+            onTaskHasDetailsKnown={onTaskHasDetailsKnown}
+            onTaskRenamed={onTaskRenamed}
+            onDueDateUpdated={onDueDateUpdated}
+            onAddCalendarTask={onAddCalendarTask}
+            defaultListId={defaultListId}
+            fullWidth={fullWidth}
+            externalDropTargetDateKey={externalDropTargetDateKey}
+            onPeriodLabelChange={setPeriodLabel}
+            {...sidebarSyncProps}
+          />,
+        )
+      ) : activeView === "weeks" ? (
+        wrapViewWithSidebar(
+          <CalendarMultiWeekView
+            tasks={tasks}
+            lists={lists}
+            selectedTaskId={selectedTaskId}
+            weekCount={multiWeekCount}
+            onSelectTask={onSelectTask}
+            onSetTaskDueDate={onSetTaskDueDate}
+            onSetTaskDueTime={onSetTaskDueTime}
+            onDetailsSaved={onDetailsSaved}
+            onTaskHasDetailsKnown={onTaskHasDetailsKnown}
+            onTaskRenamed={onTaskRenamed}
+            onDueDateUpdated={onDueDateUpdated}
+            onAddCalendarTask={onAddCalendarTask}
+            defaultListId={defaultListId}
+            fullWidth={fullWidth}
+            externalDropTargetDateKey={externalDropTargetDateKey}
+            onPeriodLabelChange={setPeriodLabel}
+            {...sidebarSyncProps}
+          />,
+        )
       ) : (
         <CalendarViewPlaceholder label={activeViewLabel} />
       )}
@@ -1066,6 +1106,10 @@ export function CalendarPanel({
   onToggleTaskLabel,
   onLabelsChanged,
   onMoveTaskToList,
+  onDetailsSaved,
+  onTaskHasDetailsKnown,
+  onTaskRenamed,
+  onDueDateUpdated,
   onAddCalendarTask,
   defaultListId,
 }: CalendarPanelProps) {
@@ -1108,7 +1152,10 @@ export function CalendarPanel({
           onToggleTask={onToggleTask}
           onSetTaskDueDate={onSetTaskDueDate}
           onSetTaskDueTime={onSetTaskDueTime}
-          onMoveTaskToList={onMoveTaskToList}
+          onDetailsSaved={onDetailsSaved}
+          onTaskHasDetailsKnown={onTaskHasDetailsKnown}
+          onTaskRenamed={onTaskRenamed}
+          onDueDateUpdated={onDueDateUpdated}
           onAddCalendarTask={onAddCalendarTask}
           defaultListId={defaultListId}
         />

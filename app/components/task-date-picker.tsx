@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import {
+  BiBlock,
   BiChevronDown,
   BiChevronLeft,
   BiChevronRight,
@@ -26,7 +27,7 @@ type TaskDatePickerProps = {
   dueTimeMinutes?: number | null;
   dueDurationMinutes?: number | null;
   dueTimeZone?: string | null;
-  onSelectDate: (dateValue: string) => void;
+  onSelectDate: (dateValue: string | null) => void;
   onSaveDueTime?: (dueTime: TaskDueTime) => void;
 };
 
@@ -546,7 +547,7 @@ export function TaskDatePicker({
 
   return (
     <div
-      className={`w-[280px] overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-xl dark:border-zinc-700 dark:bg-zinc-900 ${
+      className={`relative z-50 w-[280px] overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-xl dark:border-zinc-700 dark:bg-zinc-900 ${
         isTimeMenuOpen ? "min-h-[648px]" : ""
       }`}
     >
@@ -602,6 +603,23 @@ export function TaskDatePicker({
             <span className="text-sm text-zinc-400">{option.hint}</span>
           </button>
         ))}
+
+        {dueDate ? (
+          <button
+            type="button"
+            onClick={() => {
+              onSelectDate(null);
+              setTypedDate("");
+              setDateInputError(false);
+            }}
+            className="flex w-full items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/80"
+          >
+            <BiBlock className="size-5 shrink-0 text-zinc-400" aria-hidden="true" />
+            <span className="flex-1 text-sm text-zinc-900 dark:text-zinc-50">
+              No Date
+            </span>
+          </button>
+        ) : null}
       </div>
 
       <div className="border-t border-zinc-200 dark:border-zinc-700">

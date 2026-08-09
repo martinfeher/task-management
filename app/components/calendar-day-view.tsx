@@ -1,13 +1,21 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BiChevronLeft, BiChevronRight } from "react-icons/bi";
 import { CalendarAddTaskPopover } from "./calendar-add-task-popover";
-import { CalendarTaskPopover } from "./calendar-task-popover";
+import {
+  CalendarTaskModal,
+  getCalendarTaskSnapshot,
+  type CalendarTaskEditorCallbacks,
+} from "./calendar-task-modal";
 import type { TaskListItem, TodoList } from "./todo-app";
 import type { TaskDueTime } from "@/lib/task-due-time";
 import { normalizeDueTimeMinutes } from "@/lib/task-due-time";
-import { getCalendarShellClassName } from "@/lib/calendar-layout";
+import {
+  CalendarTimedTaskBlock,
+  getTaskTiming,
+  type CalendarTaskResizePreview,
+} from "./calendar-timed-task-block";
 import {
   CALENDAR_TIME_SLOT_MINUTES,
   formatCalendarSlotTimeLabel,
@@ -16,6 +24,14 @@ import {
   isCalendarSlotWithinTimedGrid,
   type CalendarDropSlot,
 } from "@/lib/calendar-time-grid";
+import {
+  bindCalendarTaskDrag,
+  calendarTaskDragClassName,
+  getActiveCalendarDropSlot,
+  type CalendarTaskDragState,
+} from "@/lib/calendar-task-drag";
+import { getCalendarShellClassName } from "@/lib/calendar-layout";
+import type { CalendarSidebarSyncProps } from "./calendar-view-sidebar-layout";
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const HOUR_START = 8;
@@ -29,11 +45,7 @@ type CalendarDayViewProps = {
   onSelectTask: (taskId: string) => void;
   onSetTaskDueDate?: (taskId: string, dateValue: string | null) => void;
   onSetTaskDueTime?: (taskId: string, dueTime: TaskDueTime) => void;
-  onMoveTaskToList?: (
-    taskId: string,
-    sourceListId: string,
-    targetListId: string,
-  ) => void;
+} & CalendarTaskEditorCallbacks & {
   onAddCalendarTask?: (payload: {
     name: string;
     dueDate: string;
@@ -45,19 +57,8 @@ type CalendarDayViewProps = {
   fullWidth?: boolean;
   externalDropTargetDateKey?: string | null;
   externalDropTargetTimeMinutes?: number | null;
-};
-
-function getActiveDropSlot(
-  externalDropTargetDateKey: string | null,
-  externalDropTargetTimeMinutes: number | null,
-): CalendarDropSlot | null {
-  if (!externalDropTargetDateKey) return null;
-
-  return {
-    dateKey: externalDropTargetDateKey,
-    dueTimeMinutes: externalDropTargetTimeMinutes,
-  };
-}
+  onPeriodLabelChange?: (label: string) => void;
+} & CalendarSidebarSyncProps;
 
 function startOfDay(date: Date) {
   const next = new Date(date);
@@ -112,21 +113,25 @@ export function CalendarDayView({
   onSelectTask,
   onSetTaskDueDate,
   onSetTaskDueTime,
-  onMoveTaskToList,
+  onDetailsSaved,
+  onTaskHasDetailsKnown,
+  onTaskRenamed,
+  onDueDateUpdated,
   onAddCalendarTask,
   defaultListId = null,
   fullWidth = false,
   externalDropTargetDateKey = null,
   externalDropTargetTimeMinutes = null,
+  onPeriodLabelChange,
+  sidebarFocusDate,
+  sidebarJumpRequestId,
+  onSidebarFocusDateChange,
 }: CalendarDayViewProps) {
   const [today, setToday] = useState<Date | null>(null);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [now, setNow] = useState<Date | null>(null);
-  const [taskPopover, setTaskPopover] = useState<{
-    task: TaskListItem;
-    x: number;
-    y: number;
-  } | null>(null);
+  const lastSidebarJumpRequestIdRef = useRef(0);
+  const [modalTaskId, setModalTaskId] = useState<string | null>(null);
   const [addTaskPopover, setAddTaskPopover] = useState<{
     date: Date;
     x: number;
@@ -134,6 +139,14 @@ export function CalendarDayView({
     dueTimeMinutes: number | null;
   } | null>(null);
   const [draftTaskName, setDraftTaskName] = useState("");
+  const [dropTargetSlot, setDropTargetSlot] = useState<CalendarDropSlot | null>(
+    null,
+  );
+  const [resizePreview, setResizePreview] =
+    useState<CalendarTaskResizePreview | null>(null);
+  const dragStateRef = useRef<CalendarTaskDragState | null>(null);
+  const suppressTaskClickRef = useRef(false);
+  const canDragTasks = Boolean(onSetTaskDueDate || onSetTaskDueTime);
 
   useEffect(() => {
     const current = startOfDay(new Date());
@@ -188,10 +201,10 @@ export function CalendarDayView({
     return { allDay, timed };
   }, [tasks, selectedDay]);
 
-  const popoverTask = useMemo(() => {
-    if (!taskPopover) return null;
-    return tasks.find((item) => item.id === taskPopover.task.id) ?? taskPopover.task;
-  }, [taskPopover, tasks]);
+  const modalTaskSnapshot = useMemo(
+    () => (modalTaskId ? getCalendarTaskSnapshot(modalTaskId, tasks) : null),
+    [modalTaskId, tasks],
+  );
 
   const currentTimeTop =
     now === null
@@ -237,7 +250,7 @@ export function CalendarDayView({
   function handleAllDayClick(event: React.MouseEvent<HTMLElement>) {
     if (!selectedDay) return;
 
-    setTaskPopover(null);
+    setModalTaskId(null);
 
     if (!onAddCalendarTask || lists.length === 0) return;
 
@@ -254,7 +267,7 @@ export function CalendarDayView({
     if (!selectedDay) return;
 
     event.stopPropagation();
-    setTaskPopover(null);
+    setModalTaskId(null);
 
     if (!onAddCalendarTask || lists.length === 0) return;
 
@@ -288,22 +301,67 @@ export function CalendarDayView({
   }
 
   function handleCalendarTaskClick(
-    event: React.MouseEvent<HTMLButtonElement>,
+    event: React.MouseEvent<HTMLElement>,
     task: TaskListItem,
   ) {
     event.stopPropagation();
+
+    if (suppressTaskClickRef.current) {
+      suppressTaskClickRef.current = false;
+      return;
+    }
+
     onSelectTask(task.id);
     closeAddTaskPopover();
-    setTaskPopover({
+    setModalTaskId(task.id);
+  }
+
+  function handleCalendarTaskPointerDown(
+    event: React.PointerEvent<HTMLButtonElement>,
+    task: TaskListItem,
+    day: Date,
+  ) {
+    event.stopPropagation();
+    bindCalendarTaskDrag(event, {
       task,
-      x: event.clientX,
-      y: event.clientY,
+      sourceDateKey: toDateKey(day),
+      hourStart: HOUR_START,
+      hourHeightPx: HOUR_HEIGHT_PX,
+      onSetTaskDueDate,
+      onSetTaskDueTime,
+      dragStateRef,
+      suppressTaskClickRef,
+      setDropTargetSlot,
+      onDragStart: () => setModalTaskId(null),
     });
   }
 
   useEffect(() => {
     if (!selectedDay) return;
-    setTaskPopover(null);
+    onPeriodLabelChange?.(formatMonthYear(selectedDay));
+  }, [onPeriodLabelChange, selectedDay]);
+
+  useEffect(() => {
+    if (!selectedDay || !onSidebarFocusDateChange) return;
+    onSidebarFocusDateChange(selectedDay);
+  }, [onSidebarFocusDateChange, selectedDay]);
+
+  useEffect(() => {
+    if (
+      sidebarJumpRequestId === undefined ||
+      sidebarFocusDate === undefined ||
+      sidebarJumpRequestId === lastSidebarJumpRequestIdRef.current
+    ) {
+      return;
+    }
+
+    lastSidebarJumpRequestIdRef.current = sidebarJumpRequestId;
+    setSelectedDay(startOfDay(sidebarFocusDate));
+  }, [sidebarFocusDate, sidebarJumpRequestId]);
+
+  useEffect(() => {
+    if (!selectedDay) return;
+    setModalTaskId(null);
     closeAddTaskPopover();
   }, [selectedDay]);
 
@@ -319,7 +377,8 @@ export function CalendarDayView({
   const isToday = isSameDay(selectedDay, today);
   const isActiveDay =
     addTaskPopover !== null && isSameDay(selectedDay, addTaskPopover.date);
-  const activeDropSlot = getActiveDropSlot(
+  const activeDropSlot = getActiveCalendarDropSlot(
+    dropTargetSlot,
     externalDropTargetDateKey,
     externalDropTargetTimeMinutes,
   );
@@ -349,14 +408,14 @@ export function CalendarDayView({
           HOUR_START,
           HOUR_HEIGHT_PX,
         );
-  const showExternalDropMarker =
+  const showDragSlotMarker =
     isTimedDropTarget && !isActiveDay && externalDropSlotMinutes !== null;
   const showSelectedSlotMarker =
     selectedSlotTop !== null &&
     selectedSlotTop >= 0 &&
     selectedSlotTop <= (hours.length + 1) * HOUR_HEIGHT_PX &&
     ((isActiveDay && addTaskPopover?.dueTimeMinutes !== null) ||
-      showExternalDropMarker);
+      showDragSlotMarker);
   const showNowLine =
     isToday &&
     currentTimeTop !== null &&
@@ -364,40 +423,37 @@ export function CalendarDayView({
     currentTimeTop <= (HOUR_END - HOUR_START + 1) * HOUR_HEIGHT_PX;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col p-4">
+    <div className="flex min-h-0 flex-1 flex-col px-4 pb-4 pt-0">
       <div className={getCalendarShellClassName(fullWidth, "max-w-5xl")}>
-        <div className="mb-4 flex shrink-0 items-center justify-between">
-          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-            {formatMonthYear(selectedDay)}
-          </h2>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={goToToday}
-              className="mr-1 rounded-md px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
-            >
-              Today
-            </button>
-            <button
-              type="button"
-              aria-label="Previous day"
-              onClick={goToPreviousDay}
-              className="flex size-8 items-center justify-center rounded-md text-zinc-600 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-            >
-              <BiChevronLeft className="size-5" />
-            </button>
-            <button
-              type="button"
-              aria-label="Next day"
-              onClick={goToNextDay}
-              className="flex size-8 items-center justify-center rounded-md text-zinc-600 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-            >
-              <BiChevronRight className="size-5" />
-            </button>
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white dark:bg-zinc-950">
+          <div className="flex shrink-0 items-center justify-start border-b border-zinc-200 px-3 py-2 dark:border-zinc-800">
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={goToToday}
+                className="mr-1 rounded-md px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+              >
+                Today
+              </button>
+              <button
+                type="button"
+                aria-label="Previous day"
+                onClick={goToPreviousDay}
+                className="flex size-8 items-center justify-center rounded-md text-zinc-600 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              >
+                <BiChevronLeft className="size-5" />
+              </button>
+              <button
+                type="button"
+                aria-label="Next day"
+                onClick={goToNextDay}
+                className="flex size-8 items-center justify-center rounded-md text-zinc-600 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              >
+                <BiChevronRight className="size-5" />
+              </button>
+            </div>
           </div>
-        </div>
-
-        <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+          <div className="min-h-0 flex-1 overflow-auto">
           <div className="grid min-w-[420px] grid-cols-[56px_minmax(0,1fr)]">
             <div className="sticky top-0 z-20 border-b border-r border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950" />
             <div className="sticky top-0 z-20 border-b border-r border-zinc-200 bg-white px-2 py-2 text-center dark:border-zinc-800 dark:bg-zinc-950">
@@ -438,11 +494,13 @@ export function CalendarDayView({
                       event.stopPropagation();
                       handleCalendarTaskClick(event, task);
                     }}
-                    className={`block w-full truncate rounded px-1.5 py-0.5 text-left text-[11px] transition-colors ${
-                      task.id === selectedTaskId
-                        ? "bg-[#4873c7] text-white"
-                        : "bg-[#dbeafe] text-[#1e3a8a] hover:bg-[#bfdbfe] dark:bg-blue-950/50 dark:text-blue-100"
-                    }`}
+                    onPointerDown={(event) => {
+                      handleCalendarTaskPointerDown(event, task, selectedDay);
+                    }}
+                    className={`block w-full truncate rounded px-1.5 py-0.5 text-left text-[11px] transition-colors ${calendarTaskDragClassName(
+                      canDragTasks,
+                      task.id === selectedTaskId,
+                    )}`}
                   >
                     {task.name}
                   </button>
@@ -527,18 +585,13 @@ export function CalendarDayView({
               />
 
               {dayTasks.timed.map((task) => {
-                const minutes =
-                  normalizeDueTimeMinutes(task.dueTimeMinutes) ?? 0;
+                const timing = getTaskTiming(task, resizePreview);
                 const top =
                   HOUR_HEIGHT_PX +
-                  (minutes / 60 - HOUR_START) * HOUR_HEIGHT_PX;
-                const durationMinutes =
-                  task.dueDurationMinutes && task.dueDurationMinutes > 0
-                    ? task.dueDurationMinutes
-                    : 60;
+                  (timing.dueTimeMinutes / 60 - HOUR_START) * HOUR_HEIGHT_PX;
                 const height = Math.max(
                   24,
-                  (durationMinutes / 60) * HOUR_HEIGHT_PX,
+                  (timing.dueDurationMinutes / 60) * HOUR_HEIGHT_PX,
                 );
 
                 if (
@@ -549,22 +602,28 @@ export function CalendarDayView({
                 }
 
                 return (
-                  <button
+                  <CalendarTimedTaskBlock
                     key={task.id}
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      handleCalendarTaskClick(event, task);
-                    }}
-                    style={{ top, height }}
-                    className={`absolute inset-x-1 z-10 overflow-hidden rounded px-1.5 py-0.5 text-left text-[11px] leading-tight transition-colors ${
-                      task.id === selectedTaskId
-                        ? "bg-[#4873c7] text-white"
-                        : "bg-[#dbeafe] text-[#1e3a8a] hover:bg-[#bfdbfe] dark:bg-blue-950/50 dark:text-blue-100"
-                    }`}
-                  >
-                    <span className="line-clamp-2">{task.name}</span>
-                  </button>
+                    task={task}
+                    day={selectedDay}
+                    top={top}
+                    height={height}
+                    startMinutes={timing.dueTimeMinutes}
+                    durationMinutes={timing.dueDurationMinutes}
+                    hourStart={HOUR_START}
+                    hourHeightPx={HOUR_HEIGHT_PX}
+                    selected={task.id === selectedTaskId}
+                    canInteract={canDragTasks}
+                    onTaskClick={handleCalendarTaskClick}
+                    onSetTaskDueDate={onSetTaskDueDate}
+                    onSetTaskDueTime={onSetTaskDueTime}
+                    dragStateRef={dragStateRef}
+                    suppressTaskClickRef={suppressTaskClickRef}
+                    setDropTargetSlot={setDropTargetSlot}
+                    setResizePreview={setResizePreview}
+                    onDragStart={() => setModalTaskId(null)}
+                    toDateKey={toDateKey}
+                  />
                 );
               })}
 
@@ -583,7 +642,7 @@ export function CalendarDayView({
                       <span className="absolute -right-1 -top-1 size-2 rounded-full bg-[#4873c7]" />
                     </div>
                   </div>
-                  {isActiveDay || showExternalDropMarker ? (
+                  {isActiveDay || showDragSlotMarker ? (
                     <div
                       aria-hidden="true"
                       style={{
@@ -594,7 +653,7 @@ export function CalendarDayView({
                         ),
                       }}
                       className={`pointer-events-none absolute inset-x-1 z-10 overflow-hidden rounded border px-1.5 py-0.5 text-left text-[11px] ${
-                        showExternalDropMarker
+                        showDragSlotMarker
                           ? "border-blue-400/60 bg-blue-100/70 text-blue-700 dark:border-blue-500/50 dark:bg-blue-950/40 dark:text-blue-200"
                           : "border-[#4873c7]/40 bg-[#4873c7]/10 text-[#4873c7]"
                       }`}
@@ -623,6 +682,7 @@ export function CalendarDayView({
               ) : null}
             </div>
           </div>
+          </div>
         </div>
       </div>
 
@@ -641,16 +701,15 @@ export function CalendarDayView({
         />
       ) : null}
 
-      {popoverTask && taskPopover ? (
-        <CalendarTaskPopover
-          task={popoverTask}
-          lists={lists}
-          x={taskPopover.x}
-          y={taskPopover.y}
-          onClose={() => setTaskPopover(null)}
-          onSetTaskDueDate={onSetTaskDueDate}
-          onSetTaskDueTime={onSetTaskDueTime}
-          onMoveTaskToList={onMoveTaskToList}
+      {modalTaskId ? (
+        <CalendarTaskModal
+          taskId={modalTaskId}
+          taskSnapshot={modalTaskSnapshot}
+          onClose={() => setModalTaskId(null)}
+          onDetailsSaved={onDetailsSaved}
+          onTaskHasDetailsKnown={onTaskHasDetailsKnown}
+          onTaskRenamed={onTaskRenamed}
+          onDueDateUpdated={onDueDateUpdated}
         />
       ) : null}
     </div>
