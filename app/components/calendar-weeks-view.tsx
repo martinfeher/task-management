@@ -527,7 +527,7 @@ export function CalendarMultiWeekView({
                     className={`inline-flex size-7 items-center justify-center rounded-full text-sm ${
                       isToday
                         ? CALENDAR_TODAY_DATE_CIRCLE_CLASS
-                        : "font-medium text-zinc-700 dark:text-zinc-200"
+                        : " text-zinc-700 dark:text-zinc-200"
                     }`}
                   >
                     {day.getDate()}

@@ -43,6 +43,10 @@ type TaskDatePickerProps = {
   className?: string;
 };
 
+const TASK_DATE_PICKER_WIDTH = 258;
+
+export { TASK_DATE_PICKER_WIDTH };
+
 const WEEKDAY_LABELS = ["M", "T", "W", "T", "F", "S", "S"];
 
 function getMondayFirstWeekdayIndex(date: Date) {
@@ -357,17 +361,11 @@ function MonthGrid({
         </div>
       )}
 
-      {!showHeading && (
-        <h4 className="mb-2 px-3 text-sm font-semibold text-zinc-900 dark:text-zinc-50">
-          {new Intl.DateTimeFormat(undefined, { month: "short" }).format(monthDate)}
-        </h4>
-      )}
-
-      <div className="grid grid-cols-7 px-2">
+      <div className="grid grid-cols-7 px-1.5">
         {WEEKDAY_LABELS.map((label, index) => (
           <div
             key={`${label}-${index}`}
-            className="flex h-8 items-center justify-center text-xs font-medium text-zinc-400"
+            className="flex h-7 items-center justify-center text-[13px] font-medium text-zinc-400"
           >
             {label}
           </div>
@@ -375,7 +373,7 @@ function MonthGrid({
 
         {days.map((day, index) => {
           if (!day) {
-            return <div key={`empty-${index}`} className="h-9" />;
+            return <div key={`empty-${index}`} className="h-8" />;
           }
 
           const isSunday = day.getDay() === 0;
@@ -389,12 +387,12 @@ function MonthGrid({
               key={day.toISOString()}
               type="button"
               onClick={() => onSelectDate(day)}
-              className="relative flex h-9 items-center justify-center rounded-xl transition-colors hover:bg-slate-100 dark:hover:bg-zinc-800 cursor-pointer"
+              className="relative flex h-8 items-center justify-center rounded-full transition-colors hover:bg-slate-100 dark:hover:bg-zinc-800 cursor-pointer"
             >
               <span
-                className={`flex size-7 items-center justify-center rounded-full text-sm ${
+                className={`flex size-[25px] items-center justify-center rounded-full text-[13px] ${
                   isSelected
-                    ? "bg-zinc-400 font-semibold text-white"
+                    ? "bg-slate-400 font-500 text-white"
                     : isSunday
                       ? "font-medium text-orange-700"
                       : "text-zinc-600 dark:text-zinc-100"
@@ -403,10 +401,10 @@ function MonthGrid({
                 {day.getDate()}
               </span>
               {isToday && !isSelected ? (
-                <span className="absolute bottom-1 left-1/2 size-1 -translate-x-1/2 rounded-full bg-zinc-400" />
+                <span className="absolute bottom-1 left-1/2 size-1 -translate-x-1/2 rounded-full bg-emerald-500" />
               ) : null}
               {isRecurring && !isSelected ? (
-                <span className="absolute bottom-1 left-1/2 size-1 -translate-x-1/2 rounded-full bg-[#4873c7]" />
+                <span className="absolute bottom-1 left-1/2 size-1 -translate-x-1/2 rounded-full bg-emerald-500" />
               ) : null}
             </button>
           );
@@ -501,13 +499,17 @@ function TaskRecurrenceMenu({
           disabled
             ? "cursor-not-allowed border-zinc-200 text-zinc-400 dark:border-zinc-700"
             : isOpen || activeRecurrence || hasDraftChanges
-              ? "cursor-pointer border-zinc-200 bg-zinc-50 text-zinc-900 hover:bg-zinc-100 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50 dark:hover:bg-zinc-700/80"
+              ? "cursor-pointer border-emerald-500 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 dark:border-emerald-400 dark:bg-emerald-950/40 dark:text-emerald-200 dark:hover:bg-emerald-950/60"
               : "cursor-pointer border-zinc-200 text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800/80"
         }`}
       >
         <span className="flex min-w-0 flex-1 items-center gap-2">
           <BiRevision
-            className="size-4 shrink-0 text-zinc-500"
+            className={`size-4 shrink-0 ${
+              isOpen || activeRecurrence || hasDraftChanges
+                ? "text-emerald-600 dark:text-emerald-400"
+                : "text-zinc-500"
+            }`}
             aria-hidden="true"
           />
           <span className="truncate">{triggerLabel}</span>
@@ -538,7 +540,7 @@ function TaskRecurrenceMenu({
                 onClick={() => handleSelectOption(option.id, option.rule)}
                 className={`flex w-full items-center gap-2 rounded-[12px] px-3 py-2.5 text-left text-[15px] transition-colors ${
                   isSelected
-                    ? "bg-[#bf572b] font-medium text-white"
+                    ? "bg-emerald-500 font-medium text-white"
                     : "text-zinc-800 hover:bg-zinc-50 dark:text-zinc-100 dark:hover:bg-zinc-800/80"
                 }`}
               >
@@ -558,7 +560,7 @@ function TaskRecurrenceMenu({
         <button
           type="button"
           onClick={handleSaveDraft}
-          className="w-full rounded-full bg-[#b2b2b2] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#a5a5a5] cursor-pointer"
+          className="w-full rounded-full bg-emerald-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600 cursor-pointer"
         >
           Save
         </button>
@@ -705,7 +707,7 @@ function TaskTimeMenu({
               onClick={() => selectTime(preset.minutes)}
               className={`rounded-full border px-3 py-1.5 text-left text-[11.5px] transition-colors cursor-pointer ${
                 isSelected
-                  ? "border-[#4873c7] bg-[#eef3fc] text-zinc-900 dark:border-[#7da2ff] dark:bg-[#1e293b] dark:text-zinc-50"
+                  ? "border-emerald-500 bg-emerald-50 text-zinc-900 dark:border-emerald-400 dark:bg-emerald-950/40 dark:text-zinc-50"
                   : "border-zinc-200 text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800/80"
               }`}
             >
@@ -733,7 +735,7 @@ function TaskTimeMenu({
               onClick={() => selectTime(minutes)}
               className={`flex w-full px-4 py-2.5 text-left text-sm transition-colors cursor-pointer ${
                 isSelected
-                  ? "bg-[#eef3fc] font-medium text-zinc-900 dark:bg-[#1e293b] dark:text-zinc-50"
+                  ? "bg-emerald-50 font-medium text-zinc-900 dark:bg-emerald-950/40 dark:text-zinc-50"
                   : "text-zinc-700 hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-zinc-800/80"
               }`}
             >
@@ -758,7 +760,7 @@ function TaskTimeMenu({
                 onClick={() => setDurationMinutes(option.value)}
                 className={`rounded-full border px-3 py-1 text-sm transition-colors cursor-pointer ${
                   isSelected
-                    ? "border-[#4873c7] bg-[#eef3fc] text-zinc-900 dark:border-[#7da2ff] dark:bg-[#1e293b] dark:text-zinc-50"
+                    ? "border-emerald-500 bg-emerald-50 text-zinc-900 dark:border-emerald-400 dark:bg-emerald-950/40 dark:text-zinc-50"
                     : "border-zinc-200 text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800/80"
                 }`}
               >
@@ -789,7 +791,7 @@ function TaskTimeMenu({
             type="button"
             onClick={handleSave}
             disabled={!canSave}
-            className="rounded-lg bg-[#dc4c3e] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#c53727] disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Save
           </button>
@@ -910,12 +912,13 @@ export function TaskDatePicker({
 
   return (
     <div
-      className={`relative z-50 w-[280px] overflow-visible bg-white dark:bg-zinc-900 ${
+      className={`relative z-50 overflow-visible bg-white dark:bg-zinc-900 ${
         className ??
         "rounded-xl border border-zinc-200 shadow-xl dark:border-zinc-700"
       } ${isTimeMenuOpen ? "min-h-[720px]" : ""}`}
+      style={{ width: TASK_DATE_PICKER_WIDTH }}
     >
-      <div className="border-b border-zinc-200 px-3 py-2.5 dark:border-zinc-700">
+      <div className="border-b border-zinc-200 px-2.5 py-[7px] dark:border-zinc-700">
         <input
           type="text"
           value={typedDate}
@@ -956,12 +959,12 @@ export function TaskDatePicker({
             key={option.key}
             type="button"
             onClick={() => selectDate(option.date)}
-            className="flex w-full text-[12px] items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/80"
+            className="flex w-full text-[12px] items-center gap-3 pl-3 pr-4 py-[6px] text-left transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/80"
           >
             {/* <span className="flex w-6 shrink-0 items-center justify-center">
               {option.icon}
             </span> */}
-            <span className="flex-1 text-sm text-zinc-900 dark:text-zinc-50">
+            <span className="flex-1 text-sm text-zinc-700 dark:text-zinc-50">
               {option.label}
             </span>
             <span className="text-sm text-zinc-400">{option.hint}</span>
@@ -976,11 +979,11 @@ export function TaskDatePicker({
               setTypedDate("");
               setDateInputError(false);
             }}
-            className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/80 cursor-pointer"
+            className="group flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/80 cursor-pointer"
           >
-            <BiBlock className="size-[18px] shrink-0 text-zinc-400" aria-hidden="true" />
-            <span className="flex-1 text-sm text-zinc-900 dark:text-zinc-50">
-              No Date
+            <BiBlock className="group-hover:text-zinc-450 size-[18px] shrink-0 text-zinc-400" aria-hidden="true" />
+            <span className="flex-1 text-sm text-[#8f8f8f] group-hover:text-zinc-500">
+              No Date 
             </span>
           </button>
         ) : null}
@@ -1032,18 +1035,24 @@ export function TaskDatePicker({
         </div>
       </div>
 
-      <div className="space-y-2 border-t border-zinc-200 p-3 dark:border-zinc-700">
+      <div className="space-y-2 border-t border-zinc-200 px-3 py-2.5 dark:border-zinc-700">
         <div className="relative">
           <button
             type="button"
             onClick={() => setIsTimeMenuOpen((open) => !open)}
             className={`flex w-full items-center justify-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition-colors cursor-pointer ${
               isTimeMenuOpen || dueTimeMinutes !== null
-                ? "border-zinc-300 bg-zinc-50 text-zinc-900 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50"
+                ? "border-emerald-500 bg-emerald-50 text-emerald-800 dark:border-emerald-400 dark:bg-emerald-950/40 dark:text-emerald-200"
                 : "border-zinc-200 text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800/80"
             }`}
           >
-            <BiTimeFive className="size-4" />
+            <BiTimeFive
+              className={`size-4 ${
+                isTimeMenuOpen || dueTimeMinutes !== null
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : ""
+              }`}
+            />
             {timeButtonLabel}
           </button>
 

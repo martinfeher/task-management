@@ -226,7 +226,7 @@ body {
 
 .detail-line[data-line-type="h1"] {
   margin-bottom: 3px;
-  color: #333333;
+  color: #4B4B4B;
 }
 
 .detail-line[data-line-type="h1"][data-empty="true"]::before {

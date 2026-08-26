@@ -575,7 +575,7 @@ export function CalendarMultiDayView({
             style={{ gridTemplateColumns, minWidth: minGridWidth }}
           >
             <div
-              className={`sticky top-0 z-20 border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950 ${CALENDAR_HOUR_COLUMN_DIVIDER_CLASS}`}
+              className={`sticky top-0 z-20 bg-white dark:bg-zinc-950 ${CALENDAR_HOUR_COLUMN_DIVIDER_CLASS}`}
             />
             {visibleDays.map((day, dayIndex) => {
               const isToday = isSameDay(day, today);
@@ -602,7 +602,7 @@ export function CalendarMultiDayView({
 
             <div
               className={calendarAllDayLabelCellClassName(
-                `border-b border-zinc-200 dark:border-zinc-800 ${CALENDAR_HOUR_COLUMN_DIVIDER_CLASS}`,
+                `bg-white dark:bg-zinc-950 ${CALENDAR_HOUR_COLUMN_DIVIDER_CLASS}`,
               )}
               style={{ height: allDayRowHeightPx }}
             >

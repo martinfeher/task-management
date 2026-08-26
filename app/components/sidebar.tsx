@@ -1131,7 +1131,7 @@ export function Sidebar({
 
           <button
             type="button"
-            className={`${getItemClassName(false)} gap-2 pr-4 pl-[15px] group hover:text-zinc-900 hover:bg-zinc-150!`}
+            className={`${getItemClassName(false)} gap-2 pr-4 pl-[15px] group hover:text-zinc-900 hover:bg-[#ececee]`}
             onClick={() => setIsAddListOpen(true)}
           >
             <div className="pl-3 pr-3 py-1 rounded-lg flex items-center gap-1 duration-200">

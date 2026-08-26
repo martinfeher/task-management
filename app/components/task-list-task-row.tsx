@@ -10,7 +10,7 @@ import {
   TASK_COMPLETE_ANIMATION_MS,
   TaskCompletionCheckbox,
 } from "./task-completion-checkbox";
-import { TaskDatePicker } from "./task-date-picker";
+import { TaskDatePicker, TASK_DATE_PICKER_WIDTH } from "./task-date-picker";
 import {
   TaskRowContextMenu,
   type TaskRowContextMenuView,
@@ -110,7 +110,6 @@ type TaskListTaskRowProps = {
   useWiderRowPadding?: boolean;
 };
 
-const TASK_DATE_PICKER_WIDTH = 280;
 const TASK_DATE_PICKER_GAP = 4;
 const TASK_LABEL_SELECTOR_WIDTH = 280;
 const TASK_LABEL_SELECTOR_GAP = 4;
@@ -122,9 +121,9 @@ const TASK_PRIORITY_MENU_GAP = 4;
 const TASK_ROW_LEFT_BORDER_WIDTH_CLASS = "border-l-[2px]";
 const TASK_ROW_LEFT_BORDER_COLOR_CLASS = "border-l-[#dADFeF]";
 
-// Schedule/time subline: base #98979c, hover 17% darker → #7e7d81
+// Schedule/time subline: base #98979c, row hover 20% darker → #79787c
 const TASK_ROW_SCHEDULE_COLOR_CLASS =
-  "text-[#98979c] hover:text-[#7e7d81]";
+  "text-[#98979c] group-hover:text-[#79787c]";
 const TASK_ROW_SCHEDULE_TRANSITION_CLASS =
   "transition-colors duration-200 ease-in-out";
 
@@ -160,7 +159,7 @@ export function getTaskRowLeftBorderClass(
     return `${TASK_ROW_LEFT_BORDER_WIDTH_CLASS} ${TASK_ROW_LEFT_BORDER_COLOR_CLASS}`;
   }
 
-  return `${TASK_ROW_LEFT_BORDER_WIDTH_CLASS} border-l-transparent hover:border-l-[#DADFDF]`;
+  return "border-l-0 hover:shadow-[inset_2px_0_0_#DADFDF]";
 }
 
 function getRowMenuView(
@@ -286,7 +285,7 @@ export function TaskListTaskRow({
       isPriorityMenuOpen ||
       rowMenuView !== null);
 
-  const basePaddingLeft = useWiderRowPadding ? 22 : 1;
+  const basePaddingLeft = useWiderRowPadding ? 22 : 0;
   const rowPaddingLeft = basePaddingLeft + depth * SUBTASK_INDENT_PX;
   const isSelected = task.id === selectedTaskId;
   const leftBorderClass = getTaskRowLeftBorderClass(task.id, selectedTaskId);
@@ -521,7 +520,7 @@ export function TaskListTaskRow({
       {showDragHandle ? (
         <span
           aria-hidden="true"
-          className={`flex size-[19px] ml-[2px] mr-[1px] shrink-0 cursor-move items-center justify-center ${
+          className={`flex size-[19px] mr-[1px] shrink-0 cursor-move items-center justify-center ${
             hideDueDate ? "" : "group-hover:opacity-100"
           } ${checkedContentDim}`}
           style={{ transition: dimTransition }}

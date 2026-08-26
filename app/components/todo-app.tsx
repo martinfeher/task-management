@@ -844,7 +844,7 @@ export function TodoApp({
             Math.max(TASK_LIST_PANEL_DEFAULT_WIDTH, width),
           ),
         );
-        return nextWidth === currentWidth ? currentWidth : nextWidth;
+        return nextWidth <= currentWidth ? currentWidth : nextWidth;
       });
     },
     [clampTaskListWidth, hasResizedTaskList],

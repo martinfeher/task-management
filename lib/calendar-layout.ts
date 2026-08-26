@@ -126,7 +126,7 @@ export function getCalendarDayColumnDividerClass(
 }
 
 export const CALENDAR_TODAY_DATE_CIRCLE_CLASS =
-  "bg-[#5363b5] font-semibold text-white";
+  "bg-[#5363b5] text-white";
 
 /** Horizontal placement for timed tasks inside a day column. */
 export const CALENDAR_TASK_TIMED_COLUMN_INSET_CLASS = "left-px right-[2%]";

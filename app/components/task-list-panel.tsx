@@ -618,6 +618,8 @@ export function TaskListPanel({
   }, [panelWidth, title, listId, isLabelFilter]);
 
   const resolvedPanelWidth = panelWidth ?? embeddedAutoWidth;
+  const resolvedPanelWidthRef = useRef(resolvedPanelWidth);
+  resolvedPanelWidthRef.current = resolvedPanelWidth;
 
   const applyAutoExpandedWidth = useCallback(
     (nextWidth: number) => {
@@ -632,7 +634,7 @@ export function TaskListPanel({
       }
 
       setEmbeddedAutoWidth((currentWidth) =>
-        currentWidth === clampedWidth ? currentWidth : clampedWidth,
+        clampedWidth <= currentWidth ? currentWidth : clampedWidth,
       );
     },
     [autoExpandMaxWidth, onAutoExpandWidth, panelWidth],
@@ -645,9 +647,11 @@ export function TaskListPanel({
     const measureAndExpand = () => {
       const overflow = measureTaskListTruncationOverflow(root);
       if (overflow <= 1) return;
-      if (resolvedPanelWidth >= autoExpandMaxWidth) return;
 
-      applyAutoExpandedWidth(resolvedPanelWidth + overflow);
+      const currentWidth = resolvedPanelWidthRef.current;
+      if (currentWidth >= autoExpandMaxWidth) return;
+
+      applyAutoExpandedWidth(currentWidth + overflow);
     };
 
     measureAndExpand();
@@ -661,11 +665,9 @@ export function TaskListPanel({
     applyAutoExpandedWidth,
     autoExpandMaxWidth,
     completedTasks,
-    editingTaskId,
     isCompletedOpen,
     listTasks,
     pinnedVisibleTasks,
-    resolvedPanelWidth,
     title,
     unpinnedVisibleTasks,
   ]);

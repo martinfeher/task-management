@@ -75,6 +75,8 @@ const BASE_HOUR_HEIGHT_PX = 52;
 const TWO_WEEK_HOUR_HEIGHT_PX = Math.round(BASE_HOUR_HEIGHT_PX * 0.6);
 const GRID_TOP_OFFSET_PX = 0;
 const SELECTED_WEEK_DAY_COLUMN_CLASS = "bg-[#f6f6f9]";
+const SELECTED_WEEK_DAY_ROW_BORDER_CLASS =
+  "border-b border-zinc-200 dark:border-zinc-800";
 
 function getWeekDayColumnDividerClass(
   dayIndex: number,
@@ -710,7 +712,7 @@ export function CalendarWeekView({
                 <div className="sticky top-0 z-20 bg-white dark:bg-zinc-950">
                   <div className="grid grid-cols-[56px_repeat(7,minmax(0,1fr))]">
                   <div
-                    className={`border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950 ${CALENDAR_HOUR_COLUMN_DIVIDER_CLASS}`}
+                    className={`bg-white dark:bg-zinc-950 ${CALENDAR_HOUR_COLUMN_DIVIDER_CLASS}`}
                   />
                   {weekDays.map((day, dayIndex) => {
                     const isToday = isSameDay(day, today);
@@ -722,8 +724,8 @@ export function CalendarWeekView({
                         onClick={() => handleDayHeaderSelect(day)}
                         className={`px-2 py-2 text-center transition-colors cursor-pointer ${getWeekDayColumnDividerClass(dayIndex, weekDays, isSelectedWeekDay)} ${
                           isSelectedDay
-                            ? `${SELECTED_WEEK_DAY_COLUMN_CLASS} rounded-t-[8px]`
-                            : "border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950"
+                            ? `${SELECTED_WEEK_DAY_COLUMN_CLASS} rounded-t-[8px] ${SELECTED_WEEK_DAY_ROW_BORDER_CLASS}`
+                            : `${SELECTED_WEEK_DAY_ROW_BORDER_CLASS} bg-white dark:bg-zinc-950`
                         }`}
                       >
                         <div className="text-[14px] font-medium uppercase tracking-wide text-[#222222] dark:text-zinc-200">
@@ -733,7 +735,7 @@ export function CalendarWeekView({
                           className={`mt-1 inline-flex size-7 items-center justify-center rounded-full text-sm ${
                             isToday
                               ? CALENDAR_TODAY_DATE_CIRCLE_CLASS
-                              : "font-medium text-[#999999] dark:text-zinc-400"
+                              : " text-[#999999] dark:text-zinc-400"
                           }`}
                         >
                           {day.getDate()}
@@ -744,7 +746,7 @@ export function CalendarWeekView({
 
                   <div
                     className={calendarAllDayLabelCellClassName(
-                      `border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950 ${CALENDAR_HOUR_COLUMN_DIVIDER_CLASS}`,
+                      `bg-white dark:bg-zinc-950 ${CALENDAR_HOUR_COLUMN_DIVIDER_CLASS}`,
                     )}
                     style={{ height: allDayRowHeightPx }}
                   >
@@ -779,8 +781,8 @@ export function CalendarWeekView({
                               : isActiveDay
                                 ? "border-b border-zinc-200 bg-blue-50 ring-1 ring-inset ring-[#4873c7] dark:border-zinc-800 dark:bg-blue-950/30"
                                 : isSelectedDay
-                                  ? SELECTED_WEEK_DAY_COLUMN_CLASS
-                                  : "border-b border-zinc-200 bg-white hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900/60"
+                                  ? `${SELECTED_WEEK_DAY_COLUMN_CLASS} ${SELECTED_WEEK_DAY_ROW_BORDER_CLASS}`
+                                  : `${SELECTED_WEEK_DAY_ROW_BORDER_CLASS} bg-white hover:bg-zinc-50 dark:bg-zinc-950 dark:hover:bg-zinc-900/60`
                           }`,
                         )}
                         style={{ height: allDayRowHeightPx }}

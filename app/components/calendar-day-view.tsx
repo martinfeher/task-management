@@ -569,7 +569,7 @@ export function CalendarDayView({
         <div className="grid w-full shrink-0 grid-cols-[56px_minmax(0,1fr)]">
           <div
             className={calendarAllDayLabelCellClassName(
-              "shrink-0 border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950",
+              "shrink-0 bg-white dark:bg-zinc-950",
             )}
             style={{ height: allDayRowHeightPx }}
           >
