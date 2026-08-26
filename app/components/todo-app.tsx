@@ -2933,7 +2933,6 @@ export function TodoApp({
                   onAddTask={addTask}
                   onToggleTask={toggleTask}
                   onSelectTask={handleTaskListSelect}
-                  focusTitleInDetailsPanel={showRightPanel}
                   onRenameTask={renameTask}
                   onTaskNameChange={handleTaskRenamed}
                   onReorderTasks={reorderTasks}
@@ -3070,7 +3069,6 @@ export function TodoApp({
                 onAddTask={addTask}
                 onToggleTask={toggleTask}
                 onSelectTask={handleTaskListSelect}
-                focusTitleInDetailsPanel={showRightPanel}
                 onRenameTask={renameTask}
                 onTaskNameChange={handleTaskRenamed}
                 onReorderTasks={reorderTasks}

@@ -28,7 +28,7 @@ export function TaskLabelPills({
       aria-label="Edit labels"
       aria-haspopup="dialog"
       onClick={onClick}
-      className={`flex min-w-0 items-center gap-1 rounded-md transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.06] ${className}`}
+      className={`flex min-w-0 items-center gap-1 rounded-md transition-colors cursor-pointer hover:bg-black/[0.04] dark:hover:bg-white/[0.06] ${className}`}
     >
       {labels.map((item) => {
         const palette = getLabelColor(item);

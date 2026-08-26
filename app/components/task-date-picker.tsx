@@ -976,7 +976,7 @@ export function TaskDatePicker({
               setTypedDate("");
               setDateInputError(false);
             }}
-            className="flex w-full items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/80 cursor-pointer"
+            className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/80 cursor-pointer"
           >
             <BiBlock className="size-[18px] shrink-0 text-zinc-400" aria-hidden="true" />
             <span className="flex-1 text-sm text-zinc-900 dark:text-zinc-50">

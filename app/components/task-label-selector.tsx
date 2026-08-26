@@ -224,6 +224,7 @@ export function TaskLabelSelector({
     <div
       role="dialog"
       aria-label="Add label"
+      data-task-label-menu
       className="w-[220px] overflow-hidden rounded-3xl bg-white shadow-[0_12px_32px_rgba(0,0,0,0.12)] dark:bg-zinc-900 dark:shadow-[0_12px_32px_rgba(0,0,0,0.32)]"
       onMouseDown={(event) => event.stopPropagation()}
       onClick={(event) => event.stopPropagation()}
@@ -245,10 +246,15 @@ export function TaskLabelSelector({
                   type="button"
                   aria-label={`Remove ${item.label}`}
                   disabled={isSubmitting}
-                  onClick={() => onToggleLabel(item.id)}
-                  className="rounded-full p-0.5 transition-colors hover:bg-black/5 disabled:opacity-50 -mr-[5px]! cursor-pointer"
+                  onPointerDown={(event) => {
+                    if (event.button !== 0 || isSubmitting) return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onToggleLabel(item.id);
+                  }}
+                  className="rounded-full p-0.5 transition-colors hover:bg-black/10 disabled:cursor-not-allowed disabled:opacity-50 -mr-[5px] cursor-pointer"
                 >
-                  <LuX className="size-3" />
+                  <LuX className="size-3" aria-hidden="true" />
                 </button>
               </span>
               );

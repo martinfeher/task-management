@@ -332,7 +332,6 @@ type TaskListPanelProps = {
   onAddTask: (name: string, options?: AddTaskOptions) => void | Promise<void>;
   onToggleTask: (taskId: string) => void;
   onSelectTask: (taskId: string) => void | Promise<void>;
-  focusTitleInDetailsPanel?: boolean;
   onRenameTask: (taskId: string, name: string) => void;
   onTaskNameChange?: (taskId: string, name: string) => void;
   onReorderTasks?: (
@@ -399,7 +398,6 @@ export function TaskListPanel({
   onAddTask,
   onToggleTask,
   onSelectTask,
-  focusTitleInDetailsPanel = false,
   onRenameTask,
   onTaskNameChange,
   onReorderTasks,
@@ -502,7 +500,7 @@ export function TaskListPanel({
     if (!task) return;
 
     setAssignedLabelIds(task.labels.map((tag) => tag.id));
-  }, [activeLabelMenuTaskId, orderedTasks]);
+  }, [activeLabelMenuTaskId]);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const newTaskInputRef = useRef<HTMLInputElement>(null);
   const addTaskFormRef = useRef<HTMLFormElement>(null);
@@ -675,9 +673,11 @@ export function TaskListPanel({
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       const target = event.target as Node;
+      const targetElement = target instanceof Element ? target : null;
 
       if (taskDateMenuRef.current?.contains(target)) return;
       if (isTaskDatePickerTriggerElement(target)) return;
+      if (targetElement?.closest("[data-task-label-menu]")) return;
       if (taskLabelMenuRef.current?.contains(target)) return;
       if (taskPriorityMenuRef.current?.contains(target)) return;
       if (taskContextMenuRef.current?.contains(target)) return;
@@ -1009,15 +1009,14 @@ export function TaskListPanel({
       return;
     }
 
-    await onSelectTask(task.id);
-    if (focusTitleInDetailsPanel) {
-      if (editingTaskId !== null) {
-        clearTitleEditIdleTimeout();
-        setEditingTaskId(null);
+    if (editingTaskId !== null && editingTaskId !== task.id) {
+      const editingTask = orderedTasks.find((item) => item.id === editingTaskId);
+      if (editingTask) {
+        commitTitleEdit(editingTask);
       }
-      return;
     }
 
+    await onSelectTask(task.id);
     startTitleEdit(task);
   }
 
@@ -1205,13 +1204,34 @@ export function TaskListPanel({
   async function handleToggleLabel(taskId: string, labelId: string) {
     if (!onToggleTaskLabel) return;
 
-    const isAssigned = assignedLabelIds.includes(labelId);
+    let nextAssigned = false;
+
+    setAssignedLabelIds((current) => {
+      const isAssigned = current.includes(labelId);
+      nextAssigned = !isAssigned;
+      return isAssigned
+        ? current.filter((id) => id !== labelId)
+        : current.includes(labelId)
+          ? current
+          : [...current, labelId];
+    });
     setIsLabelSubmitting(true);
 
     try {
-      const updatedTags = await onToggleTaskLabel(taskId, labelId, !isAssigned);
+      const updatedTags = await onToggleTaskLabel(
+        taskId,
+        labelId,
+        nextAssigned,
+      );
       setAssignedLabelIds(updatedTags.map((tag) => tag.id));
     } catch {
+      setAssignedLabelIds((current) =>
+        nextAssigned
+          ? current.filter((id) => id !== labelId)
+          : current.includes(labelId)
+            ? current
+            : [...current, labelId],
+      );
       return;
     } finally {
       setIsLabelSubmitting(false);

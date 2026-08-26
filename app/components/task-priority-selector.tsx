@@ -27,13 +27,13 @@ function TaskPrioritySelectorButton({
   children: ReactNode;
 }) {
   return (
-    <div className="group/priority-option relative">
+    <div className="group/priority-option relative cursor-pointer">
       <button
         type="button"
         aria-label={label}
         aria-describedby={tooltipId}
         aria-pressed={isSelected}
-        className={`flex size-8 items-center justify-center rounded-full transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800 ${
+        className={`flex size-8 items-center justify-center rounded-full transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer ${
           isSelected ? "bg-zinc-100 dark:bg-zinc-800" : ""
         }`}
         onClick={onClick}
@@ -63,7 +63,7 @@ export function TaskPrioritySelector({
       <div className="mb-2 text-xs font-medium text-zinc-400 dark:text-zinc-500">
         priority
       </div>
-      <div className="flex items-center gap-1">
+      <div className="flex w-full items-center justify-evenly">
         {TASK_PRIORITY_OPTIONS.map((option) => {
           const isSelected = selectedPriority === option.level;
 

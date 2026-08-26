@@ -328,7 +328,10 @@ export function TaskListTaskRow({
   const dueTimeLabel = formatDueTimeLabel(task.dueTimeMinutes);
   const hasDueTime = normalizeDueTimeMinutes(task.dueTimeMinutes) !== null;
   const showSetDateOnHover =
-    hasDueDateActions && !hasDueTime && !task.dueDate;
+    hasDueDateActions &&
+    !hasDueTime &&
+    !task.dueDate &&
+    task.labels.length === 0;
   const dueScheduleSubline = formatTaskListScheduleSubline(
     task.dueDate,
     dueTimeLabel,
@@ -557,7 +560,7 @@ export function TaskListTaskRow({
             onClick={(event) => event.stopPropagation()}
             onBlur={() => onCommitTitleEdit(task)}
             onKeyDown={(event) => onTitleKeyDown(event, task)}
-            className="min-w-0 bg-transparent px-1 py-0 text-sm leading-[19px] text-zinc-900 outline-none dark:text-zinc-50"
+            className="min-w-0 w-full border-0 bg-transparent p-0 text-left text-sm leading-[19px] text-zinc-900 outline-none dark:text-zinc-50"
           />
         ) : (
           <span
@@ -584,6 +587,7 @@ export function TaskListTaskRow({
                 event.stopPropagation();
                 handleDatePickerTrigger(event, true);
               }}
+              onClick={(event) => event.stopPropagation()}
               data-task-date-picker-trigger
             >
               <BiCalendar
@@ -677,7 +681,7 @@ export function TaskListTaskRow({
                 aria-haspopup="dialog"
                 aria-expanded={openDatePickerTaskId === task.id}
                 aria-describedby={`set-date-tooltip-${task.id}`}
-                className={`flex h-[19px] w-[19px] shrink-0 items-center justify-center rounded-md text-zinc-400 transition-colors cursor-pointer hover:text-zinc-600 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 ${
+                className={`flex h-[19px] w-[19px] shrink-0 mr-1 items-center justify-center rounded-md text-zinc-400 transition-colors cursor-pointer hover:text-zinc-600 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 ${
                   task.dueDate ? "text-zinc-400 dark:text-zinc-300" : ""
                 }`}
                 onPointerDown={(event) => {
