@@ -1,0 +1,128 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model TodoList {
+  id        String   @id @default(cuid())
+  name      String
+  position  Int      @default(0)
+  tasks     Task[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Task {
+  id        String    @id @default(cuid())
+  name      String
+  completed Boolean   @default(false)
+  details   String    @default("")
+  dueDate            DateTime?
+  dueTimeMinutes     Int?
+  dueDurationMinutes Int?
+  dueTimeZone        String    @default("floating")
+  calendarColor      String?
+  recurrenceRule     String?
+  recurrenceAnchor   DateTime?
+  position           Int       @default(0)
+  pinned             Boolean   @default(false)
+  important          Boolean   @default(false)
+  parentId           String?
+  parent             Task?     @relation("TaskSubtasks", fields: [parentId], references: [id], onDelete: SetNull)
+  subtasks           Task[]    @relation("TaskSubtasks")
+  listId    String
+  list      TodoList  @relation(fields: [listId], references: [id], onDelete: Cascade)
+  tags      TaskTag[]
+  versions  TaskVersion[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model TaskVersion {
+  id          String   @id @default(cuid())
+  taskId      String
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  name        String
+  details     String
+  contentHash String
+  source      String   @default("auto")
+  createdAt   DateTime @default(now())
+
+  @@index([taskId, createdAt(sort: Desc)])
+}
+
+model Tag {
+  id        String    @id @default(cuid())
+  slug      String    @unique
+  label     String
+  color     String?
+  position  Int       @default(0)
+  category  String    @default("priority")
+  level     Int?
+  tasks     TaskTag[]
+  createdAt DateTime  @default(now())
+}
+
+model TaskTag {
+  taskId    String
+  tagId     String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([taskId, tagId])
+}
+
+model AppSetting {
+  key       String   @id
+  value     String   @default("")
+  updatedAt DateTime @updatedAt
+}
+
+model SidebarTemplateSetting {
+  id           String   @id @default("default")
+  backgroundId String   @default("solid-blue")
+  baseColor    String   @default("#f1f5ff")
+  updatedAt    DateTime @updatedAt
+}
+
+model CalendarTaskTemplateSetting {
+  id           String   @id @default("default")
+  backgroundId String   @default("solid")
+  baseColor    String   @default("#bbd8fe")
+  endColor     String   @default("#ffffff")
+  titleColor   String   @default("#1f1f1f")
+  timeColor    String   @default("#8f8f8f")
+  updatedAt    DateTime @updatedAt
+}
+
+model TooltipTemplateSetting {
+  id              String   @id @default("default")
+  backgroundColor String   @default("#3d3e3f")
+  textColor       String   @default("#ffffff")
+  cornerRadiusPx  Int      @default(6)
+  updatedAt       DateTime @updatedAt
+}
+
+model TemplateStyle {
+  id                   String   @id @default(cuid())
+  name                 String
+  sidebarBackgroundId  String   @default("solid-blue")
+  sidebarBaseColor     String   @default("#f1f5ff")
+  calendarBackgroundId String   @default("solid")
+  calendarBaseColor    String   @default("#bbd8fe")
+  calendarEndColor     String   @default("#ffffff")
+  calendarTitleColor   String   @default("#1f1f1f")
+  calendarTimeColor    String   @default("#8f8f8f")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}

@@ -1,0 +1,39 @@
+# Staging stack: PostgreSQL + optional app with persistent uploads.
+# Usage:
+#   docker compose -f docker-compose.staging.yml up -d postgres
+#   export DATABASE_URL="postgresql://todolist:todolist@localhost:5432/todolist?schema=public"
+#   npm run db:migrate:deploy && npm run dev
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: todolist
+      POSTGRES_PASSWORD: todolist
+      POSTGRES_DB: todolist
+    ports:
+      - "5432:5432"
+    volumes:
+      - todolist_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U todolist -d todolist"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Uncomment to run the Next.js app in Docker with a persistent uploads volume.
+  # app:
+  #   build: .
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     DATABASE_URL: postgresql://todolist:todolist@postgres:5432/todolist?schema=public
+  #   volumes:
+  #     - ./uploads/tasks:/app/uploads/tasks
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+
+volumes:
+  todolist_pg_data:

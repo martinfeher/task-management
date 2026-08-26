@@ -1,0 +1,130 @@
+"use client";
+
+import { FormEvent, useEffect, useRef, useState } from "react";
+
+type RenameListModalProps = {
+  open: boolean;
+  title?: string;
+  initialName?: string;
+  confirmLabel?: string;
+  onConfirm: (name: string) => void;
+  onCancel: () => void;
+};
+
+const LIST_MODAL_ANIMATION_MS = 200;
+
+export function RenameListModal({
+  open,
+  title = "Rename list",
+  initialName = "",
+  confirmLabel = "Save",
+  onConfirm,
+  onCancel,
+}: RenameListModalProps) {
+  const [name, setName] = useState(initialName);
+  const [isMounted, setIsMounted] = useState(open);
+  const [isEntered, setIsEntered] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (open) {
+      setIsMounted(true);
+      const frame = window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
+          setIsEntered(true);
+        });
+      });
+      return () => window.cancelAnimationFrame(frame);
+    }
+
+    setIsEntered(false);
+    const timeout = window.setTimeout(() => {
+      setIsMounted(false);
+    }, LIST_MODAL_ANIMATION_MS);
+    return () => window.clearTimeout(timeout);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    setName(initialName);
+    requestAnimationFrame(() => {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    });
+  }, [open, initialName]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      onCancel();
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [open, onCancel]);
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!name.trim()) return;
+    onConfirm(name.trim());
+  }
+
+  if (!isMounted) return null;
+
+  return (
+    <div
+      className={`list-modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4 ${
+        isEntered ? "is-entered" : ""
+      }`}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          onCancel();
+        }
+      }}
+    >
+      <form
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="list-name-modal-title"
+        onSubmit={handleSubmit}
+        className="list-name-modal-panel w-full max-w-sm bg-white p-5 dark:bg-zinc-900"
+      >
+        <h2
+          id="list-name-modal-title"
+          className="text-lg font-semibold text-zinc-900 dark:text-zinc-50"
+        >
+          {title}
+        </h2>
+        <input
+          ref={inputRef}
+          type="text"
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          autoFocus
+          placeholder="List name"
+          className="mt-4 h-[35px] w-full rounded-md border border-zinc-300 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-50"
+        />
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="h-[35px] rounded-md px-4 text-sm text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800 cursor-pointer!"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={!name.trim()}
+            className="h-[35px] rounded-md bg-zinc-900 px-4 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200 cursor-pointer!"
+          >
+            {confirmLabel}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}

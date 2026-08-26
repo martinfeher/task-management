@@ -1,0 +1,18 @@
+{
+  "expo": {
+    "name": "Todo Mobile",
+    "slug": "todolist-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "todolist",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#4873c7"
+      }
+    }
+  }
+}
