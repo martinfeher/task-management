@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 @source inline("rounded-[8px]");
+@source inline("rounded-[14px]");
 @source inline("size-[18px]");
 @source inline("size-[22px]");
 @source inline("size-[24px]");
@@ -40,7 +41,7 @@ html[data-app-font="sf-pro"] {
   --font-app: var(--font-sf-pro);
 }
 
-html[data-app-font="sf-pro"] :where(b, strong, .font-bold) {
+html[data-app-font="sf-pro"] :where(b, strong, .font-bold, .font-semibold, .font-medium) {
   font-synthesis: none;
 }
 
@@ -242,6 +243,7 @@ body {
   content: "start writing or press / to access commands";
   color: #d4d4d8;
   pointer-events: none;
+  font-size: 16px;
 }
 
 .task-details-editor
@@ -546,6 +548,23 @@ body {
     --app-tooltip-arrow-color,
     var(--app-tooltip-background, #3f3f46)
   );
+}
+
+.task-date-picker-remove-tooltip::after {
+  left: auto;
+  right: 14px;
+  transform: none;
+}
+
+.task-context-menu-tooltip-start::after {
+  left: 14px;
+  transform: none;
+}
+
+.task-context-menu-tooltip-end::after {
+  left: auto;
+  right: 14px;
+  transform: none;
 }
 
 .task-priority-tooltip::after {
@@ -1037,9 +1056,11 @@ body {
 }
 
 .task-item-date-picker-popover {
-  border-radius: 12px;
-  border: 1px solid rgb(235 235 235);
-  box-shadow: var(--calendar-task-surface-shadow);
+  border-radius: 16px;
+  border: 1px solid #ebecef;
+  box-shadow:
+    0 12px 40px -8px rgba(15, 23, 42, 0.18),
+    0 2px 8px rgba(15, 23, 42, 0.06);
 }
 
 .checkbox-wrapper-29 {

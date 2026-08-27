@@ -2360,12 +2360,13 @@ export function TodoApp({
   }
 
   async function setTaskDueDate(taskId: string, dateValue: string | null) {
-    const optimisticDueDate = dateValue
-      ? new Date(`${dateValue}T00:00:00`).toISOString()
+    const normalizedDateValue = dateValue ?? null;
+    const optimisticDueDate = normalizedDateValue
+      ? new Date(`${normalizedDateValue}T00:00:00`).toISOString()
       : null;
     handleDueDateUpdated(taskId, optimisticDueDate);
 
-    const updated = await updateTaskDueDateInDb(taskId, dateValue);
+    const updated = await updateTaskDueDateInDb(taskId, normalizedDateValue);
     const dueDate = updated.dueDate
       ? new Date(updated.dueDate).toISOString()
       : null;

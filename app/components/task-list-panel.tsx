@@ -678,6 +678,13 @@ export function TaskListPanel({
       const targetElement = target instanceof Element ? target : null;
 
       if (taskDateMenuRef.current?.contains(target)) return;
+      if (
+        targetElement?.closest(
+          "[data-task-date-picker-menu], [data-task-date-picker-root]",
+        )
+      ) {
+        return;
+      }
       if (isTaskDatePickerTriggerElement(target)) return;
       if (targetElement?.closest("[data-task-label-menu]")) return;
       if (taskLabelMenuRef.current?.contains(target)) return;
@@ -1281,7 +1288,11 @@ export function TaskListPanel({
   }
 
   function handleSelectTaskDueDate(taskId: string, dateValue: string | null) {
-    onSetTaskDueDate?.(taskId, dateValue);
+    if (!onSetTaskDueDate) return;
+    void onSetTaskDueDate(taskId, dateValue);
+    if (dateValue === null) {
+      setOpenDatePickerTaskId(null);
+    }
   }
 
   function handleSetTaskDueDateFromMenu(taskId: string, dateValue: string) {
@@ -1293,9 +1304,15 @@ export function TaskListPanel({
     openDatePicker(taskId);
   }
 
-  function handleSaveTaskDueTime(taskId: string, dueTime: TaskDueTime) {
+  function handleSaveTaskDueTime(
+    taskId: string,
+    dueTime: TaskDueTime,
+    options?: { keepOpen?: boolean },
+  ) {
     onSetTaskDueTime?.(taskId, dueTime);
-    setOpenDatePickerTaskId(null);
+    if (!options?.keepOpen) {
+      setOpenDatePickerTaskId(null);
+    }
   }
 
   function handleSaveTaskRecurrence(

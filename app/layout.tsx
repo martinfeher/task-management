@@ -14,12 +14,22 @@ const inter = Inter({
 const sfPro = localFont({
   src: [
     {
-      path: "../external/fonts/sf_pro/SFPRODISPLAYREGULAR.ttf",
+      path: "../external/fonts/sf_pro/SF-Pro-Text-Regular.otf",
       weight: "400",
       style: "normal",
     },
     {
-      path: "../external/fonts/sf_pro/SFProText-Heavy.ttf",
+      path: "../external/fonts/sf_pro/SF-Pro-Text-Medium.otf",
+      weight: "500",
+      style: "normal",
+    },
+    {
+      path: "../external/fonts/sf_pro/SF-Pro-Text-Semibold.otf",
+      weight: "600",
+      style: "normal",
+    },
+    {
+      path: "../external/fonts/sf_pro/SF-Pro-Text-Bold.otf",
       weight: "700",
       style: "normal",
     },

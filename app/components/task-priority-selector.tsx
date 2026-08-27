@@ -17,15 +17,24 @@ function TaskPrioritySelectorButton({
   label,
   isSelected,
   tooltipId,
+  tooltipAlign = "center",
   onClick,
   children,
 }: {
   label: string;
   isSelected: boolean;
   tooltipId: string;
+  tooltipAlign?: "start" | "center" | "end";
   onClick: (event: MouseEvent<HTMLButtonElement>) => void;
   children: ReactNode;
 }) {
+  const tooltipPositionClass =
+    tooltipAlign === "start"
+      ? "left-0 task-context-menu-tooltip-start"
+      : tooltipAlign === "end"
+        ? "right-0 left-auto task-context-menu-tooltip-end"
+        : "left-1/2 -translate-x-1/2";
+
   return (
     <div className="group/priority-option relative cursor-pointer">
       <button
@@ -43,7 +52,7 @@ function TaskPrioritySelectorButton({
       <span
         id={tooltipId}
         role="tooltip"
-        className="add-task-date-tooltip pointer-events-none absolute bottom-[calc(100%+6px)] left-1/2 z-50 -translate-x-1/2 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity group-hover/priority-option:opacity-100"
+        className={`add-task-date-tooltip pointer-events-none absolute bottom-[calc(100%+6px)] z-50 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity group-hover/priority-option:opacity-100 ${tooltipPositionClass}`}
       >
         {label}
       </span>
@@ -59,12 +68,12 @@ export function TaskPrioritySelector({
   const tooltipBaseId = useId();
 
   return (
-    <div className="px-3 py-2">
+    <div className="overflow-visible px-3 py-2">
       <div className="mb-2 text-xs font-medium text-zinc-400 dark:text-zinc-500">
         priority
       </div>
-      <div className="flex w-full items-center justify-evenly">
-        {TASK_PRIORITY_OPTIONS.map((option) => {
+      <div className="flex w-full items-center justify-between">
+        {TASK_PRIORITY_OPTIONS.map((option, index) => {
           const isSelected = selectedPriority === option.level;
 
           return (
@@ -73,6 +82,7 @@ export function TaskPrioritySelector({
               label={option.label}
               isSelected={isSelected}
               tooltipId={`${tooltipBaseId}-priority-${option.level}`}
+              tooltipAlign={index === 0 ? "start" : "center"}
               onClick={(event) => {
                 event.stopPropagation();
                 onSelectPriority(option.level);
@@ -83,9 +93,10 @@ export function TaskPrioritySelector({
           );
         })}
         <TaskPrioritySelectorButton
-          label="Clear priority"
+          label="Clear"
           isSelected={selectedPriority == null}
           tooltipId={`${tooltipBaseId}-priority-clear`}
+          tooltipAlign="end"
           onClick={(event) => {
             event.stopPropagation();
             onClearPriority();

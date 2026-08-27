@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { InteractIcon } from "./line-control-icons";
 import { TaskSetDateIcon } from "./task-set-date-icon";
@@ -80,7 +80,11 @@ type TaskListTaskRowProps = {
   onToggleDatePicker: (taskId: string) => void;
   onOpenDatePicker: (taskId: string) => void;
   onSelectTaskDueDate: (taskId: string, dateValue: string | null) => void;
-  onSaveTaskDueTime: (taskId: string, dueTime: TaskDueTime) => void;
+  onSaveTaskDueTime: (
+    taskId: string,
+    dueTime: TaskDueTime,
+    options?: { keepOpen?: boolean },
+  ) => void;
   onSaveTaskRecurrence: (
     taskId: string,
     rule: TaskRecurrenceRule | null,
@@ -360,17 +364,6 @@ export function TaskListTaskRow({
 
     onOpenDatePicker(task.id);
   }
-
-  useEffect(() => {
-    if (!isDatePickerOpen) return;
-
-    requestAnimationFrame(() => {
-      const dateInput = taskDateMenuRef.current?.querySelector("input");
-      if (dateInput instanceof HTMLInputElement) {
-        dateInput.focus();
-      }
-    });
-  }, [isDatePickerOpen, task.id, taskDateMenuRef]);
 
   useLayoutEffect(() => {
     if (!isDatePickerOpen) return;
@@ -705,12 +698,14 @@ export function TaskListTaskRow({
             ? createPortal(
                 <div
                   ref={taskDateMenuRef}
+                  data-task-date-picker-menu
                   className="fixed z-[100]"
                   style={{
                     top: datePickerPosition?.top ?? 0,
                     left: datePickerPosition?.left ?? 0,
                     visibility: datePickerPosition ? "visible" : "hidden",
                   }}
+                  onPointerDown={(event) => event.stopPropagation()}
                   onKeyDown={(event) => {
                     if (event.key !== "Escape") return;
                     event.stopPropagation();
@@ -727,8 +722,8 @@ export function TaskListTaskRow({
                     onSelectDate={(dateValue) =>
                       onSelectTaskDueDate(task.id, dateValue)
                     }
-                    onSaveDueTime={(dueTime) =>
-                      onSaveTaskDueTime(task.id, dueTime)
+                    onSaveDueTime={(dueTime, options) =>
+                      onSaveTaskDueTime(task.id, dueTime, options)
                     }
                     onSaveRecurrence={(rule) =>
                       onSaveTaskRecurrence(task.id, rule)

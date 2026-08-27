@@ -3713,6 +3713,9 @@ export function TaskDetailsPanel({
         dueDurationMinutes: updated.dueDurationMinutes,
         dueTimeZone: updated.dueTimeZone,
       });
+      if (dateValue === null) {
+        setIsDateMenuOpen(false);
+      }
       setMetadataError(null);
     } catch {
       setMetadataError("Could not update the due date.");
@@ -3748,7 +3751,10 @@ export function TaskDetailsPanel({
     }
   }
 
-  async function handleSaveDueTime(dueTime: TaskDueTime) {
+  async function handleSaveDueTime(
+    dueTime: TaskDueTime,
+    options?: { keepOpen?: boolean },
+  ) {
     if (!task) return;
 
     try {
@@ -3769,7 +3775,9 @@ export function TaskDetailsPanel({
         dueDurationMinutes: updated.dueDurationMinutes,
         dueTimeZone: updated.dueTimeZone,
       });
-      setIsDateMenuOpen(false);
+      if (!options?.keepOpen) {
+        setIsDateMenuOpen(false);
+      }
       setMetadataError(null);
     } catch {
       setMetadataError("Could not update the due time.");
@@ -3854,7 +3862,9 @@ export function TaskDetailsPanel({
                       onSelectDate={(dateValue) =>
                         void handleSelectDueDate(dateValue)
                       }
-                      onSaveDueTime={(dueTime) => void handleSaveDueTime(dueTime)}
+                      onSaveDueTime={(dueTime, options) =>
+                        void handleSaveDueTime(dueTime, options)
+                      }
                       onSaveRecurrence={(rule) => void handleSaveRecurrence(rule)}
                     />
                   </div>
@@ -3927,7 +3937,7 @@ export function TaskDetailsPanel({
                 <button
                   type="button"
                   onClick={() => onToggleTask(task.id)}
-                  className="ml-1 flex cursor-pointer items-center gap-1.5 rounded-full border border-[#e6e9ec] bg-white pl-2 pr-[9px] py-[5px] text-[12px] font-normal text-[#333333] transition-colors hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+                  className="ml-1 flex cursor-pointer items-center gap-1.5 rounded-full border border-[#e6e9ec] bg-white pl-2 pr-[9px] py-[5px] text-[12px] font-normal text-[#454545] transition-colors hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
                 >
                   <LuCheck className="size-3.5 shrink-0" aria-hidden="true" />
                   Mark complete
@@ -4059,11 +4069,11 @@ export function TaskDetailsPanel({
                         title="Add block below"
                         aria-haspopup="menu"
                         aria-expanded={addBlockMenu !== null}
-                        className="flex size-[21px] cursor-grab items-center justify-center rounded rounded-lg px-[1px] py-[3px] text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+                        className="flex size-[19px] cursor-grab items-center justify-center rounded rounded-lg px-[1px] py-[3px] text-zinc-350 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
                         onMouseDown={(event) => event.preventDefault()}
                         onClick={(event) => handlePlusClick(event, lineId)}
                       >
-                        <PlusIcon className="size-[28px]" />
+                        <PlusIcon className="size-[21px]" />
                       </button>
                     ) : null}
                     {showDrag ? (

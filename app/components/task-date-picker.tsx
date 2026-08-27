@@ -1,16 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type SyntheticEvent } from "react";
 import {
-  BiBlock,
   BiChevronDown,
   BiChevronLeft,
   BiChevronRight,
-  BiRevision,
   BiSun,
   BiTimeFive,
 } from "react-icons/bi";
-import { LuCheck } from "react-icons/lu";
+import { CalendarOff, Repeat } from "lucide-react";
 import {
   formatDueTimeLabel,
   formatTime24Hour,
@@ -31,6 +29,10 @@ import {
   type TaskRecurrenceRule,
 } from "@/lib/task-recurrence";
 
+type TaskDueTimeSaveOptions = {
+  keepOpen?: boolean;
+};
+
 type TaskDatePickerProps = {
   dueDate: string | null;
   dueTimeMinutes?: number | null;
@@ -38,14 +40,24 @@ type TaskDatePickerProps = {
   dueTimeZone?: string | null;
   recurrenceRule?: string | null;
   onSelectDate: (dateValue: string | null) => void;
-  onSaveDueTime?: (dueTime: TaskDueTime) => void;
+  onSaveDueTime?: (dueTime: TaskDueTime, options?: TaskDueTimeSaveOptions) => void;
   onSaveRecurrence?: (rule: TaskRecurrenceRule | null) => void;
   className?: string;
 };
 
-const TASK_DATE_PICKER_WIDTH = 258;
+const TASK_DATE_PICKER_WIDTH = 280;
 
 export { TASK_DATE_PICKER_WIDTH };
+
+/** Canvas Time Lens–aligned picker tokens (oklch approximations) */
+const PICKER_ACCENT = "#67676";
+const PICKER_ACCENT_SOFT = "#f1f1f1";
+const PICKER_BORDER = "#ebecef";
+const PICKER_MUTED = "#f4f5f7";
+const PICKER_MUTED_FG = "#71717a";
+const PICKER_FOREGROUND = "#1c2030";
+const PICKER_POPOVER_SHADOW =
+  "0 12px 40px -8px rgba(15, 23, 42, 0.18), 0 2px 8px rgba(15, 23, 42, 0.06)";
 
 const WEEKDAY_LABELS = ["M", "T", "W", "T", "F", "S", "S"];
 
@@ -305,7 +317,7 @@ function getMonthDays(year: number, month: number, today: Date) {
 function TodayIcon() {
   const today = new Date().getDate();
   return (
-    <span className="relative flex size-6 items-center justify-center rounded-md bg-emerald-500 text-[11px] font-semibold text-white">
+    <span className="relative flex size-6 items-center justify-center rounded-md bg-emerald-500 text-[14px] font-semibold text-white">
       {today}
     </span>
   );
@@ -387,24 +399,20 @@ function MonthGrid({
               key={day.toISOString()}
               type="button"
               onClick={() => onSelectDate(day)}
-              className="relative flex h-8 items-center justify-center rounded-full transition-colors hover:bg-slate-100 dark:hover:bg-zinc-800 cursor-pointer"
+              className={`relative mx-auto flex size-[29px] items-center justify-center rounded-full text-[13px] transition-colors cursor-pointer ${
+                isSelected
+                  ? "bg-slate-400 font-medium text-white"
+                  : isSunday
+                    ? "font-medium text-orange-700 hover:bg-slate-100 dark:hover:bg-zinc-800"
+                    : "text-zinc-600 hover:bg-slate-100 dark:text-zinc-100 dark:hover:bg-zinc-800"
+              }`}
             >
-              <span
-                className={`flex size-[25px] items-center justify-center rounded-full text-[13px] ${
-                  isSelected
-                    ? "bg-slate-400 font-500 text-white"
-                    : isSunday
-                      ? "font-medium text-orange-700"
-                      : "text-zinc-600 dark:text-zinc-100"
-                }`}
-              >
-                {day.getDate()}
-              </span>
+              {day.getDate()}
               {isToday && !isSelected ? (
-                <span className="absolute bottom-1 left-1/2 size-1 -translate-x-1/2 rounded-full bg-emerald-500" />
+                <span className="absolute bottom-0.5 left-1/2 size-1 -translate-x-1/2 rounded-full bg-emerald-500" />
               ) : null}
               {isRecurring && !isSelected ? (
-                <span className="absolute bottom-1 left-1/2 size-1 -translate-x-1/2 rounded-full bg-emerald-500" />
+                <span className="absolute bottom-0.5 left-1/2 size-1 -translate-x-1/2 rounded-full bg-emerald-500" />
               ) : null}
             </button>
           );
@@ -428,59 +436,40 @@ function TaskRecurrenceMenu({
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const activeOptionId = getRecurrenceMenuSelectionId(activeRecurrence) ?? "none";
-  const [draftOptionId, setDraftOptionId] = useState(activeOptionId);
-  const triggerLabel = formatRecurrenceLabel(activeRecurrence);
-  const hasDraftChanges = draftOptionId !== activeOptionId;
-  const showSaveButton = hasDraftChanges && draftOptionId !== "none";
-
-  useEffect(() => {
-    setDraftOptionId(activeOptionId);
-  }, [activeOptionId]);
+  const triggerLabel =
+    RECURRENCE_MENU_OPTIONS.find((option) => option.id === activeOptionId)
+      ?.label ?? formatRecurrenceLabel(activeRecurrence);
 
   useEffect(() => {
     if (!isOpen) return;
 
     function handlePointerDown(event: MouseEvent) {
-      const target = event.target as Node;
-      if (menuRef.current?.contains(target)) return;
+      if (menuRef.current?.contains(event.target as Node)) return;
       setIsOpen(false);
+      onOpenChange?.(false);
     }
 
-    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("mousedown", handlePointerDown, true);
     return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("mousedown", handlePointerDown, true);
     };
-  }, [isOpen]);
+  }, [isOpen, onOpenChange]);
 
   function closeMenu() {
     setIsOpen(false);
     onOpenChange?.(false);
   }
 
-  function handleSelectOption(optionId: string, rule: TaskRecurrenceRule | null) {
-    if (optionId === "none") {
-      onSaveRecurrence(null);
-      setDraftOptionId("none");
-      closeMenu();
-      return;
-    }
-
-    setDraftOptionId(optionId);
-    closeMenu();
-  }
-
-  function handleSaveDraft() {
-    const option = RECURRENCE_MENU_OPTIONS.find(
-      (entry) => entry.id === draftOptionId,
-    );
-    if (!option?.rule) return;
+  function handleSelectOption(optionId: string) {
+    const option = RECURRENCE_MENU_OPTIONS.find((entry) => entry.id === optionId);
+    if (!option) return;
 
     onSaveRecurrence(option.rule);
     closeMenu();
   }
 
   return (
-    <div ref={menuRef} className="relative space-y-2">
+    <div ref={menuRef} className="relative">
       <button
         type="button"
         disabled={disabled}
@@ -489,35 +478,32 @@ function TaskRecurrenceMenu({
         aria-expanded={isOpen}
         onClick={() => {
           if (disabled) return;
-          setIsOpen((open) => {
-            const nextOpen = !open;
-            onOpenChange?.(nextOpen);
-            return nextOpen;
-          });
+          const nextOpen = !isOpen;
+          setIsOpen(nextOpen);
+          onOpenChange?.(nextOpen);
         }}
-        className={`flex w-full items-center justify-between gap-2 rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
-          disabled
-            ? "cursor-not-allowed border-zinc-200 text-zinc-400 dark:border-zinc-700"
-            : isOpen || activeRecurrence || hasDraftChanges
-              ? "cursor-pointer border-emerald-500 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 dark:border-emerald-400 dark:bg-emerald-950/40 dark:text-emerald-200 dark:hover:bg-emerald-950/60"
-              : "cursor-pointer border-zinc-200 text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800/80"
+        className={`flex w-full items-center justify-between gap-2 rounded-full border pl-5 pr-3 py-2 text-[13px] font-medium transition-colors ${
+          disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"
         }`}
+        style={{
+          borderColor: PICKER_BORDER,
+          color: PICKER_FOREGROUND,
+        }}
       >
-        <span className="flex min-w-0 flex-1 items-center gap-2">
-          <BiRevision
-            className={`size-4 shrink-0 ${
-              isOpen || activeRecurrence || hasDraftChanges
-                ? "text-emerald-600 dark:text-emerald-400"
-                : "text-zinc-500"
-            }`}
+        <span className="flex min-w-0 flex-1 items-center gap-4">
+          <Repeat
+            className="size-4 shrink-0 text-[#929494]"
+            strokeWidth={2}
+            style={{ color: PICKER_MUTED_FG }}
             aria-hidden="true"
           />
-          <span className="truncate">{triggerLabel}</span>
+          <span className="truncate text-[#6c6d6d]">{triggerLabel}</span>
         </span>
         <BiChevronDown
-          className={`size-4 shrink-0 text-zinc-500 transition-transform ${
+          className={`size-4 shrink-0 transition-transform ${
             isOpen ? "rotate-180" : ""
           }`}
+          style={{ color: PICKER_MUTED_FG }}
           aria-hidden="true"
         />
       </button>
@@ -526,10 +512,14 @@ function TaskRecurrenceMenu({
         <div
           role="listbox"
           aria-label="Repeat options"
-          className="absolute bottom-full left-0 right-0 z-30 mb-2 overflow-hidden rounded-[18px] border border-zinc-200/80 bg-white p-1.5 shadow-[0_12px_40px_rgba(15,23,42,0.14)] dark:border-zinc-700 dark:bg-zinc-900"
+          className="absolute bottom-full left-0 right-0 z-40 mb-1 overflow-hidden rounded-xl border bg-white p-1"
+          style={{
+            borderColor: PICKER_BORDER,
+            boxShadow: PICKER_POPOVER_SHADOW,
+          }}
         >
           {RECURRENCE_MENU_OPTIONS.map((option) => {
-            const isSelected = option.id === draftOptionId;
+            const isSelected = option.id === activeOptionId;
 
             return (
               <button
@@ -537,46 +527,45 @@ function TaskRecurrenceMenu({
                 type="button"
                 role="option"
                 aria-selected={isSelected}
-                onClick={() => handleSelectOption(option.id, option.rule)}
-                className={`flex w-full items-center gap-2 rounded-[12px] px-3 py-2.5 text-left text-[15px] transition-colors ${
+                onClick={() => handleSelectOption(option.id)}
+                className={`flex w-full rounded-lg px-3 py-2 text-left text-[13px] transition-colors cursor-pointer ${
                   isSelected
-                    ? "bg-emerald-500 font-medium text-white"
-                    : "text-zinc-800 hover:bg-zinc-50 dark:text-zinc-100 dark:hover:bg-zinc-800/80"
+                    ? "bg-zinc-100 font-medium text-zinc-700"
+                    : "text-zinc-700 hover:bg-zinc-50"
                 }`}
               >
-                <span className="flex size-4 shrink-0 items-center justify-center">
-                  {isSelected ? (
-                    <LuCheck className="size-3.5" aria-hidden="true" />
-                  ) : null}
-                </span>
-                <span>{option.label}</span>
+                {option.label}
               </button>
             );
           })}
         </div>
       ) : null}
-
-      {showSaveButton ? (
-        <button
-          type="button"
-          onClick={handleSaveDraft}
-          className="w-full rounded-full bg-emerald-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600 cursor-pointer"
-        >
-          Save
-        </button>
-      ) : null}
     </div>
   );
 }
 
+const DEFAULT_TIME_LIST_SCROLL_MINUTES = 15 * 60;
+
+function scrollTimeListToMinutes(
+  container: HTMLDivElement,
+  minutes: number,
+) {
+  const targetRow = container.querySelector(`[data-minutes="${minutes}"]`);
+  if (!(targetRow instanceof HTMLElement)) return;
+
+  const targetTop = targetRow.offsetTop;
+  const targetHeight = targetRow.offsetHeight;
+  const containerHeight = container.clientHeight;
+  container.scrollTop =
+    targetTop - containerHeight / 2 + targetHeight / 2;
+}
+
 function TaskTimeMenu({
   initialDueTime,
-  onCancel,
   onSave,
 }: {
   initialDueTime: TaskDueTime;
-  onCancel: () => void;
-  onSave: (dueTime: TaskDueTime) => void;
+  onSave: (dueTime: TaskDueTime, options?: TaskDueTimeSaveOptions) => void;
 }) {
   const initialMinutes = normalizeDueTimeMinutes(initialDueTime.dueTimeMinutes);
   const [draftMinutes, setDraftMinutes] = useState<number | null>(initialMinutes);
@@ -588,21 +577,47 @@ function TaskTimeMenu({
   );
   const [timeInputError, setTimeInputError] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
+  const timeInputRef = useRef<HTMLInputElement>(null);
+  const hasInitialScrolledRef = useRef(false);
   const timeOptions = useMemo(() => generateTimeListOptions(), []);
 
-  useEffect(() => {
-    if (draftMinutes == null || !listRef.current) return;
+  useLayoutEffect(() => {
+    if (!listRef.current || hasInitialScrolledRef.current) return;
 
-    const selectedRow = listRef.current.querySelector(
-      `[data-minutes="${draftMinutes}"]`,
+    scrollTimeListToMinutes(
+      listRef.current,
+      initialMinutes ?? DEFAULT_TIME_LIST_SCROLL_MINUTES,
     );
-    selectedRow?.scrollIntoView({ block: "center" });
+    hasInitialScrolledRef.current = true;
+  }, [initialMinutes]);
+
+  useLayoutEffect(() => {
+    if (draftMinutes == null || !listRef.current) return;
+    if (document.activeElement === timeInputRef.current) return;
+
+    scrollTimeListToMinutes(listRef.current, draftMinutes);
   }, [draftMinutes]);
+
+  function persistDueTime(
+    minutes: number | null,
+    duration: number | null = durationMinutes,
+    options?: TaskDueTimeSaveOptions,
+  ) {
+    onSave(
+      {
+        dueTimeMinutes: minutes,
+        dueDurationMinutes: duration,
+        dueTimeZone: initialDueTime.dueTimeZone,
+      },
+      options,
+    );
+  }
 
   function selectTime(minutes: number) {
     setDraftMinutes(minutes);
     setTypedTime(formatTime24Hour(minutes));
     setTimeInputError(false);
+    persistDueTime(minutes, durationMinutes, { keepOpen: true });
   }
 
   function commitTypedTime() {
@@ -629,74 +644,77 @@ function TaskTimeMenu({
     return draftMinutes;
   }
 
-  function handleSave() {
-    if (typedTime.trim() && !commitTypedTime()) {
-      return;
-    }
+  function commitTypedTimeAndSave() {
+    if (!typedTime.trim()) return;
+    if (!commitTypedTime()) return;
 
     const minutes = resolveDraftMinutes();
-    if (minutes === null) return;
-
-    onSave({
-      dueTimeMinutes: minutes,
-      dueDurationMinutes: durationMinutes,
-      dueTimeZone: initialDueTime.dueTimeZone,
-    });
+    if (minutes !== null) {
+      persistDueTime(minutes, durationMinutes, { keepOpen: true });
+    }
   }
 
   function handleClearTime() {
-    onSave({
-      dueTimeMinutes: null,
-      dueDurationMinutes: null,
-      dueTimeZone: initialDueTime.dueTimeZone,
-    });
+    persistDueTime(null, null, { keepOpen: true });
   }
 
-  const canSave = resolveDraftMinutes() !== null;
-
   return (
-    <div className="absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-xl dark:border-zinc-700 dark:bg-zinc-900">
-      <div className="border-b border-zinc-200 px-3 py-3 dark:border-zinc-700">
-        <div
-          className={`flex items-center gap-2 rounded-lg border bg-white px-2.5 py-2 dark:bg-zinc-900 ${
-            timeInputError
-              ? "border-red-300 dark:border-red-700"
-              : "border-zinc-200 dark:border-zinc-700"
-          }`}
-        >
-          <BiTimeFive
-            className="size-4 shrink-0 text-zinc-400"
-            aria-hidden="true"
-          />
-          <input
-            type="text"
-            value={typedTime}
-            onChange={(event) => {
-              setTypedTime(event.target.value);
-              if (timeInputError) setTimeInputError(false);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                commitTypedTime();
+    <div
+      data-task-time-menu
+      className="mt-3 space-y-3 rounded-2xl border bg-white px-3 pt-3 pb-2"
+      style={{ borderColor: PICKER_BORDER }}
+    >
+      <div
+        className={`flex items-center gap-2 text-[14px] rounded-xl px-3 py-[6px] ${
+          timeInputError ? "" : ""
+        }`}
+        style={{
+          backgroundColor: PICKER_MUTED,
+          ...(draftMinutes != null && !timeInputError
+            ? {
+                boxShadow: `inset 0 0 0 1px ${PICKER_ACCENT}`,
               }
-            }}
-            onBlur={() => {
-              commitTypedTime();
-            }}
-            placeholder="Type a time — 9, 930, 6pm"
-            aria-invalid={timeInputError}
-            className="min-w-0 flex-1 bg-transparent text-sm text-zinc-900 outline-none placeholder:text-zinc-400 dark:text-zinc-50"
-          />
-        </div>
-        {timeInputError ? (
-          <p className="mt-1.5 text-xs text-red-500">
-            Enter a valid time, e.g. 9, 930, 6pm, or 09:00
-          </p>
-        ) : null}
+            : {}),
+        }}
+      >
+        <BiTimeFive
+          className="size-4 shrink-0 text-[#5f5f5f]"
+          aria-hidden="true"
+        />
+        <input
+          ref={timeInputRef}
+          type="text"
+          data-task-time-input
+          value={typedTime}
+          onChange={(event) => {
+            setTypedTime(event.target.value);
+            if (timeInputError) setTimeInputError(false);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              commitTypedTimeAndSave();
+            }
+          }}
+          onPointerDown={(event) => event.stopPropagation()}
+          placeholder="Type a time — 9, 930, 6pm"
+          aria-invalid={timeInputError}
+          className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-zinc-400"
+          style={{
+            color:
+              draftMinutes != null && !timeInputError
+                ? PICKER_ACCENT
+                : PICKER_FOREGROUND,
+          }}
+        />
       </div>
+      {timeInputError ? (
+        <p className="text-[14px] text-red-500">
+          Enter a valid time, e.g. 9, 930, 6pm, or 09:00
+        </p>
+      ) : null}
 
-      <div className="grid grid-cols-2 gap-2 border-b border-zinc-200 px-3 py-3 dark:border-zinc-700">
+      <div className="grid grid-cols-2 gap-2">
         {TIME_PRESETS.map((preset) => {
           const isSelected = draftMinutes === preset.minutes;
 
@@ -705,14 +723,23 @@ function TaskTimeMenu({
               key={preset.id}
               type="button"
               onClick={() => selectTime(preset.minutes)}
-              className={`rounded-full border px-3 py-1.5 text-left text-[11.5px] transition-colors cursor-pointer ${
+              className="rounded-xl border px-2.5 py-1.5 text-left transition-colors cursor-pointer"
+              style={
                 isSelected
-                  ? "border-emerald-500 bg-emerald-50 text-zinc-900 dark:border-emerald-400 dark:bg-emerald-950/40 dark:text-zinc-50"
-                  : "border-zinc-200 text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800/80"
-              }`}
+                  ? {
+                      borderColor: PICKER_BORDER,
+                      backgroundColor: PICKER_ACCENT_SOFT,
+                    }
+                  : { borderColor: PICKER_BORDER }
+              }
             >
-              <span className="font-medium">{preset.label}</span>{" "}
-              <span className="text-zinc-500 dark:text-zinc-400">
+              <span className="block text-[13.5px] font-medium text-zinc-800">
+                {preset.label}
+              </span>
+              <span
+                className="block text-[12.5px]"
+                style={{ color: PICKER_MUTED_FG }}
+              >
                 {formatTime24Hour(preset.minutes)}
               </span>
             </button>
@@ -722,7 +749,8 @@ function TaskTimeMenu({
 
       <div
         ref={listRef}
-        className="max-h-[148px] overflow-y-auto border-b border-zinc-200 dark:border-zinc-700"
+        className="max-h-36 overflow-y-auto rounded-xl border"
+        style={{ borderColor: PICKER_BORDER }}
       >
         {timeOptions.map((minutes) => {
           const isSelected = draftMinutes === minutes;
@@ -733,11 +761,14 @@ function TaskTimeMenu({
               type="button"
               data-minutes={minutes}
               onClick={() => selectTime(minutes)}
-              className={`flex w-full px-4 py-2.5 text-left text-sm transition-colors cursor-pointer ${
-                isSelected
-                  ? "bg-emerald-50 font-medium text-zinc-900 dark:bg-emerald-950/40 dark:text-zinc-50"
-                  : "text-zinc-700 hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-zinc-800/80"
+              className={`block w-full px-3 py-1 text-left text-[13px] transition-colors cursor-pointer ${
+                isSelected ? "font-semibold" : "hover:bg-zinc-50"
               }`}
+              style={
+                isSelected
+                  ? { backgroundColor: PICKER_ACCENT_SOFT, color: PICKER_ACCENT }
+                  : { color: PICKER_FOREGROUND }
+              }
             >
               {formatTime24Hour(minutes)}
             </button>
@@ -745,11 +776,14 @@ function TaskTimeMenu({
         })}
       </div>
 
-      <div className="space-y-2 border-b border-zinc-200 px-3 py-3 dark:border-zinc-700">
-        <p className="text-sm font-semibold text-[#6b7f99] dark:text-zinc-400">
+      <div>
+        <span
+          className="text-[0.65rem] font-semibold uppercase tracking-[0.14em]"
+          style={{ color: PICKER_MUTED_FG }}
+        >
           Duration
-        </p>
-        <div className="flex flex-wrap gap-2">
+        </span>
+        <div className="mt-2 flex flex-wrap gap-2">
           {TIME_PICKER_DURATION_OPTIONS.map((option) => {
             const isSelected = durationMinutes === option.value;
 
@@ -757,12 +791,25 @@ function TaskTimeMenu({
               <button
                 key={option.label}
                 type="button"
-                onClick={() => setDurationMinutes(option.value)}
-                className={`rounded-full border px-3 py-1 text-sm transition-colors cursor-pointer ${
+                onClick={() => {
+                  setDurationMinutes(option.value);
+                  const minutes = resolveDraftMinutes();
+                  if (minutes !== null) {
+                    persistDueTime(minutes, option.value, { keepOpen: true });
+                  }
+                }}
+                className="rounded-full border px-2.5 py-1 text-[12px] transition-colors cursor-pointer border-[#d5d5d5]"
+                style={
                   isSelected
-                    ? "border-emerald-500 bg-emerald-50 text-zinc-900 dark:border-emerald-400 dark:bg-emerald-950/40 dark:text-zinc-50"
-                    : "border-zinc-200 text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800/80"
-                }`}
+                    ? {
+                        backgroundColor: PICKER_ACCENT_SOFT,
+                        color: PICKER_ACCENT,
+                      }
+                    : {
+                        borderColor: PICKER_BORDER,
+                        color: PICKER_FOREGROUND,
+                      }
+                }
               >
                 {option.label}
               </button>
@@ -771,31 +818,18 @@ function TaskTimeMenu({
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-2 px-3 py-3">
+      <div
+        className="border-t pt-2"
+        style={{ borderColor: PICKER_BORDER }}
+      >
         <button
           type="button"
           onClick={handleClearTime}
-          className="text-sm font-medium text-zinc-500 transition-colors hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200 cursor-pointer"
+          className="text-[12px] font-medium transition-colors hover:opacity-80 cursor-pointer"
+          style={{ color: PICKER_MUTED_FG }}
         >
           Clear time
         </button>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={!canSave}
-            className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Save
-          </button>
-        </div>
       </div>
     </div>
   );
@@ -830,7 +864,36 @@ export function TaskDatePicker({
   const [displayRecurrence, setDisplayRecurrence] =
     useState<TaskRecurrenceRule | null>(activeRecurrence);
   const timeButtonLabel =
-    formatDueTimeLabel(dueTimeMinutes) ?? "Time";
+    formatDueTimeLabel(dueTimeMinutes) ?? "Add time";
+  const dateInputRef = useRef<HTMLInputElement>(null);
+  const hasAutoFocusedDateInputRef = useRef(false);
+
+  useEffect(() => {
+    if (hasAutoFocusedDateInputRef.current) return;
+
+    const frame = requestAnimationFrame(() => {
+      const pickerRoot = dateInputRef.current?.closest(
+        "[data-task-date-picker-root]",
+      );
+      const activeElement = document.activeElement;
+      if (
+        pickerRoot instanceof Node &&
+        activeElement instanceof Node &&
+        pickerRoot.contains(activeElement) &&
+        activeElement !== dateInputRef.current
+      ) {
+        hasAutoFocusedDateInputRef.current = true;
+        return;
+      }
+
+      dateInputRef.current?.focus();
+      hasAutoFocusedDateInputRef.current = true;
+    });
+
+    return () => {
+      cancelAnimationFrame(frame);
+    };
+  }, []);
 
   useEffect(() => {
     setDisplayRecurrence(activeRecurrence);
@@ -910,17 +973,34 @@ export function TaskDatePicker({
     },
   ];
 
+  function handleRemoveDate(event: SyntheticEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    onSelectDate(null);
+    setTypedDate("");
+    setDateInputError(false);
+  }
+
   return (
     <div
-      className={`relative z-50 overflow-visible bg-white dark:bg-zinc-900 ${
-        className ??
-        "rounded-xl border border-zinc-200 shadow-xl dark:border-zinc-700"
-      } ${isTimeMenuOpen ? "min-h-[720px]" : ""}`}
-      style={{ width: TASK_DATE_PICKER_WIDTH }}
+      data-task-date-picker-root
+      className={`relative z-50 overflow-visible bg-white ${
+        className ?? "rounded-2xl border"
+      }`}
+      style={{
+        width: TASK_DATE_PICKER_WIDTH,
+        borderColor: className ? undefined : PICKER_BORDER,
+        boxShadow: className ? undefined : PICKER_POPOVER_SHADOW,
+      }}
     >
-      <div className="border-b border-zinc-200 px-2.5 py-[7px] dark:border-zinc-700">
+      <div
+        className="border-b p-2"
+        style={{ borderColor: PICKER_BORDER }}
+      >
         <input
+          ref={dateInputRef}
           type="text"
+          data-task-date-picker-date-input
           value={typedDate}
           onChange={(event) => {
             setTypedDate(event.target.value);
@@ -937,60 +1017,76 @@ export function TaskDatePicker({
           onFocus={() => setIsDateInputFocused(true)}
           onBlur={() => setIsDateInputFocused(false)}
           placeholder={
-            isDateInputFocused ? activeFormat.placeholder : "Type a date"
+            isDateInputFocused
+              ? activeFormat.placeholder
+              : "Type a date — e.g. next friday"
           }
           aria-invalid={dateInputError}
-          className={`w-full bg-transparent text-sm outline-none placeholder:text-zinc-400 dark:text-zinc-50 cursor-pointer ${
+          className={`w-full rounded-[12px] px-3.5 py-[6px] text-[13px] outline-none ${
             dateInputError
               ? "text-red-600 placeholder:text-red-300"
-              : "text-zinc-900"
+              : "text-zinc-900 placeholder:text-zinc-400"
           }`}
+          style={{ backgroundColor: PICKER_MUTED }}
         />
         {dateInputError && (
-          <p className="mt-1 text-xs text-red-500">
+          <p className="mt-1.5 text-[14px] text-red-500">
             Enter a valid future date, e.g. {activeFormat.example}
           </p>
         )}
       </div>
 
-      <div className="py-1 text-[#444444]">
+      <div
+        className="flex gap-2 overflow-visible border-b p-2"
+        style={{ borderColor: PICKER_BORDER }}
+      >
         {quickOptions.map((option) => (
           <button
             key={option.key}
             type="button"
             onClick={() => selectDate(option.date)}
-            className="flex w-full text-[12px] items-center gap-3 pl-3 pr-4 py-[6px] text-left transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/80"
+            className="flex-1 rounded-xl border px-3 py-[5px] text-left transition-colors hover:border-[#d5d5d5] hover:bg-[#f0f0f0] cursor-pointer"
+            style={{ borderColor: PICKER_BORDER }}
           >
-            {/* <span className="flex w-6 shrink-0 items-center justify-center">
-              {option.icon}
-            </span> */}
-            <span className="flex-1 text-sm text-zinc-700 dark:text-zinc-50">
+            <span className="block text-[13px] leading-[1.3] font-medium text-zinc-700">
               {option.label}
             </span>
-            <span className="text-sm text-zinc-400">{option.hint}</span>
-          </button>
-        ))}
-
-        {dueDate ? (
-          <button
-            type="button"
-            onClick={() => {
-              onSelectDate(null);
-              setTypedDate("");
-              setDateInputError(false);
-            }}
-            className="group flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/80 cursor-pointer"
-          >
-            <BiBlock className="group-hover:text-zinc-450 size-[18px] shrink-0 text-zinc-400" aria-hidden="true" />
-            <span className="flex-1 text-sm text-[#8f8f8f] group-hover:text-zinc-500">
-              No Date 
+            <span
+              className="block text-[12px] text-zinc-450"
+            >
+              {option.hint}
             </span>
           </button>
+        ))}
+        {dueDate ? (
+          <div className="group/no-date relative shrink-0">
+            <button
+              type="button"
+              onPointerDown={handleRemoveDate}
+              aria-label="Remove date"
+              aria-describedby="task-date-picker-remove-date-tooltip"
+              className="flex shrink-0 items-center justify-center rounded-xl border px-3 py-2 h-[46px]! transition-colors hover:border-red-300 hover:text-red-600 cursor-pointer"
+              style={{ borderColor: PICKER_BORDER, color: PICKER_MUTED_FG }}
+            >
+              <CalendarOff
+                className="pointer-events-none size-4 text-zinc-500"
+                strokeWidth={2}
+                aria-hidden="true"
+              />
+            </button>
+            <span
+              id="task-date-picker-remove-date-tooltip"
+              role="tooltip"
+              className="task-date-picker-remove-tooltip add-task-date-tooltip pointer-events-none absolute right-0 bottom-[calc(100%+10px)] z-40 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity group-hover/no-date:opacity-100"
+            >
+              Remove date
+            </span>
+          </div>
         ) : null}
       </div>
 
       <div className="border-t border-zinc-200 dark:border-zinc-700">
-        <div className="flex items-center justify-between px-3 py-2">
+        <div className="flex items-center justify-between px-[11px] py-[7px]">
           <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
             {formatMonthYear(viewMonth)}
           </h4>
@@ -1035,25 +1131,35 @@ export function TaskDatePicker({
         </div>
       </div>
 
-      <div className="space-y-2 border-t border-zinc-200 px-3 py-2.5 dark:border-zinc-700">
+      <div
+        className="space-y-3 border-t p-3"
+        style={{ borderColor: PICKER_BORDER }}
+      >
         <div className="relative">
           <button
             type="button"
             onClick={() => setIsTimeMenuOpen((open) => !open)}
-            className={`flex w-full items-center justify-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition-colors cursor-pointer ${
+            className="flex w-full items-center justify-center gap-2 rounded-full border py-2 text-[13px] border-[#dedede] text-zinc-600 font-medium transition-colors cursor-pointer"
+            style={
               isTimeMenuOpen || dueTimeMinutes !== null
-                ? "border-emerald-500 bg-emerald-50 text-emerald-800 dark:border-emerald-400 dark:bg-emerald-950/40 dark:text-emerald-200"
-                : "border-zinc-200 text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800/80"
-            }`}
+                ? {
+                    backgroundColor: PICKER_ACCENT_SOFT,
+                    color: PICKER_ACCENT,
+                  }
+                : {
+                    borderColor: PICKER_BORDER,
+                    color: PICKER_MUTED_FG,
+                  }
+            }
           >
-            <BiTimeFive
-              className={`size-4 ${
-                isTimeMenuOpen || dueTimeMinutes !== null
-                  ? "text-emerald-600 dark:text-emerald-400"
-                  : ""
-              }`}
-            />
+            <BiTimeFive className="size-4" />
             {timeButtonLabel}
+            <BiChevronDown
+              className={`size-4 transition-transform ${
+                isTimeMenuOpen ? "rotate-180" : ""
+              }`}
+              aria-hidden="true"
+            />
           </button>
 
           {isTimeMenuOpen && onSaveDueTime ? (
@@ -1063,10 +1169,8 @@ export function TaskDatePicker({
                 dueDurationMinutes: dueDurationMinutes ?? null,
                 dueTimeZone: normalizeDueTimeZone(dueTimeZone),
               }}
-              onCancel={() => setIsTimeMenuOpen(false)}
-              onSave={(dueTime) => {
-                onSaveDueTime(dueTime);
-                setIsTimeMenuOpen(false);
+              onSave={(dueTime, options) => {
+                onSaveDueTime(dueTime, options);
               }}
             />
           ) : null}
