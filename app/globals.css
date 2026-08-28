@@ -2,6 +2,7 @@
 
 @source inline("rounded-[8px]");
 @source inline("rounded-[14px]");
+@source inline("gap-[8px]");
 @source inline("size-[18px]");
 @source inline("size-[22px]");
 @source inline("size-[24px]");
@@ -28,6 +29,7 @@
     0 1.125px 1.5px rgba(0, 0, 0, 0.026),
     0 3.75px 11.25px rgba(0, 0, 0, 0.051),
     0 11.25px 23.25px rgba(0, 0, 0, 0.077);
+  --list-calendar-button-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   --calendar-task-drag-width-extra: 4px;
   --app-tooltip-shadow:
     0 1px 2px rgba(0, 0, 0, 0.05),
@@ -520,6 +522,22 @@ body {
   animation: add-task-form-in 100ms ease-out forwards;
 }
 
+@keyframes add-task-form-reset {
+  from {
+    opacity: 0.45;
+    filter: blur(6px);
+  }
+
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+.add-task-form-reset {
+  animation: add-task-form-reset 180ms ease-out forwards;
+}
+
 .add-task-date-tooltip {
   background-color: var(--app-tooltip-background, #3d3e3f);
   color: var(--app-tooltip-text, #ffffff);
@@ -574,6 +592,12 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .add-task-form-enter {
+    animation: none;
+    opacity: 1;
+    filter: none;
+  }
+
+  .add-task-form-reset {
     animation: none;
     opacity: 1;
     filter: none;
@@ -1000,6 +1024,7 @@ body {
       0 1.125px 1.5px rgba(0, 0, 0, 0.128),
       0 3.75px 11.25px rgba(0, 0, 0, 0.204),
       0 11.25px 23.25px rgba(0, 0, 0, 0.255);
+    --list-calendar-button-shadow: 0 1px 3px rgba(0, 0, 0, 0.32);
   }
 
   .task-row-dragging {
@@ -1053,6 +1078,10 @@ body {
   border: 1px solid rgb(235 235 235);
   box-shadow: var(--calendar-task-hover-preview-shadow);
   animation: calendar-task-preview-in 160ms ease-out;
+}
+
+.list-calendar-button {
+  box-shadow: var(--list-calendar-button-shadow);
 }
 
 .task-item-date-picker-popover {

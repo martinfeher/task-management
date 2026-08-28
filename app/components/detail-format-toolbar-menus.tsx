@@ -27,6 +27,34 @@ export const FORMAT_TOOLBAR_DROPDOWN_MENU_CLASS =
 export const FORMAT_TOOLBAR_DROPDOWN_ITEM_CLASS =
   "flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-zinc-900 transition-colors hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800";
 
+export const FORMAT_TOOLBAR_TOOLTIP_CLASS =
+  "add-task-date-tooltip add-task-date-tooltip-below pointer-events-none absolute top-[calc(100%+6px)] left-1/2 z-50 -translate-x-1/2 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity";
+
+type FormatToolbarTooltipWrapProps = {
+  label: string;
+  tooltipId: string;
+  children: ReactNode;
+};
+
+export function FormatToolbarTooltipWrap({
+  label,
+  tooltipId,
+  children,
+}: FormatToolbarTooltipWrapProps) {
+  return (
+    <div className="group/format-tooltip relative">
+      {children}
+      <span
+        id={tooltipId}
+        role="tooltip"
+        className={`${FORMAT_TOOLBAR_TOOLTIP_CLASS} group-hover/format-tooltip:opacity-100`}
+      >
+        {label}
+      </span>
+    </div>
+  );
+}
+
 const TEXT_BLOCK_OPTIONS: {
   type: DetailTextBlockType;
   label: string;
@@ -91,6 +119,8 @@ type DropdownShellProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   ariaLabel: string;
+  tooltipId: string;
+  tooltipLabel: string;
   triggerClassName?: string;
   menuClassName?: string;
   align?: "left" | "right";
@@ -102,6 +132,8 @@ function FormatToolbarDropdownShell({
   open,
   onOpenChange,
   ariaLabel,
+  tooltipId,
+  tooltipLabel,
   triggerClassName = FORMAT_TOOLBAR_DROPDOWN_TRIGGER_CLASS,
   menuClassName = FORMAT_TOOLBAR_DROPDOWN_MENU_CLASS,
   align = "left",
@@ -109,30 +141,33 @@ function FormatToolbarDropdownShell({
   children,
 }: DropdownShellProps) {
   return (
-    <div className="relative">
-      <button
-        type="button"
-        aria-label={ariaLabel}
-        aria-expanded={open}
-        aria-haspopup="menu"
-        className={`${triggerClassName} ${open ? "bg-zinc-100 dark:bg-zinc-800" : ""}`}
-        onMouseDown={(event) => event.preventDefault()}
-        onClick={() => onOpenChange(!open)}
-      >
-        {trigger}
-      </button>
-
-      {open ? (
-        <div
-          role="menu"
+    <FormatToolbarTooltipWrap label={tooltipLabel} tooltipId={tooltipId}>
+      <div className="relative">
+        <button
+          type="button"
           aria-label={ariaLabel}
-          className={`${menuClassName} ${align === "right" ? "right-0" : "left-0"} min-w-[168px]`}
+          aria-describedby={tooltipId}
+          aria-expanded={open}
+          aria-haspopup="menu"
+          className={`${triggerClassName} ${open ? "bg-zinc-100 dark:bg-zinc-800" : ""}`}
           onMouseDown={(event) => event.preventDefault()}
+          onClick={() => onOpenChange(!open)}
         >
-          {children}
-        </div>
-      ) : null}
-    </div>
+          {trigger}
+        </button>
+
+        {open ? (
+          <div
+            role="menu"
+            aria-label={ariaLabel}
+            className={`${menuClassName} ${align === "right" ? "right-0" : "left-0"} min-w-[168px]`}
+            onMouseDown={(event) => event.preventDefault()}
+          >
+            {children}
+          </div>
+        ) : null}
+      </div>
+    </FormatToolbarTooltipWrap>
   );
 }
 
@@ -156,6 +191,8 @@ export function DetailFormatColorDropdown({
       open={open}
       onOpenChange={onOpenChange}
       ariaLabel="Text color"
+      tooltipId="format-toolbar-text-color-tooltip"
+      tooltipLabel="Text color"
       trigger={
         <>
           <span className="relative flex min-w-5 items-center justify-center px-0.5">
@@ -213,6 +250,8 @@ export function DetailFormatListDropdown({
       open={open}
       onOpenChange={onOpenChange}
       ariaLabel="List type"
+      tooltipId="format-toolbar-list-type-tooltip"
+      tooltipLabel="List type"
       trigger={
         <>
           <BulletListIcon className="size-4 text-zinc-700 dark:text-zinc-200" />
@@ -259,6 +298,8 @@ export function DetailFormatBlockTypeDropdown({
       open={open}
       onOpenChange={onOpenChange}
       ariaLabel="Block type"
+      tooltipId="format-toolbar-block-type-tooltip"
+      tooltipLabel="Text style"
       trigger={
         <>
           <span className="text-sm font-medium text-zinc-800 dark:text-zinc-100">Aa</span>
@@ -320,6 +361,8 @@ export function DetailFormatFontComboDropdown({
       open={open}
       onOpenChange={onOpenChange}
       ariaLabel="Font family and size"
+      tooltipId="format-toolbar-font-tooltip"
+      tooltipLabel="Font"
       menuClassName={`${FORMAT_TOOLBAR_DROPDOWN_MENU_CLASS} min-w-[200px] max-h-72 overflow-y-auto`}
       trigger={
         <>
@@ -397,6 +440,8 @@ export function DetailFormatOverflowMenu({
       open={open}
       onOpenChange={onOpenChange}
       ariaLabel="More formatting options"
+      tooltipId="format-toolbar-more-tooltip"
+      tooltipLabel="More options"
       align="right"
       trigger={
         <span className="flex size-4 items-center justify-center tracking-widest text-zinc-600 dark:text-zinc-300">

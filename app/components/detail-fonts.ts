@@ -436,11 +436,47 @@ function removeStylePropertyFromRange(
   }
 }
 
-function replaceRangeWithPlainText(range: Range): Text | null {
+function isInlineFormattingElement(element: HTMLElement) {
+  if (FORMATTING_TAGS.has(element.tagName)) return true;
+  if (element.tagName === "FONT" || element.tagName === "A") return true;
+  if (element.style.cssText.trim()) return true;
+
+  return false;
+}
+
+function unwrapInlineFormattingAroundText(textNode: Text, boundary: HTMLElement) {
+  let parent = textNode.parentNode;
+
+  while (parent instanceof HTMLElement && parent !== boundary) {
+    if (!isInlineFormattingElement(parent)) break;
+    unwrapElement(parent);
+    parent = textNode.parentNode;
+  }
+}
+
+function cleanupEmptyFormattingInRange(line: HTMLElement, range: Range) {
+  const candidates = line.querySelectorAll(
+    "span, mark, b, strong, i, em, u, s, strike, font, a",
+  );
+
+  for (const element of Array.from(candidates)) {
+    if (!(element instanceof HTMLElement)) continue;
+    if (!range.intersectsNode(element)) continue;
+    if (element.textContent?.length !== 0) continue;
+
+    element.remove();
+  }
+}
+
+function replaceRangeWithPlainText(
+  range: Range,
+  line: HTMLElement,
+): Text | null {
   const text = range.toString();
   if (!text) {
     if (!range.collapsed) {
       range.deleteContents();
+      cleanupEmptyFormattingInRange(line, range);
     }
     return null;
   }
@@ -448,6 +484,9 @@ function replaceRangeWithPlainText(range: Range): Text | null {
   range.deleteContents();
   const textNode = document.createTextNode(text);
   range.insertNode(textNode);
+  unwrapInlineFormattingAroundText(textNode, line);
+  cleanupEmptyFormattingInRange(line, range);
+
   return textNode;
 }
 
@@ -473,16 +512,19 @@ export function stripFormattingInSelection(
   );
   if (lines.length === 0) return false;
 
-  const lineRanges = lines
-    .map((line) => getLineSelectionRange(line, range))
-    .filter((lineRange) => lineRange.toString().length > 0);
+  const lineSelections = lines
+    .map((line) => ({
+      line,
+      range: getLineSelectionRange(line, range),
+    }))
+    .filter(({ range: lineRange }) => lineRange.toString().length > 0);
 
-  if (lineRanges.length === 0) return false;
+  if (lineSelections.length === 0) return false;
 
   const insertedNodes: Text[] = [];
 
-  for (const lineRange of lineRanges.reverse()) {
-    const textNode = replaceRangeWithPlainText(lineRange);
+  for (const { line, range: lineRange } of lineSelections.reverse()) {
+    const textNode = replaceRangeWithPlainText(lineRange, line);
     if (textNode) {
       insertedNodes.unshift(textNode);
     }

@@ -94,6 +94,7 @@ import {
   DetailFormatFontComboDropdown,
   DetailFormatListDropdown,
   DetailFormatOverflowMenu,
+  FormatToolbarTooltipWrap,
   type FormatToolbarDropdown,
 } from "./detail-format-toolbar-menus";
 import { GrammarCheckModal } from "./grammar-check-modal";
@@ -216,7 +217,7 @@ type AddBlockMenuState = {
 };
 
 const FORMAT_TOOLBAR_CONTAINER_CLASS =
-  "fixed z-50 -translate-y-full overflow-hidden rounded-2xl border border-zinc-200/90 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.12)] dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-[0_8px_24px_rgba(0,0,0,0.32)]";
+  "fixed z-50 -translate-y-full overflow-visible rounded-2xl border border-zinc-200/90 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.12)] dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-[0_8px_24px_rgba(0,0,0,0.32)]";
 
 const FORMAT_TOOLBAR_ROW_CLASS = "flex items-center gap-0.5 px-1.5 py-1";
 
@@ -225,6 +226,23 @@ const FORMAT_TOOLBAR_TEXT_BUTTON_CLASS =
 
 const FORMAT_TOOLBAR_ICON_BUTTON_CLASS =
   "flex h-8 w-8 items-center justify-center rounded-lg text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800";
+
+const FORMAT_TOOLBAR_ACTIVE_BUTTON_CLASS =
+  "bg-zinc-100 text-[#2563eb] dark:bg-zinc-800 dark:text-blue-300";
+
+type FormatMenuInlineFormats = {
+  bold: boolean;
+  italic: boolean;
+  underline: boolean;
+  highlight: boolean;
+};
+
+const DEFAULT_FORMAT_MENU_INLINE_FORMATS: FormatMenuInlineFormats = {
+  bold: false,
+  italic: false,
+  underline: false,
+  highlight: false,
+};
 
 const TASK_DETAILS_TOOLTIP_CLASS =
   "add-task-date-tooltip add-task-date-tooltip-below pointer-events-none absolute top-[calc(100%+8px)] left-1/2 z-50 -translate-x-1/2 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity";
@@ -500,6 +518,26 @@ function selectionHasHighlight(editor: HTMLElement) {
   );
 }
 
+function getDetailSelectionInlineFormatState(
+  editor: HTMLElement,
+): FormatMenuInlineFormats {
+  const selection = window.getSelection();
+  if (
+    !selection ||
+    selection.isCollapsed ||
+    !editor.contains(selection.anchorNode)
+  ) {
+    return DEFAULT_FORMAT_MENU_INLINE_FORMATS;
+  }
+
+  return {
+    bold: document.queryCommandState("bold"),
+    italic: document.queryCommandState("italic"),
+    underline: document.queryCommandState("underline"),
+    highlight: selectionHasHighlight(editor),
+  };
+}
+
 function unwrapElement(element: HTMLElement) {
   const parent = element.parentNode;
   if (!parent) return;
@@ -694,6 +732,8 @@ export function TaskDetailsPanel({
     useState<DetailFontFamilyId>("sans-serif");
   const [formatMenuBlockType, setFormatMenuBlockType] =
     useState<TextBlockType>("text");
+  const [formatMenuInlineFormats, setFormatMenuInlineFormats] =
+    useState<FormatMenuInlineFormats>(DEFAULT_FORMAT_MENU_INLINE_FORMATS);
   const [showLinkMenu, setShowLinkMenu] = useState(false);
   const [linkText, setLinkText] = useState("");
   const [linkUrl, setLinkUrl] = useState("");
@@ -1819,6 +1859,7 @@ export function TaskDetailsPanel({
     setFormatMenuFontSize(fontState.size);
     setFormatMenuFontFamily(fontState.familyId);
     setFormatMenuBlockType(getActiveTextBlockType(editor));
+    setFormatMenuInlineFormats(getDetailSelectionInlineFormatState(editor));
     closeFormatDropdowns();
   }, [closeFormatDropdowns, rememberFormatSelection]);
 
@@ -1866,6 +1907,7 @@ export function TaskDetailsPanel({
     closeFormatDropdowns();
     if (editor) {
       setFormatMenuBlockType(getActiveTextBlockType(editor));
+      setFormatMenuInlineFormats(getDetailSelectionInlineFormatState(editor));
     }
     updateLineControls();
   }, [
@@ -4199,8 +4241,6 @@ export function TaskDetailsPanel({
         <div
           ref={formatMenuRef}
           className={`${FORMAT_TOOLBAR_CONTAINER_CLASS} ${
-            openFormatDropdown ? "overflow-visible" : ""
-          } ${
             formatMenu.alignLeft ? "" : "-translate-x-1/2"
           } ${
             formatMenu.placement === "below" ? "translate-y-2" : "-translate-y-full"
@@ -4278,36 +4318,66 @@ export function TaskDetailsPanel({
           ) : (
             <>
               <div className={FORMAT_TOOLBAR_ROW_CLASS}>
-                <button
-                  type="button"
-                  aria-label="Bold"
-                  title="Bold"
-                  className={`${FORMAT_TOOLBAR_TEXT_BUTTON_CLASS} font-bold`}
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => applyFormat("bold")}
+                <FormatToolbarTooltipWrap
+                  label="Bold"
+                  tooltipId="format-toolbar-bold-tooltip"
                 >
-                  B
-                </button>
-                <button
-                  type="button"
-                  aria-label="Italic"
-                  title="Italic"
-                  className={`${FORMAT_TOOLBAR_TEXT_BUTTON_CLASS} italic`}
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => applyFormat("italic")}
+                  <button
+                    type="button"
+                    aria-label="Bold"
+                    aria-pressed={formatMenuInlineFormats.bold}
+                    aria-describedby="format-toolbar-bold-tooltip"
+                    className={`${FORMAT_TOOLBAR_TEXT_BUTTON_CLASS} font-bold ${
+                      formatMenuInlineFormats.bold
+                        ? FORMAT_TOOLBAR_ACTIVE_BUTTON_CLASS
+                        : ""
+                    }`}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => applyFormat("bold")}
+                  >
+                    B
+                  </button>
+                </FormatToolbarTooltipWrap>
+                <FormatToolbarTooltipWrap
+                  label="Italic"
+                  tooltipId="format-toolbar-italic-tooltip"
                 >
-                  I
-                </button>
-                <button
-                  type="button"
-                  aria-label="Underline"
-                  title="Underline"
-                  className={`${FORMAT_TOOLBAR_TEXT_BUTTON_CLASS} underline`}
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => applyFormat("underline")}
+                  <button
+                    type="button"
+                    aria-label="Italic"
+                    aria-pressed={formatMenuInlineFormats.italic}
+                    aria-describedby="format-toolbar-italic-tooltip"
+                    className={`${FORMAT_TOOLBAR_TEXT_BUTTON_CLASS} italic ${
+                      formatMenuInlineFormats.italic
+                        ? FORMAT_TOOLBAR_ACTIVE_BUTTON_CLASS
+                        : ""
+                    }`}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => applyFormat("italic")}
+                  >
+                    I
+                  </button>
+                </FormatToolbarTooltipWrap>
+                <FormatToolbarTooltipWrap
+                  label="Underline"
+                  tooltipId="format-toolbar-underline-tooltip"
                 >
-                  U
-                </button>
+                  <button
+                    type="button"
+                    aria-label="Underline"
+                    aria-pressed={formatMenuInlineFormats.underline}
+                    aria-describedby="format-toolbar-underline-tooltip"
+                    className={`${FORMAT_TOOLBAR_TEXT_BUTTON_CLASS} underline ${
+                      formatMenuInlineFormats.underline
+                        ? FORMAT_TOOLBAR_ACTIVE_BUTTON_CLASS
+                        : ""
+                    }`}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => applyFormat("underline")}
+                  >
+                    U
+                  </button>
+                </FormatToolbarTooltipWrap>
 
                 <div aria-hidden="true" className={FORMAT_TOOLBAR_DIVIDER_CLASS} />
 
@@ -4319,29 +4389,44 @@ export function TaskDetailsPanel({
                   onSelectColor={applyTextColor}
                 />
 
-                <button
-                  type="button"
-                  aria-label="Highlight"
-                  title="Highlight"
-                  className={FORMAT_TOOLBAR_ICON_BUTTON_CLASS}
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => applyFormat("highlight")}
+                <FormatToolbarTooltipWrap
+                  label="Highlight"
+                  tooltipId="format-toolbar-highlight-tooltip"
                 >
-                  <LuHighlighter className="size-4" />
-                </button>
+                  <button
+                    type="button"
+                    aria-label="Highlight"
+                    aria-pressed={formatMenuInlineFormats.highlight}
+                    aria-describedby="format-toolbar-highlight-tooltip"
+                    className={`${FORMAT_TOOLBAR_ICON_BUTTON_CLASS} ${
+                      formatMenuInlineFormats.highlight
+                        ? FORMAT_TOOLBAR_ACTIVE_BUTTON_CLASS
+                        : ""
+                    }`}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => applyFormat("highlight")}
+                  >
+                    <LuHighlighter className="size-4" />
+                  </button>
+                </FormatToolbarTooltipWrap>
 
                 <div aria-hidden="true" className={FORMAT_TOOLBAR_DIVIDER_CLASS} />
 
-                <button
-                  type="button"
-                  aria-label="Add link"
-                  title="Add link (⌘K / Ctrl+K)"
-                  className={FORMAT_TOOLBAR_ICON_BUTTON_CLASS}
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={openLinkMenu}
+                <FormatToolbarTooltipWrap
+                  label="Add link (⌘K / Ctrl+K)"
+                  tooltipId="format-toolbar-link-tooltip"
                 >
-                  <BiLink className="size-4" />
-                </button>
+                  <button
+                    type="button"
+                    aria-label="Add link"
+                    aria-describedby="format-toolbar-link-tooltip"
+                    className={FORMAT_TOOLBAR_ICON_BUTTON_CLASS}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={openLinkMenu}
+                  >
+                    <BiLink className="size-4" />
+                  </button>
+                </FormatToolbarTooltipWrap>
 
                 <DetailFormatListDropdown
                   open={openFormatDropdown === "list"}
@@ -4386,18 +4471,23 @@ export function TaskDetailsPanel({
 
                 <div aria-hidden="true" className={FORMAT_TOOLBAR_DIVIDER_CLASS} />
 
-                <button
-                  type="button"
-                  aria-label="Clear formatting"
-                  title="Clear formatting"
-                  className={FORMAT_TOOLBAR_ICON_BUTTON_CLASS}
-                  onMouseDown={(event) => {
-                    event.preventDefault();
-                    clearFormatting();
-                  }}
+                <FormatToolbarTooltipWrap
+                  label="Clear formatting"
+                  tooltipId="format-toolbar-clear-tooltip"
                 >
-                  <LuRemoveFormatting className="size-4" />
-                </button>
+                  <button
+                    type="button"
+                    aria-label="Clear formatting"
+                    aria-describedby="format-toolbar-clear-tooltip"
+                    className={FORMAT_TOOLBAR_ICON_BUTTON_CLASS}
+                    onMouseDown={(event) => {
+                      event.preventDefault();
+                      clearFormatting();
+                    }}
+                  >
+                    <LuRemoveFormatting className="size-4" />
+                  </button>
+                </FormatToolbarTooltipWrap>
 
                 <DetailFormatOverflowMenu
                   open={openFormatDropdown === "overflow"}

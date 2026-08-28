@@ -111,7 +111,7 @@ const itemClassName =
   "flex mx-[6px] mb-px w-[236px] items-center rounded-[3px]  text-left text-sm transition-colors cursor-pointer";
 
 const completedItemClassName =
-  "flex mx-[4px] mb-px min-h-[44px] w-auto flex-col items-start justify-center gap-0 rounded-[3px]  px-4 py-1 text-left text-sm transition-colors";
+  "flex mx-[4px] mb-px min-h-[44px] w-auto flex-col items-start justify-center gap-0 rounded-[3px] px-4 py-1 text-left text-sm transition-colors";
 
 function getItemClassName(isSelected: boolean, baseClassName = itemClassName) {
   const heightClass =
@@ -902,7 +902,7 @@ export function Sidebar({
                 else onSelectCalendar();
                 closeDrawer();
               }}
-              className={`${getNavItemClassName(isNavItemSelected)} gap-2 px-4 rounded-r-[9px] ${
+              className={`${getNavItemClassName(isNavItemSelected)} gap-[8px] px-4 rounded-r-[9px] ${
                 showNavAccentBorder
                   ? "border-l-[2px] border-l-[#dadfdf]"
                   : "border-l-[2px] border-l-transparent"
@@ -923,7 +923,7 @@ export function Sidebar({
                   aria-hidden="true"
                 />
               )}
-              <span className="inline-block max-w-full truncate rounded-full px-3 py-[3.5px] text-zinc-700 transition-all duration-300 cursor-pointer dark:bg-zinc-800/60 dark:hover:bg-zinc-800/80">
+              <span className="inline-block max-w-full truncate rounded-full pl-0 pr-3 py-[3.5px] text-zinc-700 transition-all duration-300 cursor-pointer dark:bg-zinc-800/60 dark:hover:bg-zinc-800/80">
                 {item.label}
               </span>
             </div>
@@ -945,7 +945,7 @@ export function Sidebar({
               className={
                 item.action === "search"
                   ? "mx-[6px] my-2 flex h-[35px] w-auto bg-[#fcfbff] cursor-pointer items-center gap-2 self-stretch rounded-[7px] border border-[#e3e3e9] py-0 pl-3 pr-[3px] text-left text-sm text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800/60"
-                  : `${getItemClassName(isNavItemSelected)} gap-2 px-4`
+                  : `${getItemClassName(isNavItemSelected)} gap-1 px-4`
               }
             >
               {item.action === "search" ? (

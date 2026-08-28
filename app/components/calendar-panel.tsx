@@ -214,7 +214,7 @@ function CalendarViewTabs({
   periodLabelAction?: ReactNode;
 }) {
   const tabButtonClassName = (isActive: boolean) =>
-    `rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors hover:bg-[#F1F5F9] cursor-pointer ${
+    `rounded-full px-3.5 py-1.5 text-sm transition-colors hover:bg-[#F1F5F9] cursor-pointer ${
       isActive
         ? "bg-[#e8F2F6] text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50"
         : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"

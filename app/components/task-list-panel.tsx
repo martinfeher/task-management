@@ -11,7 +11,8 @@ import {
   type RefObject,
 } from "react";
 import { BiChevronDown, BiSortAlt2 } from "react-icons/bi";
-import { LuCalendarCheck2, LuCheck, LuMenu, LuPlus, LuX } from "react-icons/lu";
+import { IoPricetagsOutline } from "react-icons/io5";
+import { LuCalendarCheck2, LuCheck, LuMenu, LuX } from "react-icons/lu";
 import { PiArrowBendDownRight } from "react-icons/pi";
 import { createLabel, getLabels } from "@/app/actions/todo";
 import { TaskDatePicker } from "./task-date-picker";
@@ -22,7 +23,9 @@ import {
   getTaskRowLeftBorderClass,
   isTaskDatePickerTriggerElement,
 } from "./task-list-task-row";
-import type { Label } from "./task-label-selector";
+import { TaskLabelSelector, type Label } from "./task-label-selector";
+import { TaskPrioritySelector } from "./task-priority-selector";
+import { TaskPriorityFlagIcon } from "./task-priority-icon";
 import {
   TaskRowContextMenu,
   type TaskRowContextMenuView,
@@ -42,6 +45,7 @@ import {
   type SidebarListDragTarget,
 } from "@/lib/sidebar-list-drag";
 import { formatShortDayMonth } from "@/lib/date-format";
+import type { TaskPriorityLevel } from "@/lib/task-priority";
 import {
   buildVisibleTasks,
   clampSubtaskKeepDropIndex,
@@ -426,7 +430,6 @@ export function TaskListPanel({
   onOpenSidebar,
 }: TaskListPanelProps) {
   const [newTaskName, setNewTaskName] = useState("");
-  const [isAddingTask, setIsAddingTask] = useState(false);
   const newTaskParsePreview = useMemo(() => {
     if (!newTaskName.trim()) return null;
     const parsed = parseNaturalLanguageTask(newTaskName, { lists });
@@ -434,7 +437,21 @@ export function TaskListPanel({
   }, [lists, newTaskName]);
   const [newTaskDueDate, setNewTaskDueDate] = useState<string | null>(null);
   const [newTaskDueTime, setNewTaskDueTime] = useState<TaskDueTime | null>(null);
+  const [newTaskPriority, setNewTaskPriority] = useState<TaskPriorityLevel | null>(
+    null,
+  );
+  const [addTaskLabelIds, setAddTaskLabelIds] = useState<string[]>([]);
+  const [addTaskAvailableLabels, setAddTaskAvailableLabels] = useState<Label[]>(
+    [],
+  );
+  const [addTaskLabelQuery, setAddTaskLabelQuery] = useState("");
+  const [isAddTaskLabelSubmitting, setIsAddTaskLabelSubmitting] =
+    useState(false);
   const [isAddTaskDatePickerOpen, setIsAddTaskDatePickerOpen] = useState(false);
+  const [isAddTaskLabelMenuOpen, setIsAddTaskLabelMenuOpen] = useState(false);
+  const [isAddTaskPriorityMenuOpen, setIsAddTaskPriorityMenuOpen] =
+    useState(false);
+  const [isAddTaskFormResetting, setIsAddTaskFormResetting] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [titleDraft, setTitleDraft] = useState("");
   const titleDraftRef = useRef(titleDraft);
@@ -506,8 +523,9 @@ export function TaskListPanel({
   const addTaskFormRef = useRef<HTMLFormElement>(null);
   const addTaskDateMenuRef = useRef<HTMLDivElement>(null);
   const addTaskDatePickerRef = useRef<HTMLDivElement>(null);
+  const addTaskLabelMenuRef = useRef<HTMLDivElement>(null);
+  const addTaskPriorityMenuRef = useRef<HTMLDivElement>(null);
   const isAddTaskDatePickerOpenRef = useRef(false);
-  const shouldFocusAddTaskDatePickerRef = useRef(false);
   const keepAddTaskOpenRef = useRef(false);
   const titleEditReadyRef = useRef(false);
   const titleEditIdleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
@@ -606,8 +624,11 @@ export function TaskListPanel({
     resetLabelMenuState();
     resetMoveMenuState();
     setPointerContextMenu(null);
-    setIsAddingTask(false);
     setNewTaskName("");
+    setNewTaskDueDate(null);
+    setNewTaskDueTime(null);
+    setNewTaskPriority(null);
+    setAddTaskLabelIds([]);
     setActiveSort(null);
     setIsCompletedOpen(false);
   }, [title]);
@@ -836,7 +857,7 @@ export function TaskListPanel({
       if (shouldIgnoreAddTaskShortcut(event.target)) return;
 
       event.preventDefault();
-      setIsAddingTask(true);
+      focusAddTaskInput();
     }
 
     window.addEventListener("keydown", handleAddTaskShortcut);
@@ -844,28 +865,29 @@ export function TaskListPanel({
   }, [showAddTask]);
 
   useEffect(() => {
-    if (!isAddingTask) return;
+    if (!isAddTaskLabelMenuOpen) return;
 
-    requestAnimationFrame(() => {
-      newTaskInputRef.current?.focus();
-    });
-  }, [isAddingTask]);
+    let cancelled = false;
+
+    void getLabels()
+      .then((tags) => {
+        if (!cancelled) {
+          setAddTaskAvailableLabels(tags);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setAddTaskAvailableLabels([]);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAddTaskLabelMenuOpen]);
 
   useEffect(() => {
     isAddTaskDatePickerOpenRef.current = isAddTaskDatePickerOpen;
-  }, [isAddTaskDatePickerOpen]);
-
-  useEffect(() => {
-    if (!isAddTaskDatePickerOpen) return;
-    if (!shouldFocusAddTaskDatePickerRef.current) return;
-
-    shouldFocusAddTaskDatePickerRef.current = false;
-    requestAnimationFrame(() => {
-      const dateInput = addTaskDatePickerRef.current?.querySelector("input");
-      if (dateInput instanceof HTMLInputElement) {
-        dateInput.focus();
-      }
-    });
   }, [isAddTaskDatePickerOpen]);
 
   useEffect(() => {
@@ -884,9 +906,28 @@ export function TaskListPanel({
     };
   }, [isAddTaskDatePickerOpen]);
 
-  function startAddingTask() {
-    keepAddTaskOpenRef.current = false;
-    setIsAddingTask(true);
+  useEffect(() => {
+    if (!isAddTaskLabelMenuOpen && !isAddTaskPriorityMenuOpen) return;
+
+    function handlePointerDown(event: MouseEvent) {
+      const target = event.target as Node;
+      if (addTaskLabelMenuRef.current?.contains(target)) return;
+      if (addTaskPriorityMenuRef.current?.contains(target)) return;
+      if (addTaskFormRef.current?.contains(target)) return;
+      setIsAddTaskLabelMenuOpen(false);
+      setIsAddTaskPriorityMenuOpen(false);
+    }
+
+    document.addEventListener("mousedown", handlePointerDown, true);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown, true);
+    };
+  }, [isAddTaskLabelMenuOpen, isAddTaskPriorityMenuOpen]);
+
+  function focusAddTaskInput() {
+    requestAnimationFrame(() => {
+      newTaskInputRef.current?.focus();
+    });
   }
 
   function resetNewTaskSchedule() {
@@ -895,11 +936,23 @@ export function TaskListPanel({
     setIsAddTaskDatePickerOpen(false);
   }
 
-  function cancelAddTask() {
+  function resetNewTaskMetadata() {
+    setNewTaskPriority(null);
+    setAddTaskLabelIds([]);
+    setAddTaskLabelQuery("");
+    setIsAddTaskLabelMenuOpen(false);
+    setIsAddTaskPriorityMenuOpen(false);
+  }
+
+  function resetNewTaskForm() {
     keepAddTaskOpenRef.current = false;
-    setIsAddingTask(false);
     setNewTaskName("");
     resetNewTaskSchedule();
+    resetNewTaskMetadata();
+  }
+
+  function cancelAddTask() {
+    resetNewTaskForm();
   }
 
   function isFocusWithinAddTaskForm() {
@@ -908,13 +961,31 @@ export function TaskListPanel({
 
     if (addTaskFormRef.current?.contains(activeElement)) return true;
     if (addTaskDatePickerRef.current?.contains(activeElement)) return true;
+    if (addTaskLabelMenuRef.current?.contains(activeElement)) return true;
+    if (addTaskPriorityMenuRef.current?.contains(activeElement)) return true;
 
     return false;
   }
 
-  function openAddTaskDatePicker(focusPickerInput = false) {
-    shouldFocusAddTaskDatePickerRef.current = focusPickerInput;
-    setIsAddTaskDatePickerOpen(true);
+  async function handleCreateAddTaskLabel(label: string, color: string) {
+    const trimmed = label.trim();
+    if (!trimmed) return;
+
+    setIsAddTaskLabelSubmitting(true);
+    try {
+      const created = await createLabel(trimmed, color);
+      setAddTaskAvailableLabels((current) =>
+        [...current, created].sort((a, b) =>
+          a.label.localeCompare(b.label, undefined, { sensitivity: "base" }),
+        ),
+      );
+      setAddTaskLabelIds([created.id]);
+      setAddTaskLabelQuery("");
+      setIsAddTaskLabelMenuOpen(false);
+      onLabelsChanged?.();
+    } finally {
+      setIsAddTaskLabelSubmitting(false);
+    }
   }
 
   async function submitNewTask() {
@@ -928,6 +999,12 @@ export function TaskListPanel({
     const taskName = parsed.name.trim() || rawInput;
     const manualDueDate = newTaskDueDate;
     const manualDueTime = newTaskDueTime;
+    const manualPriority = newTaskPriority;
+    const manualLabel =
+      addTaskLabelIds.length > 0
+        ? addTaskAvailableLabels.find((item) => item.id === addTaskLabelIds[0])
+            ?.label ?? null
+        : null;
 
     const addOptions: AddTaskOptions = {
       keepFormOpen: true,
@@ -945,17 +1022,22 @@ export function TaskListPanel({
               },
           }
         : {}),
-      ...(parsed.priority !== null ? { priority: parsed.priority } : {}),
-      ...(parsed.label ? { label: parsed.label } : {}),
+      ...(manualPriority !== null || parsed.priority !== null
+        ? { priority: manualPriority ?? parsed.priority }
+        : {}),
+      ...(manualLabel || parsed.label
+        ? { label: manualLabel ?? parsed.label ?? undefined }
+        : {}),
       ...(parsed.recurrenceRule ? { recurrenceRule: parsed.recurrenceRule } : {}),
       ...(parsed.listId ? { listId: parsed.listId } : {}),
       ...(parsed.subtasks.length > 0 ? { subtasks: parsed.subtasks } : {}),
     };
 
     keepAddTaskOpenRef.current = true;
-    setIsAddingTask(true);
     setNewTaskName("");
     resetNewTaskSchedule();
+    resetNewTaskMetadata();
+    setIsAddTaskFormResetting(true);
     setActiveSort(null);
 
     try {
@@ -2043,38 +2125,40 @@ export function TaskListPanel({
                     <LuMenu className="size-5" aria-hidden="true" />
                   </button>
                 ) : null}
-                <h1 className="min-w-0 truncate text-xl font-semibold text-zinc-900 dark:text-zinc-50">
+                <h1 className="min-w-0 truncate text-xl font-semibold text-gray-700 dark:text-zinc-50">
                   {title}
                 </h1>
                 {showListCalendarButton && hasScheduledTasks ? (
-                  <button
-                    ref={listCalendarButtonRef}
-                    type="button"
-                    onClick={onListCalendarClick}
-                    onMouseEnter={() => onListCalendarHoverStart?.()}
-                    onMouseLeave={() => onListCalendarHoverEnd?.()}
-                    aria-pressed={isListCalendarOpen}
-                    aria-label={`Calendar - ${title}`}
-                    className={`group flex shrink-0 items-center overflow-hidden rounded-lg py-[4px] pl-[9px] ml-1 pr-[9px] transition-[background-color,padding,max-width,opacity] cursor-pointer ${
-                      isListCalendarOpen || isListCalendarPreview
-                        ? "bg-[#4873c7] text-white"
-                        : "bg-[#eceef0] text-zinc-700 hover:bg-zinc-250 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
-                    }`}
-                  >
-                    <LuCalendarCheck2
-                      className="size-4 shrink-0"
-                      aria-hidden="true"
-                    />
-                    <span
-                      className={`overflow-hidden whitespace-nowrap text-[12px] font-medium transition-[max-width,opacity,padding] duration-200 ease-out ${
+                  <div className="list-calendar-button ml-1 shrink-0 rounded-lg">
+                    <button
+                      ref={listCalendarButtonRef}
+                      type="button"
+                      onClick={onListCalendarClick}
+                      onMouseEnter={() => onListCalendarHoverStart?.()}
+                      onMouseLeave={() => onListCalendarHoverEnd?.()}
+                      aria-pressed={isListCalendarOpen}
+                      aria-label={`Calendar - ${title}`}
+                      className={`group flex w-full items-center overflow-hidden rounded-lg py-[4px] pl-[9px] pr-[9px] transition-[background-color,padding,max-width,opacity] cursor-pointer ${
                         isListCalendarOpen || isListCalendarPreview
-                          ? "max-w-[12rem] pl-1.5 opacity-100"
-                          : "max-w-0 opacity-0 group-hover:max-w-[12rem] group-hover:pl-1.5 group-hover:opacity-100"
+                          ? "bg-[#4873c7] text-white"
+                          : "bg-[#eceef0] text-zinc-700 hover:bg-zinc-250 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
                       }`}
                     >
-                      Calendar
-                    </span>
-                  </button>
+                      <LuCalendarCheck2
+                        className="size-4 shrink-0"
+                        aria-hidden="true"
+                      />
+                      <span
+                        className={`overflow-hidden whitespace-nowrap text-[12px] font-medium transition-[max-width,opacity,padding] duration-200 ease-out ${
+                          isListCalendarOpen || isListCalendarPreview
+                            ? "max-w-[12rem] pl-1.5 opacity-100"
+                            : "max-w-0 opacity-0 group-hover:max-w-[12rem] group-hover:pl-1.5 group-hover:opacity-100"
+                        }`}
+                      >
+                        Calendar
+                      </span>
+                    </button>
+                  </div>
                 ) : null}
               </div>
               <div className="flex shrink-0 items-center gap-1">
@@ -2142,26 +2226,40 @@ export function TaskListPanel({
 
           <div className="relative z-20 flex items-center overflow-visible pl-[16px] pr-[6px] py-2 min-h-[50px]">
             {showAddTask ? (
-              isAddingTask ? (
-                <div className="mr-[10px]! min-w-0 flex-1 overflow-visible">
-                  <form
-                    ref={addTaskFormRef}
-                    onSubmit={handleSubmit}
-                    className="add-task-form-enter flex min-w-0 w-full items-center rounded-lg border border-[#d8dde8] bg-[#fbfbfb] pl-2 pr-[6.5px] dark:border-zinc-600 dark:bg-zinc-900"
-                  >
+              <div className="mr-[10px] min-w-0 flex-1 overflow-visible">
+                <form
+                  ref={addTaskFormRef}
+                  onSubmit={handleSubmit}
+                  onAnimationEnd={(event) => {
+                    if (event.animationName !== "add-task-form-reset") return;
+                    setIsAddTaskFormResetting(false);
+                  }}
+                  className={`add-task-form-enter flex min-w-0 w-full items-center rounded-[9px] border border-[#dfe3ea] bg-[#f8f9fb] py-1 pl-3 pr-1.5 dark:border-zinc-600 dark:bg-zinc-900 ${
+                    isAddTaskFormResetting ? "add-task-form-reset" : ""
+                  }`}
+                >
                   <input
                     ref={newTaskInputRef}
                     type="text"
                     value={newTaskName}
                     onChange={(event) => setNewTaskName(event.target.value)}
-                    placeholder='Add task"'
+                    placeholder="New task"
                     aria-label="Task name"
-                    className="min-w-0 flex-1 bg-transparent px-1 py-2 text-sm text-zinc-700 outline-none dark:text-zinc-50"
+                    title="Add task (Ctrl+Enter / Cmd+Enter)"
+                    className="min-w-0 flex-1 bg-transparent py-1.5 text-sm text-zinc-700 outline-none placeholder:text-zinc-400 dark:text-zinc-50 dark:placeholder:text-zinc-500"
                     onKeyDown={(event) => {
                       if (event.key === "Escape") {
                         event.preventDefault();
                         if (isAddTaskDatePickerOpenRef.current) {
                           setIsAddTaskDatePickerOpen(false);
+                          return;
+                        }
+                        if (isAddTaskLabelMenuOpen) {
+                          setIsAddTaskLabelMenuOpen(false);
+                          return;
+                        }
+                        if (isAddTaskPriorityMenuOpen) {
+                          setIsAddTaskPriorityMenuOpen(false);
                           return;
                         }
                         cancelAddTask();
@@ -2176,6 +2274,7 @@ export function TaskListPanel({
                       }, 0);
                     }}
                   />
+
                   <div
                     className="group/date-picker relative shrink-0"
                     ref={addTaskDateMenuRef}
@@ -2191,30 +2290,25 @@ export function TaskListPanel({
                       aria-expanded={isAddTaskDatePickerOpen}
                       aria-describedby="add-task-calendar-tooltip"
                       onMouseDown={(event) => event.preventDefault()}
-                      onFocus={() => openAddTaskDatePicker(true)}
-                      onClick={() =>
-                        setIsAddTaskDatePickerOpen((open) => !open)
-                      }
-                      className={`group flex h-7 shrink-0 cursor-pointer items-center gap-0.5 rounded-[7px] pl-1.5 pr-[4px] mr-1 transition-colors hover:bg-[#f0f0f2] hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 ${
+                      onClick={() => {
+                        setIsAddTaskLabelMenuOpen(false);
+                        setIsAddTaskPriorityMenuOpen(false);
+                        setIsAddTaskDatePickerOpen((open) => !open);
+                      }}
+                      className={`flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-[#eef0f3] dark:hover:bg-zinc-800 ${
                         newTaskDueDate || newTaskDueTime
                           ? "text-[#4873c7] dark:text-[#7da2ff]"
                           : ""
                       }`}
                     >
-                      <TaskSetDateIcon className="size-[22px] text-[#7c7c8b] group-hover:text-[#54545e]" />
-                      <BiChevronDown
-                        className={`size-3 text-[#bbbbbb] transition-transform ${
-                          isAddTaskDatePickerOpen ? "rotate-180" : ""
-                        }`}
-                        aria-hidden="true"
-                      />
+                      <TaskSetDateIcon className="size-[19px] text-[#8b8b97] group-hover/date-picker:text-[#54545e]" />
                     </button>
                     <span
                       id="add-task-calendar-tooltip"
                       role="tooltip"
                       className="add-task-date-tooltip pointer-events-none absolute bottom-[calc(100%+10px)] left-1/2 z-40 -translate-x-1/2 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity group-hover/date-picker:opacity-100"
                     >
-                      Set Date
+                      date
                     </span>
                     {isAddTaskDatePickerOpen ? (
                       <div
@@ -2249,13 +2343,120 @@ export function TaskListPanel({
                       </div>
                     ) : null}
                   </div>
-               
+
+                  <div
+                    className="group/add-label relative shrink-0"
+                    ref={addTaskLabelMenuRef}
+                  >
+                    <button
+                      type="button"
+                      aria-label="label"
+                      aria-haspopup="dialog"
+                      aria-expanded={isAddTaskLabelMenuOpen}
+                      aria-describedby="add-task-label-tooltip"
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => {
+                        setIsAddTaskDatePickerOpen(false);
+                        setIsAddTaskPriorityMenuOpen(false);
+                        setIsAddTaskLabelMenuOpen((open) => !open);
+                      }}
+                      className={`flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-[#eef0f3] dark:hover:bg-zinc-800 ${
+                        addTaskLabelIds.length > 0
+                          ? "text-[#4873c7] dark:text-[#7da2ff]"
+                          : ""
+                      }`}
+                    >
+                      <IoPricetagsOutline className="size-[15px] text-[#aeaeae] group-hover/add-label:text-[#54545e]" />
+                    </button>
+                    <span
+                      id="add-task-label-tooltip"
+                      role="tooltip"
+                      className="add-task-date-tooltip pointer-events-none absolute bottom-[calc(100%+10px)] left-1/2 z-40 -translate-x-1/2 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity group-hover/add-label:opacity-100"
+                    >
+                      label
+                    </span>
+                    {isAddTaskLabelMenuOpen ? (
+                      <div className="absolute right-0 top-full z-[100] mt-1 w-[240px] overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+                        <TaskLabelSelector
+                          labels={addTaskAvailableLabels}
+                          assignedLabelIds={addTaskLabelIds}
+                          query={addTaskLabelQuery}
+                          isSubmitting={isAddTaskLabelSubmitting}
+                          onQueryChange={setAddTaskLabelQuery}
+                          onToggleLabel={(labelId) => {
+                            setAddTaskLabelIds((current) =>
+                              current.includes(labelId)
+                                ? current.filter((id) => id !== labelId)
+                                : [labelId],
+                            );
+                            setIsAddTaskLabelMenuOpen(false);
+                          }}
+                          onCreateLabel={(label, color) =>
+                            void handleCreateAddTaskLabel(label, color)
+                          }
+                          onCancel={() => setIsAddTaskLabelMenuOpen(false)}
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div
+                    className="group/add-priority relative shrink-0"
+                    ref={addTaskPriorityMenuRef}
+                  >
+                    <button
+                      type="button"
+                      aria-label="priority"
+                      aria-haspopup="dialog"
+                      aria-expanded={isAddTaskPriorityMenuOpen}
+                      aria-describedby="add-task-priority-tooltip"
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => {
+                        setIsAddTaskDatePickerOpen(false);
+                        setIsAddTaskLabelMenuOpen(false);
+                        setIsAddTaskPriorityMenuOpen((open) => !open);
+                      }}
+                      className={`flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-[#eef0f3] dark:hover:bg-zinc-800 ${
+                        newTaskPriority !== null
+                          ? "text-[#4873c7] dark:text-[#7da2ff]"
+                          : ""
+                      }`}
+                    >
+                      <TaskPriorityFlagIcon
+                        level={newTaskPriority}
+                        outline={newTaskPriority === null}
+                        className="size-[14px] text-[#aeaeae]! group-hover/add-priority:text-[#54545e]"
+                      />
+                    </button>
+                    <span
+                      id="add-task-priority-tooltip"
+                      role="tooltip"
+                      className="add-task-date-tooltip pointer-events-none absolute bottom-[calc(100%+10px)] left-1/2 z-40 -translate-x-1/2 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity group-hover/add-priority:opacity-100"
+                    >
+                      priority
+                    </span>
+                    {isAddTaskPriorityMenuOpen ? (
+                      <div className="absolute right-0 top-full z-[100] mt-1 w-[220px] overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+                        <TaskPrioritySelector
+                          selectedPriority={newTaskPriority}
+                          onSelectPriority={(priority) => {
+                            setNewTaskPriority(priority);
+                            setIsAddTaskPriorityMenuOpen(false);
+                          }}
+                          onClearPriority={() => {
+                            setNewTaskPriority(null);
+                            setIsAddTaskPriorityMenuOpen(false);
+                          }}
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+
                   <button
                     type="submit"
                     onMouseDown={(event) => event.preventDefault()}
                     disabled={!newTaskName.trim()}
-                    className="flex h-7 shrink-0 cursor-pointer items-center gap-1 rounded-[10px] bg-[#b4bdc5] px-[9px] text-xs font-medium text-white transition-colors enabled:hover:bg-zinc-500 disabled:cursor-not-allowed"
-                    // className="flex h-7 shrink-0 cursor-pointer items-center gap-1 rounded-[10px] bg-zinc-400 px-[9px] text-xs font-medium text-white transition-colors enabled:hover:bg-zinc-500 disabled:cursor-not-allowed"
+                    className="ml-px flex h-7 shrink-0 cursor-pointer items-center gap-1 rounded-full bg-[#b4bdc5] px-2.5 text-xs font-medium text-white transition-colors enabled:hover:bg-[#a3adb7] disabled:cursor-not-allowed disabled:opacity-70"
                   >
                     <LuCheck className="size-3.5" aria-hidden="true" />
                     Add
@@ -2266,18 +2467,7 @@ export function TaskListPanel({
                     {newTaskParsePreview}
                   </p>
                 ) : null}
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={startAddingTask}
-                  title="Add task (Ctrl+Enter / Cmd+Enter)"
-                  className="flex h-[33px] items-center gap-2 rounded-[10px] bg-[#4873c7] pl-[13px] pr-[15px] text-sm font-medium text-white transition-colors cursor-pointer hover:bg-[#3f68bd]"
-                >
-                  <LuPlus className="size-4" aria-hidden="true" />
-                  Add task
-                </button>
-              )
+              </div>
             ) : null}
           </div>
 
