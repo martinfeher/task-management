@@ -26,6 +26,9 @@ model Task {
   name      String
   completed Boolean   @default(false)
   details   String    @default("")
+  detailsDoc    Json?
+  detailsText   String    @default("")
+  schemaVersion Int       @default(1)
   dueDate            DateTime?
   dueTimeMinutes     Int?
   dueDurationMinutes Int?
@@ -54,6 +57,7 @@ model TaskVersion {
   task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
   name        String
   details     String
+  detailsDoc  Json?
   contentHash String
   source      String   @default("auto")
   createdAt   DateTime @default(now())
