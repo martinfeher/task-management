@@ -21,6 +21,27 @@ export function taskDetailsToPlainText(details: string) {
     .trim();
 }
 
+function escapeHtml(text: string) {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+export function plainTextToTaskDetails(text: string) {
+  const trimmed = text.trim();
+  if (!trimmed) return "";
+
+  return trimmed
+    .split("\n")
+    .map(
+      (line) =>
+        `<div class="detail-line" data-line-type="text">${line ? escapeHtml(line) : "<br>"}</div>`,
+    )
+    .join("");
+}
+
 export function taskDetailsHasContent(details: string) {
   const trimmed = details.trim();
   if (!trimmed || EMPTY_DETAILS_HTML.has(trimmed)) {
@@ -41,4 +62,25 @@ export function taskDetailsHasContent(details: string) {
     .trim();
 
   return text.length > 0;
+}
+
+/** Avoid overwriting meaningful saved details with an empty snapshot. */
+export function shouldPersistTaskDetails(
+  nextDetails: string,
+  savedDetails: string,
+) {
+  if (nextDetails === savedDetails) return false;
+
+  return !(
+    !taskDetailsHasContent(nextDetails) && taskDetailsHasContent(savedDetails)
+  );
+}
+
+export function resolveTaskDetailsForSave(
+  nextDetails: string,
+  savedDetails: string,
+) {
+  return shouldPersistTaskDetails(nextDetails, savedDetails)
+    ? nextDetails
+    : savedDetails;
 }

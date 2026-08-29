@@ -332,7 +332,11 @@ export function getDetailSelectionFontState(
     };
   }
 
-  let node: Node | null = selection.anchorNode;
+  const range = selection.getRangeAt(0);
+  let node: Node | null = selection.isCollapsed
+    ? selection.focusNode ?? selection.anchorNode
+    : range.startContainer;
+
   if (node?.nodeType === Node.TEXT_NODE) {
     node = node.parentElement;
   }
@@ -378,15 +382,6 @@ export function getDetailSelectionFontState(
 function canApplyDetailFont(editor: HTMLElement) {
   const activeLine = getActiveLineElement(editor);
   return Boolean(activeLine) && !isCodeLine(activeLine);
-}
-
-function prepareDetailFontApply(editor: HTMLElement, savedRange?: Range | null) {
-  if (!savedRange || !editor.contains(savedRange.commonAncestorContainer)) {
-    return;
-  }
-
-  editor.focus();
-  restoreSelectionRange(savedRange);
 }
 
 function removeStylePropertyFromRange(
@@ -624,6 +619,50 @@ function restoreSelectionRange(range: Range) {
   selection.addRange(range);
 }
 
+function isRangeInEditor(editor: HTMLElement, range: Range) {
+  try {
+    return editor.contains(range.commonAncestorContainer);
+  } catch {
+    return false;
+  }
+}
+
+function hasRangeText(range: Range) {
+  return !range.collapsed && range.toString().length > 0;
+}
+
+function resolveApplyRange(editor: HTMLElement, savedRange?: Range | null) {
+  const selection = window.getSelection();
+  const currentInEditor =
+    selection?.rangeCount &&
+    selection.anchorNode &&
+    editor.contains(selection.anchorNode)
+      ? selection.getRangeAt(0)
+      : null;
+  const savedInEditor =
+    savedRange && isRangeInEditor(editor, savedRange)
+      ? savedRange.cloneRange()
+      : null;
+
+  if (currentInEditor && hasRangeText(currentInEditor)) {
+    return currentInEditor.cloneRange();
+  }
+
+  if (savedInEditor && hasRangeText(savedInEditor)) {
+    return savedInEditor;
+  }
+
+  if (currentInEditor) {
+    return currentInEditor.cloneRange();
+  }
+
+  if (savedInEditor) {
+    return savedInEditor;
+  }
+
+  return null;
+}
+
 function applyStyleToSelection(
   editor: HTMLElement,
   styles: { fontFamily?: string; fontSize?: string },
@@ -689,7 +728,11 @@ export function applyDetailFontFamily(
   familyId: DetailFontFamilyId,
   savedRange?: Range | null,
 ) {
-  prepareDetailFontApply(editor, savedRange);
+  const range = resolveApplyRange(editor, savedRange);
+  if (!range) return false;
+
+  editor.focus();
+  restoreSelectionRange(range);
 
   if (!canApplyDetailFont(editor)) return false;
 
@@ -697,17 +740,12 @@ export function applyDetailFontFamily(
   if (!option) return false;
 
   if (option.isDefault) {
-    const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0) return false;
-
-    const rangeToClear = selection.getRangeAt(0).cloneRange();
-    editor.focus();
-    removeStylePropertyFromRange(rangeToClear, "fontFamily");
-    restoreSelectionRange(rangeToClear);
+    removeStylePropertyFromRange(range.cloneRange(), "fontFamily");
+    restoreSelectionRange(range);
     return true;
   }
 
-  return applyStyleToSelection(editor, { fontFamily: option.value }, savedRange);
+  return applyStyleToSelection(editor, { fontFamily: option.value }, null);
 }
 
 export function applyDetailFontSize(
@@ -715,25 +753,24 @@ export function applyDetailFontSize(
   size: DetailFontSizeOption,
   savedRange?: Range | null,
 ) {
-  prepareDetailFontApply(editor, savedRange);
+  const range = resolveApplyRange(editor, savedRange);
+  if (!range) return false;
+
+  editor.focus();
+  restoreSelectionRange(range);
 
   if (!canApplyDetailFont(editor)) return false;
 
   if (size === DEFAULT_DETAIL_FONT_SIZE_PX) {
-    const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0) return false;
-
-    const rangeToClear = selection.getRangeAt(0).cloneRange();
-    editor.focus();
-    removeStylePropertyFromRange(rangeToClear, "fontSize");
-    restoreSelectionRange(rangeToClear);
+    removeStylePropertyFromRange(range.cloneRange(), "fontSize");
+    restoreSelectionRange(range);
     return true;
   }
 
   return applyStyleToSelection(
     editor,
     { fontSize: `${size}px` },
-    savedRange,
+    null,
   );
 }
 

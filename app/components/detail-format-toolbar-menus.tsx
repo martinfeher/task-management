@@ -16,7 +16,13 @@ import {
   NumberedListIcon,
 } from "./line-control-icons";
 
-export type FormatToolbarDropdown = "color" | "list" | "block" | "font" | "overflow";
+export type FormatToolbarDropdown =
+  | "color"
+  | "list"
+  | "block"
+  | "fontFamily"
+  | "fontSize"
+  | "overflow";
 
 export const FORMAT_TOOLBAR_DROPDOWN_TRIGGER_CLASS =
   "flex h-8 cursor-pointer items-center gap-0.5 rounded-lg px-2 text-sm text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800";
@@ -335,23 +341,19 @@ export function DetailFormatBlockTypeDropdown({
   );
 }
 
-type DetailFormatFontComboDropdownProps = {
+type DetailFormatFontFamilyDropdownProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   familyId: DetailFontFamilyId;
-  size: DetailFontSizeOption;
   onSelectFamily: (familyId: DetailFontFamilyId) => void;
-  onSelectSize: (size: DetailFontSizeOption) => void;
 };
 
-export function DetailFormatFontComboDropdown({
+export function DetailFormatFontFamilyDropdown({
   open,
   onOpenChange,
   familyId,
-  size,
   onSelectFamily,
-  onSelectSize,
-}: DetailFormatFontComboDropdownProps) {
+}: DetailFormatFontFamilyDropdownProps) {
   const familyLabel =
     DETAIL_FONT_FAMILY_OPTIONS.find((option) => option.id === familyId)?.label ??
     "Sans Serif";
@@ -360,22 +362,19 @@ export function DetailFormatFontComboDropdown({
     <FormatToolbarDropdownShell
       open={open}
       onOpenChange={onOpenChange}
-      ariaLabel="Font family and size"
-      tooltipId="format-toolbar-font-tooltip"
-      tooltipLabel="Font"
-      menuClassName={`${FORMAT_TOOLBAR_DROPDOWN_MENU_CLASS} min-w-[200px] max-h-72 overflow-y-auto`}
+      ariaLabel="Font family"
+      tooltipId="format-toolbar-font-family-tooltip"
+      tooltipLabel="Font family"
+      menuClassName={`${FORMAT_TOOLBAR_DROPDOWN_MENU_CLASS} min-w-[168px] max-h-72 overflow-y-auto`}
       trigger={
         <>
           <span className="max-w-[120px] truncate whitespace-nowrap">
-            {familyLabel} · {size}
+            {familyLabel}
           </span>
           <LuChevronDown className="size-3.5 shrink-0 text-zinc-500" />
         </>
       }
     >
-      <p className="px-3 pb-1 pt-2 text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-        Font
-      </p>
       {DETAIL_FONT_FAMILY_OPTIONS.map((option) => (
         <button
           key={option.id}
@@ -386,16 +385,47 @@ export function DetailFormatFontComboDropdown({
           }`}
           style={option.value ? { fontFamily: option.value } : undefined}
           onMouseDown={(event) => event.preventDefault()}
-          onClick={() => onSelectFamily(option.id)}
+          onClick={() => {
+            onSelectFamily(option.id);
+            onOpenChange(false);
+          }}
         >
           {option.label}
         </button>
       ))}
-      <div className="my-1 border-t border-zinc-200 dark:border-zinc-700" />
-      <p className="px-3 pb-1 text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-        Size
-      </p>
-      <div className="grid grid-cols-4 gap-0.5 px-2 pb-2">
+    </FormatToolbarDropdownShell>
+  );
+}
+
+type DetailFormatFontSizeDropdownProps = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  size: DetailFontSizeOption;
+  onSelectSize: (size: DetailFontSizeOption) => void;
+};
+
+export function DetailFormatFontSizeDropdown({
+  open,
+  onOpenChange,
+  size,
+  onSelectSize,
+}: DetailFormatFontSizeDropdownProps) {
+  return (
+    <FormatToolbarDropdownShell
+      open={open}
+      onOpenChange={onOpenChange}
+      ariaLabel="Font size"
+      tooltipId="format-toolbar-font-size-tooltip"
+      tooltipLabel="Font size"
+      menuClassName={`${FORMAT_TOOLBAR_DROPDOWN_MENU_CLASS} min-w-[168px]`}
+      trigger={
+        <>
+          <span className="whitespace-nowrap">{size}</span>
+          <LuChevronDown className="size-3.5 shrink-0 text-zinc-500" />
+        </>
+      }
+    >
+      <div className="grid grid-cols-4 gap-0.5 px-2 py-2">
         {DETAIL_FONT_SIZE_OPTIONS.map((option) => (
           <button
             key={option}

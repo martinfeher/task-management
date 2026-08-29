@@ -20,6 +20,7 @@ import { TaskLabelPills } from "./task-label-pills";
 import { TaskPriorityMenu } from "./task-priority-menu";
 import { TaskPriorityPill } from "./task-priority-pill";
 import { PiDotsThreeBold } from "react-icons/pi";
+import { CiStickyNote } from "react-icons/ci";
 import { BiAlarm, BiCalendar, BiRevision } from "react-icons/bi";
 import type { TaskListItem, TodoList } from "./todo-app";
 import type { TaskDueTime } from "@/lib/task-due-time";
@@ -104,9 +105,11 @@ type TaskListTaskRowProps = {
   onOpenCustomDatePicker: (taskId: string) => void;
   onSelectTaskPriority: (taskId: string, priority: number) => void;
   onClearTaskPriority: (taskId: string) => void;
+  onConvertTaskToNote: (taskId: string) => void;
   onCloseTaskMenu: () => void;
   hasDueDateActions: boolean;
   hasPriorityActions: boolean;
+  hasNoteActions: boolean;
   hasPinActions: boolean;
   hasImportantActions: boolean;
   hasLabelActions: boolean;
@@ -163,7 +166,7 @@ export function getTaskRowLeftBorderClass(
     return `${TASK_ROW_LEFT_BORDER_WIDTH_CLASS} ${TASK_ROW_LEFT_BORDER_COLOR_CLASS}`;
   }
 
-  return "border-l-0 hover:shadow-[inset_2px_0_0_#DADFDF]";
+  return `${TASK_ROW_LEFT_BORDER_WIDTH_CLASS} border-l-transparent hover:shadow-[inset_2px_0_0_#DADFDF]`;
 }
 
 function getRowMenuView(
@@ -266,9 +269,11 @@ export function TaskListTaskRow({
   onOpenCustomDatePicker,
   onSelectTaskPriority,
   onClearTaskPriority,
+  onConvertTaskToNote,
   onCloseTaskMenu,
   hasDueDateActions,
   hasPriorityActions,
+  hasNoteActions,
   hasPinActions,
   hasImportantActions,
   hasLabelActions,
@@ -332,16 +337,18 @@ export function TaskListTaskRow({
   const hasDueTime = normalizeDueTimeMinutes(task.dueTimeMinutes) !== null;
   const showSetDateOnHover =
     hasDueDateActions &&
+    !task.isNote &&
     !hasDueTime &&
     !task.dueDate &&
-    task.labels.length === 0;
+    task.labels.length === 0 &&
+    task.priority == null;
   const dueScheduleSubline = formatTaskListScheduleSubline(
     task.dueDate,
     dueTimeLabel,
     dueDateLabel,
   );
   const showDueSchedule = Boolean(
-    task.dueDate || dueTimeLabel !== null,
+    !task.isNote && (task.dueDate || dueTimeLabel !== null),
   );
   const hasRecurrence = Boolean(parseRecurrenceRule(task.recurrenceRule));
 
@@ -513,7 +520,7 @@ export function TaskListTaskRow({
       {showDragHandle ? (
         <span
           aria-hidden="true"
-          className={`flex size-[19px] mr-[1px] shrink-0 cursor-move items-center justify-center ${
+          className={`flex size-[19px] shrink-0 cursor-move items-center justify-center ${
             hideDueDate ? "" : "group-hover:opacity-100"
           } ${checkedContentDim}`}
           style={{ transition: dimTransition }}
@@ -522,25 +529,39 @@ export function TaskListTaskRow({
         </span>
       ) : null}
 
-      <TaskCompletionCheckbox
-        variant="box"
-        checkKey={task.id}
-        animateCheck={isCheckAnimating}
-        checked={task.completed || isCheckAnimating || isCompleting}
-        className="task-list-checkbox shrink-0"
-        onChange={
-          isCompleting ? () => {} : () => onToggleTask(task.id)
-        }
-        onClick={(event) => event.stopPropagation()}
-        aria-label={
-          isCompleting
-            ? `${task.name} completed`
-            : `Mark ${task.name} complete`
-        }
-      />
+      {task.isNote ? (
+        <span
+          className="task-list-checkbox flex size-[24px] shrink-0 items-center  text-[#979797]"
+          aria-label="Note"
+          title="Note"
+        >
+          <CiStickyNote
+            aria-hidden="true"
+            className="shrink-0 size-[19px]"
+            style={{ transform: "scaleX(0.9)" }}
+          />
+        </span>
+      ) : (
+        <TaskCompletionCheckbox
+          variant="box"
+          checkKey={task.id}
+          animateCheck={isCheckAnimating}
+          checked={task.completed || isCheckAnimating || isCompleting}
+          className="task-list-checkbox shrink-0"
+          onChange={
+            isCompleting ? () => {} : () => onToggleTask(task.id)
+          }
+          onClick={(event) => event.stopPropagation()}
+          aria-label={
+            isCompleting
+              ? `${task.name} completed`
+              : `Mark ${task.name} complete`
+          }
+        />
+      )}
 
       <div
-        className={`ml-[6px] flex min-w-0 flex-1 flex-col justify-center ${checkedContentDim}`}
+        className={`ml-[7px] flex min-w-0 flex-1 flex-col justify-center ${checkedContentDim}`}
         style={{ transition: dimTransition }}
       >
         {editingTaskId === task.id ? (
@@ -786,8 +807,13 @@ export function TaskListTaskRow({
                     onSelectTaskPriority(task.id, priority)
                   }
                   onClearTaskPriority={() => onClearTaskPriority(task.id)}
+                  onConvertTaskToNote={() => {
+                    onConvertTaskToNote(task.id);
+                    onCloseTaskMenu();
+                  }}
                   hasDueDateActions={hasDueDateActions}
                   hasPriorityActions={hasPriorityActions}
+                  hasNoteActions={hasNoteActions}
                   hasPinActions={hasPinActions}
                   hasImportantActions={hasImportantActions}
                   hasLabelActions={hasLabelActions}

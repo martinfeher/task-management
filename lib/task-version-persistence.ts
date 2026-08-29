@@ -1,21 +1,14 @@
 import {
-  cleanupOrphanedTaskImages,
-  referencedTaskImagesChanged,
+  repairBrokenTaskImageReferences,
 } from "@/lib/task-image-storage";
 import {
   createTaskVersionForced,
-  getAllTaskVersionDetailsHtml,
   getTaskVersionForRestore,
   listTaskVersions,
   maybeCreateTaskVersionBeforeChange,
   type TaskVersionListItem,
 } from "@/lib/task-versions";
 import { prisma } from "@/lib/prisma";
-
-async function cleanupTaskImages(taskId: string, currentDetails: string) {
-  const versionDetails = await getAllTaskVersionDetailsHtml(taskId);
-  await cleanupOrphanedTaskImages(taskId, currentDetails, versionDetails);
-}
 
 export async function persistTaskDetailsUpdate(taskId: string, details: string) {
   const existing = await prisma.task.findUnique({
@@ -30,8 +23,18 @@ export async function persistTaskDetailsUpdate(taskId: string, details: string) 
     throw new Error("Task not found");
   }
 
-  if (existing.details === details) {
-    return { changed: false as const };
+  const { details: normalizedDetails, changed: repairedReferences } =
+    await repairBrokenTaskImageReferences(taskId, details);
+
+  if (existing.details === normalizedDetails) {
+    if (repairedReferences) {
+      await prisma.task.update({
+        where: { id: taskId },
+        data: { details: normalizedDetails },
+      });
+    }
+
+    return { changed: repairedReferences };
   }
 
   await maybeCreateTaskVersionBeforeChange(
@@ -43,12 +46,8 @@ export async function persistTaskDetailsUpdate(taskId: string, details: string) 
 
   await prisma.task.update({
     where: { id: taskId },
-    data: { details },
+    data: { details: normalizedDetails },
   });
-
-  if (referencedTaskImagesChanged(taskId, existing.details, details)) {
-    await cleanupTaskImages(taskId, details);
-  }
 
   return { changed: true as const };
 }
@@ -182,10 +181,6 @@ export async function restoreTaskVersion(taskId: string, versionId: string) {
       details: version.details,
     },
   });
-
-  if (referencedTaskImagesChanged(taskId, task.details, version.details)) {
-    await cleanupTaskImages(taskId, version.details);
-  }
 
   return {
     name: version.name,

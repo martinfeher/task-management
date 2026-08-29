@@ -8,7 +8,10 @@ import type { TaskRecurrenceRule } from "@/lib/task-recurrence";
 import { serializeRecurrenceRule } from "@/lib/task-recurrence";
 import { checkGrammar } from "@/lib/grammar-check-api";
 import { fetchTaskById, saveTaskDetails, saveTaskDetailsKeepalive, saveTaskNameKeepalive } from "@/lib/task-details-api";
-import { taskDetailsHasContent } from "@/lib/task-details-content";
+import {
+  resolveTaskDetailsForSave,
+  taskDetailsHasContent,
+} from "@/lib/task-details-content";
 import { formatShortDayMonthYear } from "@/lib/date-format";
 import {
   formatDueTimeLabel,
@@ -52,6 +55,8 @@ import {
   toggleChecklistLine,
 } from "./detail-lines";
 import {
+  deleteUploadedTaskImage,
+  extractTaskImageFilename,
   getImageFilesFromDataTransfer,
   hasImageFilesInDataTransfer,
   uploadEmbeddedImagesInHtml,
@@ -88,15 +93,20 @@ import {
   type DetailFontFamilyId,
   type DetailFontSizeOption,
 } from "./detail-fonts";
+import { DetailFontFamilyControl } from "./detail-font-family-control";
+import { DetailFontSizeControl } from "./detail-font-size-control";
 import {
   DetailFormatBlockTypeDropdown,
   DetailFormatColorDropdown,
-  DetailFormatFontComboDropdown,
+  DetailFormatFontFamilyDropdown,
+  DetailFormatFontSizeDropdown,
   DetailFormatListDropdown,
   DetailFormatOverflowMenu,
   FormatToolbarTooltipWrap,
   type FormatToolbarDropdown,
 } from "./detail-format-toolbar-menus";
+
+type HeaderFormatDropdown = "family" | "size";
 import { GrammarCheckModal } from "./grammar-check-modal";
 import { TaskDatePicker } from "./task-date-picker";
 import { TaskVersionHistoryOffcanvas } from "./task-version-history-offcanvas";
@@ -114,6 +124,7 @@ type TaskDetails = {
   name: string;
   completed: boolean;
   details: string;
+  isNote: boolean;
   dueDate: string | null;
   dueTimeMinutes: number | null;
   dueDurationMinutes: number | null;
@@ -124,6 +135,7 @@ type TaskDetails = {
 type TaskDetailsSnapshot = {
   name: string;
   completed: boolean;
+  isNote?: boolean;
   dueDate: string | null;
   dueTimeMinutes: number | null;
   dueDurationMinutes: number | null;
@@ -141,6 +153,7 @@ function buildTaskDetailsFromSnapshot(
     id: taskId,
     name: snapshot.name,
     completed: snapshot.completed,
+    isNote: snapshot.isNote ?? false,
     details: "",
     dueDate: snapshot.dueDate,
     dueTimeMinutes: snapshot.dueTimeMinutes,
@@ -227,8 +240,14 @@ const FORMAT_TOOLBAR_TEXT_BUTTON_CLASS =
 const FORMAT_TOOLBAR_ICON_BUTTON_CLASS =
   "flex h-8 w-8 items-center justify-center rounded-lg text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800";
 
+const FORMAT_TOOLBAR_HIGHLIGHT_BUTTON_CLASS =
+  "flex h-8 w-8 items-center justify-center rounded-lg text-zinc-700 transition-colors hover:bg-yellow-200 dark:text-zinc-200 dark:hover:bg-yellow-500/30";
+
 const FORMAT_TOOLBAR_ACTIVE_BUTTON_CLASS =
   "bg-zinc-100 text-[#2563eb] dark:bg-zinc-800 dark:text-blue-300";
+
+const FORMAT_TOOLBAR_HIGHLIGHT_ACTIVE_BUTTON_CLASS =
+  "bg-yellow-200 text-zinc-800 dark:bg-yellow-500/30 dark:text-zinc-100";
 
 type FormatMenuInlineFormats = {
   bold: boolean;
@@ -726,6 +745,8 @@ export function TaskDetailsPanel({
   const [canRedo, setCanRedo] = useState(false);
   const [openFormatDropdown, setOpenFormatDropdown] =
     useState<FormatToolbarDropdown | null>(null);
+  const [openHeaderFormatDropdown, setOpenHeaderFormatDropdown] =
+    useState<HeaderFormatDropdown | null>(null);
   const [formatMenuFontSize, setFormatMenuFontSize] =
     useState<DetailFontSizeOption>(DEFAULT_DETAIL_FONT_SIZE_PX);
   const [formatMenuFontFamily, setFormatMenuFontFamily] =
@@ -767,12 +788,15 @@ export function TaskDetailsPanel({
   const editorWrapperRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
   const formatMenuRef = useRef<HTMLDivElement>(null);
+  const headerFormatControlsRef = useRef<HTMLDivElement>(null);
   const formatOverflowMenuRef = useRef<HTMLDivElement>(null);
   const linkUrlInputRef = useRef<HTMLInputElement>(null);
   const linkTextInputRef = useRef<HTMLInputElement>(null);
   const savedLinkSelectionRef = useRef<Range | null>(null);
   const savedFormatSelectionRef = useRef<Range | null>(null);
   const savedFormatLineIdsRef = useRef<string[]>([]);
+  const openFormatDropdownRef = useRef<FormatToolbarDropdown | null>(null);
+  openFormatDropdownRef.current = openFormatDropdown;
   const savedGrammarSelectionRef = useRef<Range | null>(null);
   const showLinkMenuRef = useRef(false);
   const addBlockMenuRef = useRef<HTMLDivElement>(null);
@@ -813,9 +837,36 @@ export function TaskDetailsPanel({
   const localPendingByTaskRef = useRef<
     Map<string, { details: string; title: string }>
   >(new Map());
+  const taskStateRef = useRef<TaskDetails | null>(null);
+  const taskSnapshotRef = useRef(taskSnapshot);
+  const taskLoadHandlersRef = useRef<{
+    hydrateFromTaskRecord: (
+      loadedTask: TaskDetails,
+      pendingLocal?: { details: string; title: string },
+    ) => void;
+    onTaskHasDetailsKnown?: (taskId: string, hasDetails: boolean) => void;
+    captureTaskSnapshotForSwitch: (currentTaskId: string) => {
+      title: string;
+      details: string;
+    };
+    persistTaskContent: (
+      taskId: string,
+      content: { title: string; details: string },
+      baseline?: { details: string; name: string },
+    ) => Promise<boolean>;
+    waitForSaveIdle: () => Promise<void>;
+    closeFormatMenu: () => void;
+  } | null>(null);
+
+  taskStateRef.current = task;
+  taskSnapshotRef.current = taskSnapshot;
 
   const readEditorContent = useCallback(() => {
-    return normalizeDetails(editorRef.current?.innerHTML ?? "");
+    if (editorRef.current) {
+      return normalizeDetails(editorRef.current.innerHTML);
+    }
+
+    return normalizeDetails(detailsRef.current);
   }, []);
 
   const readCurrentSplitContent = useCallback(() => {
@@ -830,9 +881,16 @@ export function TaskDetailsPanel({
 
     const { title, details } = readCurrentSplitContent();
     const titleChanged = Boolean(title) && title !== taskNameRef.current;
+    const resolvedDetails = resolveTaskDetailsForSave(
+      details,
+      savedDetailsRef.current,
+    );
 
-    if (details !== savedDetailsRef.current || titleChanged) {
-      localPendingByTaskRef.current.set(currentTaskId, { details, title });
+    if (resolvedDetails !== savedDetailsRef.current || titleChanged) {
+      localPendingByTaskRef.current.set(currentTaskId, {
+        details: resolvedDetails,
+        title,
+      });
       return;
     }
 
@@ -846,16 +904,22 @@ export function TaskDetailsPanel({
 
     const editorHtml = detailsRef.current;
     const { title, details } = splitEditorContent(editorHtml);
+    const resolvedDetails = resolveTaskDetailsForSave(
+      details,
+      savedDetailsRef.current,
+    );
 
     if (
-      taskDetailsHasContent(details) ||
-      details !== savedDetailsRef.current ||
+      resolvedDetails !== savedDetailsRef.current ||
       (Boolean(title) && title !== taskNameRef.current)
     ) {
-      localPendingByTaskRef.current.set(currentTaskId, { details, title });
+      localPendingByTaskRef.current.set(currentTaskId, {
+        details: resolvedDetails,
+        title,
+      });
     }
 
-    return { title, details };
+    return { title, details: resolvedDetails };
   }, []);
 
   const clearPendingLocalSave = useCallback((currentTaskId: string) => {
@@ -1086,8 +1150,12 @@ export function TaskDetailsPanel({
       const savedDetailsBaseline =
         baseline?.details ?? savedDetailsRef.current;
       const savedNameBaseline = baseline?.name ?? taskNameRef.current;
+      const resolvedDetails = resolveTaskDetailsForSave(
+        content.details,
+        savedDetailsBaseline,
+      );
 
-      const detailsChanged = content.details !== savedDetailsBaseline;
+      const detailsChanged = resolvedDetails !== savedDetailsBaseline;
       const titleChanged = Boolean(
         content.title && content.title !== savedNameBaseline,
       );
@@ -1102,7 +1170,7 @@ export function TaskDetailsPanel({
       let savedSomething = false;
 
       if (detailsChanged) {
-        const detailsBytes = new TextEncoder().encode(content.details).byteLength;
+        const detailsBytes = new TextEncoder().encode(resolvedDetails).byteLength;
         if (detailsBytes > MAX_DETAILS_SAVE_BYTES) {
           saveStatusRef.current = "error";
           setSaveStatus("error");
@@ -1112,13 +1180,13 @@ export function TaskDetailsPanel({
           return false;
         }
 
-        await saveTaskDetails(taskId, content.details);
+        await saveTaskDetails(taskId, resolvedDetails);
 
         if (taskIdRef.current === taskId) {
-          savedDetailsRef.current = content.details;
+          savedDetailsRef.current = resolvedDetails;
         }
         clearPendingLocalSave(taskId);
-        onDetailsSaved(taskId, content.details);
+        onDetailsSaved(taskId, resolvedDetails);
         savedSomething = true;
       }
 
@@ -1170,15 +1238,23 @@ export function TaskDetailsPanel({
         const content = readCurrentSplitContent();
         const savedDetailsBaseline = savedDetailsRef.current;
         const savedNameBaseline = taskNameRef.current;
+        const resolvedDetails = resolveTaskDetailsForSave(
+          content.details,
+          savedDetailsBaseline,
+        );
+        const contentToPersist = {
+          title: content.title,
+          details: resolvedDetails,
+        };
 
-        const detailsChanged = content.details !== savedDetailsBaseline;
+        const detailsChanged = resolvedDetails !== savedDetailsBaseline;
         const titleChanged = Boolean(
           content.title && content.title !== savedNameBaseline,
         );
 
         if (!detailsChanged && !titleChanged) break;
 
-        await persistTaskContent(currentTaskId, content, {
+        await persistTaskContent(currentTaskId, contentToPersist, {
           details: savedDetailsBaseline,
           name: savedNameBaseline,
         });
@@ -1192,8 +1268,12 @@ export function TaskDetailsPanel({
         }
 
         const latest = readCurrentSplitContent();
+        const latestResolvedDetails = resolveTaskDetailsForSave(
+          latest.details,
+          savedDetailsRef.current,
+        );
         const stillDirty =
-          latest.details !== savedDetailsRef.current ||
+          latestResolvedDetails !== savedDetailsRef.current ||
           (Boolean(latest.title) && latest.title !== taskNameRef.current);
 
         if (!stillDirty && !saveQueuedRef.current) break;
@@ -1526,14 +1606,8 @@ export function TaskDetailsPanel({
 
   const closeFormatDropdowns = useCallback(() => {
     setOpenFormatDropdown(null);
+    setOpenHeaderFormatDropdown(null);
   }, []);
-
-  const setFormatDropdownOpen = useCallback(
-    (dropdown: FormatToolbarDropdown, open: boolean) => {
-      setOpenFormatDropdown(open ? dropdown : null);
-    },
-    [],
-  );
 
   const closeFormatMenu = useCallback(() => {
     setFormatMenu(null);
@@ -1546,6 +1620,15 @@ export function TaskDetailsPanel({
     savedFormatLineIdsRef.current = [];
   }, [closeFormatDropdowns]);
 
+  taskLoadHandlersRef.current = {
+    hydrateFromTaskRecord,
+    onTaskHasDetailsKnown,
+    captureTaskSnapshotForSwitch,
+    persistTaskContent,
+    waitForSaveIdle,
+    closeFormatMenu,
+  };
+
   const rememberFormatSelection = useCallback(
     (editor: HTMLElement, range: Range) => {
       savedFormatSelectionRef.current = range.cloneRange();
@@ -1554,6 +1637,115 @@ export function TaskDetailsPanel({
         .filter((lineId): lineId is string => Boolean(lineId));
     },
     [],
+  );
+
+  const hasStoredFormatSelection = useCallback((editor: HTMLElement | null) => {
+    const saved = savedFormatSelectionRef.current;
+    return Boolean(
+      editor &&
+        saved &&
+        !saved.collapsed &&
+        saved.toString().length > 0 &&
+        editor.contains(saved.commonAncestorContainer),
+    );
+  }, []);
+
+  const captureFormatSelectionFromEditor = useCallback(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    const selection = window.getSelection();
+    if (
+      selection?.rangeCount &&
+      !selection.isCollapsed &&
+      selection.anchorNode &&
+      editor.contains(selection.anchorNode)
+    ) {
+      rememberFormatSelection(editor, selection.getRangeAt(0));
+    }
+  }, [rememberFormatSelection]);
+
+  const setFormatDropdownOpen = useCallback(
+    (dropdown: FormatToolbarDropdown, open: boolean) => {
+      if (open) {
+        setOpenHeaderFormatDropdown(null);
+        captureFormatSelectionFromEditor();
+      }
+      setOpenFormatDropdown(open ? dropdown : null);
+    },
+    [captureFormatSelectionFromEditor],
+  );
+
+  const syncFormatMenuFontState = useCallback(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    const range = savedFormatSelectionRef.current
+      ? savedFormatSelectionRef.current.cloneRange()
+      : null;
+    const selection = window.getSelection();
+    let effectiveRange: Range | null = null;
+
+    if (
+      selection?.rangeCount &&
+      selection.anchorNode &&
+      editor.contains(selection.anchorNode)
+    ) {
+      const currentRange = selection.getRangeAt(0);
+      if (!currentRange.collapsed && currentRange.toString().length > 0) {
+        effectiveRange = currentRange.cloneRange();
+      } else if (
+        range &&
+        editor.contains(range.commonAncestorContainer) &&
+        !range.collapsed &&
+        range.toString().length > 0
+      ) {
+        effectiveRange = range;
+      } else {
+        effectiveRange = currentRange.cloneRange();
+      }
+    } else if (
+      range &&
+      editor.contains(range.commonAncestorContainer)
+    ) {
+      effectiveRange = range;
+    }
+
+    if (!effectiveRange) return;
+
+    const previousRange =
+      selection?.rangeCount &&
+      selection.anchorNode &&
+      editor.contains(selection.anchorNode)
+        ? selection.getRangeAt(0).cloneRange()
+        : null;
+
+    const selectionForRead = effectiveRange.cloneRange();
+    const selectionObj = window.getSelection();
+    selectionObj?.removeAllRanges();
+    selectionObj?.addRange(selectionForRead);
+
+    rememberFormatSelection(editor, effectiveRange);
+    const fontState = getDetailSelectionFontState(editor);
+    setFormatMenuFontSize(fontState.size);
+    setFormatMenuFontFamily(fontState.familyId);
+    setFormatMenuBlockType(getActiveTextBlockType(editor));
+
+    if (previousRange) {
+      selectionObj?.removeAllRanges();
+      selectionObj?.addRange(previousRange);
+    }
+  }, [rememberFormatSelection]);
+
+  const setHeaderFormatDropdownOpen = useCallback(
+    (dropdown: HeaderFormatDropdown, open: boolean) => {
+      if (open) {
+        syncFormatMenuFontState();
+        setOpenFormatDropdown(null);
+      }
+      setOpenHeaderFormatDropdown(open ? dropdown : null);
+    },
+    [syncFormatMenuFontState],
   );
 
   const handleDetailFontApplied = useCallback(() => {
@@ -1577,10 +1769,10 @@ export function TaskDetailsPanel({
       const editor = editorRef.current;
       if (!editor) return;
 
-      const activeLine = getActiveLineElement(editor);
-      if (isCodeLine(activeLine)) return;
+      captureFormatSelectionFromEditor();
+      const savedRange = savedFormatSelectionRef.current?.cloneRange() ?? null;
 
-      if (applyDetailFontSize(editor, size, savedFormatSelectionRef.current)) {
+      if (applyDetailFontSize(editor, size, savedRange)) {
         const selection = window.getSelection();
         if (selection?.rangeCount) {
           rememberFormatSelection(editor, selection.getRangeAt(0));
@@ -1591,7 +1783,12 @@ export function TaskDetailsPanel({
 
       closeFormatDropdowns();
     },
-    [closeFormatDropdowns, handleDetailFontApplied, rememberFormatSelection],
+    [
+      captureFormatSelectionFromEditor,
+      closeFormatDropdowns,
+      handleDetailFontApplied,
+      rememberFormatSelection,
+    ],
   );
 
   const applyFormatFontFamily = useCallback(
@@ -1599,14 +1796,14 @@ export function TaskDetailsPanel({
       const editor = editorRef.current;
       if (!editor) return;
 
-      const activeLine = getActiveLineElement(editor);
-      if (isCodeLine(activeLine)) return;
+      captureFormatSelectionFromEditor();
+      const savedRange = savedFormatSelectionRef.current?.cloneRange() ?? null;
 
       if (
         applyDetailFontFamily(
           editor,
           familyId,
-          savedFormatSelectionRef.current,
+          savedRange,
         )
       ) {
         const selection = window.getSelection();
@@ -1616,8 +1813,15 @@ export function TaskDetailsPanel({
         setFormatMenuFontFamily(familyId);
         handleDetailFontApplied();
       }
+
+      closeFormatDropdowns();
     },
-    [handleDetailFontApplied, rememberFormatSelection],
+    [
+      captureFormatSelectionFromEditor,
+      closeFormatDropdowns,
+      handleDetailFontApplied,
+      rememberFormatSelection,
+    ],
   );
 
   const applyFormatBlockType = useCallback(
@@ -1801,11 +2005,13 @@ export function TaskDetailsPanel({
 
   const updateFormatMenu = useCallback(() => {
     if (showLinkMenuRef.current) return;
+    if (openFormatDropdownRef.current) return;
 
     const selection = window.getSelection();
     const editor = editorRef.current;
 
     if (!selection || !editor || !editor.contains(selection.anchorNode)) {
+      if (hasStoredFormatSelection(editor)) return;
       closeFormatMenu();
       return;
     }
@@ -1819,6 +2025,7 @@ export function TaskDetailsPanel({
     if (selection.isCollapsed) {
       const link = getLinkFromSelection(selection, editor);
       if (!link) {
+        if (hasStoredFormatSelection(editor)) return;
         closeFormatMenu();
         return;
       }
@@ -1861,7 +2068,7 @@ export function TaskDetailsPanel({
     setFormatMenuBlockType(getActiveTextBlockType(editor));
     setFormatMenuInlineFormats(getDetailSelectionInlineFormatState(editor));
     closeFormatDropdowns();
-  }, [closeFormatDropdowns, rememberFormatSelection]);
+  }, [closeFormatDropdowns, hasStoredFormatSelection, rememberFormatSelection]);
 
   const applyFormat = useCallback(
     (command: "bold" | "italic" | "underline" | "strikeThrough" | "highlight") => {
@@ -2237,6 +2444,7 @@ export function TaskDetailsPanel({
           id: currentTaskId,
           name,
           completed: current.completed,
+          isNote: current.isNote,
           details: normalizedDetails,
           dueDate: current.dueDate,
           dueTimeMinutes: current.dueTimeMinutes,
@@ -2295,12 +2503,21 @@ export function TaskDetailsPanel({
 
   useLayoutEffect(() => {
     if (!isReadyRef.current || !task?.id) return;
-    if (hydratedTaskIdRef.current === task.id) return;
 
     const editor = editorRef.current;
     if (!editor) return;
 
-    editor.innerHTML = detailsRef.current;
+    const targetHtml = detailsRef.current;
+    const editorHtml = normalizeDetails(editor.innerHTML);
+    const normalizedTargetHtml = normalizeDetails(targetHtml);
+    if (
+      hydratedTaskIdRef.current === task.id &&
+      editorHtml === normalizedTargetHtml
+    ) {
+      return;
+    }
+
+    editor.innerHTML = targetHtml;
     ensureBlockLines(editor);
     ensureTitleLine(editor);
     syncLineEmptyState(editor);
@@ -2310,12 +2527,24 @@ export function TaskDetailsPanel({
 
     requestAnimationFrame(() => {
       updateLineControls();
+      if (task.isNote) {
+        syncFormatMenuFontState();
+      }
       const pendingFocusRequest = pendingFocusTaskTitleRequestRef.current;
       if (pendingFocusRequest) {
         applyFocusTaskTitleIfReady(pendingFocusRequest);
       }
     });
-  }, [applyFocusTaskTitleIfReady, readEditorContent, resetHistory, task?.id, updateLineControls]);
+  }, [
+    applyFocusTaskTitleIfReady,
+    readEditorContent,
+    resetHistory,
+    syncFormatMenuFontState,
+    task?.details,
+    task?.id,
+    task?.isNote,
+    updateLineControls,
+  ]);
 
   useEffect(() => {
     if (!focusTaskTitleRequest) return;
@@ -2427,7 +2656,7 @@ export function TaskDetailsPanel({
 
     let cancelled = false;
     saveAbortRef.current = false;
-    closeFormatMenu();
+    taskLoadHandlersRef.current?.closeFormatMenu();
     setLineControls([]);
     setAddBlockMenu(null);
     setSlashCommandMenu(null);
@@ -2435,12 +2664,13 @@ export function TaskDetailsPanel({
 
     const pendingLocal = localPendingByTaskRef.current.get(taskId);
     const cachedTask = taskDetailsCache.get(taskId);
+    const snapshot = taskSnapshotRef.current;
 
     if (cachedTask) {
-      hydrateFromTaskRecord(cachedTask, pendingLocal);
-    } else if (taskSnapshot) {
-      hydrateFromTaskRecord(
-        buildTaskDetailsFromSnapshot(taskId, taskSnapshot),
+      taskLoadHandlersRef.current?.hydrateFromTaskRecord(cachedTask, pendingLocal);
+    } else if (snapshot) {
+      taskLoadHandlersRef.current?.hydrateFromTaskRecord(
+        buildTaskDetailsFromSnapshot(taskId, snapshot),
         pendingLocal,
       );
     } else {
@@ -2453,10 +2683,10 @@ export function TaskDetailsPanel({
 
     void fetchTaskById(taskId)
       .then((loadedTask) => {
-        if (cancelled) return;
+        if (cancelled || taskIdRef.current !== taskId) return;
 
         if (!loadedTask) {
-          if (!cachedTask && !taskSnapshot) {
+          if (!cachedTask && !snapshot) {
             setTask(null);
             savedDetailsRef.current = "";
             detailsRef.current = "";
@@ -2467,7 +2697,7 @@ export function TaskDetailsPanel({
         }
 
         const latestPendingLocal = localPendingByTaskRef.current.get(taskId);
-        hydrateFromTaskRecord(
+        taskLoadHandlersRef.current?.hydrateFromTaskRecord(
           {
             ...loadedTask,
             dueDate: loadedTask.dueDate
@@ -2476,7 +2706,7 @@ export function TaskDetailsPanel({
           },
           latestPendingLocal,
         );
-        onTaskHasDetailsKnown?.(
+        taskLoadHandlersRef.current?.onTaskHasDetailsKnown?.(
           loadedTask.id,
           taskDetailsHasContent(
             resolveTaskDetailsForLoad(
@@ -2487,7 +2717,7 @@ export function TaskDetailsPanel({
         );
       })
       .catch(() => {
-        if (!cancelled && !cachedTask && !taskSnapshot) {
+        if (!cancelled && !cachedTask && !snapshot) {
           isReadyRef.current = false;
           setSaveStatus("error");
         }
@@ -2509,54 +2739,56 @@ export function TaskDetailsPanel({
         return;
       }
 
-      const snapshot = captureTaskSnapshotForSwitch(previousTaskId);
+      const cleanupHandlers = taskLoadHandlersRef.current;
+      const currentTask = taskStateRef.current;
+      const snapshotForSwitch =
+        cleanupHandlers?.captureTaskSnapshotForSwitch(previousTaskId) ?? {
+          title: "",
+          details: "",
+        };
       const savedDetailsAtSwitch = savedDetailsRef.current;
       const taskNameAtSwitch = taskNameRef.current;
 
-      if (task || taskDetailsCache.has(previousTaskId)) {
+      if (currentTask || taskDetailsCache.has(previousTaskId)) {
         const existing = taskDetailsCache.get(previousTaskId);
-        const detailsToCache = taskDetailsHasContent(snapshot.details)
-          ? snapshot.details
+        const detailsToCache = taskDetailsHasContent(snapshotForSwitch.details)
+          ? snapshotForSwitch.details
           : savedDetailsAtSwitch;
         taskDetailsCache.set(previousTaskId, {
           id: previousTaskId,
-          name: snapshot.title || taskNameAtSwitch,
-          completed: task?.completed ?? existing?.completed ?? false,
+          name: snapshotForSwitch.title || taskNameAtSwitch,
+          completed: currentTask?.completed ?? existing?.completed ?? false,
+          isNote: currentTask?.isNote ?? existing?.isNote ?? false,
           details: detailsToCache,
-          dueDate: task?.dueDate ?? existing?.dueDate ?? null,
+          dueDate: currentTask?.dueDate ?? existing?.dueDate ?? null,
           dueTimeMinutes:
-            task?.dueTimeMinutes ?? existing?.dueTimeMinutes ?? null,
+            currentTask?.dueTimeMinutes ?? existing?.dueTimeMinutes ?? null,
           dueDurationMinutes:
-            task?.dueDurationMinutes ?? existing?.dueDurationMinutes ?? null,
-          dueTimeZone: task?.dueTimeZone ?? existing?.dueTimeZone ?? "UTC",
+            currentTask?.dueDurationMinutes ??
+            existing?.dueDurationMinutes ??
+            null,
+          dueTimeZone: currentTask?.dueTimeZone ?? existing?.dueTimeZone ?? "UTC",
           recurrenceRule:
-            task?.recurrenceRule ?? existing?.recurrenceRule ?? null,
+            currentTask?.recurrenceRule ?? existing?.recurrenceRule ?? null,
         });
       }
 
       isReadyRef.current = false;
 
       void (async () => {
-        await waitForSaveIdle();
+        await cleanupHandlers?.waitForSaveIdle();
 
-        const detailsToPersist = taskDetailsHasContent(snapshot.details)
-          ? snapshot.details
-          : taskDetailsHasContent(savedDetailsAtSwitch)
-            ? savedDetailsAtSwitch
-            : snapshot.details;
-
-        const wouldLoseSavedContent =
-          !taskDetailsHasContent(detailsToPersist) &&
-          taskDetailsHasContent(savedDetailsAtSwitch);
+        const detailsToPersist = resolveTaskDetailsForSave(
+          snapshotForSwitch.details,
+          savedDetailsAtSwitch,
+        );
 
         try {
-          await persistTaskContent(
+          await cleanupHandlers?.persistTaskContent(
             previousTaskId,
             {
-              title: snapshot.title,
-              details: wouldLoseSavedContent
-                ? savedDetailsAtSwitch
-                : detailsToPersist,
+              title: snapshotForSwitch.title,
+              details: detailsToPersist,
             },
             {
               details: savedDetailsAtSwitch,
@@ -2564,46 +2796,37 @@ export function TaskDetailsPanel({
             },
           );
         } catch {
-          if (
-            taskDetailsHasContent(
-              wouldLoseSavedContent ? savedDetailsAtSwitch : detailsToPersist,
-            )
-          ) {
-            saveTaskDetailsKeepalive(
-              previousTaskId,
-              wouldLoseSavedContent
-                ? savedDetailsAtSwitch
-                : detailsToPersist,
-            );
+          if (taskDetailsHasContent(detailsToPersist)) {
+            saveTaskDetailsKeepalive(previousTaskId, detailsToPersist);
           }
         }
       })();
     };
-  }, [
-    captureTaskSnapshotForSwitch,
-    closeFormatMenu,
-    hydrateFromTaskRecord,
-    onTaskHasDetailsKnown,
-    persistTaskContent,
-    taskId,
-    waitForSaveIdle,
-  ]);
+  }, [taskId]);
 
   useEffect(() => {
     function handlePageHide() {
       const currentTaskId = taskIdRef.current;
       if (!currentTaskId || !isReadyRef.current) return;
 
-      const editorHtml = editorRef.current?.innerHTML ?? detailsRef.current;
-      const { title, details } = splitEditorContent(editorHtml);
+      const editorHtml = editorRef.current
+        ? editorRef.current.innerHTML
+        : detailsRef.current;
+      const { title, details } = splitEditorContent(
+        normalizeDetails(editorHtml),
+      );
+      const resolvedDetails = resolveTaskDetailsForSave(
+        details,
+        savedDetailsRef.current,
+      );
 
-      const detailsChanged = details !== savedDetailsRef.current;
+      const detailsChanged = resolvedDetails !== savedDetailsRef.current;
       const titleChanged = Boolean(title) && title !== taskNameRef.current;
 
       if (!detailsChanged && !titleChanged) return;
 
       if (detailsChanged) {
-        saveTaskDetailsKeepalive(currentTaskId, details);
+        saveTaskDetailsKeepalive(currentTaskId, resolvedDetails);
       }
 
       if (titleChanged) {
@@ -2666,6 +2889,10 @@ export function TaskDetailsPanel({
         return;
       }
 
+      if (headerFormatControlsRef.current?.contains(target)) {
+        return;
+      }
+
       closeFormatMenu();
 
       if (lineControlsRef.current?.contains(target)) {
@@ -2700,16 +2927,27 @@ export function TaskDetailsPanel({
 
     function handleSelectionChange() {
       const editor = editorRef.current;
-      if (editor?.contains(document.activeElement)) {
+      if (!editor) return;
+
+      const selection = window.getSelection();
+      const selectionInEditor =
+        Boolean(selection?.rangeCount) &&
+        selection?.anchorNode != null &&
+        editor.contains(selection.anchorNode);
+
+      if (selectionInEditor) {
         syncLineEmptyState(editor);
 
-        const selection = window.getSelection();
         if (
           selection?.rangeCount &&
           !selection.isCollapsed &&
           editor.contains(selection.anchorNode)
         ) {
           rememberFormatSelection(editor, selection.getRangeAt(0));
+        }
+
+        if (task?.isNote) {
+          syncFormatMenuFontState();
         }
       }
 
@@ -2734,7 +2972,7 @@ export function TaskDetailsPanel({
       document.removeEventListener("mousedown", handleClickOutside, true);
       document.removeEventListener("selectionchange", handleSelectionChange);
     };
-  }, [closeFormatMenu, rememberFormatSelection, requestSave, scheduleLineControlsUpdate, updateFormatMenu]);
+  }, [closeFormatMenu, rememberFormatSelection, requestSave, scheduleLineControlsUpdate, syncFormatMenuFontState, task?.isNote, updateFormatMenu]);
 
   useLayoutEffect(() => {
     if (!formatMenu || !formatMenuRef.current) return;
@@ -3190,7 +3428,9 @@ export function TaskDetailsPanel({
     if (
       nextTarget instanceof Node &&
       (lineControlsRef.current?.contains(nextTarget) ||
-        addBlockMenuRef.current?.contains(nextTarget))
+        addBlockMenuRef.current?.contains(nextTarget) ||
+        formatMenuRef.current?.contains(nextTarget) ||
+        headerFormatControlsRef.current?.contains(nextTarget))
     ) {
       return;
     }
@@ -3260,6 +3500,10 @@ export function TaskDetailsPanel({
 
     if (editor) {
       syncLineEmptyState(editor);
+    }
+
+    if (task?.isNote) {
+      syncFormatMenuFontState();
     }
 
     updateLineControls();
@@ -3540,6 +3784,10 @@ export function TaskDetailsPanel({
       updateFormatMenu();
     }, FORMAT_MENU_DEBOUNCE_MS);
 
+    if (task?.isNote) {
+      syncFormatMenuFontState();
+    }
+
     scheduleLineControlsUpdate();
   }
 
@@ -3564,6 +3812,10 @@ export function TaskDetailsPanel({
         editor.contains(selection.anchorNode)
       ) {
         rememberFormatSelection(editor, selection.getRangeAt(0));
+      }
+
+      if (task?.isNote) {
+        syncFormatMenuFontState();
       }
     }
 
@@ -3714,6 +3966,15 @@ export function TaskDetailsPanel({
       const imageWrapper = deleteButton.closest(".detail-image-wrapper");
       if (!(imageWrapper instanceof HTMLElement)) return;
 
+      const image = imageWrapper.querySelector("img.detail-image");
+      const imageSrc =
+        image instanceof HTMLImageElement ? image.getAttribute("src") ?? "" : "";
+      const currentTaskId = taskIdRef.current;
+      const imageFilename =
+        currentTaskId && imageSrc
+          ? extractTaskImageFilename(currentTaskId, imageSrc)
+          : null;
+
       const removed = removeImageWrapper(editor, imageWrapper);
       if (!removed) return;
 
@@ -3721,7 +3982,23 @@ export function TaskDetailsPanel({
       recordHistorySnapshot();
       requestSave("flush");
       updateLineControls();
+
+      if (currentTaskId && imageFilename) {
+        void (async () => {
+          await waitForSaveIdle();
+          if (taskIdRef.current !== currentTaskId) return;
+          try {
+            await deleteUploadedTaskImage(currentTaskId, imageFilename);
+          } catch {
+            // File cleanup is best-effort; content save is the source of truth.
+          }
+        })();
+      }
       return;
+    }
+
+    if (task?.isNote) {
+      syncFormatMenuFontState();
     }
   }
 
@@ -3975,7 +4252,56 @@ export function TaskDetailsPanel({
                   </span>
                 </div>
               </div>
-              {onToggleTask && !task.completed ? (
+              {task.isNote ? (
+                <>
+                  <span className="text-[#cfcfcf]" aria-hidden="true">
+                    |
+                  </span>
+                  <div
+                    ref={headerFormatControlsRef}
+                    className="flex items-center gap-1"
+                    onMouseDown={(event) => {
+                      if (event.button !== 0) return;
+
+                      const editor = editorRef.current;
+                      if (!editor) return;
+
+                      const selection = window.getSelection();
+                      if (
+                        selection?.rangeCount &&
+                        !selection.isCollapsed &&
+                        selection.anchorNode &&
+                        editor.contains(selection.anchorNode)
+                      ) {
+                        rememberFormatSelection(editor, selection.getRangeAt(0));
+                      }
+                    }}
+                  >
+                    <DetailFontFamilyControl
+                      formatToolbar
+                      value={formatMenuFontFamily}
+                      open={openHeaderFormatDropdown === "family"}
+                      onOpenChange={(open) =>
+                        setHeaderFormatDropdownOpen("family", open)
+                      }
+                      onSelect={applyFormatFontFamily}
+                    />
+                    <span className="text-[#cfcfcf]" aria-hidden="true">
+                      |
+                    </span>
+                    <DetailFontSizeControl
+                      formatToolbar
+                      value={formatMenuFontSize}
+                      open={openHeaderFormatDropdown === "size"}
+                      onOpenChange={(open) =>
+                        setHeaderFormatDropdownOpen("size", open)
+                      }
+                      onSelect={applyFormatFontSize}
+                    />
+                  </div>
+                </>
+              ) : null}
+              {onToggleTask && !task.completed && !task.isNote ? (
                 <button
                   type="button"
                   onClick={() => onToggleTask(task.id)}
@@ -4246,6 +4572,10 @@ export function TaskDetailsPanel({
             formatMenu.placement === "below" ? "translate-y-2" : "-translate-y-full"
           }`}
           style={{ left: formatMenu.x, top: formatMenu.y }}
+          onMouseDownCapture={(event) => {
+            if (event.button !== 0) return;
+            captureFormatSelectionFromEditor();
+          }}
         >
           {showLinkMenu ? (
             <div className="space-y-2 px-2 py-2">
@@ -4398,9 +4728,9 @@ export function TaskDetailsPanel({
                     aria-label="Highlight"
                     aria-pressed={formatMenuInlineFormats.highlight}
                     aria-describedby="format-toolbar-highlight-tooltip"
-                    className={`${FORMAT_TOOLBAR_ICON_BUTTON_CLASS} ${
+                    className={`${FORMAT_TOOLBAR_HIGHLIGHT_BUTTON_CLASS} ${
                       formatMenuInlineFormats.highlight
-                        ? FORMAT_TOOLBAR_ACTIVE_BUTTON_CLASS
+                        ? FORMAT_TOOLBAR_HIGHLIGHT_ACTIVE_BUTTON_CLASS
                         : ""
                     }`}
                     onMouseDown={(event) => event.preventDefault()}
@@ -4450,22 +4780,27 @@ export function TaskDetailsPanel({
                   }}
                 />
 
-                <DetailFormatFontComboDropdown
-                  open={openFormatDropdown === "font"}
+                <DetailFormatFontFamilyDropdown
+                  open={openFormatDropdown === "fontFamily"}
                   onOpenChange={(open) => {
-                    setFormatDropdownOpen("font", open);
+                    setFormatDropdownOpen("fontFamily", open);
                     if (open) {
-                      const editor = editorRef.current;
-                      if (editor) {
-                        const fontState = getDetailSelectionFontState(editor);
-                        setFormatMenuFontFamily(fontState.familyId);
-                        setFormatMenuFontSize(fontState.size);
-                      }
+                      syncFormatMenuFontState();
                     }
                   }}
                   familyId={formatMenuFontFamily}
-                  size={formatMenuFontSize}
                   onSelectFamily={applyFormatFontFamily}
+                />
+
+                <DetailFormatFontSizeDropdown
+                  open={openFormatDropdown === "fontSize"}
+                  onOpenChange={(open) => {
+                    setFormatDropdownOpen("fontSize", open);
+                    if (open) {
+                      syncFormatMenuFontState();
+                    }
+                  }}
+                  size={formatMenuFontSize}
                   onSelectSize={applyFormatFontSize}
                 />
 

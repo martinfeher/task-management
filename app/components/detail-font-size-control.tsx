@@ -32,7 +32,7 @@ export function DetailFontSizeControl({
   onSelect,
 }: DetailFontSizeControlProps) {
   const buttonClassName = formatToolbar
-    ? "flex h-8 min-w-[44px] cursor-pointer items-center justify-between gap-0.5 rounded-lg px-2 text-sm text-zinc-700 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-zinc-200 dark:hover:bg-zinc-800"
+    ? "flex h-8 min-w-[28px] cursor-pointer items-center justify-center rounded-lg px-2 text-sm text-zinc-700 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-zinc-200 dark:hover:bg-zinc-800"
     : compact
       ? "flex h-[30px] min-w-[44px] cursor-pointer items-center justify-between gap-0.5 rounded border border-zinc-200 bg-white px-1.5 text-sm text-zinc-800 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
       : "flex h-8 w-[52px] cursor-pointer items-center justify-between rounded-md border border-zinc-200 bg-white px-2 text-sm text-zinc-800 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800";
@@ -50,7 +50,9 @@ export function DetailFontSizeControl({
         onClick={() => onOpenChange?.(!open)}
       >
         <span>{value}</span>
-        <LuChevronDown className="size-3.5 shrink-0 text-zinc-500" />
+        {formatToolbar ? null : (
+          <LuChevronDown className="size-3.5 shrink-0 text-zinc-500" />
+        )}
       </button>
 
       {open ? (

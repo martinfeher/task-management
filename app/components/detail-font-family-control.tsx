@@ -34,7 +34,7 @@ export function DetailFontFamilyControl({
     "Sans Serif";
 
   const buttonClassName = formatToolbar
-    ? "flex h-8 min-w-[112px] cursor-pointer items-center justify-between gap-1 rounded-lg px-2 text-sm text-zinc-700 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-zinc-200 dark:hover:bg-zinc-800"
+    ? "flex h-8 min-w-[72px] cursor-pointer items-center justify-center rounded-lg px-2 text-sm text-zinc-700 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-zinc-200 dark:hover:bg-zinc-800"
     : "flex h-8 min-w-[112px] cursor-pointer items-center justify-between gap-1 rounded-md border border-zinc-200 bg-white px-2.5 text-sm text-zinc-800 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800";
 
   return (
@@ -50,7 +50,9 @@ export function DetailFontFamilyControl({
         onClick={() => onOpenChange?.(!open)}
       >
         <span className="truncate">{label}</span>
-        <LuChevronDown className="size-3.5 shrink-0 text-zinc-500" />
+        {formatToolbar ? null : (
+          <LuChevronDown className="size-3.5 shrink-0 text-zinc-500" />
+        )}
       </button>
 
       {open ? (

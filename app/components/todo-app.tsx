@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
+  convertTaskToNote as convertTaskToNoteInDb,
+  convertNoteToTask as convertNoteToTaskInDb,
   createTask,
   createSubtask,
   createTodoList,
@@ -44,6 +46,7 @@ import {
 import type { CalendarExternalDragTarget } from "@/lib/calendar-time-grid";
 import type { SidebarListDragTarget } from "@/lib/sidebar-list-drag";
 import { taskDetailsHasContent } from "@/lib/task-details-content";
+import { invalidateTaskDetailsFetchCache } from "@/lib/task-details-api";
 import {
   buildTodoPath,
   clampListCalendarMultiDayCount,
@@ -109,6 +112,7 @@ export type Task = {
   priority: number | null;
   pinned: boolean;
   important: boolean;
+  isNote: boolean;
   parentId: string | null;
   labels: TaskLabel[];
 };
@@ -206,6 +210,7 @@ function withPinnedDefaults(tasksByList: Record<string, Task[]>) {
         hasDetails: task.hasDetails ?? false,
         pinned: Boolean(task.pinned),
         important: Boolean(task.important),
+        isNote: Boolean(task.isNote),
         parentId: task.parentId ?? null,
         labels: task.labels ?? [],
       })),
@@ -1264,6 +1269,7 @@ export function TodoApp({
             priority: completedTask.priority,
             pinned: result.spawnedTask.pinned,
             important: result.spawnedTask.important,
+            isNote: completedTask.isNote,
             parentId: result.spawnedTask.parentId,
             labels: [...completedTask.labels],
           };
@@ -1689,6 +1695,84 @@ export function TodoApp({
     await selectCompletedTask(taskId, listId);
   }
 
+  async function convertTaskToNote(taskId: string) {
+    const updated = await convertTaskToNoteInDb(taskId);
+    invalidateTaskDetailsFetchCache(taskId);
+
+    setTasksByList((current) => {
+      let changed = false;
+      const next = { ...current };
+
+      for (const listId of Object.keys(next)) {
+        next[listId] = next[listId].map((task) => {
+          if (task.id !== taskId) return task;
+
+          changed = true;
+          return {
+            ...task,
+            isNote: updated.isNote,
+            completed: updated.completed,
+            details: updated.details,
+            hasDetails: taskDetailsHasContent(updated.details),
+          };
+        });
+      }
+
+      return changed ? next : current;
+    });
+
+    await selectTask(taskId);
+    setFocusNoteAtEndRequest((current) => current + 1);
+  }
+
+  async function convertNoteToTask(taskId: string) {
+    const updated = await convertNoteToTaskInDb(taskId);
+    invalidateTaskDetailsFetchCache(taskId);
+
+    setTasksByList((current) => {
+      let changed = false;
+      const next = { ...current };
+
+      for (const listId of Object.keys(next)) {
+        next[listId] = next[listId].map((task) => {
+          if (task.id !== taskId) return task;
+
+          changed = true;
+          return {
+            ...task,
+            isNote: updated.isNote,
+            completed: updated.completed,
+            details: updated.details,
+            hasDetails: taskDetailsHasContent(updated.details),
+          };
+        });
+      }
+
+      return changed ? next : current;
+    });
+
+    await selectTask(taskId);
+  }
+
+  async function toggleTaskNoteType(taskId: string) {
+    let isNote = false;
+
+    for (const tasks of Object.values(tasksByListRef.current)) {
+      const task = tasks.find((entry) => entry.id === taskId);
+      if (task) {
+        isNote = task.isNote;
+        break;
+      }
+    }
+
+    if (isNote) {
+      await convertNoteToTask(taskId);
+      return;
+    }
+
+    await convertTaskToNote(taskId);
+  }
+
   async function selectNewTaskAndFocusDetails(taskId: string) {
     listCalendarReturnTaskIdRef.current = null;
     setIsListCalendarOpen(false);
@@ -1930,6 +2014,7 @@ export function TodoApp({
           priority: null,
           pinned: false,
           important: false,
+          isNote: false,
           parentId: subtask.parentId,
           labels: [],
         });
@@ -1951,6 +2036,7 @@ export function TodoApp({
       priority: resolvedPriority,
       pinned: false,
       important: markImportant,
+      isNote: false,
       parentId: null,
       labels: resolvedLabels,
     };
@@ -2016,6 +2102,7 @@ export function TodoApp({
       priority: null,
       pinned: false,
       important: false,
+      isNote: false,
       parentId: null,
       labels: [],
     };
@@ -2782,6 +2869,7 @@ export function TodoApp({
         dueDurationMinutes: task.dueDurationMinutes,
         dueTimeZone: task.dueTimeZone,
         recurrenceRule: task.recurrenceRule,
+        isNote: task.isNote,
       };
     }
 
@@ -2943,6 +3031,7 @@ export function TodoApp({
                   onSetTaskPriority={setTaskPriority}
                   onSetTaskPinned={setTaskPinned}
                   onSetTaskImportant={setTaskImportant}
+                  onConvertTaskToNote={toggleTaskNoteType}
                   onToggleTaskLabel={toggleTaskLabel}
                   onLabelsChanged={refreshLabels}
                   onMoveTaskToList={moveTaskToList}
@@ -3079,6 +3168,7 @@ export function TodoApp({
                 onSetTaskPriority={setTaskPriority}
                 onSetTaskPinned={setTaskPinned}
                 onSetTaskImportant={setTaskImportant}
+                onConvertTaskToNote={toggleTaskNoteType}
                 onToggleTaskLabel={toggleTaskLabel}
                 onLabelsChanged={refreshLabels}
                 onMoveTaskToList={moveTaskToList}

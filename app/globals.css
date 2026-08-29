@@ -538,6 +538,25 @@ body {
   animation: add-task-form-reset 180ms ease-out forwards;
 }
 
+.add-task-form .add-task-input::placeholder {
+  color: #a1a1aa;
+  transition: color 150ms ease;
+}
+
+.add-task-form:has(.add-task-submit-button:hover) .add-task-input::placeholder {
+  color: #818188;
+}
+
+.dark .add-task-form .add-task-input::placeholder {
+  color: #71717a;
+}
+
+.dark
+  .add-task-form:has(.add-task-submit-button:hover)
+  .add-task-input::placeholder {
+  color: #5a5a62;
+}
+
 .add-task-date-tooltip {
   background-color: var(--app-tooltip-background, #3d3e3f);
   color: var(--app-tooltip-text, #ffffff);

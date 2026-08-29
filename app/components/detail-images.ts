@@ -121,6 +121,26 @@ async function prepareImageUploadFile(file: File) {
   return dataUrlToUploadFile(dataUrl, file.name);
 }
 
+export function extractTaskImageFilename(taskId: string, src: string) {
+  const pattern = new RegExp(
+    `/api/task-images/${taskId}/([a-z0-9-]+\\.(?:jpe?g|png|gif|webp|svg))`,
+    "i",
+  );
+  return src.match(pattern)?.[1] ?? null;
+}
+
+export async function deleteUploadedTaskImage(taskId: string, filename: string) {
+  const response = await fetch(`/api/tasks/${taskId}/images/${filename}`, {
+    method: "DELETE",
+  });
+
+  if (!response.ok && response.status !== 404) {
+    const errorBody = (await response.json().catch(() => null)) as {
+      error?: string;
+    } | null;
+    throw new Error(errorBody?.error ?? "Failed to delete image");
+  }
+}
 export async function uploadImageFile(taskId: string, file: File) {
   const uploadFile = await prepareImageUploadFile(file);
   const formData = new FormData();

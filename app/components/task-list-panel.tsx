@@ -353,6 +353,7 @@ type TaskListPanelProps = {
   onSetTaskPriority?: (taskId: string, priority: number | null) => void;
   onSetTaskPinned?: (taskId: string, pinned: boolean) => void;
   onSetTaskImportant?: (taskId: string, important: boolean) => void;
+  onConvertTaskToNote?: (taskId: string) => void | Promise<void>;
   onToggleTaskLabel?: (
     taskId: string,
     labelId: string,
@@ -411,6 +412,7 @@ export function TaskListPanel({
   onSetTaskPriority,
   onSetTaskPinned,
   onSetTaskImportant,
+  onConvertTaskToNote,
   onToggleTaskLabel,
   onLabelsChanged,
   onMoveTaskToList,
@@ -545,6 +547,10 @@ export function TaskListPanel({
   );
   const dragStateRef = useRef<TaskDragState | null>(null);
   const suppressRowClickRef = useRef(false);
+  const pendingPointerContextMenuRef = useRef<PointerContextMenuState | null>(
+    null,
+  );
+  const suppressPointerContextMenuCloseRef = useRef(false);
 
   const canReorder = showAddTask && Boolean(listId && onReorderTasks);
   const enableSidebarListDragDrop =
@@ -623,6 +629,8 @@ export function TaskListPanel({
     setOpenPriorityMenuTaskId(null);
     resetLabelMenuState();
     resetMoveMenuState();
+    pendingPointerContextMenuRef.current = null;
+    suppressPointerContextMenuCloseRef.current = false;
     setPointerContextMenu(null);
     setNewTaskName("");
     setNewTaskDueDate(null);
@@ -693,8 +701,25 @@ export function TaskListPanel({
     unpinnedVisibleTasks,
   ]);
 
+  useLayoutEffect(() => {
+    const pendingMenu = pendingPointerContextMenuRef.current;
+    if (!pendingMenu) return;
+
+    setPointerContextMenu((current) => {
+      if (current?.taskId === pendingMenu.taskId) {
+        pendingPointerContextMenuRef.current = null;
+        return current;
+      }
+
+      return pendingMenu;
+    });
+  }, [selectedTaskId]);
+
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
+      if (event.button !== 0) return;
+      if (suppressPointerContextMenuCloseRef.current) return;
+
       const target = event.target as Node;
       const targetElement = target instanceof Element ? target : null;
 
@@ -720,6 +745,7 @@ export function TaskListPanel({
       setOpenPriorityMenuTaskId(null);
       resetLabelMenuState();
       resetMoveMenuState();
+      pendingPointerContextMenuRef.current = null;
       setPointerContextMenu(null);
     }
 
@@ -762,6 +788,7 @@ export function TaskListPanel({
       setOpenPriorityMenuTaskId(null);
       resetLabelMenuState();
       resetMoveMenuState();
+      pendingPointerContextMenuRef.current = null;
       setPointerContextMenu(null);
     }
 
@@ -1201,6 +1228,8 @@ export function TaskListPanel({
     setOpenPriorityMenuTaskId(null);
     resetLabelMenuState();
     resetMoveMenuState();
+    pendingPointerContextMenuRef.current = null;
+    suppressPointerContextMenuCloseRef.current = false;
     setPointerContextMenu(null);
   }
 
@@ -1211,6 +1240,7 @@ export function TaskListPanel({
     setOpenMoveMenuTaskId(null);
     resetLabelMenuState();
     resetMoveMenuState();
+    pendingPointerContextMenuRef.current = null;
     setPointerContextMenu(null);
     setOpenPriorityMenuTaskId((current) =>
       current === taskId ? null : taskId,
@@ -1230,6 +1260,7 @@ export function TaskListPanel({
 
   function toggleTaskMenu(taskId: string) {
     setOpenDatePickerTaskId(null);
+    pendingPointerContextMenuRef.current = null;
     setPointerContextMenu(null);
     setOpenLabelMenuTaskId(null);
     setOpenMoveMenuTaskId(null);
@@ -1261,6 +1292,7 @@ export function TaskListPanel({
     }
 
     setPointerContextMenu(null);
+    pendingPointerContextMenuRef.current = null;
     setOpenLabelMenuTaskId(taskId);
   }
 
@@ -1276,6 +1308,7 @@ export function TaskListPanel({
     }
 
     setPointerContextMenu(null);
+    pendingPointerContextMenuRef.current = null;
     setOpenMoveMenuTaskId(taskId);
   }
 
@@ -1404,6 +1437,11 @@ export function TaskListPanel({
     void onSetTaskRecurrence?.(taskId, rule);
   }
 
+  function handleConvertTaskToNote(taskId: string) {
+    closeTaskMenus();
+    void onConvertTaskToNote?.(taskId);
+  }
+
   function handleSelectTaskPriority(taskId: string, priority: number) {
     onSetTaskPriority?.(taskId, priority);
     closeTaskMenus();
@@ -1431,7 +1469,19 @@ export function TaskListPanel({
     event.preventDefault();
     event.stopPropagation();
 
-    onSelectTask(task.id);
+    const menuState: PointerContextMenuState = {
+      taskId: task.id,
+      x: event.clientX,
+      y: event.clientY,
+      view: "main",
+    };
+
+    pendingPointerContextMenuRef.current = menuState;
+    suppressPointerContextMenuCloseRef.current = true;
+    window.requestAnimationFrame(() => {
+      suppressPointerContextMenuCloseRef.current = false;
+    });
+
     setOpenDatePickerTaskId(null);
     setOpenMenuTaskId(null);
     setOpenLabelMenuTaskId(null);
@@ -1439,11 +1489,10 @@ export function TaskListPanel({
     setOpenPriorityMenuTaskId(null);
     resetLabelMenuState();
     resetMoveMenuState();
-    setPointerContextMenu({
-      taskId: task.id,
-      x: event.clientX,
-      y: event.clientY,
-      view: "main",
+    setPointerContextMenu(menuState);
+
+    queueMicrotask(() => {
+      void onSelectTask(task.id);
     });
   }
 
@@ -2041,9 +2090,11 @@ export function TaskListPanel({
           onOpenCustomDatePicker={handleOpenCustomDatePicker}
           onSelectTaskPriority={handleSelectTaskPriority}
           onClearTaskPriority={handleClearTaskPriority}
+          onConvertTaskToNote={() => handleConvertTaskToNote(task.id)}
           onCloseTaskMenu={closeTaskMenus}
           hasDueDateActions={Boolean(onSetTaskDueDate)}
           hasPriorityActions={Boolean(onSetTaskPriority)}
+          hasNoteActions={Boolean(onConvertTaskToNote)}
           hasPinActions={Boolean(onSetTaskPinned)}
           hasImportantActions={Boolean(onSetTaskImportant)}
           hasLabelActions={hasLabelActions}
@@ -2224,9 +2275,9 @@ export function TaskListPanel({
             </header>
           )}
 
-          <div className="relative z-20 flex items-center overflow-visible pl-[16px] pr-[6px] py-2 min-h-[50px]">
+          <div className="relative z-20 flex items-center overflow-visible pl-[12px] pr-[8px] py-2 min-h-[50px]">
             {showAddTask ? (
-              <div className="mr-[10px] min-w-0 flex-1 overflow-visible">
+              <div className="min-w-0 flex-1 overflow-visible">
                 <form
                   ref={addTaskFormRef}
                   onSubmit={handleSubmit}
@@ -2234,7 +2285,7 @@ export function TaskListPanel({
                     if (event.animationName !== "add-task-form-reset") return;
                     setIsAddTaskFormResetting(false);
                   }}
-                  className={`add-task-form-enter flex min-w-0 w-full items-center rounded-[9px] border border-[#dfe3ea] bg-[#f8f9fb] py-1 pl-3 pr-1.5 dark:border-zinc-600 dark:bg-zinc-900 ${
+                  className={`add-task-form add-task-form-enter flex min-w-0 w-full items-center rounded-[9px] border border-[#dfe3ea] bg-[#f8f9fb] py-1 pl-3 pr-1.5 dark:border-zinc-600 dark:bg-zinc-900 ${
                     isAddTaskFormResetting ? "add-task-form-reset" : ""
                   }`}
                 >
@@ -2246,7 +2297,7 @@ export function TaskListPanel({
                     placeholder="New task"
                     aria-label="Task name"
                     title="Add task (Ctrl+Enter / Cmd+Enter)"
-                    className="min-w-0 flex-1 bg-transparent py-1.5 text-sm text-zinc-700 outline-none placeholder:text-zinc-400 dark:text-zinc-50 dark:placeholder:text-zinc-500"
+                    className="add-task-input min-w-0 flex-1 bg-transparent py-1.5 text-sm text-zinc-700 outline-none dark:text-zinc-50"
                     onKeyDown={(event) => {
                       if (event.key === "Escape") {
                         event.preventDefault();
@@ -2455,8 +2506,7 @@ export function TaskListPanel({
                   <button
                     type="submit"
                     onMouseDown={(event) => event.preventDefault()}
-                    disabled={!newTaskName.trim()}
-                    className="ml-px flex h-7 shrink-0 cursor-pointer items-center gap-1 rounded-full bg-[#b4bdc5] px-2.5 text-xs font-medium text-white transition-colors enabled:hover:bg-[#a3adb7] disabled:cursor-not-allowed disabled:opacity-70"
+                    className="add-task-submit-button ml-px flex h-7 shrink-0 cursor-pointer items-center gap-1 rounded-full text-[#f1f1f1] bg-[#6f80c1] px-2.5 text-xs font-medium transition-colors enabled:hover:bg-[#5f70a1] disabled:cursor-not-allowed disabled:opacity-70"
                   >
                     <LuCheck className="size-3.5" aria-hidden="true" />
                     Add
@@ -2666,8 +2716,12 @@ export function TaskListPanel({
             onClearTaskPriority={() =>
               handleClearTaskPriority(pointerMenuTask.id)
             }
+            onConvertTaskToNote={() =>
+              handleConvertTaskToNote(pointerMenuTask.id)
+            }
             hasDueDateActions={Boolean(onSetTaskDueDate)}
             hasPriorityActions={Boolean(onSetTaskPriority)}
+            hasNoteActions={Boolean(onConvertTaskToNote)}
             hasPinActions={Boolean(onSetTaskPinned)}
             hasImportantActions={Boolean(onSetTaskImportant)}
             hasLabelActions={Boolean(onToggleTaskLabel)}

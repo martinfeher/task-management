@@ -17,8 +17,15 @@ import {
 } from "@/lib/task-tags";
 import { normalizeLabelColorHex } from "@/lib/label-colors";
 import { normalizeCalendarTaskColor } from "@/lib/calendar-task-colors";
-import { deleteTaskImageDirectory } from "@/lib/task-image-storage";
+import {
+  deleteTaskImageDirectory,
+  repairBrokenTaskImageReferences,
+} from "@/lib/task-image-storage";
 import { persistTaskDetailsUpdate, persistTaskRename } from "@/lib/task-version-persistence";
+import {
+  plainTextToTaskDetails,
+  taskDetailsHasContent,
+} from "@/lib/task-details-content";
 import {
   advanceDueDate,
   parseRecurrenceRule,
@@ -27,7 +34,7 @@ import {
 } from "@/lib/task-recurrence";
 
 export async function getTaskById(taskId: string) {
-  return prisma.task.findUnique({
+  const task = await prisma.task.findUnique({
     where: { id: taskId },
     select: {
       id: true,
@@ -40,8 +47,32 @@ export async function getTaskById(taskId: string) {
       dueTimeZone: true,
       recurrenceRule: true,
       recurrenceAnchor: true,
+      isNote: true,
     },
   });
+
+  if (!task) {
+    return null;
+  }
+
+  const { details, changed } = await repairBrokenTaskImageReferences(
+    taskId,
+    task.details,
+  );
+
+  if (!changed) {
+    return task;
+  }
+
+  await prisma.task.update({
+    where: { id: taskId },
+    data: { details },
+  });
+
+  return {
+    ...task,
+    details,
+  };
 }
 
 export async function updateTaskRecurrence(
@@ -517,6 +548,67 @@ export async function updateTaskImportant(taskId: string, important: boolean) {
 
   revalidatePath("/");
   return task;
+}
+
+export async function convertTaskToNote(taskId: string) {
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+    select: {
+      name: true,
+      details: true,
+      isNote: true,
+      completed: true,
+    },
+  });
+
+  if (!task) {
+    throw new Error("Task not found");
+  }
+
+  const nextDetails =
+    !taskDetailsHasContent(task.details) && task.name.trim()
+      ? plainTextToTaskDetails(task.name.trim())
+      : task.details;
+
+  const updated = await prisma.task.update({
+    where: { id: taskId },
+    data: {
+      isNote: true,
+      completed: false,
+    },
+    select: {
+      id: true,
+      isNote: true,
+      details: true,
+      completed: true,
+    },
+  });
+
+  if (nextDetails !== task.details) {
+    await persistTaskDetailsUpdate(taskId, nextDetails);
+    updated.details = nextDetails;
+  }
+
+  revalidatePath("/");
+  return updated;
+}
+
+export async function convertNoteToTask(taskId: string) {
+  const updated = await prisma.task.update({
+    where: { id: taskId },
+    data: {
+      isNote: false,
+    },
+    select: {
+      id: true,
+      isNote: true,
+      details: true,
+      completed: true,
+    },
+  });
+
+  revalidatePath("/");
+  return updated;
 }
 
 export async function renameTask(taskId: string, name: string) {

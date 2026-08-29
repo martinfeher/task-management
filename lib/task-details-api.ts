@@ -11,30 +11,89 @@ export type TaskDetailsRecord = {
   dueDurationMinutes: number | null;
   dueTimeZone: string;
   recurrenceRule: string | null;
+  isNote: boolean;
 };
 
-export async function fetchTaskById(
-  taskId: string,
-): Promise<TaskDetailsRecord | null> {
+const TASK_FETCH_DEDUPE_MS = 2_000;
+
+const inFlightTaskFetches = new Map<string, Promise<TaskDetailsRecord | null>>();
+const recentTaskFetchResults = new Map<
+  string,
+  { result: TaskDetailsRecord | null; fetchedAt: number }
+>();
+
+function mapTaskRecord(task: NonNullable<Awaited<ReturnType<typeof getTaskById>>>) {
+  return {
+    id: task.id,
+    name: task.name,
+    completed: task.completed,
+    details: task.details,
+    dueDate: task.dueDate ? task.dueDate.toISOString() : null,
+    dueTimeMinutes: task.dueTimeMinutes,
+    dueDurationMinutes: task.dueDurationMinutes,
+    dueTimeZone: normalizeDueTimeZone(task.dueTimeZone),
+    recurrenceRule: task.recurrenceRule ?? null,
+    isNote: task.isNote,
+  };
+}
+
+async function loadTaskById(taskId: string): Promise<TaskDetailsRecord | null> {
   try {
     const task = await getTaskById(taskId);
     if (!task) {
       return null;
     }
 
-    return {
-      id: task.id,
-      name: task.name,
-      completed: task.completed,
-      details: task.details,
-      dueDate: task.dueDate ? task.dueDate.toISOString() : null,
-      dueTimeMinutes: task.dueTimeMinutes,
-      dueDurationMinutes: task.dueDurationMinutes,
-      dueTimeZone: normalizeDueTimeZone(task.dueTimeZone),
-      recurrenceRule: task.recurrenceRule ?? null,
-    };
+    return mapTaskRecord(task);
   } catch {
     return null;
+  }
+}
+
+export function invalidateTaskDetailsFetchCache(taskId?: string) {
+  if (taskId) {
+    inFlightTaskFetches.delete(taskId);
+    recentTaskFetchResults.delete(taskId);
+    return;
+  }
+
+  inFlightTaskFetches.clear();
+  recentTaskFetchResults.clear();
+}
+
+export async function fetchTaskById(
+  taskId: string,
+  options?: { force?: boolean },
+): Promise<TaskDetailsRecord | null> {
+  if (!options?.force) {
+    const inFlight = inFlightTaskFetches.get(taskId);
+    if (inFlight) {
+      return inFlight;
+    }
+
+    const recent = recentTaskFetchResults.get(taskId);
+    if (recent && Date.now() - recent.fetchedAt < TASK_FETCH_DEDUPE_MS) {
+      return recent.result;
+    }
+  } else {
+    inFlightTaskFetches.delete(taskId);
+    recentTaskFetchResults.delete(taskId);
+  }
+
+  const promise = loadTaskById(taskId);
+  inFlightTaskFetches.set(taskId, promise);
+
+  try {
+    const result = await promise;
+    recentTaskFetchResults.set(taskId, {
+      result,
+      fetchedAt: Date.now(),
+    });
+    return result;
+  } finally {
+    if (inFlightTaskFetches.get(taskId) === promise) {
+      inFlightTaskFetches.delete(taskId);
+    }
   }
 }
 

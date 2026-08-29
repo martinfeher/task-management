@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, rm, writeFile } from "fs/promises";
+import { mkdir, readdir, readFile, rm, stat, writeFile } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
 
@@ -172,4 +172,81 @@ export async function deleteTaskImageDirectory(taskId: string) {
 export async function readTaskImageFile(taskId: string, filename: string) {
   const filePath = getTaskImagePath(taskId, filename);
   return readFile(filePath);
+}
+
+export async function deleteTaskImageFile(taskId: string, filename: string) {
+  assertSafeTaskId(taskId);
+  assertSafeFilename(filename);
+  await rm(getTaskImagePath(taskId, filename), { force: true });
+}
+
+async function listSafeTaskImageFiles(taskId: string) {
+  assertSafeTaskId(taskId);
+
+  try {
+    const existingFiles = await readdir(path.join(UPLOAD_ROOT, taskId));
+    return existingFiles.filter((filename) => SAFE_FILENAME.test(filename));
+  } catch {
+    return [];
+  }
+}
+
+export async function repairBrokenTaskImageReferences(
+  taskId: string,
+  detailsHtml: string,
+) {
+  assertSafeTaskId(taskId);
+
+  const referenced = extractReferencedImageFilenames(taskId, detailsHtml);
+  if (referenced.size === 0) {
+    return { details: detailsHtml, changed: false as const };
+  }
+
+  const safeFiles = await listSafeTaskImageFiles(taskId);
+  const existingSet = new Set(safeFiles);
+
+  const brokenFilenames: string[] = [];
+  for (const filename of referenced) {
+    if (!existingSet.has(filename)) {
+      brokenFilenames.push(filename);
+    }
+  }
+
+  if (brokenFilenames.length === 0) {
+    return { details: detailsHtml, changed: false as const };
+  }
+
+  const orphanFiles = safeFiles.filter((filename) => !referenced.has(filename));
+  if (orphanFiles.length === 0) {
+    return { details: detailsHtml, changed: false as const };
+  }
+
+  const orphansWithMtime = await Promise.all(
+    orphanFiles.map(async (filename) => {
+      const filePath = getTaskImagePath(taskId, filename);
+      const fileStat = await stat(filePath);
+      return { filename, mtime: fileStat.mtimeMs };
+    }),
+  );
+  orphansWithMtime.sort((left, right) => right.mtime - left.mtime);
+
+  let repairedHtml = detailsHtml;
+  const replacementCount = Math.min(
+    brokenFilenames.length,
+    orphansWithMtime.length,
+  );
+
+  for (let index = 0; index < replacementCount; index += 1) {
+    const brokenUrl = getTaskImagePublicUrl(taskId, brokenFilenames[index]);
+    const replacementUrl = getTaskImagePublicUrl(
+      taskId,
+      orphansWithMtime[index].filename,
+    );
+    repairedHtml = repairedHtml.split(brokenUrl).join(replacementUrl);
+  }
+
+  return {
+    details: repairedHtml,
+    changed: replacementCount > 0,
+  };
 }

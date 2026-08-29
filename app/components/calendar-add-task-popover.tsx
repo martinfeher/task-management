@@ -11,6 +11,9 @@ import { BiListUl } from "react-icons/bi";
 import { LuCheck, LuX } from "react-icons/lu";
 import { TaskMoveToSelector } from "./task-move-to-selector";
 import type { TodoList } from "./todo-app";
+import { plainTextToTaskDetails } from "@/lib/task-details-content";
+
+export { plainTextToTaskDetails };
 
 type CalendarAddTaskPopoverProps = {
   date: Date;
@@ -73,27 +76,6 @@ function formatPopoverDateTime(date: Date, dueTimeMinutes: number | null) {
   const timeLabel = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 
   return `${dayLabel}, ${dateLabel}, ${timeLabel}`;
-}
-
-function escapeHtml(value: string) {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
-export function plainTextToTaskDetails(text: string) {
-  const trimmed = text.trim();
-  if (!trimmed) return "";
-
-  return trimmed
-    .split("\n")
-    .map(
-      (line) =>
-        `<div class="detail-line" data-line-type="text">${line ? escapeHtml(line) : "<br>"}</div>`,
-    )
-    .join("");
 }
 
 export function CalendarAddTaskPopover({

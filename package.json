@@ -19,6 +19,11 @@
     "verify:api": "tsx scripts/verify-mobile-api.ts",
     "qa:gate": "tsx scripts/qa-gate-web.ts",
     "qa:gate:mobile": "tsx scripts/qa-gate-mobile.ts",
+    "mobile:start": "npm run start --prefix mobile",
+    "mobile:ios": "npm run ios --prefix mobile",
+    "mobile:android": "npm run android --prefix mobile",
+    "expo:start": "bash scripts/expo-mobile.sh",
+    "expo:ios": "bash scripts/expo-mobile.sh --ios",
     "postinstall": "prisma generate"
   },
   "dependencies": {

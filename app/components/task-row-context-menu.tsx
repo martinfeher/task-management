@@ -35,8 +35,10 @@ type TaskRowContextMenuProps = {
   onOpenCustomDatePicker: () => void;
   onSelectTaskPriority: (priority: number) => void;
   onClearTaskPriority: () => void;
+  onConvertTaskToNote: () => void;
   hasDueDateActions: boolean;
   hasPriorityActions: boolean;
+  hasNoteActions: boolean;
   hasPinActions: boolean;
   hasImportantActions: boolean;
   hasLabelActions: boolean;
@@ -55,6 +57,7 @@ function MainMenuItems({
   hasPinActions,
   hasImportantActions,
   hasPriorityActions,
+  hasNoteActions,
   hasDueDateActions,
   hasLabelActions,
   hasMoveActions,
@@ -67,6 +70,7 @@ function MainMenuItems({
   onOpenCustomDatePicker,
   onSelectTaskPriority,
   onClearTaskPriority,
+  onConvertTaskToNote,
 }: Pick<
   TaskRowContextMenuProps,
   | "task"
@@ -74,6 +78,7 @@ function MainMenuItems({
   | "hasPinActions"
   | "hasImportantActions"
   | "hasPriorityActions"
+  | "hasNoteActions"
   | "hasDueDateActions"
   | "hasLabelActions"
   | "hasMoveActions"
@@ -86,6 +91,7 @@ function MainMenuItems({
   | "onOpenCustomDatePicker"
   | "onSelectTaskPriority"
   | "onClearTaskPriority"
+  | "onConvertTaskToNote"
 >) {
   const menuWidthClass =
     hasDueDateActions || hasPriorityActions ? "w-[196px]" : "w-36";
@@ -118,6 +124,20 @@ function MainMenuItems({
         />
       ) : null}
       {hasDueDateActions && hasPriorityActions ? prioritySelector : null}
+      {!hasDueDateActions && hasPriorityActions ? prioritySelector : null}
+      {hasNoteActions ? (
+        <button
+          type="button"
+          role="menuitem"
+          className={menuItemClassName}
+          onClick={(event) => {
+            event.stopPropagation();
+            onConvertTaskToNote();
+          }}
+        >
+          {task.isNote ? "turn into Task" : "convert to Note"}
+        </button>
+      ) : null}
       {hasPinActions ? (
         <button
           type="button"
@@ -131,7 +151,6 @@ function MainMenuItems({
           {task.pinned ? "Unpin task" : "Pin task"}
         </button>
       ) : null}
-      {!hasDueDateActions && hasPriorityActions ? prioritySelector : null}
       {hasImportantActions ? (
         <button
           type="button"
@@ -203,8 +222,10 @@ export function TaskRowContextMenu({
   onOpenCustomDatePicker,
   onSelectTaskPriority,
   onClearTaskPriority,
+  onConvertTaskToNote,
   hasDueDateActions,
   hasPriorityActions,
+  hasNoteActions,
   hasPinActions,
   hasImportantActions,
   hasLabelActions,
@@ -219,6 +240,7 @@ export function TaskRowContextMenu({
           hasPinActions={hasPinActions}
           hasImportantActions={hasImportantActions}
           hasPriorityActions={hasPriorityActions}
+          hasNoteActions={hasNoteActions}
           hasDueDateActions={hasDueDateActions}
           hasLabelActions={hasLabelActions}
           hasMoveActions={hasMoveActions}
@@ -231,6 +253,7 @@ export function TaskRowContextMenu({
           onOpenCustomDatePicker={onOpenCustomDatePicker}
           onSelectTaskPriority={onSelectTaskPriority}
           onClearTaskPriority={onClearTaskPriority}
+          onConvertTaskToNote={onConvertTaskToNote}
         />
       )}
 
@@ -242,6 +265,7 @@ export function TaskRowContextMenu({
             hasPinActions={hasPinActions}
             hasImportantActions={hasImportantActions}
             hasPriorityActions={hasPriorityActions}
+            hasNoteActions={hasNoteActions}
             hasDueDateActions={hasDueDateActions}
             hasLabelActions={hasLabelActions}
             hasMoveActions={hasMoveActions}
@@ -254,6 +278,7 @@ export function TaskRowContextMenu({
             onOpenCustomDatePicker={onOpenCustomDatePicker}
             onSelectTaskPriority={onSelectTaskPriority}
             onClearTaskPriority={onClearTaskPriority}
+            onConvertTaskToNote={onConvertTaskToNote}
           />
           <TaskMoveToSelector
             lists={lists}

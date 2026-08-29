@@ -105,6 +105,7 @@ export async function getTodoData() {
           recurrenceRule: true,
           pinned: true,
           important: true,
+          isNote: true,
           parentId: true,
           tags: {
             include: { tag: true },
@@ -139,6 +140,7 @@ export async function getTodoData() {
             tags,
             pinned,
             important,
+            isNote,
             parentId,
           }) => ({
           id,
@@ -156,6 +158,7 @@ export async function getTodoData() {
           labels: getLabelsFromTaskTags(tags),
           pinned: Boolean(pinned),
           important: Boolean(important),
+          isNote: Boolean(isNote),
           parentId: parentId ?? null,
         }),
         ),

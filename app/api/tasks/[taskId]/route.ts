@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { jsonWithCors, optionsWithCors } from "@/lib/api-cors";
+import { repairBrokenTaskImageReferences } from "@/lib/task-image-storage";
 import { LABEL_CATEGORY } from "@/lib/task-tags";
 import { normalizeDueTimeZone } from "@/lib/task-due-time";
 import { getPriorityFromTaskTags } from "@/lib/task-tags";
@@ -62,11 +63,23 @@ export async function GET(_request: Request, context: RouteContext) {
     return jsonWithCors({ error: "Task not found" }, { status: 404 });
   }
 
+  const { details, changed } = await repairBrokenTaskImageReferences(
+    taskId,
+    task.details,
+  );
+
+  if (changed) {
+    await prisma.task.update({
+      where: { id: taskId },
+      data: { details },
+    });
+  }
+
   return jsonWithCors({
     id: task.id,
     name: task.name,
     completed: task.completed,
-    details: task.details,
+    details,
     dueDate: task.dueDate ? task.dueDate.toISOString() : null,
     dueTimeMinutes: task.dueTimeMinutes,
     dueDurationMinutes: task.dueDurationMinutes,
