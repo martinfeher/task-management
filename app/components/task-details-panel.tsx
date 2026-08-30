@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { BiLink, BiLeftArrowAlt, BiRedo, BiUndo } from "react-icons/bi";
-import { LuCheck, LuCode, LuHeading1, LuHeading2, LuHeading3, LuHighlighter, LuHistory, LuPilcrow, LuRemoveFormatting } from "react-icons/lu";
+import { LuCheck, LuCode, LuHeading1, LuHeading2, LuHeading3, LuHistory, LuPilcrow, LuRemoveFormatting } from "react-icons/lu";
 import { renameTask, updateTaskDueDate, updateTaskDueTime, updateTaskRecurrence } from "@/app/actions/todo";
 import type { TaskRecurrenceRule } from "@/lib/task-recurrence";
 import { serializeRecurrenceRule } from "@/lib/task-recurrence";
@@ -97,13 +97,15 @@ import { DetailFontFamilyControl } from "./detail-font-family-control";
 import { DetailFontSizeControl } from "./detail-font-size-control";
 import {
   DetailFormatBlockTypeDropdown,
-  DetailFormatColorDropdown,
+  DetailFormatTextHighlightColorDropdown,
   DetailFormatFontFamilyDropdown,
   DetailFormatFontSizeDropdown,
   DetailFormatListDropdown,
   DetailFormatOverflowMenu,
   FormatToolbarTooltipWrap,
+  FORMAT_TOOLBAR_ICON_SIZE_CLASS,
   type FormatToolbarDropdown,
+  type RecentFormatColor,
 } from "./detail-format-toolbar-menus";
 
 type HeaderFormatDropdown = "family" | "size";
@@ -172,6 +174,7 @@ type TaskDetailsPanelProps = {
   taskSnapshot?: TaskDetailsSnapshot | null;
   focusNoteAtEndRequest?: number;
   focusTaskTitleRequest?: number;
+  suppressDetailsTitleFocusRef?: RefObject<boolean>;
   registerSaveController?: (controller: TaskDetailsSaveController | null) => void;
   onDetailsSaved: (taskId: string, details: string) => void;
   onTaskHasDetailsKnown?: (taskId: string, hasDetails: boolean) => void;
@@ -229,31 +232,34 @@ type AddBlockMenuState = {
   left: number;
 };
 
-const FORMAT_TOOLBAR_CONTAINER_CLASS =
-  "fixed z-50 -translate-y-full overflow-visible rounded-2xl border border-zinc-200/90 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.12)] dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-[0_8px_24px_rgba(0,0,0,0.32)]";
+const FORMAT_TOOLBAR_SURFACE_CLASS =
+  "format-toolbar-popover-surface overflow-visible rounded-[19px] border border-zinc-200/70 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.12)] dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-[0_8px_24px_rgba(0,0,0,0.32)]";
+
+function getFormatToolbarPopoverClass(formatMenu: FormatMenuState) {
+  const placement = formatMenu.placement === "below" ? "below" : "above";
+  const align = formatMenu.alignLeft ? "align-left" : "align-center";
+
+  return `format-toolbar-popover format-toolbar-popover--${placement} format-toolbar-popover--${align}`;
+}
 
 const FORMAT_TOOLBAR_ROW_CLASS = "flex items-center gap-0.5 px-1.5 py-1";
 
 const FORMAT_TOOLBAR_TEXT_BUTTON_CLASS =
-  "flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-sm text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800";
+  "flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-[16px] text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800";
 
 const FORMAT_TOOLBAR_ICON_BUTTON_CLASS =
   "flex h-8 w-8 items-center justify-center rounded-lg text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800";
 
-const FORMAT_TOOLBAR_HIGHLIGHT_BUTTON_CLASS =
-  "flex h-8 w-8 items-center justify-center rounded-lg text-zinc-700 transition-colors hover:bg-yellow-200 dark:text-zinc-200 dark:hover:bg-yellow-500/30";
-
 const FORMAT_TOOLBAR_ACTIVE_BUTTON_CLASS =
   "bg-zinc-100 text-[#2563eb] dark:bg-zinc-800 dark:text-blue-300";
-
-const FORMAT_TOOLBAR_HIGHLIGHT_ACTIVE_BUTTON_CLASS =
-  "bg-yellow-200 text-zinc-800 dark:bg-yellow-500/30 dark:text-zinc-100";
 
 type FormatMenuInlineFormats = {
   bold: boolean;
   italic: boolean;
   underline: boolean;
   highlight: boolean;
+  highlightColor: string;
+  textColor: string;
 };
 
 const DEFAULT_FORMAT_MENU_INLINE_FORMATS: FormatMenuInlineFormats = {
@@ -261,7 +267,12 @@ const DEFAULT_FORMAT_MENU_INLINE_FORMATS: FormatMenuInlineFormats = {
   italic: false,
   underline: false,
   highlight: false,
+  highlightColor: "#fef08a",
+  textColor: "#37352f",
 };
+
+const RECENT_FORMAT_COLORS_STORAGE_KEY = "todolist:recent-format-colors";
+const MAX_RECENT_FORMAT_COLORS = 5;
 
 const TASK_DETAILS_TOOLTIP_CLASS =
   "add-task-date-tooltip add-task-date-tooltip-below pointer-events-none absolute top-[calc(100%+8px)] left-1/2 z-50 -translate-x-1/2 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity";
@@ -420,18 +431,102 @@ const TITLE_SYNC_DEBOUNCE_MS = 300;
 const MAX_DETAILS_SAVE_BYTES = 9 * 1024 * 1024;
 
 const HIGHLIGHT_COLOR = "#fef08a";
-const DEFAULT_TEXT_COLOR = "#444444";
+const DEFAULT_HIGHLIGHT_COLOR = HIGHLIGHT_COLOR;
+
+const HIGHLIGHT_COLOR_OPTIONS = [
+  { label: "None", value: "#ffffff" },
+  { label: "Gray", value: "#f3f4f6" },
+  { label: "Beige", value: "#f5f0e6" },
+  { label: "Peach", value: "#ffedd5" },
+  { label: "Yellow", value: "#fef08a" },
+  { label: "Mint", value: "#d1fae5" },
+  { label: "Blue", value: "#bae6fd" },
+  { label: "Purple", value: "#e9d5ff" },
+  { label: "Pink", value: "#fbcfe8" },
+  { label: "Red", value: "#fecaca" },
+] as const;
+
+const DEFAULT_TEXT_COLOR = "#37352f";
 
 const TEXT_COLOR_OPTIONS = [
-  { label: "Default", value: DEFAULT_TEXT_COLOR },
-  { label: "Red", value: "#db4035" },
-  { label: "Orange", value: "#ff9933" },
-  { label: "Yellow", value: "#b58900" },
-  { label: "Green", value: "#299438" },
-  { label: "Blue", value: "#246fe0" },
-  { label: "Purple", value: "#884dff" },
-  { label: "Pink", value: "#c855d6" },
+  { label: "Default", value: "#37352f", borderColor: "#e9e9e7" },
+  { label: "Gray", value: "#787774", borderColor: "#e3e2e0" },
+  { label: "Brown", value: "#9f6b53", borderColor: "#ece0db" },
+  { label: "Orange", value: "#d9730d", borderColor: "#fadec9" },
+  { label: "Yellow", value: "#cb912f", borderColor: "#fdecc8" },
+  { label: "Green", value: "#448361", borderColor: "#dbeddb" },
+  { label: "Blue", value: "#337ea9", borderColor: "#d3e5ef" },
+  { label: "Purple", value: "#9065b0", borderColor: "#e8deee" },
+  { label: "Pink", value: "#c14c8a", borderColor: "#f5e0e9" },
+  { label: "Red", value: "#d44c47", borderColor: "#ffe2dd" },
 ] as const;
+
+function colorsEquivalent(a: string, b: string) {
+  const normalizedA = normalizeColorValue(a);
+  const normalizedB = normalizeColorValue(b);
+  if (normalizedA === normalizedB) return true;
+
+  const hexA = normalizedA.startsWith("#")
+    ? normalizedA
+    : rgbStringToHex(a)?.toLowerCase();
+  const hexB = normalizedB.startsWith("#")
+    ? normalizedB
+    : rgbStringToHex(b)?.toLowerCase();
+
+  return Boolean(hexA && hexB && hexA === hexB);
+}
+
+function readRecentFormatColors(): RecentFormatColor[] {
+  if (typeof window === "undefined") return [];
+
+  try {
+    const raw = window.localStorage.getItem(RECENT_FORMAT_COLORS_STORAGE_KEY);
+    if (!raw) return [];
+
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .filter(
+        (entry): entry is RecentFormatColor =>
+          typeof entry === "object" &&
+          entry !== null &&
+          (entry as RecentFormatColor).kind !== undefined &&
+          typeof (entry as RecentFormatColor).color === "string" &&
+          typeof (entry as RecentFormatColor).label === "string",
+      )
+      .slice(0, MAX_RECENT_FORMAT_COLORS);
+  } catch {
+    return [];
+  }
+}
+
+function rememberRecentFormatColor(
+  current: RecentFormatColor[],
+  entry: RecentFormatColor,
+) {
+  const next = [
+    entry,
+    ...current.filter(
+      (item) =>
+        !(
+          item.kind === entry.kind &&
+          colorsEquivalent(item.color, entry.color)
+        ),
+    ),
+  ].slice(0, MAX_RECENT_FORMAT_COLORS);
+
+  try {
+    window.localStorage.setItem(
+      RECENT_FORMAT_COLORS_STORAGE_KEY,
+      JSON.stringify(next),
+    );
+  } catch {
+    return current;
+  }
+
+  return next;
+}
 
 function formatDueDateLabel(value: string | null) {
   if (!value) return null;
@@ -480,15 +575,42 @@ function resolveTaskDetailsForLoad(pending: string | undefined, loaded: string) 
   return normalizedPending;
 }
 
+function normalizeColorValue(color: string) {
+  return color.toLowerCase().replace(/\s/g, "");
+}
+
+function rgbStringToHex(color: string) {
+  const match = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if (!match) return null;
+
+  const [r, g, b] = match.slice(1, 4).map((value) => Number(value));
+  return `#${[r, g, b]
+    .map((value) => value.toString(16).padStart(2, "0"))
+    .join("")}`;
+}
+
+const HIGHLIGHT_COLOR_VALUES = new Set(
+  HIGHLIGHT_COLOR_OPTIONS.map((option) => normalizeColorValue(option.value)),
+);
+
 function isHighlightColor(color: string) {
   if (!color) return false;
 
-  const normalized = color.toLowerCase().replace(/\s/g, "");
+  const normalized = normalizeColorValue(color);
+  if (HIGHLIGHT_COLOR_VALUES.has(normalized)) {
+    return normalized !== "#ffffff";
+  }
+
+  const rgbHex = rgbStringToHex(color);
+  if (rgbHex && HIGHLIGHT_COLOR_VALUES.has(rgbHex) && rgbHex !== "#ffffff") {
+    return true;
+  }
+
   return (
-    normalized === HIGHLIGHT_COLOR ||
     normalized === "yellow" ||
     normalized === "rgb(254,240,138)" ||
-    normalized === "rgba(254,240,138,1)"
+    normalized === "rgba(254,240,138,1)" ||
+    isHighlightYellow(color)
   );
 }
 
@@ -513,7 +635,7 @@ function nodeHasHighlight(node: Node | null, editor: HTMLElement) {
       const inlineBg = current.style.backgroundColor;
       const computedBg = window.getComputedStyle(current).backgroundColor;
 
-      if (isHighlightColor(inlineBg) || isHighlightYellow(computedBg)) {
+      if (isHighlightColor(inlineBg) || isHighlightColor(computedBg)) {
         return true;
       }
     }
@@ -522,6 +644,261 @@ function nodeHasHighlight(node: Node | null, editor: HTMLElement) {
   }
 
   return false;
+}
+
+function hexToRgb(hex: string): [number, number, number] | null {
+  const normalized = normalizeColorValue(hex).replace("#", "");
+
+  if (normalized.length === 3) {
+    return [
+      Number.parseInt(normalized[0] + normalized[0], 16),
+      Number.parseInt(normalized[1] + normalized[1], 16),
+      Number.parseInt(normalized[2] + normalized[2], 16),
+    ];
+  }
+
+  if (normalized.length === 6) {
+    return [
+      Number.parseInt(normalized.slice(0, 2), 16),
+      Number.parseInt(normalized.slice(2, 4), 16),
+      Number.parseInt(normalized.slice(4, 6), 16),
+    ];
+  }
+
+  return null;
+}
+
+function colorToRgb(color: string): [number, number, number] | null {
+  if (normalizeColorValue(color).startsWith("#")) {
+    return hexToRgb(color);
+  }
+
+  const fromRgb = rgbStringToHex(color);
+  return fromRgb ? hexToRgb(fromRgb) : null;
+}
+
+function resolveHighlightColorOption(color: string) {
+  if (!color) return DEFAULT_HIGHLIGHT_COLOR;
+
+  const normalized = normalizeColorValue(color);
+  const rgbHex = rgbStringToHex(color)?.toLowerCase();
+
+  for (const option of HIGHLIGHT_COLOR_OPTIONS) {
+    if (option.value === "#ffffff") continue;
+
+    const optionNormalized = normalizeColorValue(option.value);
+    if (normalized === optionNormalized) return option.value;
+    if (rgbHex && rgbHex === optionNormalized) return option.value;
+  }
+
+  const inputRgb = colorToRgb(color);
+  if (!inputRgb) return DEFAULT_HIGHLIGHT_COLOR;
+
+  let bestMatch = DEFAULT_HIGHLIGHT_COLOR;
+  let bestDistance = Number.POSITIVE_INFINITY;
+
+  for (const option of HIGHLIGHT_COLOR_OPTIONS) {
+    if (option.value === "#ffffff") continue;
+
+    const optionRgb = colorToRgb(option.value);
+    if (!optionRgb) continue;
+
+    const distance = Math.hypot(
+      inputRgb[0] - optionRgb[0],
+      inputRgb[1] - optionRgb[1],
+      inputRgb[2] - optionRgb[2],
+    );
+
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestMatch = option.value;
+    }
+  }
+
+  return bestMatch;
+}
+
+function getExplicitBackgroundColor(element: HTMLElement) {
+  const inlineBg = element.style.backgroundColor.trim();
+  if (inlineBg) return inlineBg;
+
+  const styleAttr = element.getAttribute("style");
+  const match = styleAttr?.match(/background-color:\s*([^;]+)/i);
+  return match?.[1]?.trim() ?? null;
+}
+
+function getHighlightColorFromElement(element: HTMLElement) {
+  const explicitBg = getExplicitBackgroundColor(element);
+  if (explicitBg && isHighlightColor(explicitBg)) {
+    return resolveHighlightColorOption(explicitBg);
+  }
+
+  if (element.tagName === "MARK" && !explicitBg) {
+    return null;
+  }
+
+  const computedBg = window.getComputedStyle(element).backgroundColor;
+  if (
+    computedBg &&
+    computedBg !== "rgba(0, 0, 0, 0)" &&
+    computedBg !== "transparent" &&
+    isHighlightColor(computedBg)
+  ) {
+    return resolveHighlightColorOption(computedBg);
+  }
+
+  return null;
+}
+
+function getHighlightColorFromNode(
+  node: Node | null,
+  editor: HTMLElement,
+): string | null {
+  let current: Node | null = node;
+
+  while (current && current !== editor) {
+    if (current instanceof HTMLElement) {
+      const color = getHighlightColorFromElement(current);
+      if (color) return color;
+    }
+
+    current = current.parentNode;
+  }
+
+  return null;
+}
+
+function getSelectionHighlightColor(editor: HTMLElement) {
+  const selection = window.getSelection();
+  if (
+    !selection ||
+    selection.isCollapsed ||
+    !editor.contains(selection.anchorNode)
+  ) {
+    return DEFAULT_HIGHLIGHT_COLOR;
+  }
+
+  const colors: string[] = [];
+
+  const addColor = (color: string | null) => {
+    if (color) colors.push(color);
+  };
+
+  addColor(getHighlightColorFromNode(selection.anchorNode, editor));
+  addColor(getHighlightColorFromNode(selection.focusNode, editor));
+
+  if (selection.rangeCount > 0) {
+    const range = selection.getRangeAt(0);
+    const candidates = editor.querySelectorAll("mark, span, font");
+
+    for (const element of candidates) {
+      if (!(element instanceof HTMLElement)) continue;
+      if (!range.intersectsNode(element)) continue;
+      addColor(getHighlightColorFromElement(element));
+    }
+  }
+
+  return colors[0] ?? DEFAULT_HIGHLIGHT_COLOR;
+}
+
+function resolveTextColorOption(color: string) {
+  if (!color) return DEFAULT_TEXT_COLOR;
+
+  for (const option of TEXT_COLOR_OPTIONS) {
+    if (colorsEquivalent(option.value, color)) return option.value;
+  }
+
+  const inputRgb = colorToRgb(color);
+  if (!inputRgb) return DEFAULT_TEXT_COLOR;
+
+  let bestMatch = DEFAULT_TEXT_COLOR;
+  let bestDistance = Number.POSITIVE_INFINITY;
+
+  for (const option of TEXT_COLOR_OPTIONS) {
+    const optionRgb = colorToRgb(option.value);
+    if (!optionRgb) continue;
+
+    const distance = Math.hypot(
+      inputRgb[0] - optionRgb[0],
+      inputRgb[1] - optionRgb[1],
+      inputRgb[2] - optionRgb[2],
+    );
+
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestMatch = option.value;
+    }
+  }
+
+  return bestMatch;
+}
+
+function getTextColorFromNode(
+  node: Node | null,
+  editor: HTMLElement,
+): string | null {
+  let current: Node | null = node;
+
+  while (current && current !== editor) {
+    if (current instanceof HTMLElement) {
+      const inlineColor = current.style.color.trim();
+      if (inlineColor) {
+        return resolveTextColorOption(inlineColor);
+      }
+
+      const computedColor = window.getComputedStyle(current).color;
+      if (
+        computedColor &&
+        computedColor !== "rgba(0, 0, 0, 0)" &&
+        !colorsEquivalent(computedColor, "#555555") &&
+        !colorsEquivalent(computedColor, DEFAULT_TEXT_COLOR)
+      ) {
+        return resolveTextColorOption(computedColor);
+      }
+    }
+
+    current = current.parentNode;
+  }
+
+  return null;
+}
+
+function getSelectionTextColor(editor: HTMLElement) {
+  const selection = window.getSelection();
+  if (
+    !selection ||
+    selection.isCollapsed ||
+    !editor.contains(selection.anchorNode)
+  ) {
+    return DEFAULT_TEXT_COLOR;
+  }
+
+  document.execCommand("styleWithCSS", false, "true");
+  const commandValue = document.queryCommandValue("foreColor");
+  if (commandValue) {
+    return resolveTextColorOption(String(commandValue));
+  }
+
+  const colors: string[] = [];
+  const addColor = (color: string | null) => {
+    if (color) colors.push(color);
+  };
+
+  addColor(getTextColorFromNode(selection.anchorNode, editor));
+  addColor(getTextColorFromNode(selection.focusNode, editor));
+
+  if (selection.rangeCount > 0) {
+    const range = selection.getRangeAt(0);
+    const candidates = editor.querySelectorAll("span, font, mark, a");
+
+    for (const element of candidates) {
+      if (!(element instanceof HTMLElement)) continue;
+      if (!range.intersectsNode(element)) continue;
+      addColor(getTextColorFromNode(element, editor));
+    }
+  }
+
+  return colors[0] ?? DEFAULT_TEXT_COLOR;
 }
 
 function selectionHasHighlight(editor: HTMLElement) {
@@ -549,11 +926,17 @@ function getDetailSelectionInlineFormatState(
     return DEFAULT_FORMAT_MENU_INLINE_FORMATS;
   }
 
+  const hasHighlight = selectionHasHighlight(editor);
+
   return {
     bold: document.queryCommandState("bold"),
     italic: document.queryCommandState("italic"),
     underline: document.queryCommandState("underline"),
-    highlight: selectionHasHighlight(editor),
+    highlight: hasHighlight,
+    highlightColor: hasHighlight
+      ? getSelectionHighlightColor(editor)
+      : DEFAULT_HIGHLIGHT_COLOR,
+    textColor: getSelectionTextColor(editor),
   };
 }
 
@@ -589,24 +972,58 @@ function removeHighlightFromSelection(editor: HTMLElement) {
     if (
       element.tagName === "MARK" ||
       isHighlightColor(inlineBg) ||
-      isHighlightYellow(computedBg)
+      isHighlightColor(computedBg)
     ) {
       unwrapElement(element);
     }
   }
 }
 
-function applyHighlight(editor: HTMLElement) {
-  if (selectionHasHighlight(editor)) {
-    removeHighlightFromSelection(editor);
-    return;
+function applyHighlight(editor: HTMLElement, color: string = HIGHLIGHT_COLOR) {
+  document.execCommand("styleWithCSS", false, "true");
+  const applied = document.execCommand("hiliteColor", false, color);
+  if (!applied) {
+    document.execCommand("backColor", false, color);
+  }
+}
+
+function restoreEditorSelectionRange(range: Range) {
+  const selection = window.getSelection();
+  if (!selection) return;
+
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
+
+function resolveFormatMenuRange(
+  editor: HTMLElement,
+  savedRange: Range | null,
+): Range | null {
+  const selection = window.getSelection();
+
+  if (
+    selection?.rangeCount &&
+    selection.anchorNode &&
+    editor.contains(selection.anchorNode)
+  ) {
+    const current = selection.getRangeAt(0);
+    if (!current.collapsed && current.toString().trim()) {
+      return current.cloneRange();
+    }
   }
 
-  document.execCommand("styleWithCSS", false, "true");
-  const applied = document.execCommand("hiliteColor", false, HIGHLIGHT_COLOR);
-  if (!applied) {
-    document.execCommand("backColor", false, HIGHLIGHT_COLOR);
+  if (
+    savedRange &&
+    !savedRange.collapsed &&
+    savedRange.toString().trim() &&
+    editor.contains(savedRange.commonAncestorContainer)
+  ) {
+    const restored = savedRange.cloneRange();
+    restoreEditorSelectionRange(restored);
+    return restored;
   }
+
+  return null;
 }
 
 function getFormatMenuPositionFromRange(range: Range, editor: HTMLElement) {
@@ -717,6 +1134,7 @@ export function TaskDetailsPanel({
   taskSnapshot = null,
   focusNoteAtEndRequest = 0,
   focusTaskTitleRequest = 0,
+  suppressDetailsTitleFocusRef,
   registerSaveController,
   onDetailsSaved,
   onTaskHasDetailsKnown,
@@ -755,6 +1173,9 @@ export function TaskDetailsPanel({
     useState<TextBlockType>("text");
   const [formatMenuInlineFormats, setFormatMenuInlineFormats] =
     useState<FormatMenuInlineFormats>(DEFAULT_FORMAT_MENU_INLINE_FORMATS);
+  const [recentFormatColors, setRecentFormatColors] = useState<RecentFormatColor[]>(
+    () => readRecentFormatColors(),
+  );
   const [showLinkMenu, setShowLinkMenu] = useState(false);
   const [linkText, setLinkText] = useState("");
   const [linkUrl, setLinkUrl] = useState("");
@@ -837,6 +1258,9 @@ export function TaskDetailsPanel({
   const localPendingByTaskRef = useRef<
     Map<string, { details: string; title: string }>
   >(new Map());
+  const requestSaveRef = useRef<
+    ((mode?: "debounced" | "flush" | "immediate") => void) | null
+  >(null);
   const taskStateRef = useRef<TaskDetails | null>(null);
   const taskSnapshotRef = useRef(taskSnapshot);
   const taskLoadHandlersRef = useRef<{
@@ -949,12 +1373,12 @@ export function TaskDetailsPanel({
           ? new Date(loadedTask.dueDate).toISOString()
           : null,
       });
-      savedDetailsRef.current = effectiveDetails;
+      savedDetailsRef.current = loadedDetails;
       detailsRef.current = editorHtml;
       isLargeContentRef.current =
         effectiveDetails.length > LARGE_CONTENT_THRESHOLD ||
         editorHtml.length > LARGE_CONTENT_THRESHOLD;
-      taskNameRef.current = effectiveName;
+      taskNameRef.current = loadedTask.name;
       syncedTitleRef.current = effectiveName;
       taskIdRef.current = loadedTask.id;
       isReadyRef.current = true;
@@ -972,6 +1396,16 @@ export function TaskDetailsPanel({
           ? new Date(loadedTask.dueDate).toISOString()
           : null,
       });
+
+      const hasUnsavedLocal =
+        effectiveDetails !== loadedDetails ||
+        effectiveName.trim() !== loadedTask.name.trim();
+
+      if (hasUnsavedLocal) {
+        queueMicrotask(() => {
+          requestSaveRef.current?.("immediate");
+        });
+      }
     },
     [],
   );
@@ -1386,6 +1820,8 @@ export function TaskDetailsPanel({
     [flushAutoSave, markSavePending, saveDetails, scheduleAutoSave],
   );
 
+  requestSaveRef.current = requestSave;
+
   const flushSave = useCallback(async () => {
     const currentTaskId = taskIdRef.current;
     if (!currentTaskId || !isReadyRef.current) return;
@@ -1517,6 +1953,7 @@ export function TaskDetailsPanel({
   const applyFocusTaskTitleIfReady = useCallback(
     (requestId: number) => {
       if (!requestId) return false;
+      if (suppressDetailsTitleFocusRef?.current) return false;
       if (requestId === handledFocusTaskTitleRequestRef.current) return true;
       if (!isReadyRef.current || !editorRef.current || !taskId) return false;
       if (hydratedTaskIdRef.current !== taskId) return false;
@@ -1533,7 +1970,7 @@ export function TaskDetailsPanel({
       });
       return true;
     },
-    [taskId, updateLineControls],
+    [suppressDetailsTitleFocusRef, taskId, updateLineControls],
   );
 
   const scheduleLineControlsUpdate = useCallback(() => {
@@ -1639,17 +2076,6 @@ export function TaskDetailsPanel({
     [],
   );
 
-  const hasStoredFormatSelection = useCallback((editor: HTMLElement | null) => {
-    const saved = savedFormatSelectionRef.current;
-    return Boolean(
-      editor &&
-        saved &&
-        !saved.collapsed &&
-        saved.toString().length > 0 &&
-        editor.contains(saved.commonAncestorContainer),
-    );
-  }, []);
-
   const captureFormatSelectionFromEditor = useCallback(() => {
     const editor = editorRef.current;
     if (!editor) return;
@@ -1670,11 +2096,33 @@ export function TaskDetailsPanel({
       if (open) {
         setOpenHeaderFormatDropdown(null);
         captureFormatSelectionFromEditor();
+        setOpenFormatDropdown(dropdown);
+
+        const editor = editorRef.current;
+        if (editor && dropdown === "highlight") {
+          setFormatMenuInlineFormats(getDetailSelectionInlineFormatState(editor));
+        }
+
+        return;
       }
-      setOpenFormatDropdown(open ? dropdown : null);
+
+      setOpenFormatDropdown((current) => (current === dropdown ? null : current));
     },
     [captureFormatSelectionFromEditor],
   );
+
+  const syncFormatMenuSelectionState = useCallback(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    const selection = window.getSelection();
+    if (!selection?.rangeCount || !editor.contains(selection.anchorNode)) return;
+
+    setFormatMenuInlineFormats(getDetailSelectionInlineFormatState(editor));
+    setFormatMenuFontSize(getDetailSelectionFontState(editor).size);
+    setFormatMenuFontFamily(getDetailSelectionFontState(editor).familyId);
+    setFormatMenuBlockType(getActiveTextBlockType(editor));
+  }, []);
 
   const syncFormatMenuFontState = useCallback(() => {
     const editor = editorRef.current;
@@ -1941,11 +2389,11 @@ export function TaskDetailsPanel({
     syncEditorContent();
     syncTitleToTaskList();
     recordHistorySnapshot();
-    scheduleAutoSave();
+    requestSave("immediate");
     updateLineControls();
   }, [
     recordHistorySnapshot,
-    scheduleAutoSave,
+    requestSave,
     syncEditorContent,
     syncTitleToTaskList,
     updateLineControls,
@@ -2005,13 +2453,16 @@ export function TaskDetailsPanel({
 
   const updateFormatMenu = useCallback(() => {
     if (showLinkMenuRef.current) return;
-    if (openFormatDropdownRef.current) return;
+
+    if (openFormatDropdownRef.current) {
+      syncFormatMenuSelectionState();
+      return;
+    }
 
     const selection = window.getSelection();
     const editor = editorRef.current;
 
-    if (!selection || !editor || !editor.contains(selection.anchorNode)) {
-      if (hasStoredFormatSelection(editor)) return;
+    if (!editor) {
       closeFormatMenu();
       return;
     }
@@ -2022,56 +2473,79 @@ export function TaskDetailsPanel({
       return;
     }
 
-    if (selection.isCollapsed) {
+    if (
+      selection?.rangeCount &&
+      selection.anchorNode &&
+      editor.contains(selection.anchorNode) &&
+      selection.isCollapsed
+    ) {
       const link = getLinkFromSelection(selection, editor);
-      if (!link) {
-        if (hasStoredFormatSelection(editor)) return;
-        closeFormatMenu();
+      if (link) {
+        const linkRect = link.getBoundingClientRect();
+        const linkState = getLinkEditorState(editor, selection);
+        savedLinkSelectionRef.current = selection.getRangeAt(0).cloneRange();
+        setLinkText(linkState.text);
+        setLinkUrl(linkState.url);
+        setLinkHasExisting(linkState.hasExistingLink);
+        showLinkMenuRef.current = true;
+        setShowLinkMenu(true);
+        setFormatMenu({
+          x: linkRect.left + linkRect.width / 2,
+          y: linkRect.top - 8,
+          alignLeft: false,
+          placement: "above",
+          anchorBottom: linkRect.bottom,
+        });
+
+        requestAnimationFrame(() => {
+          linkUrlInputRef.current?.focus();
+          linkUrlInputRef.current?.select();
+        });
+
+        rememberFormatSelection(editor, selection.getRangeAt(0));
+        const fontState = getDetailSelectionFontState(editor);
+        setFormatMenuFontSize(fontState.size);
+        setFormatMenuFontFamily(fontState.familyId);
+        setFormatMenuBlockType(getActiveTextBlockType(editor));
+        setFormatMenuInlineFormats(getDetailSelectionInlineFormatState(editor));
+        closeFormatDropdowns();
         return;
       }
-
-      const linkRect = link.getBoundingClientRect();
-      const linkState = getLinkEditorState(editor, selection);
-      savedLinkSelectionRef.current = selection.getRangeAt(0).cloneRange();
-      setLinkText(linkState.text);
-      setLinkUrl(linkState.url);
-      setLinkHasExisting(linkState.hasExistingLink);
-      showLinkMenuRef.current = true;
-      setShowLinkMenu(true);
-      setFormatMenu({
-        x: linkRect.left + linkRect.width / 2,
-        y: linkRect.top - 8,
-        alignLeft: false,
-        placement: "above",
-        anchorBottom: linkRect.bottom,
-      });
-
-      requestAnimationFrame(() => {
-        linkUrlInputRef.current?.focus();
-        linkUrlInputRef.current?.select();
-      });
-    } else {
-      const range = selection.getRangeAt(0);
-      if (!range.toString().trim()) {
-        closeFormatMenu();
-        return;
-      }
-
-      const position = getFormatMenuPositionFromRange(range, editor);
-      setFormatMenu(position);
     }
 
-    rememberFormatSelection(editor, selection.getRangeAt(0));
+    const range = resolveFormatMenuRange(
+      editor,
+      savedFormatSelectionRef.current,
+    );
+    if (!range) {
+      closeFormatMenu();
+      return;
+    }
+
+    rememberFormatSelection(editor, range);
+    setShowLinkMenu(false);
+    showLinkMenuRef.current = false;
+    setFormatMenu(getFormatMenuPositionFromRange(range, editor));
+
     const fontState = getDetailSelectionFontState(editor);
     setFormatMenuFontSize(fontState.size);
     setFormatMenuFontFamily(fontState.familyId);
     setFormatMenuBlockType(getActiveTextBlockType(editor));
     setFormatMenuInlineFormats(getDetailSelectionInlineFormatState(editor));
     closeFormatDropdowns();
-  }, [closeFormatDropdowns, hasStoredFormatSelection, rememberFormatSelection]);
+  }, [closeFormatDropdowns, closeFormatMenu, rememberFormatSelection, syncFormatMenuSelectionState]);
 
   const applyFormat = useCallback(
-    (command: "bold" | "italic" | "underline" | "strikeThrough" | "highlight") => {
+    (
+      command:
+        | "bold"
+        | "italic"
+        | "underline"
+        | "strikeThrough"
+        | "highlight"
+        | "superscript"
+        | "subscript",
+    ) => {
       const editor = editorRef.current;
       if (!editor) return;
 
@@ -2081,7 +2555,7 @@ export function TaskDetailsPanel({
       editor.focus();
 
       if (command === "highlight") {
-        applyHighlight(editor);
+        applyHighlight(editor, DEFAULT_HIGHLIGHT_COLOR);
       } else {
         document.execCommand(command, false);
       }
@@ -2300,15 +2774,110 @@ export function TaskDetailsPanel({
       const activeLine = getActiveLineElement(editor);
       if (isCodeLine(activeLine)) return;
 
+      captureFormatSelectionFromEditor();
+      const savedRange = savedFormatSelectionRef.current?.cloneRange() ?? null;
+
       editor.focus();
+      if (
+        savedRange &&
+        editor.contains(savedRange.commonAncestorContainer)
+      ) {
+        restoreEditorSelectionRange(savedRange);
+      }
+
+      const resolvedColor = resolveTextColorOption(color);
       document.execCommand("styleWithCSS", false, "true");
-      document.execCommand("foreColor", false, color);
+      document.execCommand("foreColor", false, resolvedColor);
       syncEditorContent();
       recordHistorySnapshot();
       scheduleAutoSave();
-      closeFormatMenu();
+      closeFormatDropdowns();
+      setFormatMenuInlineFormats({
+        ...getDetailSelectionInlineFormatState(editor),
+        textColor: resolvedColor,
+      });
+      setRecentFormatColors((current) =>
+        rememberRecentFormatColor(current, {
+          kind: "text",
+          color: resolvedColor,
+          label:
+            TEXT_COLOR_OPTIONS.find((option) =>
+              colorsEquivalent(option.value, resolvedColor),
+            )?.label ?? "Text color",
+        }),
+      );
     },
-    [closeFormatMenu, recordHistorySnapshot, scheduleAutoSave, syncEditorContent],
+    [
+      captureFormatSelectionFromEditor,
+      closeFormatDropdowns,
+      recordHistorySnapshot,
+      scheduleAutoSave,
+      syncEditorContent,
+    ],
+  );
+
+  const applyHighlightColor = useCallback(
+    (color: string) => {
+      const editor = editorRef.current;
+      if (!editor) return;
+
+      const activeLine = getActiveLineElement(editor);
+      if (isCodeLine(activeLine)) return;
+
+      captureFormatSelectionFromEditor();
+      const savedRange = savedFormatSelectionRef.current?.cloneRange() ?? null;
+
+      editor.focus();
+      if (
+        savedRange &&
+        editor.contains(savedRange.commonAncestorContainer)
+      ) {
+        restoreEditorSelectionRange(savedRange);
+      }
+
+      if (normalizeColorValue(color) === "#ffffff") {
+        removeHighlightFromSelection(editor);
+      } else {
+        applyHighlight(editor, color);
+      }
+
+      syncEditorContent();
+      recordHistorySnapshot();
+      scheduleAutoSave();
+      closeFormatDropdowns();
+
+      const resolvedColor = resolveHighlightColorOption(color);
+      const nextInlineFormats = getDetailSelectionInlineFormatState(editor);
+      setFormatMenuInlineFormats(
+        normalizeColorValue(color) === "#ffffff"
+          ? nextInlineFormats
+          : {
+              ...nextInlineFormats,
+              highlight: true,
+              highlightColor: resolvedColor,
+            },
+      );
+
+      if (normalizeColorValue(color) !== "#ffffff") {
+        setRecentFormatColors((current) =>
+          rememberRecentFormatColor(current, {
+            kind: "highlight",
+            color: resolvedColor,
+            label:
+              HIGHLIGHT_COLOR_OPTIONS.find((option) =>
+                colorsEquivalent(option.value, resolvedColor),
+              )?.label ?? "Highlight",
+          }),
+        );
+      }
+    },
+    [
+      captureFormatSelectionFromEditor,
+      closeFormatDropdowns,
+      recordHistorySnapshot,
+      scheduleAutoSave,
+      syncEditorContent,
+    ],
   );
 
   const applyLineBlockType = useCallback(
@@ -2525,18 +3094,13 @@ export function TaskDetailsPanel({
     hydratedTaskIdRef.current = task.id;
     resetHistory(readEditorContent());
 
-    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
       updateLineControls();
       if (task.isNote) {
         syncFormatMenuFontState();
       }
-      const pendingFocusRequest = pendingFocusTaskTitleRequestRef.current;
-      if (pendingFocusRequest) {
-        applyFocusTaskTitleIfReady(pendingFocusRequest);
-      }
     });
   }, [
-    applyFocusTaskTitleIfReady,
     readEditorContent,
     resetHistory,
     syncFormatMenuFontState,
@@ -2551,7 +3115,7 @@ export function TaskDetailsPanel({
     if (!applyFocusTaskTitleIfReady(focusTaskTitleRequest)) {
       pendingFocusTaskTitleRequestRef.current = focusTaskTitleRequest;
     }
-  }, [applyFocusTaskTitleIfReady, focusTaskTitleRequest]);
+  }, [applyFocusTaskTitleIfReady, focusTaskTitleRequest, task?.id]);
 
   useEffect(() => {
     if (!focusNoteAtEndRequest) return;
@@ -2893,7 +3457,9 @@ export function TaskDetailsPanel({
         return;
       }
 
-      closeFormatMenu();
+      if (!editorRef.current?.contains(target)) {
+        closeFormatMenu();
+      }
 
       if (lineControlsRef.current?.contains(target)) {
         return;
@@ -3306,21 +3872,16 @@ export function TaskDetailsPanel({
     const html = event.clipboardData.getData("text/html");
     const plainText = event.clipboardData.getData("text/plain");
 
-    if (plainText && /\r?\n/.test(plainText)) {
-      event.preventDefault();
-      editor.focus();
-      insertPlainTextAtSelection(editor, plainText);
-      requestAnimationFrame(() => {
-        finalizePasteEditorState();
-      });
-      return;
-    }
-
     if (html && plainText && pastedHtmlHasFormatting(html)) {
       event.preventDefault();
 
       const pasteId = crypto.randomUUID();
       const currentTaskId = taskIdRef.current;
+      const selection = window.getSelection();
+      const savedPasteRange =
+        selection?.rangeCount && editor.contains(selection.anchorNode)
+          ? selection.getRangeAt(0).cloneRange()
+          : null;
 
       void (async () => {
         let htmlToPaste = html;
@@ -3335,19 +3896,35 @@ export function TaskDetailsPanel({
           }
         }
 
-        if (!editorRef.current || taskIdRef.current !== currentTaskId) return;
+        const currentEditor = editorRef.current;
+        if (!currentEditor || taskIdRef.current !== currentTaskId) return;
 
         const fragment = preparePasteFragment(htmlToPaste, pasteId);
 
-        editor.focus();
+        currentEditor.focus();
+        if (
+          savedPasteRange &&
+          currentEditor.contains(savedPasteRange.commonAncestorContainer)
+        ) {
+          restoreEditorSelectionRange(savedPasteRange);
+        }
         insertPasteFragmentAtSelection(fragment);
 
         requestAnimationFrame(() => {
           finalizePasteEditorState();
           showPasteFormatPrompt(pasteId);
-          requestSave("immediate");
         });
       })();
+      return;
+    }
+
+    if (plainText && /\r?\n/.test(plainText)) {
+      event.preventDefault();
+      editor.focus();
+      insertPlainTextAtSelection(editor, plainText);
+      requestAnimationFrame(() => {
+        finalizePasteEditorState();
+      });
       return;
     }
 
@@ -3792,30 +4369,27 @@ export function TaskDetailsPanel({
   }
 
   function handleEditorMouseUp() {
-    if (formatMenuTimerRef.current !== null) {
-      window.clearTimeout(formatMenuTimerRef.current);
-    }
-
-    formatMenuTimerRef.current = window.setTimeout(() => {
-      formatMenuTimerRef.current = null;
-      updateFormatMenu();
-    }, FORMAT_MENU_DEBOUNCE_MS);
-
     const editor = editorRef.current;
     if (editor) {
       syncLineEmptyState(editor);
 
       const selection = window.getSelection();
-      if (
-        selection?.rangeCount &&
+      const hasTextSelection =
+        Boolean(selection?.rangeCount) &&
+        selection?.anchorNode != null &&
         !selection.isCollapsed &&
-        editor.contains(selection.anchorNode)
-      ) {
-        rememberFormatSelection(editor, selection.getRangeAt(0));
-      }
+        editor.contains(selection.anchorNode) &&
+        selection.toString().trim().length > 0;
 
-      if (task?.isNote) {
-        syncFormatMenuFontState();
+      if (hasTextSelection && selection) {
+        rememberFormatSelection(editor, selection.getRangeAt(0));
+        if (task?.isNote) {
+          syncFormatMenuFontState();
+        }
+        updateFormatMenu();
+      } else {
+        savedFormatSelectionRef.current = null;
+        updateFormatMenu();
       }
     }
 
@@ -3866,6 +4440,7 @@ export function TaskDetailsPanel({
       setFormatMenu(getFormatMenuPositionFromRange(range, editor));
       setFormatMenuFontSize(getDetailSelectionFontState(editor).size);
       setFormatMenuBlockType(getActiveTextBlockType(editor));
+      setFormatMenuInlineFormats(getDetailSelectionInlineFormatState(editor));
       closeFormatDropdowns();
       setShowLinkMenu(false);
       showLinkMenuRef.current = false;
@@ -4409,7 +4984,7 @@ export function TaskDetailsPanel({
               onKeyDown={handleEditorKeyDown}
               onKeyUp={handleEditorKeyUp}
               onScroll={updateLineControls}
-              className="task-details-editor min-h-[650px] w-full resize-y overflow-auto rounded-xl bg-white py-2 pl-[30px] pr-3 text-[17px] leading-[1.75] text-[#555555] outline-none transition-colors dark:bg-zinc-950 dark:text-zinc-300 [&_.detail-line[data-line-type=bullet]]:pl-1 [&_.detail-line[data-line-type=checklist]]:cursor-pointer [&_.detail-line[data-line-type=checklist]]:pl-1 [&_.detail-line[data-line-type=h1]]:text-[24px] [&_.detail-line[data-line-type=h1]]:font-bold [&_.detail-line[data-line-type=h1]]:leading-[32px] [&_.detail-line[data-line-type=h1]]:text-[#4B4B4B] dark:[&_.detail-line[data-line-type=h1]]:text-[#F5F5F5] [&_.detail-line[data-line-type=h2]]:text-[1.3125rem] [&_.detail-line[data-line-type=h2]]:font-semibold [&_.detail-line[data-line-type=h2]]:leading-[1.6875rem] [&_.detail-line[data-line-type=h3]]:text-[1.125rem] [&_.detail-line[data-line-type=h3]]:font-semibold [&_.detail-line[data-line-type=h3]]:leading-[1.5rem] [&_.detail-line[data-line-type=numbered]]:pl-1 [&_mark]:bg-yellow-200 dark:[&_mark]:bg-yellow-500/30 [&_s]:line-through [&_strike]:line-through [&_u]:underline"
+              className="task-details-editor min-h-[650px] w-full resize-y overflow-auto rounded-xl bg-white py-2 pl-[30px] pr-3 text-[17px] leading-[1.75] text-[#555555] outline-none transition-colors dark:bg-zinc-950 dark:text-zinc-300 [&_.detail-line[data-line-type=bullet]]:pl-1 [&_.detail-line[data-line-type=checklist]]:cursor-pointer [&_.detail-line[data-line-type=checklist]]:pl-1 [&_.detail-line[data-line-type=h1]]:text-[24px] [&_.detail-line[data-line-type=h1]]:font-bold [&_.detail-line[data-line-type=h1]]:leading-[32px] [&_.detail-line[data-line-type=h1]]:text-[#4B4B4B] dark:[&_.detail-line[data-line-type=h1]]:text-[#F5F5F5] [&_.detail-line[data-line-type=h2]]:text-[1.3125rem] [&_.detail-line[data-line-type=h2]]:font-semibold [&_.detail-line[data-line-type=h2]]:leading-[1.6875rem] [&_.detail-line[data-line-type=h3]]:text-[1.125rem] [&_.detail-line[data-line-type=h3]]:font-semibold [&_.detail-line[data-line-type=h3]]:leading-[1.5rem] [&_.detail-line[data-line-type=numbered]]:pl-1 [&_mark]:bg-yellow-200 dark:[&_mark]:bg-yellow-300/30 [&_s]:line-through [&_strike]:line-through [&_u]:underline"
             />
 
             {dropIndicator && (
@@ -4566,17 +5141,16 @@ export function TaskDetailsPanel({
       {formatMenu && (
         <div
           ref={formatMenuRef}
-          className={`${FORMAT_TOOLBAR_CONTAINER_CLASS} ${
-            formatMenu.alignLeft ? "" : "-translate-x-1/2"
-          } ${
-            formatMenu.placement === "below" ? "translate-y-2" : "-translate-y-full"
-          }`}
+          className={getFormatToolbarPopoverClass(formatMenu)}
           style={{ left: formatMenu.x, top: formatMenu.y }}
-          onMouseDownCapture={(event) => {
-            if (event.button !== 0) return;
-            captureFormatSelectionFromEditor();
-          }}
         >
+          <div
+            className={FORMAT_TOOLBAR_SURFACE_CLASS}
+            onMouseDownCapture={(event) => {
+              if (event.button !== 0) return;
+              captureFormatSelectionFromEditor();
+            }}
+          >
           {showLinkMenu ? (
             <div className="space-y-2 px-2 py-2">
               <input
@@ -4711,52 +5285,22 @@ export function TaskDetailsPanel({
 
                 <div aria-hidden="true" className={FORMAT_TOOLBAR_DIVIDER_CLASS} />
 
-                <DetailFormatColorDropdown
-                  open={openFormatDropdown === "color"}
-                  onOpenChange={(open) => setFormatDropdownOpen("color", open)}
-                  defaultTextColor={DEFAULT_TEXT_COLOR}
+                <DetailFormatTextHighlightColorDropdown
+                  open={openFormatDropdown === "highlight"}
+                  onOpenChange={(open) =>
+                    setFormatDropdownOpen("highlight", open)
+                  }
+                  selectedTextColor={formatMenuInlineFormats.textColor}
+                  selectedHighlightColor={formatMenuInlineFormats.highlightColor}
                   textColorOptions={TEXT_COLOR_OPTIONS}
-                  onSelectColor={applyTextColor}
+                  highlightColorOptions={HIGHLIGHT_COLOR_OPTIONS}
+                  isHighlightActive={formatMenuInlineFormats.highlight}
+                  onSelectTextColor={applyTextColor}
+                  onSelectHighlightColor={applyHighlightColor}
+                  recentColors={recentFormatColors}
                 />
 
-                <FormatToolbarTooltipWrap
-                  label="Highlight"
-                  tooltipId="format-toolbar-highlight-tooltip"
-                >
-                  <button
-                    type="button"
-                    aria-label="Highlight"
-                    aria-pressed={formatMenuInlineFormats.highlight}
-                    aria-describedby="format-toolbar-highlight-tooltip"
-                    className={`${FORMAT_TOOLBAR_HIGHLIGHT_BUTTON_CLASS} ${
-                      formatMenuInlineFormats.highlight
-                        ? FORMAT_TOOLBAR_HIGHLIGHT_ACTIVE_BUTTON_CLASS
-                        : ""
-                    }`}
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => applyFormat("highlight")}
-                  >
-                    <LuHighlighter className="size-4" />
-                  </button>
-                </FormatToolbarTooltipWrap>
-
                 <div aria-hidden="true" className={FORMAT_TOOLBAR_DIVIDER_CLASS} />
-
-                <FormatToolbarTooltipWrap
-                  label="Add link (⌘K / Ctrl+K)"
-                  tooltipId="format-toolbar-link-tooltip"
-                >
-                  <button
-                    type="button"
-                    aria-label="Add link"
-                    aria-describedby="format-toolbar-link-tooltip"
-                    className={FORMAT_TOOLBAR_ICON_BUTTON_CLASS}
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={openLinkMenu}
-                  >
-                    <BiLink className="size-4" />
-                  </button>
-                </FormatToolbarTooltipWrap>
 
                 <DetailFormatListDropdown
                   open={openFormatDropdown === "list"}
@@ -4807,6 +5351,22 @@ export function TaskDetailsPanel({
                 <div aria-hidden="true" className={FORMAT_TOOLBAR_DIVIDER_CLASS} />
 
                 <FormatToolbarTooltipWrap
+                  label="Add link (⌘K / Ctrl+K)"
+                  tooltipId="format-toolbar-link-tooltip"
+                >
+                  <button
+                    type="button"
+                    aria-label="Add link"
+                    aria-describedby="format-toolbar-link-tooltip"
+                    className={FORMAT_TOOLBAR_ICON_BUTTON_CLASS}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={openLinkMenu}
+                  >
+                    <BiLink className={FORMAT_TOOLBAR_ICON_SIZE_CLASS} />
+                  </button>
+                </FormatToolbarTooltipWrap>
+
+                <FormatToolbarTooltipWrap
                   label="Clear formatting"
                   tooltipId="format-toolbar-clear-tooltip"
                 >
@@ -4820,7 +5380,7 @@ export function TaskDetailsPanel({
                       clearFormatting();
                     }}
                   >
-                    <LuRemoveFormatting className="size-4" />
+                    <LuRemoveFormatting className={FORMAT_TOOLBAR_ICON_SIZE_CLASS} />
                   </button>
                 </FormatToolbarTooltipWrap>
 
@@ -4829,11 +5389,14 @@ export function TaskDetailsPanel({
                   onOpenChange={(open) => setFormatDropdownOpen("overflow", open)}
                   menuRef={formatOverflowMenuRef}
                   onStrikethrough={() => applyFormat("strikeThrough")}
+                  onSuperscript={() => applyFormat("superscript")}
+                  onSubscript={() => applyFormat("subscript")}
                   onGrammarCheck={() => void runGrammarCheck()}
                 />
               </div>
             </>
           )}
+          </div>
         </div>
       )}
 

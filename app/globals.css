@@ -3,6 +3,8 @@
 @source inline("rounded-[8px]");
 @source inline("rounded-[14px]");
 @source inline("gap-[8px]");
+@source inline("size-[16px]");
+@source inline("size-[20px]");
 @source inline("size-[18px]");
 @source inline("size-[22px]");
 @source inline("size-[24px]");
@@ -154,6 +156,7 @@ body {
   position: absolute;
   left: 0;
   top: 0;
+  font-family: var(--font-app), ui-sans-serif, system-ui, sans-serif !important;
 }
 
 .detail-line[data-line-type="bullet"]::before {
@@ -236,6 +239,7 @@ body {
   content: "Title";
   color: #a1a1aa;
   pointer-events: none;
+  font-family: var(--font-app), ui-sans-serif, system-ui, sans-serif !important;
 }
 
 .task-details-editor
@@ -246,6 +250,7 @@ body {
   color: #d4d4d8;
   pointer-events: none;
   font-size: 16px;
+  font-family: var(--font-app), ui-sans-serif, system-ui, sans-serif !important;
 }
 
 .task-details-editor
@@ -258,6 +263,7 @@ body {
   color: #d4d4d8;
   pointer-events: none;
   margin-left: 0.25rem;
+  font-family: var(--font-app), ui-sans-serif, system-ui, sans-serif !important;
 }
 
 .task-details-editor .detail-line[data-line-type="code"] {
@@ -303,6 +309,7 @@ body {
   content: "Enter code";
   color: #a1a1aa;
   pointer-events: none;
+  font-family: var(--font-app), ui-sans-serif, system-ui, sans-serif !important;
 }
 
 .task-details-editor .detail-line:has(.detail-image-wrapper) {
@@ -1097,6 +1104,84 @@ body {
   border: 1px solid rgb(235 235 235);
   box-shadow: var(--calendar-task-hover-preview-shadow);
   animation: calendar-task-preview-in 160ms ease-out;
+}
+
+@keyframes format-toolbar-surface-enter-above {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes format-toolbar-surface-enter-below {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.format-toolbar-popover {
+  position: fixed;
+  z-index: 50;
+  pointer-events: none;
+}
+
+.format-toolbar-popover--above.format-toolbar-popover--align-center {
+  transform: translate(-50%, -100%);
+}
+
+.format-toolbar-popover--above.format-toolbar-popover--align-left {
+  transform: translateY(-100%);
+}
+
+.format-toolbar-popover--below.format-toolbar-popover--align-center {
+  transform: translate(-50%, 0.5rem);
+}
+
+.format-toolbar-popover--below.format-toolbar-popover--align-left {
+  transform: translateY(0.5rem);
+}
+
+.format-toolbar-popover-surface {
+  pointer-events: auto;
+  overflow: visible;
+  animation-duration: 360ms;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  animation-fill-mode: both;
+}
+
+.format-toolbar-popover--above .format-toolbar-popover-surface {
+  transform-origin: center bottom;
+  animation-name: format-toolbar-surface-enter-above;
+}
+
+.format-toolbar-popover--below .format-toolbar-popover-surface {
+  transform-origin: center top;
+  animation-name: format-toolbar-surface-enter-below;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .format-toolbar-popover-surface {
+    animation: none;
+  }
+}
+
+.format-highlight-trigger[aria-expanded="true"] {
+  background-color: #f6f7f8 !important;
+}
+
+.format-highlight-trigger:hover {
+  background-color: #f6f7f8 !important;
 }
 
 .list-calendar-button {

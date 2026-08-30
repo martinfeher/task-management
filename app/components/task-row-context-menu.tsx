@@ -309,7 +309,7 @@ export function TaskRowContextMenu({
   if (fixedPosition) {
     return (
       <div
-        className="fixed z-50"
+        className="fixed z-[100]"
         style={{ left: fixedPosition.x, top: fixedPosition.y }}
       >
         {menu}

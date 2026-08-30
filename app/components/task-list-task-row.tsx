@@ -43,7 +43,7 @@ type TaskListTaskRowProps = {
   selectedTaskId: string | null;
   editingTaskId: string | null;
   titleDraft: string;
-  titleInputRef: RefObject<HTMLInputElement | null>;
+  onTitleEditReady?: () => void;
   showDragHandle: boolean;
   openDatePickerTaskId: string | null;
   openMenuTaskId: string | null;
@@ -223,7 +223,7 @@ export function TaskListTaskRow({
   selectedTaskId,
   editingTaskId,
   titleDraft,
-  titleInputRef,
+  onTitleEditReady,
   showDragHandle,
   openDatePickerTaskId,
   openMenuTaskId,
@@ -280,6 +280,20 @@ export function TaskListTaskRow({
   hasMoveActions,
   useWiderRowPadding = false,
 }: TaskListTaskRowProps) {
+  const titleInputRef = useRef<HTMLInputElement>(null);
+
+  useLayoutEffect(() => {
+    if (editingTaskId !== task.id) return;
+
+    const input = titleInputRef.current;
+    if (!input) return;
+
+    input.focus({ preventScroll: true });
+    const end = input.value.length;
+    input.setSelectionRange(end, end);
+    onTitleEditReady?.();
+  }, [editingTaskId, onTitleEditReady, task.id, titleDraft]);
+
   const rowMenuView = getRowMenuView(
     task.id,
     openMenuTaskId,
@@ -567,6 +581,7 @@ export function TaskListTaskRow({
         {editingTaskId === task.id ? (
           <input
             ref={titleInputRef}
+            data-task-title-input
             type="text"
             value={titleDraft}
             onChange={(event) => onTitleDraftChange(task.id, event.target.value)}

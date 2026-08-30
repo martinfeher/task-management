@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   convertTaskToNote as convertTaskToNoteInDb,
   convertNoteToTask as convertNoteToTaskInDb,
@@ -622,7 +622,6 @@ export function TodoApp({
   initialTasksByList,
   initialRoute,
 }: TodoAppProps) {
-  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const searchParamsKey = searchParams.toString();
@@ -659,6 +658,13 @@ export function TodoApp({
   const clearSidebarHoverTimerRef = useRef<number | null>(null);
   const [focusNoteAtEndRequest, setFocusNoteAtEndRequest] = useState(0);
   const [focusTaskTitleRequest, setFocusTaskTitleRequest] = useState(0);
+  const suppressDetailsTitleFocusRef = useRef(false);
+  const handleListTitleEditStart = useCallback(() => {
+    suppressDetailsTitleFocusRef.current = true;
+  }, []);
+  const handleListTitleEditEnd = useCallback(() => {
+    suppressDetailsTitleFocusRef.current = false;
+  }, []);
   const [activeView, setActiveView] = useState<ActiveView>(bootState.activeView);
   const [tasksByList, setTasksByList] = useState(() => initialTasks);
   const [pendingUndo, setPendingUndo] = useState<PendingUndo | null>(null);
@@ -792,6 +798,45 @@ export function TodoApp({
   const pendingPathRef = useRef<string | null>(null);
   const currentRouteRef = useRef<TodoRoute>(bootRoute);
   taskListWidthRef.current = taskListWidth;
+
+  const selectTaskImmediate = useCallback(
+    (taskId: string) => {
+      if (taskId !== selectedTaskId) {
+        void detailsSaveControllerRef.current?.flushSave();
+      }
+
+      const route = getRouteFromAppState({
+        activeView,
+        selectedListId,
+        selectedTaskId: taskId,
+        selectedLabelId,
+        isListCalendarOpen,
+        listCalendarView,
+        listCalendarMultiDayCount,
+        listCalendarMultiWeekCount,
+        calendarView,
+        calendarMultiDayCount,
+        calendarMultiWeekCount,
+      });
+      pendingPathRef.current = buildTodoPath(route);
+      currentRouteRef.current = route;
+
+      setSelectedTaskId(taskId);
+    },
+    [
+      activeView,
+      calendarMultiDayCount,
+      calendarMultiWeekCount,
+      calendarView,
+      isListCalendarOpen,
+      listCalendarMultiDayCount,
+      listCalendarMultiWeekCount,
+      listCalendarView,
+      selectedLabelId,
+      selectedListId,
+      selectedTaskId,
+    ],
+  );
 
   const clampTaskListWidth = useCallback((width: number) => {
     const container = splitContainerRef.current;
@@ -946,6 +991,12 @@ export function TodoApp({
               : activeView === "calendar"
                 ? "Calendar"
                 : (selectedList?.name ?? null);
+
+  const taskListViewResetKey = [
+    displayedListId ?? "",
+    displayedLabelId ?? "",
+    displayedActiveView ?? "",
+  ].join(":");
 
   const taskListItems: TaskListItem[] = useMemo(
     () =>
@@ -1300,6 +1351,11 @@ export function TodoApp({
       return;
     }
 
+    // Ignore stale URL reads while a client-side navigation is in flight.
+    if (pendingPathRef.current) {
+      return;
+    }
+
     const route = parseTodoPath(pathname, searchParams);
     if (!route || routesEqual(route, currentRouteRef.current)) {
       return;
@@ -1351,7 +1407,14 @@ export function TodoApp({
 
     currentRouteRef.current = route;
     pendingPathRef.current = path;
-    router.push(path);
+    // Use the History API directly instead of router.push(). This route's
+    // dynamic segments (e.g. /tasks/[taskId]) have no loading.tsx or
+    // generateStaticParams, so router.push() triggers a full server
+    // round-trip (re-running getTodoData()) on every task/list selection,
+    // which is what caused the visible flicker/rerender on the first click
+    // after switching tasks. pushState only updates the URL bar and syncs
+    // usePathname()/useSearchParams(), with no server request.
+    window.history.pushState(null, "", path);
   }, [
     activeView,
     selectedListId,
@@ -1366,7 +1429,6 @@ export function TodoApp({
     calendarMultiWeekCount,
     pathname,
     searchParamsKey,
-    router,
   ]);
 
   const handleListCalendarViewChange = useCallback((view: CalendarViewTab) => {
@@ -2991,6 +3053,7 @@ export function TodoApp({
               >
                 <TaskListPanel
                   title={taskListTitle}
+                  viewResetKey={taskListViewResetKey}
                   tasks={taskListItems}
                   completedTasks={listCompletedTasks}
                   lists={lists}
@@ -3022,6 +3085,10 @@ export function TodoApp({
                   onAddTask={addTask}
                   onToggleTask={toggleTask}
                   onSelectTask={handleTaskListSelect}
+                  onSelectTaskQuiet={selectTask}
+                  onSelectTaskImmediate={selectTaskImmediate}
+                  onListTitleEditStart={handleListTitleEditStart}
+                  onListTitleEditEnd={handleListTitleEditEnd}
                   onRenameTask={renameTask}
                   onTaskNameChange={handleTaskRenamed}
                   onReorderTasks={reorderTasks}
@@ -3118,6 +3185,7 @@ export function TodoApp({
                     taskSnapshot={selectedTaskSnapshot}
                     focusNoteAtEndRequest={focusNoteAtEndRequest}
                     focusTaskTitleRequest={focusTaskTitleRequest}
+                    suppressDetailsTitleFocusRef={suppressDetailsTitleFocusRef}
                     registerSaveController={registerDetailsSaveController}
                     onDetailsSaved={handleDetailsSaved}
                     onTaskHasDetailsKnown={handleTaskHasDetailsKnown}
@@ -3138,6 +3206,7 @@ export function TodoApp({
             <div onMouseEnter={commitSidebarHoverSelection}>
               <TaskListPanel
                 title={taskListTitle}
+                viewResetKey={taskListViewResetKey}
                 tasks={taskListItems}
                 completedTasks={listCompletedTasks}
                 lists={lists}
@@ -3159,6 +3228,10 @@ export function TodoApp({
                 onAddTask={addTask}
                 onToggleTask={toggleTask}
                 onSelectTask={handleTaskListSelect}
+                onSelectTaskQuiet={selectTask}
+                onSelectTaskImmediate={selectTaskImmediate}
+                onListTitleEditStart={handleListTitleEditStart}
+                onListTitleEditEnd={handleListTitleEditEnd}
                 onRenameTask={renameTask}
                 onTaskNameChange={handleTaskRenamed}
                 onReorderTasks={reorderTasks}

@@ -10,6 +10,7 @@ import {
   useState,
   type RefObject,
 } from "react";
+import { createPortal } from "react-dom";
 import { BiChevronDown, BiSortAlt2 } from "react-icons/bi";
 import { IoPricetagsOutline } from "react-icons/io5";
 import { LuCalendarCheck2, LuCheck, LuMenu, LuX } from "react-icons/lu";
@@ -28,7 +29,6 @@ import { TaskPrioritySelector } from "./task-priority-selector";
 import { TaskPriorityFlagIcon } from "./task-priority-icon";
 import {
   TaskRowContextMenu,
-  type TaskRowContextMenuView,
 } from "./task-row-context-menu";
 import type { TaskListItem, TodoList, AddTaskOptions } from "./todo-app";
 import type { TaskDueTime } from "@/lib/task-due-time";
@@ -64,6 +64,17 @@ import {
   getTaskDropIndex,
   getTaskRowElements,
 } from "./task-reorder";
+import {
+  clearTaskListTitleEdit,
+  closeTaskListPointerMenu,
+  openTaskListPointerMenu,
+  shouldSuppressTaskListPointerMenuClose,
+  stashTaskListTitleEdit,
+  updateTaskListPointerMenu,
+  useTaskListPointerMenu,
+  useTaskListTitleEditSession,
+  type TaskListPointerContextMenuState,
+} from "@/lib/task-list-interaction-store";
 
 export const TASK_LIST_PANEL_DEFAULT_WIDTH = 350;
 export const TASK_LIST_PANEL_AUTO_EXPAND_MAX_WIDTH = 450;
@@ -307,15 +318,23 @@ function sortTasks(
   return sorted;
 }
 
-type PointerContextMenuState = {
-  taskId: string;
-  x: number;
-  y: number;
-  view: TaskRowContextMenuView;
-};
+function clampPointerContextMenuPosition(x: number, y: number) {
+  if (typeof window === "undefined") {
+    return { x, y };
+  }
+
+  const menuWidth = 220;
+  const menuHeight = 280;
+
+  return {
+    x: Math.min(Math.max(8, x), window.innerWidth - menuWidth - 8),
+    y: Math.min(Math.max(8, y), window.innerHeight - menuHeight - 8),
+  };
+}
 
 type TaskListPanelProps = {
   title: string | null;
+  viewResetKey: string;
   tasks: TaskListItem[];
   completedTasks?: TaskListItem[];
   lists: TodoList[];
@@ -336,6 +355,10 @@ type TaskListPanelProps = {
   onAddTask: (name: string, options?: AddTaskOptions) => void | Promise<void>;
   onToggleTask: (taskId: string) => void;
   onSelectTask: (taskId: string) => void | Promise<void>;
+  onSelectTaskQuiet?: (taskId: string) => void | Promise<void>;
+  onSelectTaskImmediate?: (taskId: string) => void;
+  onListTitleEditStart?: () => void;
+  onListTitleEditEnd?: () => void;
   onRenameTask: (taskId: string, name: string) => void;
   onTaskNameChange?: (taskId: string, name: string) => void;
   onReorderTasks?: (
@@ -383,6 +406,7 @@ type TaskListPanelProps = {
 
 export function TaskListPanel({
   title,
+  viewResetKey,
   tasks,
   completedTasks = [],
   lists,
@@ -403,6 +427,10 @@ export function TaskListPanel({
   onAddTask,
   onToggleTask,
   onSelectTask,
+  onSelectTaskQuiet,
+  onSelectTaskImmediate,
+  onListTitleEditStart,
+  onListTitleEditEnd,
   onRenameTask,
   onTaskNameChange,
   onReorderTasks,
@@ -480,8 +508,8 @@ export function TaskListPanel({
   const [assignedLabelIds, setAssignedLabelIds] = useState<string[]>([]);
   const [labelQuery, setLabelQuery] = useState("");
   const [isLabelSubmitting, setIsLabelSubmitting] = useState(false);
-  const [pointerContextMenu, setPointerContextMenu] =
-    useState<PointerContextMenuState | null>(null);
+  const pointerContextMenu = useTaskListPointerMenu();
+  const titleEditSession = useTaskListTitleEditSession();
   const [dropIndicator, setDropIndicator] = useState<DropIndicatorState | null>(
     null,
   );
@@ -520,8 +548,6 @@ export function TaskListPanel({
 
     setAssignedLabelIds(task.labels.map((tag) => tag.id));
   }, [activeLabelMenuTaskId]);
-  const titleInputRef = useRef<HTMLInputElement>(null);
-  const newTaskInputRef = useRef<HTMLInputElement>(null);
   const addTaskFormRef = useRef<HTMLFormElement>(null);
   const addTaskDateMenuRef = useRef<HTMLDivElement>(null);
   const addTaskDatePickerRef = useRef<HTMLDivElement>(null);
@@ -530,6 +556,9 @@ export function TaskListPanel({
   const isAddTaskDatePickerOpenRef = useRef(false);
   const keepAddTaskOpenRef = useRef(false);
   const titleEditReadyRef = useRef(false);
+  const editingTaskIdRef = useRef<string | null>(null);
+  editingTaskIdRef.current = editingTaskId;
+  const newTaskInputRef = useRef<HTMLInputElement>(null);
   const titleEditIdleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
@@ -547,10 +576,8 @@ export function TaskListPanel({
   );
   const dragStateRef = useRef<TaskDragState | null>(null);
   const suppressRowClickRef = useRef(false);
-  const pendingPointerContextMenuRef = useRef<PointerContextMenuState | null>(
-    null,
-  );
-  const suppressPointerContextMenuCloseRef = useRef(false);
+  const selectedTaskIdRef = useRef(selectedTaskId);
+  selectedTaskIdRef.current = selectedTaskId;
 
   const canReorder = showAddTask && Boolean(listId && onReorderTasks);
   const enableSidebarListDragDrop =
@@ -614,7 +641,12 @@ export function TaskListPanel({
 
     const task = tasks.find((item) => item.id === editingTaskId);
     if (!task || task.name === titleDraft) return;
-    if (document.activeElement === titleInputRef.current) return;
+    if (
+      document.activeElement instanceof HTMLElement &&
+      document.activeElement.closest("[data-task-title-input]")
+    ) {
+      return;
+    }
 
     setTitleDraft(task.name);
   }, [tasks, editingTaskId, titleDraft]);
@@ -629,9 +661,8 @@ export function TaskListPanel({
     setOpenPriorityMenuTaskId(null);
     resetLabelMenuState();
     resetMoveMenuState();
-    pendingPointerContextMenuRef.current = null;
-    suppressPointerContextMenuCloseRef.current = false;
-    setPointerContextMenu(null);
+    closeTaskListPointerMenu();
+    clearTaskListTitleEdit();
     setNewTaskName("");
     setNewTaskDueDate(null);
     setNewTaskDueTime(null);
@@ -639,12 +670,13 @@ export function TaskListPanel({
     setAddTaskLabelIds([]);
     setActiveSort(null);
     setIsCompletedOpen(false);
-  }, [title]);
+    finishTitleEdit();
+  }, [viewResetKey]);
 
   useEffect(() => {
     if (panelWidth != null) return;
     setEmbeddedAutoWidth(TASK_LIST_PANEL_DEFAULT_WIDTH);
-  }, [panelWidth, title, listId, isLabelFilter]);
+  }, [panelWidth, viewResetKey, listId, isLabelFilter]);
 
   const resolvedPanelWidth = panelWidth ?? embeddedAutoWidth;
   const resolvedPanelWidthRef = useRef(resolvedPanelWidth);
@@ -702,23 +734,18 @@ export function TaskListPanel({
   ]);
 
   useLayoutEffect(() => {
-    const pendingMenu = pendingPointerContextMenuRef.current;
-    if (!pendingMenu) return;
+    if (!titleEditSession) return;
+    if (editingTaskId === titleEditSession.taskId) return;
 
-    setPointerContextMenu((current) => {
-      if (current?.taskId === pendingMenu.taskId) {
-        pendingPointerContextMenuRef.current = null;
-        return current;
-      }
-
-      return pendingMenu;
-    });
-  }, [selectedTaskId]);
+    onListTitleEditStart?.();
+    setEditingTaskId(titleEditSession.taskId);
+    setTitleDraft(titleEditSession.name);
+  }, [editingTaskId, onListTitleEditStart, selectedTaskId, titleEditSession]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (event.button !== 0) return;
-      if (suppressPointerContextMenuCloseRef.current) return;
+      if (shouldSuppressTaskListPointerMenuClose()) return;
 
       const target = event.target as Node;
       const targetElement = target instanceof Element ? target : null;
@@ -745,8 +772,7 @@ export function TaskListPanel({
       setOpenPriorityMenuTaskId(null);
       resetLabelMenuState();
       resetMoveMenuState();
-      pendingPointerContextMenuRef.current = null;
-      setPointerContextMenu(null);
+      closeTaskListPointerMenu();
     }
 
     if (
@@ -788,8 +814,7 @@ export function TaskListPanel({
       setOpenPriorityMenuTaskId(null);
       resetLabelMenuState();
       resetMoveMenuState();
-      pendingPointerContextMenuRef.current = null;
-      setPointerContextMenu(null);
+      closeTaskListPointerMenu();
     }
 
     if (
@@ -815,23 +840,6 @@ export function TaskListPanel({
     openPriorityMenuTaskId,
     pointerContextMenu,
   ]);
-
-  useEffect(() => {
-    if (!editingTaskId) {
-      titleEditReadyRef.current = false;
-      return;
-    }
-
-    requestAnimationFrame(() => {
-      const input = titleInputRef.current;
-      if (!input) return;
-
-      input.focus();
-      const end = input.value.length;
-      input.setSelectionRange(end, end);
-      titleEditReadyRef.current = true;
-    });
-  }, [editingTaskId]);
 
   useEffect(() => {
     if (!editingTaskId) {
@@ -1089,9 +1097,38 @@ export function TaskListPanel({
     void submitNewTask();
   }
 
+  function handleTitleEditBlur(task: TaskListItem) {
+    requestAnimationFrame(() => {
+      if (!titleEditReadyRef.current) return;
+      if (editingTaskIdRef.current !== task.id) return;
+      if (
+        document.activeElement instanceof HTMLElement &&
+        document.activeElement.closest("[data-task-title-input]")
+      ) {
+        return;
+      }
+      commitTitleEdit(task);
+    });
+  }
+
+  const handleTitleEditReady = useCallback(() => {
+    titleEditReadyRef.current = true;
+    if (titleEditSession?.taskId === editingTaskIdRef.current) {
+      clearTaskListTitleEdit();
+    }
+  }, [titleEditSession]);
+
   function startTitleEdit(task: TaskListItem) {
+    titleEditReadyRef.current = false;
+    stashTaskListTitleEdit(task.id, task.name);
+    onListTitleEditStart?.();
     setEditingTaskId(task.id);
     setTitleDraft(task.name);
+  }
+
+  function finishTitleEdit() {
+    clearTaskListTitleEdit();
+    onListTitleEditEnd?.();
   }
 
   function clearTitleEditIdleTimeout() {
@@ -1121,7 +1158,7 @@ export function TaskListPanel({
     }, 5000);
   }
 
-  async function handleTaskClick(task: TaskListItem) {
+  function handleTaskClick(task: TaskListItem) {
     if (suppressRowClickRef.current) {
       suppressRowClickRef.current = false;
       return;
@@ -1134,14 +1171,24 @@ export function TaskListPanel({
       }
     }
 
-    await onSelectTask(task.id);
     startTitleEdit(task);
+
+    const selectTaskForClick =
+      onSelectTaskImmediate ?? onSelectTaskQuiet ?? onSelectTask;
+    const taskId = task.id;
+    const previousSelectedTaskId = selectedTaskIdRef.current;
+    queueMicrotask(() => {
+      if (taskId !== previousSelectedTaskId) {
+        selectTaskForClick(taskId);
+      }
+    });
   }
 
   function cancelTitleEdit(task: TaskListItem) {
     clearTitleEditIdleTimeout();
     setTitleDraft(task.name);
     setEditingTaskId(null);
+    finishTitleEdit();
   }
 
   function commitTitleEdit(task: TaskListItem) {
@@ -1158,6 +1205,7 @@ export function TaskListPanel({
     }
 
     setEditingTaskId(null);
+    finishTitleEdit();
   }
 
   function handleTitleKeyDown(
@@ -1228,9 +1276,7 @@ export function TaskListPanel({
     setOpenPriorityMenuTaskId(null);
     resetLabelMenuState();
     resetMoveMenuState();
-    pendingPointerContextMenuRef.current = null;
-    suppressPointerContextMenuCloseRef.current = false;
-    setPointerContextMenu(null);
+    closeTaskListPointerMenu();
   }
 
   function togglePriorityMenu(taskId: string) {
@@ -1240,8 +1286,7 @@ export function TaskListPanel({
     setOpenMoveMenuTaskId(null);
     resetLabelMenuState();
     resetMoveMenuState();
-    pendingPointerContextMenuRef.current = null;
-    setPointerContextMenu(null);
+    closeTaskListPointerMenu();
     setOpenPriorityMenuTaskId((current) =>
       current === taskId ? null : taskId,
     );
@@ -1260,8 +1305,7 @@ export function TaskListPanel({
 
   function toggleTaskMenu(taskId: string) {
     setOpenDatePickerTaskId(null);
-    pendingPointerContextMenuRef.current = null;
-    setPointerContextMenu(null);
+    closeTaskListPointerMenu();
     setOpenLabelMenuTaskId(null);
     setOpenMoveMenuTaskId(null);
     setOpenPriorityMenuTaskId(null);
@@ -1287,12 +1331,13 @@ export function TaskListPanel({
     resetMoveMenuState();
     initLabelMenuForTask(taskId);
     if (pointerContextMenu?.taskId === taskId) {
-      setPointerContextMenu({ ...pointerContextMenu, view: "label" });
+      updateTaskListPointerMenu((current) =>
+        current ? { ...current, view: "label" } : current,
+      );
       return;
     }
 
-    setPointerContextMenu(null);
-    pendingPointerContextMenuRef.current = null;
+    closeTaskListPointerMenu();
     setOpenLabelMenuTaskId(taskId);
   }
 
@@ -1303,12 +1348,13 @@ export function TaskListPanel({
     resetLabelMenuState();
     setMoveQuery("");
     if (pointerContextMenu?.taskId === taskId) {
-      setPointerContextMenu({ ...pointerContextMenu, view: "moveTo" });
+      updateTaskListPointerMenu((current) =>
+        current ? { ...current, view: "moveTo" } : current,
+      );
       return;
     }
 
-    setPointerContextMenu(null);
-    pendingPointerContextMenuRef.current = null;
+    closeTaskListPointerMenu();
     setOpenMoveMenuTaskId(taskId);
   }
 
@@ -1463,24 +1509,24 @@ export function TaskListPanel({
   }
 
   function handleTaskContextMenu(
-    event: React.MouseEvent<HTMLLIElement>,
+    event: React.MouseEvent<HTMLElement>,
     task: TaskListItem,
   ) {
     event.preventDefault();
     event.stopPropagation();
 
-    const menuState: PointerContextMenuState = {
+    const position = clampPointerContextMenuPosition(
+      event.clientX,
+      event.clientY,
+    );
+
+    const menuState: TaskListPointerContextMenuState = {
       taskId: task.id,
-      x: event.clientX,
-      y: event.clientY,
+      task,
+      x: position.x,
+      y: position.y,
       view: "main",
     };
-
-    pendingPointerContextMenuRef.current = menuState;
-    suppressPointerContextMenuCloseRef.current = true;
-    window.requestAnimationFrame(() => {
-      suppressPointerContextMenuCloseRef.current = false;
-    });
 
     setOpenDatePickerTaskId(null);
     setOpenMenuTaskId(null);
@@ -1489,11 +1535,37 @@ export function TaskListPanel({
     setOpenPriorityMenuTaskId(null);
     resetLabelMenuState();
     resetMoveMenuState();
-    setPointerContextMenu(menuState);
+    initLabelMenuForTask(task.id);
 
+    openTaskListPointerMenu(menuState);
+
+    const selectTaskForMenu =
+      onSelectTaskImmediate ?? onSelectTaskQuiet ?? onSelectTask;
+    const taskId = task.id;
+    const previousSelectedTaskId = selectedTaskIdRef.current;
     queueMicrotask(() => {
-      void onSelectTask(task.id);
+      if (taskId !== previousSelectedTaskId) {
+        selectTaskForMenu(taskId);
+      }
     });
+  }
+
+  function handleTaskListContextMenu(event: React.MouseEvent<HTMLUListElement>) {
+    if (event.defaultPrevented) return;
+
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+
+    const row = target.closest("[data-task-id]");
+    if (!(row instanceof HTMLElement)) return;
+
+    const taskId = row.dataset.taskId;
+    if (!taskId) return;
+
+    const task = tasksById.get(taskId);
+    if (!task) return;
+
+    handleTaskContextMenu(event, task);
   }
 
   function handleDragMove(event: PointerEvent) {
@@ -2034,8 +2106,8 @@ export function TaskListPanel({
           selectedTaskId={selectedTaskId}
           editingTaskId={editingTaskId}
           titleDraft={titleDraft}
-          titleInputRef={titleInputRef}
           showDragHandle={canReorder || enableCalendarDragDrop || enableSidebarListDragDrop}
+          onTitleEditReady={handleTitleEditReady}
           openDatePickerTaskId={openDatePickerTaskId}
           openMenuTaskId={openMenuTaskId}
           openLabelMenuTaskId={openLabelMenuTaskId}
@@ -2060,10 +2132,7 @@ export function TaskListPanel({
             setTitleDraft(value);
             onTaskNameChange?.(taskId, value);
           }}
-          onCommitTitleEdit={(item) => {
-            if (!titleEditReadyRef.current) return;
-            commitTitleEdit(item);
-          }}
+          onCommitTitleEdit={handleTitleEditBlur}
           onTitleKeyDown={handleTitleKeyDown}
           onTaskDragStart={(event, taskId) =>
             handleRowPointerDown(event, taskId, section)
@@ -2123,9 +2192,71 @@ export function TaskListPanel({
     });
   }
 
-  const pointerMenuTask = pointerContextMenu
-    ? orderedTasks.find((task) => task.id === pointerContextMenu.taskId)
-    : null;
+  const pointerMenuTask = pointerContextMenu?.task ?? null;
+
+  const pointerContextMenuPortal =
+    pointerContextMenu && pointerMenuTask && typeof document !== "undefined"
+      ? createPortal(
+          <div ref={pointerContextMenuRef}>
+            <TaskRowContextMenu
+              task={pointerMenuTask}
+              view={pointerContextMenu.view}
+              lists={lists}
+              currentListId={resolveTaskListId(pointerMenuTask)}
+              moveQuery={moveQuery}
+              availableLabels={availableLabels}
+              assignedLabelIds={assignedLabelIds}
+              labelQuery={labelQuery}
+              isLabelSubmitting={isLabelSubmitting}
+              fixedPosition={{
+                x: pointerContextMenu.x,
+                y: pointerContextMenu.y,
+              }}
+              onMoveQueryChange={setMoveQuery}
+              onLabelQueryChange={setLabelQuery}
+              onToggleLabelSelection={(labelId) =>
+                handleToggleLabel(pointerMenuTask.id, labelId)
+              }
+              onCreateLabel={(label, color) =>
+                handleCreateLabel(pointerMenuTask.id, label, color)
+              }
+              onClose={closeTaskMenus}
+              onToggleTaskPinned={() => handleToggleTaskPinned(pointerMenuTask)}
+              onToggleTaskImportant={() =>
+                handleToggleTaskImportant(pointerMenuTask)
+              }
+              onOpenLabelMenu={() => openLabelMenu(pointerMenuTask.id)}
+              onOpenMoveMenu={() => openMoveMenu(pointerMenuTask.id)}
+              onMoveTaskToList={(targetListId) =>
+                handleMoveTaskToList(pointerMenuTask.id, targetListId)
+              }
+              onSetTaskDueDate={(dateValue) =>
+                handleSetTaskDueDateFromMenu(pointerMenuTask.id, dateValue)
+              }
+              onOpenCustomDatePicker={() =>
+                handleOpenCustomDatePicker(pointerMenuTask.id)
+              }
+              onSelectTaskPriority={(priority) =>
+                handleSelectTaskPriority(pointerMenuTask.id, priority)
+              }
+              onClearTaskPriority={() =>
+                handleClearTaskPriority(pointerMenuTask.id)
+              }
+              onConvertTaskToNote={() =>
+                handleConvertTaskToNote(pointerMenuTask.id)
+              }
+              hasDueDateActions={Boolean(onSetTaskDueDate)}
+              hasPriorityActions={Boolean(onSetTaskPriority)}
+              hasNoteActions={Boolean(onConvertTaskToNote)}
+              hasPinActions={Boolean(onSetTaskPinned)}
+              hasImportantActions={Boolean(onSetTaskImportant)}
+              hasLabelActions={Boolean(onToggleTaskLabel)}
+              hasMoveActions={Boolean(onMoveTaskToList) && lists.length > 1}
+            />
+          </div>,
+          document.body,
+        )
+      : null;
 
   return (
     <section
@@ -2534,7 +2665,11 @@ export function TaskListPanel({
               <p className="px-4 pb-1 pt-2.5 text-[10px] font-semibold uppercase tracking-wide text-slate-300 dark:text-zinc-400">
                 Pinned
               </p>
-              <ul ref={pinnedListRef} className="relative flex flex-col">
+              <ul
+                ref={pinnedListRef}
+                className="relative flex flex-col"
+                onContextMenu={handleTaskListContextMenu}
+              >
                 {dropIndicator?.section === "pinned" && (
                   <div
                     className="pointer-events-none absolute right-4 z-20 h-0.5 bg-blue-500"
@@ -2556,6 +2691,7 @@ export function TaskListPanel({
                 ? "border-t border-zinc-200 dark:border-zinc-700"
                 : ""
             }`}
+            onContextMenu={handleTaskListContextMenu}
           >
             {dropIndicator?.section === "unpinned" && (
               <div
@@ -2670,65 +2806,7 @@ export function TaskListPanel({
         </div>
       )}
 
-      {pointerContextMenu && pointerMenuTask ? (
-        <div ref={pointerContextMenuRef}>
-          <TaskRowContextMenu
-            task={pointerMenuTask}
-            view={pointerContextMenu.view}
-            lists={lists}
-            currentListId={resolveTaskListId(pointerMenuTask)}
-            moveQuery={moveQuery}
-            availableLabels={availableLabels}
-            assignedLabelIds={assignedLabelIds}
-            labelQuery={labelQuery}
-            isLabelSubmitting={isLabelSubmitting}
-            fixedPosition={{
-              x: pointerContextMenu.x,
-              y: pointerContextMenu.y,
-            }}
-            onMoveQueryChange={setMoveQuery}
-            onLabelQueryChange={setLabelQuery}
-            onToggleLabelSelection={(labelId) =>
-              handleToggleLabel(pointerMenuTask.id, labelId)
-            }
-            onCreateLabel={(label, color) =>
-              handleCreateLabel(pointerMenuTask.id, label, color)
-            }
-            onClose={closeTaskMenus}
-            onToggleTaskPinned={() => handleToggleTaskPinned(pointerMenuTask)}
-            onToggleTaskImportant={() =>
-              handleToggleTaskImportant(pointerMenuTask)
-            }
-            onOpenLabelMenu={() => openLabelMenu(pointerMenuTask.id)}
-            onOpenMoveMenu={() => openMoveMenu(pointerMenuTask.id)}
-            onMoveTaskToList={(targetListId) =>
-              handleMoveTaskToList(pointerMenuTask.id, targetListId)
-            }
-            onSetTaskDueDate={(dateValue) =>
-              handleSetTaskDueDateFromMenu(pointerMenuTask.id, dateValue)
-            }
-            onOpenCustomDatePicker={() =>
-              handleOpenCustomDatePicker(pointerMenuTask.id)
-            }
-            onSelectTaskPriority={(priority) =>
-              handleSelectTaskPriority(pointerMenuTask.id, priority)
-            }
-            onClearTaskPriority={() =>
-              handleClearTaskPriority(pointerMenuTask.id)
-            }
-            onConvertTaskToNote={() =>
-              handleConvertTaskToNote(pointerMenuTask.id)
-            }
-            hasDueDateActions={Boolean(onSetTaskDueDate)}
-            hasPriorityActions={Boolean(onSetTaskPriority)}
-            hasNoteActions={Boolean(onConvertTaskToNote)}
-            hasPinActions={Boolean(onSetTaskPinned)}
-            hasImportantActions={Boolean(onSetTaskImportant)}
-            hasLabelActions={Boolean(onToggleTaskLabel)}
-            hasMoveActions={Boolean(onMoveTaskToList) && lists.length > 1}
-          />
-        </div>
-      ) : null}
+      {pointerContextMenuPortal}
     </section>
   );
 }
