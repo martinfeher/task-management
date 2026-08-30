@@ -27,6 +27,7 @@ import {
   getCalendarShellClassName,
   CALENDAR_VIEW_SURFACE_CLASS,
   CALENDAR_VIEW_WRAPPER_CLASS,
+  CALENDAR_TIMED_GRID_SCROLL_CLASS,
   CALENDAR_HOUR_COLUMN_DIVIDER_CLASS,
   getCalendarDayColumnDividerClass,
   getCalendarTaskItemStyle,
@@ -45,6 +46,8 @@ import {
   CALENDAR_TIME_SLOT_MINUTES,
   getCalendarTaskPreviewHeight,
   getMinutesFromCalendarGridY,
+  getCalendarTimedGridHeightPx,
+  getCalendarTimedGridScrollTop,
   getTopForCalendarMinutes,
   type CalendarDropSlot,
 } from "@/lib/calendar-time-grid";
@@ -245,6 +248,7 @@ export function CalendarMultiDayView({
   const timeGridRef = useRef<HTMLDivElement>(null);
   const newTaskPreviewRef = useRef<HTMLDivElement>(null);
   const hourColumnRef = useRef<HTMLDivElement>(null);
+  const timeScrollRef = useRef<HTMLDivElement>(null);
   const [nowLineTop, setNowLineTop] = useState<number | null>(null);
 
   useEffect(() => {
@@ -504,15 +508,41 @@ export function CalendarMultiDayView({
   }, [rangeStart, dayCount]);
 
   useLayoutEffect(() => {
-    if (!showGlobalNowLine || !hourColumnRef.current || currentTimeTop === null) {
+    if (!showGlobalNowLine || currentTimeTop === null) {
       setNowLineTop(null);
       return;
     }
 
-    setNowLineTop(
-      hourColumnRef.current.offsetTop + GRID_TOP_OFFSET_PX + currentTimeTop,
+    setNowLineTop(GRID_TOP_OFFSET_PX + currentTimeTop);
+  }, [showGlobalNowLine, currentTimeTop]);
+
+  useLayoutEffect(() => {
+    const scrollEl = timeScrollRef.current;
+    if (!scrollEl || !today || !now || currentTimeTop === null) return;
+
+    const includesToday = visibleDays.some((day) => isSameDay(day, today));
+    const gridHeightPx = getCalendarTimedGridHeightPx(
+      hours.length,
+      HOUR_HEIGHT_PX,
+      GRID_TOP_OFFSET_PX,
     );
-  }, [showGlobalNowLine, currentTimeTop, hours.length, rangeStart, dayCount]);
+
+    scrollEl.scrollTop = getCalendarTimedGridScrollTop({
+      scrollContainerHeightPx: scrollEl.clientHeight,
+      gridHeightPx,
+      firstTaskTopPx: null,
+      currentTimeTopPx: includesToday ? currentTimeTop : null,
+      preferCurrentTime: includesToday,
+    });
+  }, [
+    currentTimeTop,
+    dayCount,
+    hours.length,
+    now,
+    rangeStart,
+    today,
+    visibleDays,
+  ]);
 
   if (!rangeStart || !today || !now) {
     return (
@@ -569,122 +599,135 @@ export function CalendarMultiDayView({
               nextLabel="Next day"
             />
           </div>
-          <div className="min-h-0 flex-1 overflow-auto">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <div className="shrink-0 overflow-x-auto">
+              <div
+                className="grid border-b border-zinc-200 dark:border-zinc-800"
+                style={{ gridTemplateColumns, minWidth: minGridWidth }}
+              >
+                <div
+                  className={`bg-white dark:bg-zinc-950 ${CALENDAR_HOUR_COLUMN_DIVIDER_CLASS}`}
+                />
+                {visibleDays.map((day, dayIndex) => {
+                  const isToday = isSameDay(day, today);
+                  return (
+                    <div
+                      key={`head-${toDateKey(day)}`}
+                      className={`bg-white px-2 py-2 text-center dark:bg-zinc-950 ${getCalendarDayColumnDividerClass(dayIndex, visibleDays.length)}`}
+                    >
+                      <div className="text-xs font-medium uppercase tracking-wide text-zinc-400">
+                        {getCalendarWeekdayLabel(day)}
+                      </div>
+                      <div
+                        className={`mt-1 inline-flex size-7 items-center justify-center rounded-full text-sm ${
+                          isToday
+                            ? CALENDAR_TODAY_DATE_CIRCLE_CLASS
+                            : "font-medium text-zinc-700 dark:text-zinc-200"
+                        }`}
+                      >
+                        {day.getDate()}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="shrink-0 overflow-x-auto">
+              <div
+                className="grid"
+                style={{ gridTemplateColumns, minWidth: minGridWidth }}
+              >
+                <div
+                  className={calendarAllDayLabelCellClassName(
+                    `bg-white dark:bg-zinc-950 ${CALENDAR_HOUR_COLUMN_DIVIDER_CLASS}`,
+                  )}
+                  style={{ height: allDayRowHeightPx }}
+                >
+                  All day
+                </div>
+                {visibleDays.map((day, dayIndex) => {
+                  const dateKey = toDateKey(day);
+                  const dayTasks = tasksByDate.get(dateKey)?.allDay ?? [];
+                  const activeDropSlot = getActiveCalendarDropSlot(
+                    dropTargetSlot,
+                    externalDropTargetDateKey,
+                    null,
+                  );
+                  const isDropTarget =
+                    activeDropSlot?.dateKey === dateKey &&
+                    activeDropSlot.dueTimeMinutes === null;
+                  const isActiveDay =
+                    addTaskPopover !== null && isSameDay(day, addTaskPopover.date);
+                  const isActiveAllDay =
+                    isActiveDay && addTaskPopover?.dueTimeMinutes === null;
+
+                  return (
+                    <div
+                      key={`allday-${dateKey}`}
+                      data-calendar-day={dateKey}
+                      onClick={(event) => handleAllDayClick(event, day)}
+                      className={`${calendarAllDayCellClassName(
+                        `cursor-pointer border-b border-zinc-200 transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900/60 ${getCalendarDayColumnDividerClass(dayIndex, visibleDays.length)} ${
+                        isDropTarget
+                          ? "bg-blue-50 ring-1 ring-inset ring-blue-400 dark:bg-blue-950/30"
+                          : isActiveAllDay
+                            ? "bg-blue-50 ring-1 ring-inset ring-[#4873c7] dark:bg-blue-950/30"
+                            : "bg-white dark:bg-zinc-950"
+                      }`,
+                      )}`}
+                      style={{ height: allDayRowHeightPx }}
+                    >
+                      <div className="space-y-1">
+                        {dayTasks.map((task) => (
+                          <CalendarTaskHoverButton
+                            key={getCalendarTaskKey(task)}
+                            task={task}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleCalendarTaskClick(event, task);
+                            }}
+                            onPointerDown={(event) => {
+                              event.stopPropagation();
+                              handleCalendarTaskPointerDown(event, task, day);
+                            }}
+                            className={`${calendarAllDayTaskClassName(
+                              task.id === selectedTaskId,
+                              canDragTasks,
+                            )} calendar-task-row--single-line gap-1 overflow-hidden`}
+                            style={getCalendarTaskItemStyle(task.priority, task.calendarColor)}
+                          >
+                            <CalendarTaskTitle
+                              name={task.name}
+                              recurrenceRule={task.recurrenceRule}
+                            />
+                            <CalendarTaskCompletionCheckbox
+                              task={task}
+                              onToggleTask={onToggleTask}
+                              isCompleting={completingTaskIds?.has(task.id)}
+                              isCheckAnimating={checkAnimatingTaskIds?.has(task.id)}
+                              className="calendar-task-checkbox"
+                            />
+                          </CalendarTaskHoverButton>
+                        ))}
+                        {isActiveAllDay ? (
+                          <div
+                            aria-hidden="true"
+                            className="block h-4 truncate rounded bg-zinc-200/50 px-1.5 text-[11px] text-zinc-400 dark:bg-zinc-700"
+                          >
+                            {draftTaskName.trim() || ""}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            <div ref={timeScrollRef} className={CALENDAR_TIMED_GRID_SCROLL_CLASS}>
           <div
             className="relative grid"
             style={{ gridTemplateColumns, minWidth: minGridWidth }}
           >
-            <div
-              className={`sticky top-0 z-20 bg-white dark:bg-zinc-950 ${CALENDAR_HOUR_COLUMN_DIVIDER_CLASS}`}
-            />
-            {visibleDays.map((day, dayIndex) => {
-              const isToday = isSameDay(day, today);
-              return (
-                <div
-                  key={`head-${toDateKey(day)}`}
-                  className={`sticky top-0 z-20 border-b border-zinc-200 bg-white px-2 py-2 text-center dark:border-zinc-800 dark:bg-zinc-950 ${getCalendarDayColumnDividerClass(dayIndex, visibleDays.length)}`}
-                >
-                  <div className="text-xs font-medium uppercase tracking-wide text-zinc-400">
-                    {getCalendarWeekdayLabel(day)}
-                  </div>
-                  <div
-                    className={`mt-1 inline-flex size-7 items-center justify-center rounded-full text-sm ${
-                      isToday
-                        ? CALENDAR_TODAY_DATE_CIRCLE_CLASS
-                        : "font-medium text-zinc-700 dark:text-zinc-200"
-                    }`}
-                  >
-                    {day.getDate()}
-                  </div>
-                </div>
-              );
-            })}
-
-            <div
-              className={calendarAllDayLabelCellClassName(
-                `bg-white dark:bg-zinc-950 ${CALENDAR_HOUR_COLUMN_DIVIDER_CLASS}`,
-              )}
-              style={{ height: allDayRowHeightPx }}
-            >
-              All day
-            </div>
-            {visibleDays.map((day, dayIndex) => {
-              const dateKey = toDateKey(day);
-              const dayTasks = tasksByDate.get(dateKey)?.allDay ?? [];
-              const activeDropSlot = getActiveCalendarDropSlot(
-                dropTargetSlot,
-                externalDropTargetDateKey,
-                null,
-              );
-              const isDropTarget =
-                activeDropSlot?.dateKey === dateKey &&
-                activeDropSlot.dueTimeMinutes === null;
-              const isActiveDay =
-                addTaskPopover !== null && isSameDay(day, addTaskPopover.date);
-              const isActiveAllDay =
-                isActiveDay && addTaskPopover?.dueTimeMinutes === null;
-
-              return (
-                <div
-                  key={`allday-${dateKey}`}
-                  data-calendar-day={dateKey}
-                  onClick={(event) => handleAllDayClick(event, day)}
-                  className={`${calendarAllDayCellClassName(
-                    `cursor-pointer border-b border-zinc-200 transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900/60 ${getCalendarDayColumnDividerClass(dayIndex, visibleDays.length)} ${
-                    isDropTarget
-                      ? "bg-blue-50 ring-1 ring-inset ring-blue-400 dark:bg-blue-950/30"
-                      : isActiveAllDay
-                        ? "bg-blue-50 ring-1 ring-inset ring-[#4873c7] dark:bg-blue-950/30"
-                        : "bg-white dark:bg-zinc-950"
-                  }`,
-                  )}`}
-                  style={{ height: allDayRowHeightPx }}
-                >
-                  <div className="space-y-1">
-                    {dayTasks.map((task) => (
-                      <CalendarTaskHoverButton
-                        key={getCalendarTaskKey(task)}
-                        task={task}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          handleCalendarTaskClick(event, task);
-                        }}
-                        onPointerDown={(event) => {
-                          event.stopPropagation();
-                          handleCalendarTaskPointerDown(event, task, day);
-                        }}
-                        className={`${calendarAllDayTaskClassName(
-                          task.id === selectedTaskId,
-                          canDragTasks,
-                        )} calendar-task-row--single-line gap-1 overflow-hidden`}
-                        style={getCalendarTaskItemStyle(task.priority, task.calendarColor)}
-                      >
-                        <CalendarTaskTitle
-                          name={task.name}
-                          recurrenceRule={task.recurrenceRule}
-                        />
-                        <CalendarTaskCompletionCheckbox
-                          task={task}
-                          onToggleTask={onToggleTask}
-                          isCompleting={completingTaskIds?.has(task.id)}
-                          isCheckAnimating={checkAnimatingTaskIds?.has(task.id)}
-                          className="calendar-task-checkbox"
-                        />
-                      </CalendarTaskHoverButton>
-                    ))}
-                    {isActiveAllDay ? (
-                      <div
-                        aria-hidden="true"
-                        className="block h-4 truncate rounded bg-zinc-200/50 px-1.5 text-[11px] text-zinc-400 dark:bg-zinc-700"
-                      >
-                        {draftTaskName.trim() || ""}
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-              );
-            })}
-
             <div
               ref={hourColumnRef}
               className={`relative ${CALENDAR_HOUR_COLUMN_DIVIDER_CLASS}`}
@@ -908,6 +951,7 @@ export function CalendarMultiDayView({
               />
             ) : null}
           </div>
+            </div>
           </div>
         </div>
       </div>

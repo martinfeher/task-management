@@ -15,6 +15,7 @@ import type { DetailTextBlockType, LineBlockType } from "./detail-lines";
 import {
   DETAIL_FONT_FAMILY_OPTIONS,
   DETAIL_FONT_SIZE_OPTIONS,
+  getFormatToolbarFontFamilyOptions,
   type DetailFontFamilyId,
   type DetailFontSizeOption,
 } from "./detail-fonts";
@@ -32,22 +33,72 @@ export const FORMAT_TOOLBAR_ICON_SIZE_CLASS = "size-[18px]";
 export const FORMAT_TOOLBAR_ICON_TEXT_CLASS = "text-[17px]";
 export const FORMAT_TOOLBAR_TEXT_COLOR_ICON_SIZE_CLASS = "size-[20px]";
 
+/** 10% brighter than Tailwind zinc-700 / zinc-200 */
+export const FORMAT_TOOLBAR_ICON_COLOR = "text-[#525259] dark:text-[#e7e7e9]";
+/** 10% brighter than Tailwind zinc-600 / zinc-300 */
+export const FORMAT_TOOLBAR_ICON_COLOR_MUTED = "text-[#63636b] dark:text-[#d8d8dc]";
+/** 10% brighter than Tailwind zinc-500 */
+export const FORMAT_TOOLBAR_CHEVRON_COLOR = "text-[#7f7f87]";
+/** 10% brighter than Tailwind zinc-800 / zinc-100 */
+export const FORMAT_TOOLBAR_TRIGGER_LABEL_COLOR =
+  "text-[#3d3d3f] dark:text-[#f5f5f6]";
+/** Default text-color trigger icon — intentionally unchanged */
+const FORMAT_TOOLBAR_TEXT_COLOR_ICON_COLOR = "text-zinc-700 dark:text-zinc-200";
+
 export const FORMAT_TOOLBAR_DROPDOWN_TRIGGER_CLASS =
-  "flex h-8 cursor-pointer items-center gap-0.5 rounded-lg px-2 text-sm text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800";
+  `flex h-8 cursor-pointer items-center gap-0.5 rounded-lg px-2 text-sm ${FORMAT_TOOLBAR_ICON_COLOR} transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800`;
 
 export const FORMAT_TOOLBAR_DROPDOWN_MENU_CLASS =
-  "overflow-hidden rounded-lg border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900 min-w-[168px]";
+  "overflow-hidden rounded-lg border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900 min-w-[168px] cursor-pointer";
 
 export const FORMAT_TOOLBAR_DROPDOWN_ITEM_CLASS =
   "flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-zinc-900 transition-colors hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800";
 
+export const FORMAT_TOOLBAR_FONT_FAMILY_TRIGGER_CLASS =
+  `flex h-8 cursor-pointer items-center gap-0.5 rounded-lg px-2 text-[12.5px] ${FORMAT_TOOLBAR_ICON_COLOR} transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800`;
+
+export const FORMAT_TOOLBAR_FONT_FAMILY_ITEM_CLASS =
+  "flex w-full items-center gap-2 px-3 py-1.5 text-left text-[15px] text-[#48484a] transition-colors hover:bg-zinc-100 dark:text-[#fbfbfb] dark:hover:bg-zinc-800 cursor-pointer";
+
+export const FORMAT_TOOLBAR_FONT_SIZE_TEXT_CLASS = "text-[14px]";
+/** 15% brighter than #83a1e0 / Tailwind blue-300 (#93c5fd) */
+export const FORMAT_TOOLBAR_FONT_SIZE_SELECTED_COLOR =
+  "text-[#96afe5] dark:text-[#a3cefd]";
+
+export const FORMAT_TOOLBAR_FONT_SIZE_TRIGGER_CLASS =
+  `flex h-8 cursor-pointer items-center gap-0.5 rounded-lg px-2 ${FORMAT_TOOLBAR_FONT_SIZE_TEXT_CLASS} ${FORMAT_TOOLBAR_ICON_COLOR} transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800`;
+
+const FORMAT_TOOLBAR_OVERFLOW_MENU_ICON_CLASS =
+  `inline-flex h-[18px] w-[22px] shrink-0 items-center justify-center leading-none ${FORMAT_TOOLBAR_ICON_COLOR}`;
+
+const FORMAT_TOOLBAR_OVERFLOW_MENU_CLASS =
+  "overflow-hidden rounded-lg border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900 w-[151px] min-w-[151px]";
+
+const FORMAT_TOOLBAR_OVERFLOW_MENU_TRIGGER_CLASS =
+  "flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800";
+
+const FORMAT_TOOLBAR_OVERFLOW_MENU_ITEM_CLASS =
+  "flex w-full items-center gap-2 px-[10.8px] py-1.5 text-left text-sm text-zinc-900 transition-colors hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800";
+
 export const FORMAT_TOOLBAR_TOOLTIP_CLASS =
   "add-task-date-tooltip add-task-date-tooltip-below pointer-events-none absolute top-[calc(100%+6px)] left-1/2 z-50 -translate-x-1/2 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity";
+
+export const FORMAT_TOOLBAR_TOOLTIP_SHORTCUT_CLASS =
+  "format-toolbar-tooltip-shortcut mt-0.5 block text-[10px] font-normal leading-none";
+
+export function getFormatToolbarShortcut(key: string) {
+  const isApple =
+    typeof navigator !== "undefined" &&
+    /Mac|iPhone|iPad/i.test(navigator.userAgent);
+
+  return isApple ? `⌘${key.toUpperCase()}` : `Ctrl+${key.toUpperCase()}`;
+}
 
 type FormatToolbarTooltipWrapProps = {
   label: string;
   tooltipId: string;
   hideTooltip?: boolean;
+  shortcut?: string;
   children: ReactNode;
 };
 
@@ -55,6 +106,7 @@ export function FormatToolbarTooltipWrap({
   label,
   tooltipId,
   hideTooltip = false,
+  shortcut,
   children,
 }: FormatToolbarTooltipWrapProps) {
   return (
@@ -64,10 +116,13 @@ export function FormatToolbarTooltipWrap({
         id={tooltipId}
         role="tooltip"
         className={`${FORMAT_TOOLBAR_TOOLTIP_CLASS} ${
-          hideTooltip ? "" : "group-hover/format-tooltip:opacity-100"
-        }`}
+          shortcut ? "py-2 text-center" : ""
+        } ${hideTooltip ? "" : "group-hover/format-tooltip:opacity-100"}`}
       >
-        {label}
+        <span className="block whitespace-nowrap">{label}</span>
+        {shortcut ? (
+          <span className={FORMAT_TOOLBAR_TOOLTIP_SHORTCUT_CLASS}>{shortcut}</span>
+        ) : null}
       </span>
     </div>
   );
@@ -190,10 +245,10 @@ function BlockTypeIcon({
 }) {
   const colorClass =
     type === "text" && active
-      ? "text-[#323232]"
+      ? "text-[#474747] dark:text-[#474747]"
       : active
         ? "text-[#2563eb]"
-        : "text-zinc-700 dark:text-zinc-200";
+        : FORMAT_TOOLBAR_ICON_COLOR;
 
   if (type === "text") {
     return (
@@ -222,7 +277,8 @@ type DropdownShellProps = {
   triggerStyle?: CSSProperties;
   openClassName?: string;
   menuClassName?: string;
-  align?: "left" | "right";
+  menuStyle?: CSSProperties;
+  align?: "left" | "right" | "center";
   trigger: ReactNode;
   children: ReactNode;
 };
@@ -239,6 +295,7 @@ function FormatToolbarDropdownShell({
   triggerStyle,
   openClassName = "bg-zinc-100 dark:bg-zinc-800",
   menuClassName = FORMAT_TOOLBAR_DROPDOWN_MENU_CLASS,
+  menuStyle,
   align = "left",
   trigger,
   children,
@@ -290,7 +347,13 @@ function FormatToolbarDropdownShell({
 
         {open ? (
           <div
-            className={`absolute top-full z-10 ${align === "right" ? "right-0" : "left-0"} pt-1`}
+            className={`absolute top-full z-10 pt-1 ${
+              align === "right"
+                ? "right-0"
+                : align === "center"
+                  ? "left-1/2 -translate-x-1/2"
+                  : "left-0"
+            }`}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
           >
@@ -298,6 +361,7 @@ function FormatToolbarDropdownShell({
               role="menu"
               aria-label={ariaLabel}
               className={menuClassName}
+              style={menuStyle}
               onMouseDown={(event) => event.preventDefault()}
             >
               {children}
@@ -322,7 +386,7 @@ export type RecentFormatColor = {
 };
 
 const FORMAT_COLOR_MENU_SECTION_TITLE_CLASS =
-  "mb-2 text-[12px] font-medium text-zinc-700 dark:text-zinc-100";
+  "mb-2 text-[11px] font-medium text-gray-600 dark:text-zinc-300";
 
 function TextColorSwatchButton({
   option,
@@ -377,7 +441,7 @@ function HighlightColorSwatchButton({
           : "border-zinc-200/80 dark:border-zinc-600"
       } ${
         selected
-          ? "ring-[1.4px] ring-[#b4b4bb] ring-offset-1 dark:ring-[#8d8d95]"
+          ? "ring-[1px] ring-[#d5d5d9] ring-offset-[1px] dark:ring-[#b9b9bb]"
           : ""
       }`}
       style={{ backgroundColor: option.value }}
@@ -430,7 +494,7 @@ export function DetailFormatTextHighlightColorDropdown({
       tooltipLabel="Text & highlight color"
       openClassName=""
       menuClassName={`${FORMAT_TOOLBAR_DROPDOWN_MENU_CLASS} min-w-[220px]`}
-      triggerClassName="format-highlight-trigger flex h-8 cursor-pointer items-center gap-0.5 rounded-lg px-2 text-sm text-zinc-700 transition-[background-color] duration-150 dark:text-zinc-200"
+      triggerClassName={`format-highlight-trigger flex h-8 cursor-pointer items-center gap-0.5 rounded-lg px-2 text-sm ${FORMAT_TOOLBAR_ICON_COLOR} transition-[background-color] duration-150`}
       trigger={
         <>
           <span
@@ -447,11 +511,11 @@ export function DetailFormatTextHighlightColorDropdown({
               className={`${FORMAT_TOOLBAR_TEXT_COLOR_ICON_SIZE_CLASS} ${
                 hasCustomTextColor
                   ? "text-current"
-                  : "text-zinc-700 dark:text-zinc-200"
+                  : FORMAT_TOOLBAR_TEXT_COLOR_ICON_COLOR
               }`}
             />
           </span>
-          <LuChevronDown className="size-3.5 shrink-0 text-zinc-500" />
+          <LuChevronDown className={`size-3.5 shrink-0 ${FORMAT_TOOLBAR_CHEVRON_COLOR}`} />
         </>
       }
     >
@@ -558,9 +622,9 @@ export function DetailFormatListDropdown({
       trigger={
         <>
           <BulletListIcon
-            className={`${FORMAT_TOOLBAR_ICON_SIZE_CLASS} text-zinc-700 dark:text-zinc-200`}
+            className={`${FORMAT_TOOLBAR_ICON_SIZE_CLASS} ${FORMAT_TOOLBAR_ICON_COLOR}`}
           />
-          <LuChevronDown className="size-3.5 shrink-0 text-zinc-500" />
+          <LuChevronDown className={`size-3.5 shrink-0 ${FORMAT_TOOLBAR_CHEVRON_COLOR}`} />
         </>
       }
     >
@@ -575,7 +639,7 @@ export function DetailFormatListDropdown({
             onOpenChange(false);
           }}
         >
-          <Icon className={`${FORMAT_TOOLBAR_ICON_SIZE_CLASS} text-zinc-600 dark:text-zinc-300`} />
+          <Icon className={`${FORMAT_TOOLBAR_ICON_SIZE_CLASS} ${FORMAT_TOOLBAR_ICON_COLOR_MUTED}`} />
           {label}
         </button>
       ))}
@@ -608,13 +672,13 @@ export function DetailFormatBlockTypeDropdown({
       trigger={
         <>
           <span
-            className={`font-medium text-zinc-800 dark:text-zinc-100 ${
+            className={`font-medium ${FORMAT_TOOLBAR_TRIGGER_LABEL_COLOR} ${
               activeType === "text" ? "text-[14px]" : FORMAT_TOOLBAR_ICON_TEXT_CLASS
             }`}
           >
             Aa
           </span>
-          <LuChevronDown className="size-3.5 shrink-0 text-zinc-500" />
+          <LuChevronDown className={`size-3.5 shrink-0 ${FORMAT_TOOLBAR_CHEVRON_COLOR}`} />
         </>
       }
     >
@@ -659,8 +723,10 @@ export function DetailFormatFontFamilyDropdown({
   familyId,
   onSelectFamily,
 }: DetailFormatFontFamilyDropdownProps) {
+  const formatToolbarFontOptions = getFormatToolbarFontFamilyOptions();
   const familyLabel =
     DETAIL_FONT_FAMILY_OPTIONS.find((option) => option.id === familyId)?.label ??
+    formatToolbarFontOptions[0]?.label ??
     "Sans Serif";
 
   return (
@@ -670,22 +736,24 @@ export function DetailFormatFontFamilyDropdown({
       ariaLabel="Font family"
       tooltipId="format-toolbar-font-family-tooltip"
       tooltipLabel="Font family"
-      menuClassName={`${FORMAT_TOOLBAR_DROPDOWN_MENU_CLASS} min-w-[168px] max-h-72 overflow-y-auto`}
+      triggerClassName={FORMAT_TOOLBAR_FONT_FAMILY_TRIGGER_CLASS}
+      menuClassName={`${FORMAT_TOOLBAR_DROPDOWN_MENU_CLASS} max-h-72 overflow-y-auto`}
+      menuStyle={{ minWidth: "128px" }}
       trigger={
         <>
           <span className="max-w-[120px] truncate whitespace-nowrap">
             {familyLabel}
           </span>
-          <LuChevronDown className="size-3.5 shrink-0 text-zinc-500" />
+          <LuChevronDown className={`size-3.5 shrink-0 ${FORMAT_TOOLBAR_CHEVRON_COLOR}`} />
         </>
       }
     >
-      {DETAIL_FONT_FAMILY_OPTIONS.map((option) => (
+      {formatToolbarFontOptions.map((option) => (
         <button
           key={option.id}
           type="button"
           role="menuitem"
-          className={`${FORMAT_TOOLBAR_DROPDOWN_ITEM_CLASS} ${
+          className={`${FORMAT_TOOLBAR_FONT_FAMILY_ITEM_CLASS} ${
             option.id === familyId ? "bg-zinc-100 dark:bg-zinc-800" : ""
           }`}
           style={option.value ? { fontFamily: option.value } : undefined}
@@ -722,11 +790,14 @@ export function DetailFormatFontSizeDropdown({
       ariaLabel="Font size"
       tooltipId="format-toolbar-font-size-tooltip"
       tooltipLabel="Font size"
+      triggerClassName={FORMAT_TOOLBAR_FONT_SIZE_TRIGGER_CLASS}
       menuClassName={`${FORMAT_TOOLBAR_DROPDOWN_MENU_CLASS} min-w-[168px]`}
       trigger={
         <>
-          <span className="whitespace-nowrap">{size}</span>
-          <LuChevronDown className="size-3.5 shrink-0 text-zinc-500" />
+          <span className={`whitespace-nowrap ${FORMAT_TOOLBAR_FONT_SIZE_TEXT_CLASS}`}>
+            {size}
+          </span>
+          <LuChevronDown className={`size-3.5 shrink-0 ${FORMAT_TOOLBAR_CHEVRON_COLOR}`} />
         </>
       }
     >
@@ -736,10 +807,10 @@ export function DetailFormatFontSizeDropdown({
             key={option}
             type="button"
             role="menuitem"
-            className={`rounded-md px-1 py-1 text-center text-sm transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800 ${
+            className={`rounded-md px-1 py-1 text-center ${FORMAT_TOOLBAR_FONT_SIZE_TEXT_CLASS} transition-colors hover:bg-zinc-100/50 dark:hover:bg-zinc-800 ${
               option === size
-                ? "bg-zinc-100 font-medium text-[#2563eb] dark:bg-zinc-800 dark:text-blue-300"
-                : "text-zinc-800 dark:text-zinc-100"
+                ? `bg-zinc-100 font-medium ${FORMAT_TOOLBAR_FONT_SIZE_SELECTED_COLOR} dark:bg-zinc-800`
+                : FORMAT_TOOLBAR_TRIGGER_LABEL_COLOR
             }`}
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => {
@@ -762,7 +833,6 @@ type DetailFormatOverflowMenuProps = {
   onStrikethrough: () => void;
   onSuperscript: () => void;
   onSubscript: () => void;
-  onGrammarCheck: () => void;
 };
 
 export function DetailFormatOverflowMenu({
@@ -772,7 +842,6 @@ export function DetailFormatOverflowMenu({
   onStrikethrough,
   onSuperscript,
   onSubscript,
-  onGrammarCheck,
 }: DetailFormatOverflowMenuProps) {
   return (
     <FormatToolbarDropdownShell
@@ -781,10 +850,12 @@ export function DetailFormatOverflowMenu({
       ariaLabel="More formatting options"
       tooltipId="format-toolbar-more-tooltip"
       tooltipLabel="More options"
-      align="right"
+      align="center"
+      triggerClassName={FORMAT_TOOLBAR_OVERFLOW_MENU_TRIGGER_CLASS}
+      menuClassName={FORMAT_TOOLBAR_OVERFLOW_MENU_CLASS}
       trigger={
         <span
-          className={`flex ${FORMAT_TOOLBAR_ICON_SIZE_CLASS} items-center justify-center ${FORMAT_TOOLBAR_ICON_TEXT_CLASS} tracking-widest text-zinc-600 dark:text-zinc-300`}
+          className={`flex ${FORMAT_TOOLBAR_ICON_SIZE_CLASS} items-center justify-center ${FORMAT_TOOLBAR_ICON_TEXT_CLASS} tracking-widest ${FORMAT_TOOLBAR_ICON_COLOR_MUTED}`}
         >
           ···
         </span>
@@ -794,14 +865,15 @@ export function DetailFormatOverflowMenu({
         <button
           type="button"
           role="menuitem"
-          className={FORMAT_TOOLBAR_DROPDOWN_ITEM_CLASS}
+          className={FORMAT_TOOLBAR_OVERFLOW_MENU_ITEM_CLASS}
+          style={{ fontSize: "13px" }}
           onClick={() => {
             onStrikethrough();
             onOpenChange(false);
           }}
         >
           <span
-            className={`flex ${FORMAT_TOOLBAR_ICON_SIZE_CLASS} items-center justify-center ${FORMAT_TOOLBAR_ICON_TEXT_CLASS} line-through`}
+            className={`${FORMAT_TOOLBAR_OVERFLOW_MENU_ICON_CLASS} ${FORMAT_TOOLBAR_ICON_TEXT_CLASS} -translate-x-[3px] line-through`}
           >
             S
           </span>
@@ -810,14 +882,15 @@ export function DetailFormatOverflowMenu({
         <button
           type="button"
           role="menuitem"
-          className={FORMAT_TOOLBAR_DROPDOWN_ITEM_CLASS}
+          className={FORMAT_TOOLBAR_OVERFLOW_MENU_ITEM_CLASS}
+          style={{ fontSize: "13px" }}
           onClick={() => {
             onSuperscript();
             onOpenChange(false);
           }}
         >
           <span
-            className={`flex ${FORMAT_TOOLBAR_ICON_SIZE_CLASS} items-center justify-center ${FORMAT_TOOLBAR_ICON_TEXT_CLASS} font-medium`}
+            className={`${FORMAT_TOOLBAR_OVERFLOW_MENU_ICON_CLASS} ${FORMAT_TOOLBAR_ICON_TEXT_CLASS} font-medium`}
           >
             x²
           </span>
@@ -826,32 +899,19 @@ export function DetailFormatOverflowMenu({
         <button
           type="button"
           role="menuitem"
-          className={FORMAT_TOOLBAR_DROPDOWN_ITEM_CLASS}
+          className={FORMAT_TOOLBAR_OVERFLOW_MENU_ITEM_CLASS}
+          style={{ fontSize: "13px" }}
           onClick={() => {
             onSubscript();
             onOpenChange(false);
           }}
         >
           <span
-            className={`flex ${FORMAT_TOOLBAR_ICON_SIZE_CLASS} items-center justify-center ${FORMAT_TOOLBAR_ICON_TEXT_CLASS} font-medium`}
+            className={`${FORMAT_TOOLBAR_OVERFLOW_MENU_ICON_CLASS} ${FORMAT_TOOLBAR_ICON_TEXT_CLASS} font-medium`}
           >
             x₂
           </span>
           Subscript
-        </button>
-        <button
-          type="button"
-          role="menuitem"
-          className={FORMAT_TOOLBAR_DROPDOWN_ITEM_CLASS}
-          onClick={() => {
-            onGrammarCheck();
-            onOpenChange(false);
-          }}
-        >
-          <span className="flex size-5 items-center justify-center text-xs font-semibold">
-            ABC
-          </span>
-          Check grammar
         </button>
       </div>
     </FormatToolbarDropdownShell>

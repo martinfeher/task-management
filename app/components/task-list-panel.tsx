@@ -67,6 +67,7 @@ import {
 import {
   clearTaskListTitleEdit,
   closeTaskListPointerMenu,
+  getTaskListPointerMenuSnapshot,
   openTaskListPointerMenu,
   shouldSuppressTaskListPointerMenuClose,
   stashTaskListTitleEdit,
@@ -318,18 +319,32 @@ function sortTasks(
   return sorted;
 }
 
+const TASK_ROW_CONTEXT_MENU_WIDTH = 220;
+const TASK_ROW_CONTEXT_MENU_HEIGHT = 280;
+
 function clampPointerContextMenuPosition(x: number, y: number) {
   if (typeof window === "undefined") {
     return { x, y };
   }
 
-  const menuWidth = 220;
-  const menuHeight = 280;
-
   return {
-    x: Math.min(Math.max(8, x), window.innerWidth - menuWidth - 8),
-    y: Math.min(Math.max(8, y), window.innerHeight - menuHeight - 8),
+    x: Math.min(
+      Math.max(8, x),
+      window.innerWidth - TASK_ROW_CONTEXT_MENU_WIDTH - 8,
+    ),
+    y: Math.min(
+      Math.max(8, y),
+      window.innerHeight - TASK_ROW_CONTEXT_MENU_HEIGHT - 8,
+    ),
   };
+}
+
+function computeTaskRowMenuAnchorPosition(anchor: HTMLElement) {
+  const rect = anchor.getBoundingClientRect();
+  return clampPointerContextMenuPosition(
+    rect.right - TASK_ROW_CONTEXT_MENU_WIDTH,
+    rect.bottom + 4,
+  );
 }
 
 type TaskListPanelProps = {
@@ -764,6 +779,7 @@ export function TaskListPanel({
       if (taskPriorityMenuRef.current?.contains(target)) return;
       if (taskContextMenuRef.current?.contains(target)) return;
       if (pointerContextMenuRef.current?.contains(target)) return;
+      if (targetElement?.closest("[data-task-row-menu-trigger]")) return;
 
       setOpenDatePickerTaskId(null);
       setOpenMenuTaskId(null);
@@ -1303,15 +1319,49 @@ export function TaskListPanel({
     setOpenDatePickerTaskId(taskId);
   }
 
-  function toggleTaskMenu(taskId: string) {
+  function openTaskRowMenuFromButton(
+    task: TaskListItem,
+    anchor: HTMLElement,
+  ) {
+    suppressRowClickRef.current = true;
+
+    const currentPointerMenu = getTaskListPointerMenuSnapshot();
+    if (
+      currentPointerMenu?.taskId === task.id &&
+      currentPointerMenu.view === "main"
+    ) {
+      closeTaskMenus();
+      return;
+    }
+
+    const position = computeTaskRowMenuAnchorPosition(anchor);
+    const menuState: TaskListPointerContextMenuState = {
+      taskId: task.id,
+      task,
+      x: position.x,
+      y: position.y,
+      view: "main",
+    };
+
     setOpenDatePickerTaskId(null);
-    closeTaskListPointerMenu();
+    setOpenMenuTaskId(null);
     setOpenLabelMenuTaskId(null);
     setOpenMoveMenuTaskId(null);
     setOpenPriorityMenuTaskId(null);
     resetLabelMenuState();
     resetMoveMenuState();
-    setOpenMenuTaskId((current) => (current === taskId ? null : taskId));
+    initLabelMenuForTask(task.id);
+    openTaskListPointerMenu(menuState);
+
+    const selectTaskForMenu =
+      onSelectTaskImmediate ?? onSelectTaskQuiet ?? onSelectTask;
+    const taskId = task.id;
+    const previousSelectedTaskId = selectedTaskIdRef.current;
+    queueMicrotask(() => {
+      if (taskId !== previousSelectedTaskId) {
+        selectTaskForMenu(taskId);
+      }
+    });
   }
 
   function openLabelMenu(taskId: string) {
@@ -2109,7 +2159,7 @@ export function TaskListPanel({
           showDragHandle={canReorder || enableCalendarDragDrop || enableSidebarListDragDrop}
           onTitleEditReady={handleTitleEditReady}
           openDatePickerTaskId={openDatePickerTaskId}
-          openMenuTaskId={openMenuTaskId}
+          isPointerMenuOpen={pointerContextMenu?.taskId === task.id}
           openLabelMenuTaskId={openLabelMenuTaskId}
           openMoveMenuTaskId={openMoveMenuTaskId}
           openPriorityMenuTaskId={openPriorityMenuTaskId}
@@ -2142,7 +2192,7 @@ export function TaskListPanel({
           onSelectTaskDueDate={handleSelectTaskDueDate}
           onSaveTaskDueTime={handleSaveTaskDueTime}
           onSaveTaskRecurrence={handleSaveTaskRecurrence}
-          onToggleTaskMenu={toggleTaskMenu}
+          onOpenTaskRowMenu={openTaskRowMenuFromButton}
           onTogglePriorityMenu={togglePriorityMenu}
           onToggleTaskPinned={handleToggleTaskPinned}
           onToggleTaskImportant={handleToggleTaskImportant}
@@ -2637,7 +2687,7 @@ export function TaskListPanel({
                   <button
                     type="submit"
                     onMouseDown={(event) => event.preventDefault()}
-                    className="add-task-submit-button ml-px flex h-7 shrink-0 cursor-pointer items-center gap-1 rounded-full text-[#f1f1f1] bg-[#6f80c1] px-2.5 text-xs font-medium transition-colors enabled:hover:bg-[#5f70a1] disabled:cursor-not-allowed disabled:opacity-70"
+                    className="add-task-submit-button ml-px flex h-7 shrink-0 cursor-pointer items-center gap-1 rounded-full text-[#f1f1f1] bg-[#6f81c1] px-2.5 text-xs font-medium transition-colors enabled:hover:bg-[#6272a0] disabled:cursor-not-allowed disabled:opacity-70"
                   >
                     <LuCheck className="size-3.5" aria-hidden="true" />
                     Add

@@ -3,6 +3,8 @@
 @source inline("rounded-[8px]");
 @source inline("rounded-[14px]");
 @source inline("gap-[8px]");
+@source inline("text-[13.5px]");
+@source inline("text-[14px]");
 @source inline("size-[16px]");
 @source inline("size-[20px]");
 @source inline("size-[18px]");
@@ -592,6 +594,10 @@ body {
     --app-tooltip-arrow-color,
     var(--app-tooltip-background, #3f3f46)
   );
+}
+
+.format-toolbar-tooltip-shortcut {
+  color: rgba(255, 255, 255, 0.55);
 }
 
 .task-date-picker-remove-tooltip::after {

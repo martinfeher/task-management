@@ -2,6 +2,13 @@ import {
   repairBrokenTaskImageReferences,
 } from "@/lib/task-image-storage";
 import {
+  CURRENT_SCHEMA_VERSION,
+  docToPlainText,
+  htmlToDoc,
+  validateTaskDoc,
+} from "@/lib/task-document";
+import { taskDetailsHasContent } from "@/lib/task-details-content";
+import {
   createTaskVersionForced,
   getTaskVersionForRestore,
   listTaskVersions,
@@ -9,6 +16,37 @@ import {
   type TaskVersionListItem,
 } from "@/lib/task-versions";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@/app/generated/prisma/client";
+
+function buildDetailsDocFields(detailsHtml: string): {
+  detailsDoc: Prisma.InputJsonValue | typeof Prisma.DbNull;
+  detailsText: string;
+  schemaVersion: number;
+} {
+  if (!taskDetailsHasContent(detailsHtml)) {
+    return {
+      detailsDoc: Prisma.DbNull,
+      detailsText: "",
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+    };
+  }
+
+  try {
+    const doc = htmlToDoc(detailsHtml);
+    validateTaskDoc(doc);
+    return {
+      detailsDoc: doc as Prisma.InputJsonValue,
+      detailsText: docToPlainText(doc),
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+    };
+  } catch {
+    return {
+      detailsDoc: Prisma.DbNull,
+      detailsText: "",
+      schemaVersion: 1,
+    };
+  }
+}
 
 export async function persistTaskDetailsUpdate(taskId: string, details: string) {
   const existing = await prisma.task.findUnique({
@@ -28,9 +66,13 @@ export async function persistTaskDetailsUpdate(taskId: string, details: string) 
 
   if (existing.details === normalizedDetails) {
     if (repairedReferences) {
+      const docFields = buildDetailsDocFields(normalizedDetails);
       await prisma.task.update({
         where: { id: taskId },
-        data: { details: normalizedDetails },
+        data: {
+          details: normalizedDetails,
+          ...docFields,
+        },
       });
     }
 
@@ -44,9 +86,14 @@ export async function persistTaskDetailsUpdate(taskId: string, details: string) 
     "auto",
   );
 
+  const docFields = buildDetailsDocFields(normalizedDetails);
+
   await prisma.task.update({
     where: { id: taskId },
-    data: { details: normalizedDetails },
+    data: {
+      details: normalizedDetails,
+      ...docFields,
+    },
   });
 
   return { changed: true as const };

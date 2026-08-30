@@ -13,6 +13,7 @@ import type {
   TaskListNode,
   TextNode,
 } from "./types";
+import { resolveDetailFontFamilyCss } from "./detail-font-families";
 
 /**
  * Converts the legacy `.detail-line` HTML (see docs/details-api.md) produced
@@ -45,18 +46,6 @@ const NOISE_BACKGROUND_COLORS = new Set([
   "inherit",
 ]);
 const DEFAULT_FONT_SIZE_PX = 17;
-// Non-default font stacks the app's own toolbar can produce (detail-fonts.ts).
-const KNOWN_FONT_FAMILY_VALUES = new Set([
-  "var(--font-inter), sans-serif",
-  "var(--font-sf-pro), sans-serif",
-  "var(--font-euclid-circular), sans-serif",
-  "Georgia, 'Times New Roman', Times, serif",
-  "'Courier New', Courier, monospace",
-  "Arial, Helvetica, sans-serif",
-  "'Times New Roman', Times, serif",
-  "'Courier New', monospace",
-  "Verdana, Geneva, sans-serif",
-]);
 
 const UI_CHROME_CLASSES = [
   "detail-image-delete",
@@ -131,8 +120,9 @@ function applySpanStyle(el: ParsedElement, acc: MarkAcc): MarkAcc {
   }
 
   const fontFamily = style["font-family"]?.trim();
-  if (fontFamily && KNOWN_FONT_FAMILY_VALUES.has(fontFamily)) {
-    next.fontFamily = fontFamily;
+  const resolvedFontFamily = resolveDetailFontFamilyCss(fontFamily);
+  if (resolvedFontFamily) {
+    next.fontFamily = resolvedFontFamily;
   }
 
   const fontSize = style["font-size"]?.trim();

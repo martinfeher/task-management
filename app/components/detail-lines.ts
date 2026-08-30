@@ -1487,12 +1487,23 @@ function isDetailsHtmlEmpty(html: string) {
   return getLineElements(container).every((line) => isLineEmpty(line));
 }
 
-export function syncLineEmptyState(editor: HTMLElement) {
+export type SyncLineEmptyStateOptions = {
+  hoveredLine?: HTMLElement | null;
+};
+
+export function syncLineEmptyState(
+  editor: HTMLElement,
+  options?: SyncLineEmptyStateOptions,
+) {
   normalizeImageLines(editor);
   normalizeCodeLines(editor);
   normalizeChecklistLines(editor);
 
   const activeLine = getActiveLineElement(editor);
+  const hoveredLine =
+    options?.hoveredLine && editor.contains(options.hoveredLine)
+      ? options.hoveredLine
+      : null;
 
   getLineElements(editor).forEach((line, index) => {
     const isEmpty = isLineEmpty(line);
@@ -1506,7 +1517,7 @@ export function syncLineEmptyState(editor: HTMLElement) {
     const showBodyPlaceholder =
       isEmpty &&
       index > 0 &&
-      line === activeLine &&
+      (line === activeLine || line === hoveredLine) &&
       !line.querySelector(".detail-image-wrapper") &&
       !isCodeLine(line);
 

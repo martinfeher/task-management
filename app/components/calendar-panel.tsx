@@ -1336,6 +1336,7 @@ export function CalendarViewsPanel({
         onClose={handleCalendarSearchClose}
         onSelectTask={handleCalendarSearchSelect}
       />
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       {activeView === "month" ? (
         <CalendarMonthView
           tasks={tasks}
@@ -1496,6 +1497,7 @@ export function CalendarViewsPanel({
       ) : (
         <CalendarViewPlaceholder label={activeViewLabel} />
       )}
+      </div>
     </div>
     </CalendarTaskHoverPreviewProvider>
     </CalendarTaskColorMenuProvider>

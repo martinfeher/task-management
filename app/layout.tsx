@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import { Inter } from "next/font/google";
+import { Inter, Lora, Great_Vibes } from "next/font/google";
 import localFont from "next/font/local";
 import { APP_FONT_STORAGE_KEY, parseAppFont } from "@/lib/app-font";
 import "./globals.css";
@@ -45,6 +45,19 @@ const euclidCircular = localFont({
   weight: "300",
 });
 
+const lora = Lora({
+  subsets: ["latin"],
+  variable: "--font-lora",
+  display: "swap",
+});
+
+const greatVibes = Great_Vibes({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--font-great-vibes",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
   title: "Todolist",
   description: "A simple todo list app",
@@ -62,7 +75,7 @@ export default async function RootLayout({
     <html
       lang="en"
       data-app-font={appFont}
-      className={`${inter.variable} ${sfPro.variable} ${euclidCircular.variable} h-full antialiased`}
+      className={`${inter.variable} ${sfPro.variable} ${euclidCircular.variable} ${lora.variable} ${greatVibes.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col font-sans">

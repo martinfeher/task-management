@@ -46,7 +46,7 @@ type TaskListTaskRowProps = {
   onTitleEditReady?: () => void;
   showDragHandle: boolean;
   openDatePickerTaskId: string | null;
-  openMenuTaskId: string | null;
+  isPointerMenuOpen?: boolean;
   openLabelMenuTaskId: string | null;
   openMoveMenuTaskId: string | null;
   openPriorityMenuTaskId: string | null;
@@ -90,7 +90,7 @@ type TaskListTaskRowProps = {
     taskId: string,
     rule: TaskRecurrenceRule | null,
   ) => void;
-  onToggleTaskMenu: (taskId: string) => void;
+  onOpenTaskRowMenu: (task: TaskListItem, anchor: HTMLElement) => void;
   onTogglePriorityMenu: (taskId: string) => void;
   onToggleTaskPinned: (task: TaskListItem) => void;
   onToggleTaskImportant: (task: TaskListItem) => void;
@@ -171,11 +171,9 @@ export function getTaskRowLeftBorderClass(
 
 function getRowMenuView(
   taskId: string,
-  openMenuTaskId: string | null,
   openMoveMenuTaskId: string | null,
 ): TaskRowContextMenuView | null {
   if (openMoveMenuTaskId === taskId) return "moveTo";
-  if (openMenuTaskId === taskId) return "main";
   return null;
 }
 
@@ -226,7 +224,7 @@ export function TaskListTaskRow({
   onTitleEditReady,
   showDragHandle,
   openDatePickerTaskId,
-  openMenuTaskId,
+  isPointerMenuOpen = false,
   openLabelMenuTaskId,
   openMoveMenuTaskId,
   openPriorityMenuTaskId,
@@ -254,7 +252,7 @@ export function TaskListTaskRow({
   onSelectTaskDueDate,
   onSaveTaskDueTime,
   onSaveTaskRecurrence,
-  onToggleTaskMenu,
+  onOpenTaskRowMenu,
   onTogglePriorityMenu,
   onToggleTaskPinned,
   onToggleTaskImportant,
@@ -294,11 +292,7 @@ export function TaskListTaskRow({
     onTitleEditReady?.();
   }, [editingTaskId, onTitleEditReady, task.id, titleDraft]);
 
-  const rowMenuView = getRowMenuView(
-    task.id,
-    openMenuTaskId,
-    openMoveMenuTaskId,
-  );
+  const rowMenuView = getRowMenuView(task.id, openMoveMenuTaskId);
   const isLabelMenuOpen = openLabelMenuTaskId === task.id;
   const isPriorityMenuOpen = openPriorityMenuTaskId === task.id;
   const isRowMenuOpen =
@@ -306,6 +300,7 @@ export function TaskListTaskRow({
     (openDatePickerTaskId === task.id ||
       isLabelMenuOpen ||
       isPriorityMenuOpen ||
+      isPointerMenuOpen ||
       rowMenuView !== null);
 
   const basePaddingLeft = useWiderRowPadding ? 22 : 0;
@@ -777,14 +772,19 @@ export function TaskListTaskRow({
             <button
               ref={rowMenuButtonRef}
               type="button"
+              data-task-row-menu-trigger
               aria-label={`Open menu for ${task.name}`}
               aria-haspopup="menu"
-              aria-expanded={rowMenuView !== null}
+              aria-expanded={isPointerMenuOpen || rowMenuView !== null}
               title="More options"
               className="flex size-[23px] shrink-0 items-center justify-center rounded-full text-zinc-400 cursor-pointer transition-colors hover:bg-zinc-200/80 hover:text-zinc-500 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+              onPointerDown={(event) => {
+                if (event.button !== 0) return;
+                event.stopPropagation();
+              }}
               onClick={(event) => {
                 event.stopPropagation();
-                onToggleTaskMenu(task.id);
+                onOpenTaskRowMenu(task, event.currentTarget);
               }}
             >
               <PiDotsThreeBold className="size-4" />

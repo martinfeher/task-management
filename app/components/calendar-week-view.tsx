@@ -28,6 +28,7 @@ import {
   getCalendarShellClassName,
   CALENDAR_VIEW_SURFACE_CLASS,
   CALENDAR_VIEW_WRAPPER_CLASS,
+  CALENDAR_TIMED_GRID_SCROLL_CLASS,
   CALENDAR_HOUR_COLUMN_DIVIDER_CLASS,
   getCalendarDayColumnDividerClass,
   getCalendarWeekStart,
@@ -42,6 +43,8 @@ import {
   formatCalendarCollapsedEarlyHoursLabel,
   getCalendarDisplayHours,
   getCalendarTaskPreviewHeight,
+  getCalendarTimedGridHeightPx,
+  getCalendarTimedGridScrollTop,
   getCalendarTimedGridHourStart,
   getCalendarTimedGridTopOffset,
   getMinutesFromCalendarGridY,
@@ -285,6 +288,7 @@ export function CalendarWeekView({
   const timeGridRef = useRef<HTMLDivElement>(null);
   const newTaskPreviewRef = useRef<HTMLDivElement>(null);
   const hourColumnRef = useRef<HTMLDivElement>(null);
+  const timeScrollRef = useRef<HTMLDivElement>(null);
   const [nowLineTop, setNowLineTop] = useState<number | null>(null);
   const [earlyHoursExpanded, setEarlyHoursExpanded] = useState(false);
   const {
@@ -614,8 +618,46 @@ export function CalendarWeekView({
     effectiveGridTopOffset,
     showWeekNowLine,
     currentTimeTop,
+  ]);
+
+  useLayoutEffect(() => {
+    const scrollEl = timeScrollRef.current;
+    if (!scrollEl || !today || !now || !showWeekNowLine || currentTimeTop === null) {
+      return;
+    }
+
+    const todayTimedGrid = scrollEl.querySelector(
+      '[data-calendar-today-timed-grid="true"]',
+    );
+    if (!(todayTimedGrid instanceof HTMLElement)) {
+      scrollEl.scrollTop = 0;
+      return;
+    }
+
+    const gridHeightPx = getCalendarTimedGridHeightPx(
+      hours.length,
+      hourHeightPx,
+      effectiveGridTopOffset,
+    );
+    const targetScrollTop = getCalendarTimedGridScrollTop({
+      scrollContainerHeightPx: scrollEl.clientHeight,
+      gridHeightPx,
+      firstTaskTopPx: null,
+      currentTimeTopPx: currentTimeTop,
+      preferCurrentTime: true,
+    });
+
+    scrollEl.scrollTop = todayTimedGrid.offsetTop + targetScrollTop;
+  }, [
+    currentTimeTop,
+    effectiveGridTopOffset,
+    hourHeightPx,
     hours.length,
+    now,
+    showWeekNowLine,
+    today,
     weekStart,
+    visibleWeekCount,
   ]);
 
   if (!weekStart || !today || !now) {
@@ -686,7 +728,7 @@ export function CalendarWeekView({
             />
           </div>
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <div className="min-h-0 flex-1 overflow-auto">
+            <div ref={timeScrollRef} className={CALENDAR_TIMED_GRID_SCROLL_CLASS}>
               <div className="min-w-[760px]">
                 {visibleWeeks.map((weekDays, weekIndex) => {
                   const allDayRowHeightPx = getAllDayRowHeightPx(weekDays);
@@ -824,7 +866,12 @@ export function CalendarWeekView({
                   </div>
                 </div>
 
-                <div className="relative grid grid-cols-[56px_repeat(7,minmax(0,1fr))]">
+                <div
+                  className="relative grid grid-cols-[56px_repeat(7,minmax(0,1fr))]"
+                  data-calendar-today-timed-grid={
+                    weekDays.some((day) => isSameDay(day, today)) ? "true" : undefined
+                  }
+                >
                   <div
                     ref={weekIndex === 0 ? hourColumnRef : undefined}
                     className={`relative ${CALENDAR_HOUR_COLUMN_DIVIDER_CLASS}`}

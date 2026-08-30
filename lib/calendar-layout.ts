@@ -111,6 +111,8 @@ export function getCalendarShellClassName(
 export const CALENDAR_VIEW_WRAPPER_CLASS = "flex min-h-0 flex-1 flex-col";
 export const CALENDAR_VIEW_SURFACE_CLASS =
   "flex min-h-0 flex-1 flex-col overflow-hidden bg-white dark:bg-zinc-950";
+export const CALENDAR_TIMED_GRID_SCROLL_CLASS =
+  "min-h-0 flex-1 overflow-y-auto overflow-x-auto";
 
 export const CALENDAR_DAY_COLUMN_DIVIDER_CLASS =
   "border-r border-zinc-200 dark:border-zinc-800";

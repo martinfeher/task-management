@@ -5,6 +5,7 @@ import {
   DETAIL_FONT_SIZE_OPTIONS,
   type DetailFontSizeOption,
 } from "./detail-fonts";
+import { FORMAT_TOOLBAR_FONT_SIZE_TEXT_CLASS } from "./detail-format-toolbar-menus";
 
 type DetailFontSizeControlProps = {
   value: DetailFontSizeOption;
@@ -22,6 +23,9 @@ const menuClassName =
 const menuItemClassName =
   "flex w-full items-center px-3 py-1.5 text-left text-sm text-zinc-900 hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800";
 
+const formatToolbarMenuItemClassName =
+  `flex w-full items-center px-3 py-1.5 text-left ${FORMAT_TOOLBAR_FONT_SIZE_TEXT_CLASS} text-zinc-900 hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800`;
+
 export function DetailFontSizeControl({
   value,
   disabled = false,
@@ -32,7 +36,7 @@ export function DetailFontSizeControl({
   onSelect,
 }: DetailFontSizeControlProps) {
   const buttonClassName = formatToolbar
-    ? "flex h-8 min-w-[28px] cursor-pointer items-center justify-center rounded-lg px-2 text-sm text-zinc-700 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-zinc-200 dark:hover:bg-zinc-800"
+    ? `flex h-8 min-w-[28px] cursor-pointer items-center justify-center rounded-lg px-2 ${FORMAT_TOOLBAR_FONT_SIZE_TEXT_CLASS} text-zinc-700 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-zinc-200 dark:hover:bg-zinc-800`
     : compact
       ? "flex h-[30px] min-w-[44px] cursor-pointer items-center justify-between gap-0.5 rounded border border-zinc-200 bg-white px-1.5 text-sm text-zinc-800 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
       : "flex h-8 w-[52px] cursor-pointer items-center justify-between rounded-md border border-zinc-200 bg-white px-2 text-sm text-zinc-800 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800";
@@ -67,7 +71,7 @@ export function DetailFontSizeControl({
               type="button"
               role="option"
               aria-selected={option === value}
-              className={`${menuItemClassName} justify-center ${
+              className={`${formatToolbar ? formatToolbarMenuItemClassName : menuItemClassName} justify-center ${
                 option === value ? "bg-zinc-100 dark:bg-zinc-800" : ""
               }`}
               onMouseDown={(event) => event.preventDefault()}

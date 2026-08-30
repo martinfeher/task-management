@@ -68,7 +68,7 @@ export function TaskContextMenuDateShortcuts({
 
   return (
     <div className="px-3 py-2">
-      <div className="mb-2 text-xs font-medium text-zinc-400 dark:text-zinc-500">
+      <div className="mb-[3px] text-xs font-medium text-zinc-350 dark:text-zinc-500">
         Date
       </div>
       <div className="flex items-center justify-between">

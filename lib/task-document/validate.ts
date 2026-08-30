@@ -1,3 +1,4 @@
+import { isAllowedDetailFontFamily } from "./detail-font-families";
 import {
   type BlockNode,
   type InlineNode,
@@ -10,7 +11,8 @@ import {
 
 /** Rejects anything but simple hex/rgb/rgba/hsl/named CSS colors — no url(), no expressions. */
 const SAFE_COLOR = /^(#[0-9a-fA-F]{3,8}|rgba?\([0-9.,%\s]+\)|hsla?\([0-9.,%\s]+\)|[a-zA-Z]+)$/;
-const SAFE_FONT_FAMILY = /^[a-zA-Z0-9\s,'"-]{1,120}$/;
+const SAFE_FONT_FAMILY =
+  /^(var\(--[a-z0-9-]+\),\s*[a-z\s'-]+|[a-zA-Z0-9\s,'"-]{1,160})$/i;
 const SAFE_FONT_SIZE = /^[0-9]{1,3}(\.[0-9]+)?(px|pt|rem|em)$/;
 
 function isSafeHref(href: string) {
@@ -55,7 +57,11 @@ function validateMark(value: unknown): Mark {
         out.color = attrs.color;
       }
       if (attrs.fontFamily !== undefined) {
-        if (typeof attrs.fontFamily !== "string" || !SAFE_FONT_FAMILY.test(attrs.fontFamily)) {
+        if (
+          typeof attrs.fontFamily !== "string" ||
+          (!isAllowedDetailFontFamily(attrs.fontFamily) &&
+            !SAFE_FONT_FAMILY.test(attrs.fontFamily))
+        ) {
           fail(`Unsafe fontFamily: ${String(attrs.fontFamily)}`);
         }
         out.fontFamily = attrs.fontFamily;

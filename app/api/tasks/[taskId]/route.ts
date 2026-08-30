@@ -31,6 +31,8 @@ export async function GET(_request: Request, context: RouteContext) {
       name: true,
       completed: true,
       details: true,
+      detailsDoc: true,
+      schemaVersion: true,
       dueDate: true,
       dueTimeMinutes: true,
       dueDurationMinutes: true,
@@ -80,6 +82,12 @@ export async function GET(_request: Request, context: RouteContext) {
     name: task.name,
     completed: task.completed,
     details,
+    // Canonical ProseMirror/Tiptap-style doc — long-term source of truth for
+    // rich formatting, kept in lockstep with `details` HTML by
+    // `persistTaskDetailsUpdate`. `details` remains the legacy/edit-surface
+    // representation for both clients.
+    detailsDoc: task.detailsDoc ?? null,
+    schemaVersion: task.schemaVersion,
     dueDate: task.dueDate ? task.dueDate.toISOString() : null,
     dueTimeMinutes: task.dueTimeMinutes,
     dueDurationMinutes: task.dueDurationMinutes,

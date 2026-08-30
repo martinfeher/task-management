@@ -20,23 +20,19 @@ export type DetailFontFamilyId =
   | "euclid-circular"
   | "serif"
   | "monospace"
-  | "arial"
-  | "georgia"
-  | "times-new-roman"
-  | "courier-new"
-  | "verdana";
+  | "lora"
+  | "great-vibes";
 
 export const DETAIL_FONT_FAMILY_OPTIONS: {
   id: DetailFontFamilyId;
   label: string;
   value: string;
-  isDefault?: boolean;
 }[] = [
   {
     id: "sans-serif",
     label: "Sans Serif",
-    value: "",
-    isDefault: true,
+    value:
+      "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
   },
   {
     id: "inter",
@@ -65,31 +61,56 @@ export const DETAIL_FONT_FAMILY_OPTIONS: {
       "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Courier New', monospace",
   },
   {
-    id: "arial",
-    label: "Arial",
-    value: "Arial, Helvetica, sans-serif",
+    id: "lora",
+    label: "Lora",
+    value: "var(--font-lora), serif",
   },
   {
-    id: "georgia",
-    label: "Georgia",
-    value: "Georgia, serif",
-  },
-  {
-    id: "times-new-roman",
-    label: "Times New Roman",
-    value: "'Times New Roman', Times, serif",
-  },
-  {
-    id: "courier-new",
-    label: "Courier New",
-    value: "'Courier New', Courier, monospace",
-  },
-  {
-    id: "verdana",
-    label: "Verdana",
-    value: "Verdana, Geneva, sans-serif",
+    id: "great-vibes",
+    label: "Great Vibes",
+    value: "var(--font-great-vibes), cursive",
   },
 ];
+
+export function getAppFontFamilyId(): Extract<
+  DetailFontFamilyId,
+  "inter" | "sf-pro" | "euclid-circular"
+> {
+  if (typeof document === "undefined") {
+    return "inter";
+  }
+
+  const appFont = document.documentElement.dataset.appFont;
+
+  if (appFont === "sf-pro") {
+    return "sf-pro";
+  }
+
+  if (appFont === "euclid-circular") {
+    return "euclid-circular";
+  }
+
+  return "inter";
+}
+
+export function getFormatToolbarFontFamilyOptions() {
+  const appFontId = getAppFontFamilyId();
+  const appFont = DETAIL_FONT_FAMILY_OPTIONS.find((option) => option.id === appFontId);
+  const sansSerif = DETAIL_FONT_FAMILY_OPTIONS.find((option) => option.id === "sans-serif");
+  const serif = DETAIL_FONT_FAMILY_OPTIONS.find((option) => option.id === "serif");
+  const monospace = DETAIL_FONT_FAMILY_OPTIONS.find(
+    (option) => option.id === "monospace",
+  );
+  const lora = DETAIL_FONT_FAMILY_OPTIONS.find((option) => option.id === "lora");
+  const greatVibes = DETAIL_FONT_FAMILY_OPTIONS.find(
+    (option) => option.id === "great-vibes",
+  );
+
+  return [appFont, sansSerif, serif, monospace, lora, greatVibes].filter(
+    (option): option is (typeof DETAIL_FONT_FAMILY_OPTIONS)[number] =>
+      Boolean(option),
+  );
+}
 
 export const DETAIL_FONT_SIZE_OPTIONS = [
   8, 9, 10, 11, 12, 14, 15, 16, 17, 18, 20, 22, 24, 26, 28, 36, 48, 72,
@@ -228,7 +249,6 @@ function matchesDetailFontFamilyOption(
   normalized: string,
   option: (typeof DETAIL_FONT_FAMILY_OPTIONS)[number],
 ) {
-  if (!option.value) return false;
   if (fontFamiliesMatch(normalized, option.value)) return true;
 
   switch (option.id) {
@@ -238,6 +258,12 @@ function matchesDetailFontFamilyOption(
       return normalized.includes("sf pro") || normalized.includes("sf-pro");
     case "euclid-circular":
       return normalized.includes("euclid");
+    case "lora":
+      return /\blora\b/.test(normalized);
+    case "great-vibes":
+      return (
+        normalized.includes("great vibes") || normalized.includes("great-vibes")
+      );
     default:
       return false;
   }
@@ -247,7 +273,7 @@ export function matchDetailFontFamilyId(fontFamily: string): DetailFontFamilyId 
   const normalized = normalizeFontFamilyName(fontFamily);
 
   if (!normalized) {
-    return "sans-serif";
+    return getAppFontFamilyId();
   }
 
   for (const option of DETAIL_FONT_FAMILY_OPTIONS) {
@@ -261,7 +287,19 @@ export function matchDetailFontFamilyId(fontFamily: string): DetailFontFamilyId 
     normalized.includes("ui-sans-serif") ||
     normalized.includes("system-ui")
   ) {
+    return getAppFontFamilyId();
+  }
+
+  if (/\barial\b|\bverdana\b|\bhelvetica\b/.test(normalized)) {
     return "sans-serif";
+  }
+
+  if (/\bgeorgia\b|\btimes new roman\b|\btimes\b/.test(normalized)) {
+    return "serif";
+  }
+
+  if (/\bcourier\b/.test(normalized)) {
+    return "monospace";
   }
 
   return "sans-serif";
@@ -327,7 +365,7 @@ export function getDetailSelectionFontState(
   const selection = window.getSelection();
   if (!selection?.rangeCount || !editor.contains(selection.anchorNode)) {
     return {
-      familyId: "sans-serif",
+      familyId: getAppFontFamilyId(),
       size: DEFAULT_DETAIL_FONT_SIZE_PX,
     };
   }
@@ -354,7 +392,7 @@ export function getDetailSelectionFontState(
       return {
         familyId: inlineFamily
           ? matchDetailFontFamilyId(inlineFamily)
-          : "sans-serif",
+          : getAppFontFamilyId(),
         size: inlineSize
           ? matchDetailFontSize(inlineSize)
           : DEFAULT_DETAIL_FONT_SIZE_PX,
@@ -367,7 +405,7 @@ export function getDetailSelectionFontState(
   const element = getSelectionElement(editor);
   if (!element) {
     return {
-      familyId: "sans-serif",
+      familyId: getAppFontFamilyId(),
       size: DEFAULT_DETAIL_FONT_SIZE_PX,
     };
   }
@@ -544,20 +582,27 @@ export function stripFormattingInSelection(
 }
 
 function getTextNodesInRange(range: Range, editor: HTMLElement) {
+  function acceptTextNode(node: Text) {
+    if (!editor.contains(node)) return false;
+    if (!range.intersectsNode(node)) return false;
+    if (node.textContent === "\uFEFF") return false;
+    return true;
+  }
+
+  const root = range.commonAncestorContainer;
+  if (root instanceof Text && acceptTextNode(root)) {
+    return [root];
+  }
+
   const nodes: Text[] = [];
-  const walker = document.createTreeWalker(
-    range.commonAncestorContainer,
-    NodeFilter.SHOW_TEXT,
-    {
-      acceptNode(node) {
-        if (!(node instanceof Text)) return NodeFilter.FILTER_REJECT;
-        if (!editor.contains(node)) return NodeFilter.FILTER_REJECT;
-        if (!range.intersectsNode(node)) return NodeFilter.FILTER_REJECT;
-        if (node.textContent === "\uFEFF") return NodeFilter.FILTER_REJECT;
-        return NodeFilter.FILTER_ACCEPT;
-      },
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      if (!(node instanceof Text)) return NodeFilter.FILTER_REJECT;
+      return acceptTextNode(node)
+        ? NodeFilter.FILTER_ACCEPT
+        : NodeFilter.FILTER_REJECT;
     },
-  );
+  });
 
   while (walker.nextNode()) {
     nodes.push(walker.currentNode as Text);
@@ -739,13 +784,13 @@ export function applyDetailFontFamily(
   const option = DETAIL_FONT_FAMILY_OPTIONS.find((item) => item.id === familyId);
   if (!option) return false;
 
-  if (option.isDefault) {
+  if (familyId === getAppFontFamilyId()) {
     removeStylePropertyFromRange(range.cloneRange(), "fontFamily");
     restoreSelectionRange(range);
     return true;
   }
 
-  return applyStyleToSelection(editor, { fontFamily: option.value }, null);
+  return applyStyleToSelection(editor, { fontFamily: option.value }, range);
 }
 
 export function applyDetailFontSize(
@@ -770,7 +815,7 @@ export function applyDetailFontSize(
   return applyStyleToSelection(
     editor,
     { fontSize: `${size}px` },
-    null,
+    range,
   );
 }
 

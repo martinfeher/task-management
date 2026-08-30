@@ -6,7 +6,6 @@ import { LuCheck, LuCode, LuHeading1, LuHeading2, LuHeading3, LuHistory, LuPilcr
 import { renameTask, updateTaskDueDate, updateTaskDueTime, updateTaskRecurrence } from "@/app/actions/todo";
 import type { TaskRecurrenceRule } from "@/lib/task-recurrence";
 import { serializeRecurrenceRule } from "@/lib/task-recurrence";
-import { checkGrammar } from "@/lib/grammar-check-api";
 import { fetchTaskById, saveTaskDetails, saveTaskDetailsKeepalive, saveTaskNameKeepalive } from "@/lib/task-details-api";
 import {
   resolveTaskDetailsForSave,
@@ -42,6 +41,7 @@ import {
   isTitleLine,
   type LineBlockType,
   placeCaretInLine,
+  placeCaretAtEndOfLine,
   focusNoteAtEnd,
   focusTaskTitle,
   focusDetailLine,
@@ -82,6 +82,7 @@ import {
   applyDetailFontSize,
   clearPasteBatchMarkers,
   DEFAULT_DETAIL_FONT_SIZE_PX,
+  getAppFontFamilyId,
   getDetailSelectionFontState,
   getPasteBatchPromptPosition,
   insertPasteFragmentAtSelection,
@@ -103,13 +104,14 @@ import {
   DetailFormatListDropdown,
   DetailFormatOverflowMenu,
   FormatToolbarTooltipWrap,
+  getFormatToolbarShortcut,
+  FORMAT_TOOLBAR_ICON_COLOR,
   FORMAT_TOOLBAR_ICON_SIZE_CLASS,
   type FormatToolbarDropdown,
   type RecentFormatColor,
 } from "./detail-format-toolbar-menus";
 
 type HeaderFormatDropdown = "family" | "size";
-import { GrammarCheckModal } from "./grammar-check-modal";
 import { TaskDatePicker } from "./task-date-picker";
 import { TaskVersionHistoryOffcanvas } from "./task-version-history-offcanvas";
 import {
@@ -245,10 +247,12 @@ function getFormatToolbarPopoverClass(formatMenu: FormatMenuState) {
 const FORMAT_TOOLBAR_ROW_CLASS = "flex items-center gap-0.5 px-1.5 py-1";
 
 const FORMAT_TOOLBAR_TEXT_BUTTON_CLASS =
-  "flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-[16px] text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800";
+  `flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-[16px] ${FORMAT_TOOLBAR_ICON_COLOR} transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800`;
 
 const FORMAT_TOOLBAR_ICON_BUTTON_CLASS =
-  "flex h-8 w-8 items-center justify-center rounded-lg text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800";
+  `flex h-8 w-8 items-center justify-center rounded-lg ${FORMAT_TOOLBAR_ICON_COLOR} transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800`;
+
+const TASK_DETAILS_DATE_MENU_HOVER_CLOSE_MS = 120;
 
 const FORMAT_TOOLBAR_ACTIVE_BUTTON_CLASS =
   "bg-zinc-100 text-[#2563eb] dark:bg-zinc-800 dark:text-blue-300";
@@ -995,6 +999,80 @@ function restoreEditorSelectionRange(range: Range) {
   selection.addRange(range);
 }
 
+function getCaretRangeFromPoint(clientX: number, clientY: number): Range | null {
+  try {
+    if (typeof document.caretRangeFromPoint === "function") {
+      return document.caretRangeFromPoint(clientX, clientY);
+    }
+
+    const caretPosition = document.caretPositionFromPoint?.(clientX, clientY);
+    if (!caretPosition) return null;
+
+    const range = document.createRange();
+    const { offsetNode, offset } = caretPosition;
+
+    if (offsetNode.nodeType === Node.TEXT_NODE) {
+      const maxOffset = (offsetNode.textContent ?? "").length;
+      range.setStart(offsetNode, Math.min(Math.max(offset, 0), maxOffset));
+    } else if (offsetNode.nodeType === Node.ELEMENT_NODE) {
+      const maxOffset = offsetNode.childNodes.length;
+      range.setStart(offsetNode, Math.min(Math.max(offset, 0), maxOffset));
+    } else {
+      return null;
+    }
+
+    range.collapse(true);
+    return range;
+  } catch {
+    return null;
+  }
+}
+
+function editorHasLiveExtendedTextSelection(editor: HTMLElement): boolean {
+  const selection = window.getSelection();
+  return Boolean(
+    selection?.rangeCount &&
+      selection.anchorNode &&
+      editor.contains(selection.anchorNode) &&
+      !selection.isCollapsed &&
+      selection.toString().trim(),
+  );
+}
+
+function collapseEditorSelectionAtPoint(
+  editor: HTMLElement,
+  clientX: number,
+  clientY: number,
+) {
+  const selection = window.getSelection();
+  if (!selection) return;
+
+  const probe = getCaretRangeFromPoint(clientX, clientY);
+  if (probe && editor.contains(probe.startContainer)) {
+    try {
+      selection.removeAllRanges();
+      selection.addRange(probe);
+      return;
+    } catch {
+      // Fall back to line-based caret placement below.
+    }
+  }
+
+  const line = getLineElementAtPoint(editor, clientY);
+  if (line && editor.contains(line)) {
+    const lineRect = line.getBoundingClientRect();
+    const midpoint = lineRect.left + lineRect.width / 2;
+    if (clientX >= midpoint) {
+      placeCaretAtEndOfLine(line);
+    } else {
+      placeCaretInLine(line);
+    }
+    return;
+  }
+
+  selection.removeAllRanges();
+}
+
 function resolveFormatMenuRange(
   editor: HTMLElement,
   savedRange: Range | null,
@@ -1010,6 +1088,8 @@ function resolveFormatMenuRange(
     if (!current.collapsed && current.toString().trim()) {
       return current.cloneRange();
     }
+
+    return null;
   }
 
   if (
@@ -1025,6 +1105,8 @@ function resolveFormatMenuRange(
 
   return null;
 }
+
+const FORMAT_MENU_ABOVE_SELECTION_GAP = 10;
 
 function getFormatMenuPositionFromRange(range: Range, editor: HTMLElement) {
   const selectedLines = getLineElements(editor).filter((line) =>
@@ -1061,7 +1143,7 @@ function getFormatMenuPositionFromRange(range: Range, editor: HTMLElement) {
 
   return {
     x: alignLeft ? left : left + (right - left) / 2,
-    y: top - 8,
+    y: top - FORMAT_MENU_ABOVE_SELECTION_GAP,
     alignLeft,
     placement: "above" as const,
     anchorBottom:
@@ -1106,7 +1188,7 @@ function clampFormatMenuPosition(
     y + menuHeight > viewportHeight - FORMAT_MENU_VIEWPORT_PADDING
   ) {
     placement = "above";
-    y = (anchorBottom ?? y) - 8;
+    y = (anchorBottom ?? y) - FORMAT_MENU_ABOVE_SELECTION_GAP;
   }
 
   return { x, y, alignLeft, placement, anchorBottom };
@@ -1168,7 +1250,7 @@ export function TaskDetailsPanel({
   const [formatMenuFontSize, setFormatMenuFontSize] =
     useState<DetailFontSizeOption>(DEFAULT_DETAIL_FONT_SIZE_PX);
   const [formatMenuFontFamily, setFormatMenuFontFamily] =
-    useState<DetailFontFamilyId>("sans-serif");
+    useState<DetailFontFamilyId>(() => getAppFontFamilyId());
   const [formatMenuBlockType, setFormatMenuBlockType] =
     useState<TextBlockType>("text");
   const [formatMenuInlineFormats, setFormatMenuInlineFormats] =
@@ -1180,13 +1262,6 @@ export function TaskDetailsPanel({
   const [linkText, setLinkText] = useState("");
   const [linkUrl, setLinkUrl] = useState("");
   const [linkHasExisting, setLinkHasExisting] = useState(false);
-  const [grammarModalOpen, setGrammarModalOpen] = useState(false);
-  const [grammarOriginalText, setGrammarOriginalText] = useState("");
-  const [grammarCorrectedText, setGrammarCorrectedText] = useState<string | null>(
-    null,
-  );
-  const [grammarLoading, setGrammarLoading] = useState(false);
-  const [grammarError, setGrammarError] = useState<string | null>(null);
   const [pasteFormatPrompt, setPasteFormatPrompt] = useState<{
     pasteId: string;
     top: number;
@@ -1218,11 +1293,12 @@ export function TaskDetailsPanel({
   const savedFormatLineIdsRef = useRef<string[]>([]);
   const openFormatDropdownRef = useRef<FormatToolbarDropdown | null>(null);
   openFormatDropdownRef.current = openFormatDropdown;
-  const savedGrammarSelectionRef = useRef<Range | null>(null);
   const showLinkMenuRef = useRef(false);
   const addBlockMenuRef = useRef<HTMLDivElement>(null);
   const slashCommandMenuRef = useRef<HTMLDivElement>(null);
   const dateMenuRef = useRef<HTMLDivElement>(null);
+  const dateMenuCloseTimerRef = useRef<number | null>(null);
+  const dateMenuHoverDismissedRef = useRef(false);
   const dateButtonRef = useRef<HTMLButtonElement>(null);
   const lineControlsRef = useRef<HTMLDivElement>(null);
   const hoveredLineRef = useRef<HTMLElement | null>(null);
@@ -1230,6 +1306,7 @@ export function TaskDetailsPanel({
   const pendingClickLineRef = useRef<HTMLElement | null>(null);
   const activeLineControlsRef = useRef<HTMLElement | null>(null);
   const isMouseOverEditorRef = useRef(false);
+  const isEditorPointerDownRef = useRef(false);
   const dragStateRef = useRef<{
     sourceIndex: number;
     sourceLine: HTMLElement;
@@ -1284,6 +1361,19 @@ export function TaskDetailsPanel({
 
   taskStateRef.current = task;
   taskSnapshotRef.current = taskSnapshot;
+
+  function syncEditorLineEmptyState(editor: HTMLElement) {
+    syncLineEmptyState(editor, { hoveredLine: hoveredLineRef.current });
+  }
+
+  function setLineControlsPointerEventsEnabled(enabled: boolean) {
+    const root = lineControlsRef.current;
+    if (!root) return;
+
+    root.querySelectorAll("button").forEach((button) => {
+      button.style.pointerEvents = enabled ? "auto" : "none";
+    });
+  }
 
   const readEditorContent = useCallback(() => {
     if (editorRef.current) {
@@ -1476,7 +1566,7 @@ export function TaskDetailsPanel({
         lines[0].innerHTML = "<br>";
       }
 
-      syncLineEmptyState(editor);
+      syncEditorLineEmptyState(editor);
       syncedTitleRef.current = name;
       setTask((current) => (current ? { ...current, name } : current));
       detailsRef.current = editor.innerHTML;
@@ -1879,6 +1969,7 @@ export function TaskDetailsPanel({
     }
 
     if (dragStateRef.current) return;
+    if (isEditorPointerDownRef.current) return;
 
     let line: HTMLElement | null = null;
     const editorFocused = editor.contains(document.activeElement);
@@ -1893,9 +1984,6 @@ export function TaskDetailsPanel({
 
     if (addBlockMenu && activeLineControlsRef.current) {
       line = activeLineControlsRef.current;
-    } else if (pendingLine && editor.contains(pendingLine)) {
-      line = pendingLine;
-      clickedLineRef.current = pendingLine;
     } else if (
       hoveredLine &&
       !isTitleLine(editor, hoveredLine) &&
@@ -1903,6 +1991,9 @@ export function TaskDetailsPanel({
       !isCodeLine(hoveredLine)
     ) {
       line = hoveredLine;
+    } else if (pendingLine && editor.contains(pendingLine)) {
+      line = pendingLine;
+      clickedLineRef.current = pendingLine;
     } else if (editorFocused) {
       line = activeLine ?? clickedLineRef.current;
       if (line) {
@@ -1940,12 +2031,21 @@ export function TaskDetailsPanel({
 
     activeLineControlsRef.current = line;
     const isEmpty = isDetailLineEmpty(line);
+    const isLineHovered = hoveredLine === line;
+    const isLineActive =
+      pendingLine === line ||
+      (editorFocused && activeLine === line) ||
+      clickedLineRef.current === line;
+    const keepAddBlockMenuOpen =
+      Boolean(addBlockMenu) && activeLineControlsRef.current === line;
+
     setLineControls([
       {
         lineId,
         top: position.top,
-        showPlus: isEmpty,
-        showDrag: !isEmpty,
+        showPlus:
+          isEmpty && (isLineHovered || isLineActive || keepAddBlockMenuOpen),
+        showDrag: !isEmpty && (isLineHovered || isLineActive),
       },
     ]);
   }, [addBlockMenu]);
@@ -1984,6 +2084,35 @@ export function TaskDetailsPanel({
     }, LINE_CONTROLS_DEBOUNCE_MS);
   }, [updateLineControls]);
 
+  function beginEditorPointerInteraction() {
+    isEditorPointerDownRef.current = true;
+    setLineControlsPointerEventsEnabled(false);
+  }
+
+  function endEditorPointerInteraction() {
+    if (!isEditorPointerDownRef.current) return;
+
+    isEditorPointerDownRef.current = false;
+    setLineControlsPointerEventsEnabled(true);
+
+    const editor = editorRef.current;
+    if (editor) {
+      syncEditorLineEmptyState(editor);
+    }
+    updateLineControls();
+  }
+
+  useEffect(() => {
+    function handleDocumentMouseUp() {
+      endEditorPointerInteraction();
+    }
+
+    document.addEventListener("mouseup", handleDocumentMouseUp);
+    return () => {
+      document.removeEventListener("mouseup", handleDocumentMouseUp);
+    };
+  }, [updateLineControls]);
+
   const runEditorNormalization = useCallback(
     (mode: "light" | "full") => {
       const editor = editorRef.current;
@@ -1995,7 +2124,7 @@ export function TaskDetailsPanel({
       if (mode === "full") {
         splitBlockLinesOnBreaks(editor);
         normalizeLinks(editor);
-        syncLineEmptyState(editor);
+        syncEditorLineEmptyState(editor);
       }
 
       syncEditorContent();
@@ -2056,6 +2185,30 @@ export function TaskDetailsPanel({
     savedFormatSelectionRef.current = null;
     savedFormatLineIdsRef.current = [];
   }, [closeFormatDropdowns]);
+
+  const dismissFormatMenu = useCallback(() => {
+    if (formatMenuTimerRef.current !== null) {
+      window.clearTimeout(formatMenuTimerRef.current);
+      formatMenuTimerRef.current = null;
+    }
+
+    closeFormatMenu();
+
+    const editor = editorRef.current;
+    const selection = window.getSelection();
+    if (
+      editor &&
+      selection?.rangeCount &&
+      selection.anchorNode &&
+      editor.contains(selection.anchorNode) &&
+      !selection.isCollapsed
+    ) {
+      const range = selection.getRangeAt(0);
+      range.collapse(false);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+  }, [closeFormatMenu]);
 
   taskLoadHandlersRef.current = {
     hydrateFromTaskRecord,
@@ -2199,7 +2352,7 @@ export function TaskDetailsPanel({
   const handleDetailFontApplied = useCallback(() => {
     const editor = editorRef.current;
     if (editor) {
-      syncLineEmptyState(editor);
+      syncEditorLineEmptyState(editor);
     }
     syncEditorContent();
     recordHistorySnapshot();
@@ -2217,10 +2370,19 @@ export function TaskDetailsPanel({
       const editor = editorRef.current;
       if (!editor) return;
 
-      captureFormatSelectionFromEditor();
       const savedRange = savedFormatSelectionRef.current?.cloneRange() ?? null;
+      if (
+        savedRange &&
+        editor.contains(savedRange.commonAncestorContainer)
+      ) {
+        restoreEditorSelectionRange(savedRange);
+      }
 
-      if (applyDetailFontSize(editor, size, savedRange)) {
+      captureFormatSelectionFromEditor();
+      const rangeToApply =
+        savedFormatSelectionRef.current?.cloneRange() ?? savedRange;
+
+      if (applyDetailFontSize(editor, size, rangeToApply)) {
         const selection = window.getSelection();
         if (selection?.rangeCount) {
           rememberFormatSelection(editor, selection.getRangeAt(0));
@@ -2244,14 +2406,23 @@ export function TaskDetailsPanel({
       const editor = editorRef.current;
       if (!editor) return;
 
-      captureFormatSelectionFromEditor();
       const savedRange = savedFormatSelectionRef.current?.cloneRange() ?? null;
+      if (
+        savedRange &&
+        editor.contains(savedRange.commonAncestorContainer)
+      ) {
+        restoreEditorSelectionRange(savedRange);
+      }
+
+      captureFormatSelectionFromEditor();
+      const rangeToApply =
+        savedFormatSelectionRef.current?.cloneRange() ?? savedRange;
 
       if (
         applyDetailFontFamily(
           editor,
           familyId,
-          savedRange,
+          rangeToApply,
         )
       ) {
         const selection = window.getSelection();
@@ -2297,7 +2468,7 @@ export function TaskDetailsPanel({
 
       applyBlockTypeToSelection(editor, type, rangeToApply);
       setFormatMenuBlockType(type);
-      syncLineEmptyState(editor);
+      syncEditorLineEmptyState(editor);
       syncEditorContent();
       recordHistorySnapshot();
       scheduleAutoSave();
@@ -2377,6 +2548,26 @@ export function TaskDetailsPanel({
     };
   }, [dismissPasteFormatPrompt, pasteFormatPrompt]);
 
+  useEffect(() => {
+    if (!formatMenu) return;
+
+    function handleFormatMenuEscape(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+
+      const target = event.target as Node | null;
+      if (!target || !panelRef.current?.contains(target)) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      dismissFormatMenu();
+    }
+
+    document.addEventListener("keydown", handleFormatMenuEscape, true);
+    return () => {
+      document.removeEventListener("keydown", handleFormatMenuEscape, true);
+    };
+  }, [dismissFormatMenu, formatMenu]);
+
   const finalizePasteEditorState = useCallback(() => {
     const editor = editorRef.current;
     if (!editor) return;
@@ -2385,7 +2576,7 @@ export function TaskDetailsPanel({
     splitBlockLinesOnBreaks(editor);
     ensureTitleLine(editor);
     normalizeLinks(editor);
-    syncLineEmptyState(editor);
+    syncEditorLineEmptyState(editor);
     syncEditorContent();
     syncTitleToTaskList();
     recordHistorySnapshot();
@@ -2416,7 +2607,7 @@ export function TaskDetailsPanel({
         }
 
         ensureBlockLines(currentEditor);
-        syncLineEmptyState(currentEditor);
+        syncEditorLineEmptyState(currentEditor);
         syncEditorContent();
         recordHistorySnapshot();
         scheduleAutoSave();
@@ -2491,7 +2682,7 @@ export function TaskDetailsPanel({
         setShowLinkMenu(true);
         setFormatMenu({
           x: linkRect.left + linkRect.width / 2,
-          y: linkRect.top - 8,
+          y: linkRect.top - FORMAT_MENU_ABOVE_SELECTION_GAP,
           alignLeft: false,
           placement: "above",
           anchorBottom: linkRect.bottom,
@@ -2581,7 +2772,7 @@ export function TaskDetailsPanel({
       return;
     }
 
-    syncLineEmptyState(editor);
+    syncEditorLineEmptyState(editor);
     syncEditorContent();
     recordHistorySnapshot();
     scheduleAutoSave();
@@ -2629,7 +2820,7 @@ export function TaskDetailsPanel({
           const linkRect = link.getBoundingClientRect();
           setFormatMenu({
             x: linkRect.left + linkRect.width / 2,
-            y: linkRect.top - 8,
+            y: linkRect.top - FORMAT_MENU_ABOVE_SELECTION_GAP,
             alignLeft: false,
             placement: "above",
             anchorBottom: linkRect.bottom,
@@ -2701,67 +2892,6 @@ export function TaskDetailsPanel({
     closeFormatMenu,
     recordHistorySnapshot,
     restoreSavedLinkSelection,
-    scheduleAutoSave,
-    syncEditorContent,
-  ]);
-
-  const runGrammarCheck = useCallback(async () => {
-    const editor = editorRef.current;
-    const selection = window.getSelection();
-    if (!editor || !selection || selection.rangeCount === 0) return;
-
-    const activeLine = getActiveLineElement(editor);
-    if (
-      isCodeLine(activeLine) ||
-      activeLine?.querySelector(".detail-image-wrapper")
-    ) {
-      return;
-    }
-
-    const selectedText = selection.toString().trim();
-    if (!selectedText) return;
-
-    savedGrammarSelectionRef.current = selection.getRangeAt(0).cloneRange();
-    setGrammarOriginalText(selectedText);
-    setGrammarCorrectedText(null);
-    setGrammarError(null);
-    setGrammarLoading(true);
-    setGrammarModalOpen(true);
-    closeFormatMenu();
-
-    try {
-      const corrected = await checkGrammar(selectedText);
-      setGrammarCorrectedText(corrected);
-    } catch (error) {
-      setGrammarError(
-        error instanceof Error ? error.message : "Failed to check grammar",
-      );
-    } finally {
-      setGrammarLoading(false);
-    }
-  }, [closeFormatMenu]);
-
-  const applyGrammarCorrection = useCallback(() => {
-    const editor = editorRef.current;
-    const correctedText = grammarCorrectedText;
-    const savedRange = savedGrammarSelectionRef.current;
-    const selection = window.getSelection();
-
-    if (!editor || !correctedText || !savedRange || !selection) return;
-
-    editor.focus();
-    selection.removeAllRanges();
-    selection.addRange(savedRange);
-    document.execCommand("insertText", false, correctedText);
-
-    syncEditorContent();
-    recordHistorySnapshot();
-    scheduleAutoSave();
-    setGrammarModalOpen(false);
-    savedGrammarSelectionRef.current = null;
-  }, [
-    grammarCorrectedText,
-    recordHistorySnapshot,
     scheduleAutoSave,
     syncEditorContent,
   ]);
@@ -3030,7 +3160,7 @@ export function TaskDetailsPanel({
         editor.innerHTML = editorHtml;
         ensureBlockLines(editor);
         ensureTitleLine(editor);
-        syncLineEmptyState(editor);
+        syncEditorLineEmptyState(editor);
         previousTextRef.current = editor.textContent ?? "";
         hydratedTaskIdRef.current = currentTaskId;
         resetHistory(readEditorContent());
@@ -3089,7 +3219,7 @@ export function TaskDetailsPanel({
     editor.innerHTML = targetHtml;
     ensureBlockLines(editor);
     ensureTitleLine(editor);
-    syncLineEmptyState(editor);
+    syncEditorLineEmptyState(editor);
     previousTextRef.current = editor.textContent ?? "";
     hydratedTaskIdRef.current = task.id;
     resetHistory(readEditorContent());
@@ -3438,6 +3568,10 @@ export function TaskDetailsPanel({
         window.clearTimeout(clipboardNoticeTimerRef.current);
       }
 
+      if (dateMenuCloseTimerRef.current !== null) {
+        window.clearTimeout(dateMenuCloseTimerRef.current);
+      }
+
       document.removeEventListener("pointermove", handleDragMove);
       document.removeEventListener("pointerup", handleDragEnd);
       document.body.style.cursor = "";
@@ -3448,6 +3582,21 @@ export function TaskDetailsPanel({
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       const target = event.target as Node;
+      const editor = editorRef.current;
+
+      if (editor && editor.contains(target) && !event.shiftKey) {
+        savedFormatSelectionRef.current = null;
+        savedFormatLineIdsRef.current = [];
+        if (formatMenuTimerRef.current !== null) {
+          window.clearTimeout(formatMenuTimerRef.current);
+          formatMenuTimerRef.current = null;
+        }
+        closeFormatMenu();
+
+        if (editorHasLiveExtendedTextSelection(editor)) {
+          collapseEditorSelectionAtPoint(editor, event.clientX, event.clientY);
+        }
+      }
 
       if (formatMenuRef.current?.contains(target)) {
         return;
@@ -3457,7 +3606,7 @@ export function TaskDetailsPanel({
         return;
       }
 
-      if (!editorRef.current?.contains(target)) {
+      if (!editor?.contains(target)) {
         closeFormatMenu();
       }
 
@@ -3483,6 +3632,10 @@ export function TaskDetailsPanel({
 
       setAddBlockMenu(null);
       setSlashCommandMenu(null);
+      if (dateMenuCloseTimerRef.current !== null) {
+        window.clearTimeout(dateMenuCloseTimerRef.current);
+        dateMenuCloseTimerRef.current = null;
+      }
       setIsDateMenuOpen(false);
       scheduleLineControlsUpdate();
 
@@ -3492,6 +3645,14 @@ export function TaskDetailsPanel({
     }
 
     function handleSelectionChange() {
+      // While the mouse button is held down inside the editor, the browser is
+      // actively extending a native text selection. Any synchronous DOM
+      // traversal/layout work here (line lookups, getBoundingClientRect,
+      // range.intersectsNode over every line, etc.) can interrupt that native
+      // extension, most noticeably breaking backward (right-to-left) drags.
+      // Defer all of this bookkeeping until mouseup.
+      if (isEditorPointerDownRef.current) return;
+
       const editor = editorRef.current;
       if (!editor) return;
 
@@ -3502,7 +3663,7 @@ export function TaskDetailsPanel({
         editor.contains(selection.anchorNode);
 
       if (selectionInEditor) {
-        syncLineEmptyState(editor);
+        syncEditorLineEmptyState(editor);
 
         if (
           selection?.rangeCount &&
@@ -3678,7 +3839,7 @@ export function TaskDetailsPanel({
         clearSlashCommandText(line);
         placeCaretInLine(line);
         syncEditorContent();
-        syncLineEmptyState(editor);
+        syncEditorLineEmptyState(editor);
       }
     }
 
@@ -3712,7 +3873,7 @@ export function TaskDetailsPanel({
     applyBlockTypeToSelection(editor, type);
     setSlashCommandMenu(null);
     syncEditorContent();
-    syncLineEmptyState(editor);
+    syncEditorLineEmptyState(editor);
     recordHistorySnapshot();
     scheduleAutoSave();
     updateLineControls();
@@ -3757,13 +3918,13 @@ export function TaskDetailsPanel({
     const lineRect = line.getBoundingClientRect();
     setFormatMenu({
       x: lineRect.left + lineRect.width / 2,
-      y: lineRect.top - 8,
+      y: lineRect.top - FORMAT_MENU_ABOVE_SELECTION_GAP,
       alignLeft: false,
       placement: "above",
       anchorBottom: lineRect.bottom,
     });
 
-    syncLineEmptyState(editor);
+    syncEditorLineEmptyState(editor);
 
     requestAnimationFrame(() => {
       if (state.text) {
@@ -4014,7 +4175,7 @@ export function TaskDetailsPanel({
 
     const editor = editorRef.current;
     if (editor) {
-      syncLineEmptyState(editor);
+      syncEditorLineEmptyState(editor);
     }
 
     if (inputNormalizeTimerRef.current !== null) {
@@ -4043,11 +4204,23 @@ export function TaskDetailsPanel({
 
     const line = getLineElementAtPoint(editor, event.clientY);
     hoveredLineRef.current = line;
-    scheduleLineControlsUpdate();
+    if (!isEditorPointerDownRef.current) {
+      syncEditorLineEmptyState(editor);
+      updateLineControls();
+    }
   }
 
-  function handleEditorWrapperMouseEnter() {
+  function handleEditorWrapperMouseEnter(
+    event: React.MouseEvent<HTMLDivElement>,
+  ) {
     isMouseOverEditorRef.current = true;
+
+    const editor = editorRef.current;
+    if (!editor || dragStateRef.current) return;
+
+    hoveredLineRef.current = getLineElementAtPoint(editor, event.clientY);
+    syncEditorLineEmptyState(editor);
+    updateLineControls();
   }
 
   function handleEditorWrapperMouseLeave(
@@ -4064,7 +4237,11 @@ export function TaskDetailsPanel({
 
     isMouseOverEditorRef.current = false;
     hoveredLineRef.current = null;
-    scheduleLineControlsUpdate();
+    const editor = editorRef.current;
+    if (editor) {
+      syncEditorLineEmptyState(editor);
+    }
+    updateLineControls();
   }
 
   function handleEditorFocus() {
@@ -4076,7 +4253,7 @@ export function TaskDetailsPanel({
     }
 
     if (editor) {
-      syncLineEmptyState(editor);
+      syncEditorLineEmptyState(editor);
     }
 
     if (task?.isNote) {
@@ -4090,6 +4267,22 @@ export function TaskDetailsPanel({
     const editor = editorRef.current;
     if (!editor) return;
 
+    beginEditorPointerInteraction();
+
+    if (!event.shiftKey) {
+      savedFormatSelectionRef.current = null;
+      savedFormatLineIdsRef.current = [];
+      if (formatMenuTimerRef.current !== null) {
+        window.clearTimeout(formatMenuTimerRef.current);
+        formatMenuTimerRef.current = null;
+      }
+      closeFormatMenu();
+
+      if (editorHasLiveExtendedTextSelection(editor)) {
+        collapseEditorSelectionAtPoint(editor, event.clientX, event.clientY);
+      }
+    }
+
     const hoverLine = getLineElementAtPoint(editor, event.clientY);
     if (hoverLine) {
       hoveredLineRef.current = hoverLine;
@@ -4102,7 +4295,7 @@ export function TaskDetailsPanel({
         recordHistorySnapshot();
         scheduleAutoSave();
       }
-      syncLineEmptyState(editor);
+      syncEditorLineEmptyState(editor);
       const activeLine = getActiveLineElement(editor);
       if (activeLine && !isTitleLine(editor, activeLine)) {
         clickedLineRef.current = activeLine;
@@ -4130,7 +4323,7 @@ export function TaskDetailsPanel({
     if (isDetailLineEmpty(line)) {
       event.preventDefault();
       focusDetailLine(editor, line);
-      syncLineEmptyState(editor);
+      syncEditorLineEmptyState(editor);
     }
 
     updateLineControls();
@@ -4333,6 +4526,12 @@ export function TaskDetailsPanel({
       }
     }
 
+    if (event.key === "Escape" && formatMenu) {
+      event.preventDefault();
+      dismissFormatMenu();
+      return;
+    }
+
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
       const editor = editorRef.current;
@@ -4369,10 +4568,10 @@ export function TaskDetailsPanel({
   }
 
   function handleEditorMouseUp() {
+    endEditorPointerInteraction();
+
     const editor = editorRef.current;
     if (editor) {
-      syncLineEmptyState(editor);
-
       const selection = window.getSelection();
       const hasTextSelection =
         Boolean(selection?.rangeCount) &&
@@ -4394,7 +4593,6 @@ export function TaskDetailsPanel({
     }
 
     pendingClickLineRef.current = null;
-    updateLineControls();
   }
 
   function handleEditorContextMenu(event: React.MouseEvent<HTMLDivElement>) {
@@ -4454,7 +4652,7 @@ export function TaskDetailsPanel({
     if (!lineId) return;
 
     editor.focus();
-    syncLineEmptyState(editor);
+    syncEditorLineEmptyState(editor);
 
     const position = getSlashCommandMenuPosition(activeLine);
     setSlashCommandMenu({
@@ -4577,9 +4775,48 @@ export function TaskDetailsPanel({
     }
   }
 
+  function clearDateMenuCloseTimer() {
+    if (dateMenuCloseTimerRef.current !== null) {
+      window.clearTimeout(dateMenuCloseTimerRef.current);
+      dateMenuCloseTimerRef.current = null;
+    }
+  }
+
+  function openDateMenu() {
+    if (!task) return;
+
+    clearDateMenuCloseTimer();
+    setIsDateMenuOpen(true);
+  }
+
+  function scheduleDateMenuClose() {
+    clearDateMenuCloseTimer();
+    dateMenuCloseTimerRef.current = window.setTimeout(() => {
+      dateMenuCloseTimerRef.current = null;
+      setIsDateMenuOpen(false);
+    }, TASK_DETAILS_DATE_MENU_HOVER_CLOSE_MS);
+  }
+
+  function handleDateMenuMouseEnter() {
+    if (dateMenuHoverDismissedRef.current) return;
+    openDateMenu();
+  }
+
+  function handleDateMenuMouseLeave() {
+    dateMenuHoverDismissedRef.current = false;
+    scheduleDateMenuClose();
+  }
+
   function handleDateButtonClick() {
     if (!task) return;
-    setIsDateMenuOpen((open) => !open);
+
+    clearDateMenuCloseTimer();
+    setIsDateMenuOpen((open) => {
+      if (open) {
+        dateMenuHoverDismissedRef.current = true;
+      }
+      return !open;
+    });
   }
 
   async function handleSelectDueDate(dateValue: string | null) {
@@ -4608,6 +4845,7 @@ export function TaskDetailsPanel({
         dueTimeZone: updated.dueTimeZone,
       });
       if (dateValue === null) {
+        clearDateMenuCloseTimer();
         setIsDateMenuOpen(false);
       }
       setMetadataError(null);
@@ -4670,6 +4908,7 @@ export function TaskDetailsPanel({
         dueTimeZone: updated.dueTimeZone,
       });
       if (!options?.keepOpen) {
+        clearDateMenuCloseTimer();
         setIsDateMenuOpen(false);
       }
       setMetadataError(null);
@@ -4712,7 +4951,11 @@ export function TaskDetailsPanel({
             </div>
           ) : task ? (
             <>
-              <div className="relative">
+              <div
+                className="relative"
+                onMouseEnter={handleDateMenuMouseEnter}
+                onMouseLeave={handleDateMenuMouseLeave}
+              >
                 <button
                   ref={dateButtonRef}
                   type="button"
@@ -4727,11 +4970,15 @@ export function TaskDetailsPanel({
                   className="flex cursor-pointer items-center gap-1 rounded-full bg-[#eceef0] pl-3.5 pr-3 py-[7px] text-[12px] font-semibold uppercase tracking-wide text-zinc-600 transition-colors hover:bg-[#e0e2e5] dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
                 >
                   <span className={dueDateLabel ? "text-[11px]" : undefined}>Date</span>
-             
+
                   {dueDateLabel ? (
-                    <span 
+                    <span
                       className="ml-px flex flex-col items-start normal-case tracking-normal"
-                      title={dueTimeLabel ? `${dueDateLabel} • ${dueTimeLabel}` : dueDateLabel || undefined}
+                      title={
+                        dueTimeLabel
+                          ? `${dueDateLabel} • ${dueTimeLabel}`
+                          : dueDateLabel || undefined
+                      }
                     >
                       <span className="font-normal text-[#5F5F5F] dark:text-zinc-300 text-[13px]">
                         {dueDateLabel}
@@ -4745,7 +4992,7 @@ export function TaskDetailsPanel({
                 {isDateMenuOpen && (
                   <div
                     ref={dateMenuRef}
-                    className="absolute left-0 top-full z-50 mt-1.5"
+                    className="absolute left-0 top-full z-50 pt-1.5"
                   >
                     <TaskDatePicker
                       dueDate={task.dueDate}
@@ -5002,7 +5249,7 @@ export function TaskDetailsPanel({
                 {lineControls.map(({ lineId, top, showPlus, showDrag }) => (
                   <div
                     key={lineId}
-                    className="pointer-events-auto absolute left-1 flex h-[1.75em] -translate-y-1/2 items-center"
+                    className="pointer-events-none absolute left-1 flex h-[1.75em] -translate-y-1/2 items-center"
                     style={{ top }}
                   >
                     {showPlus ? (
@@ -5012,7 +5259,7 @@ export function TaskDetailsPanel({
                         title="Add block below"
                         aria-haspopup="menu"
                         aria-expanded={addBlockMenu !== null}
-                        className="flex size-[19px] cursor-grab items-center justify-center rounded rounded-lg px-[1px] py-[3px] text-zinc-350 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+                        className="pointer-events-auto flex size-[19px] cursor-grab items-center justify-center rounded rounded-lg px-[1px] py-[3px] text-zinc-350 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
                         onMouseDown={(event) => event.preventDefault()}
                         onClick={(event) => handlePlusClick(event, lineId)}
                       >
@@ -5024,7 +5271,7 @@ export function TaskDetailsPanel({
                         type="button"
                         aria-label="Drag line"
                         title="Drag to reorder line"
-                        className="flex w-[23px] h-[26px] cursor-grab items-center justify-center rounded-full px-[1px] py-[3px] mr-[2px] text-zinc-300 transition-colors hover:bg-zinc-100 hover:text-zinc-700 active:cursor-grabbing dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+                        className="pointer-events-auto flex w-[23px] h-[26px] cursor-grab items-center justify-center rounded-full px-[1px] py-[3px] mr-[2px] text-zinc-300 transition-colors hover:bg-zinc-100 hover:text-zinc-700 active:cursor-grabbing dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
                         onPointerDown={(event) =>
                           handleLineDragStart(event, lineId)
                         }
@@ -5170,7 +5417,7 @@ export function TaskDetailsPanel({
 
                   if (event.key === "Escape") {
                     event.preventDefault();
-                    closeFormatMenu();
+                    dismissFormatMenu();
                   }
                 }}
               />
@@ -5191,7 +5438,7 @@ export function TaskDetailsPanel({
 
                   if (event.key === "Escape") {
                     event.preventDefault();
-                    closeFormatMenu();
+                    dismissFormatMenu();
                   }
                 }}
               />
@@ -5224,6 +5471,7 @@ export function TaskDetailsPanel({
               <div className={FORMAT_TOOLBAR_ROW_CLASS}>
                 <FormatToolbarTooltipWrap
                   label="Bold"
+                  shortcut={getFormatToolbarShortcut("b")}
                   tooltipId="format-toolbar-bold-tooltip"
                 >
                   <button
@@ -5244,6 +5492,7 @@ export function TaskDetailsPanel({
                 </FormatToolbarTooltipWrap>
                 <FormatToolbarTooltipWrap
                   label="Italic"
+                  shortcut={getFormatToolbarShortcut("i")}
                   tooltipId="format-toolbar-italic-tooltip"
                 >
                   <button
@@ -5264,6 +5513,7 @@ export function TaskDetailsPanel({
                 </FormatToolbarTooltipWrap>
                 <FormatToolbarTooltipWrap
                   label="Underline"
+                  shortcut={getFormatToolbarShortcut("u")}
                   tooltipId="format-toolbar-underline-tooltip"
                 >
                   <button
@@ -5380,7 +5630,9 @@ export function TaskDetailsPanel({
                       clearFormatting();
                     }}
                   >
-                    <LuRemoveFormatting className={FORMAT_TOOLBAR_ICON_SIZE_CLASS} />
+                    <LuRemoveFormatting
+                      className={`${FORMAT_TOOLBAR_ICON_SIZE_CLASS} text-[#5e5e66] dark:text-[#ffffff]`}
+                    />
                   </button>
                 </FormatToolbarTooltipWrap>
 
@@ -5391,7 +5643,6 @@ export function TaskDetailsPanel({
                   onStrikethrough={() => applyFormat("strikeThrough")}
                   onSuperscript={() => applyFormat("superscript")}
                   onSubscript={() => applyFormat("subscript")}
-                  onGrammarCheck={() => void runGrammarCheck()}
                 />
               </div>
             </>
@@ -5405,19 +5656,6 @@ export function TaskDetailsPanel({
         taskId={taskId}
         onClose={() => setIsVersionHistoryOpen(false)}
         onRestore={applyRestoredTaskVersion}
-      />
-
-      <GrammarCheckModal
-        open={grammarModalOpen}
-        originalText={grammarOriginalText}
-        correctedText={grammarCorrectedText}
-        isLoading={grammarLoading}
-        error={grammarError}
-        onApply={applyGrammarCorrection}
-        onClose={() => {
-          if (grammarLoading) return;
-          setGrammarModalOpen(false);
-        }}
       />
 
     </section>

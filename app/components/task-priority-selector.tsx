@@ -69,7 +69,7 @@ export function TaskPrioritySelector({
 
   return (
     <div className="overflow-visible px-3 py-2">
-      <div className="mb-2 text-xs font-medium text-zinc-400 dark:text-zinc-500">
+      <div className="mb-[3px] text-xs font-medium text-zinc-350 dark:text-zinc-500">
         priority
       </div>
       <div className="flex w-full items-center justify-between">
