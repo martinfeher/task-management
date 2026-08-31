@@ -276,8 +276,8 @@ export function CalendarMiniMonth({
               </span>
               {hasTasks ? (
                 <span
-                  className={`relative z-10 mt-0.5 size-[3px] shrink-0 rounded-full ${
-                    showCircle ? "bg-white/90" : "bg-[#4873c7]"
+                  className={`relative z-10 mt-0.5 size-[3px] shrink-0 -translate-y-[6px] rounded-full transition-opacity group-hover:opacity-0 ${
+                    showCircle ? "" : "bg-[#d7dde9]"
                   }`}
                 />
               ) : (

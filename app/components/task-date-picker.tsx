@@ -41,7 +41,9 @@ type TaskDatePickerProps = {
   recurrenceRule?: string | null;
   onSelectDate: (dateValue: string | null) => void;
   onSaveDueTime?: (dueTime: TaskDueTime, options?: TaskDueTimeSaveOptions) => void;
-  onSaveRecurrence?: (rule: TaskRecurrenceRule | null) => void;
+  onSaveRecurrence?: (
+    rule: TaskRecurrenceRule | null,
+  ) => void | Promise<void>;
   className?: string;
 };
 
@@ -435,10 +437,13 @@ function TaskRecurrenceMenu({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const activeOptionId = getRecurrenceMenuSelectionId(activeRecurrence) ?? "none";
+  const menuSelectionId = getRecurrenceMenuSelectionId(activeRecurrence);
+  const activeOptionId = menuSelectionId ?? "none";
   const triggerLabel =
-    RECURRENCE_MENU_OPTIONS.find((option) => option.id === activeOptionId)
-      ?.label ?? formatRecurrenceLabel(activeRecurrence);
+    menuSelectionId !== null
+      ? (RECURRENCE_MENU_OPTIONS.find((option) => option.id === menuSelectionId)
+          ?.label ?? formatRecurrenceLabel(activeRecurrence))
+      : formatRecurrenceLabel(activeRecurrence);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -463,6 +468,22 @@ function TaskRecurrenceMenu({
   function handleSelectOption(optionId: string) {
     const option = RECURRENCE_MENU_OPTIONS.find((entry) => entry.id === optionId);
     if (!option) return;
+
+    if (optionId === "none") {
+      if (!activeRecurrence) {
+        closeMenu();
+        return;
+      }
+
+      onSaveRecurrence(null);
+      closeMenu();
+      return;
+    }
+
+    if (menuSelectionId === optionId) {
+      closeMenu();
+      return;
+    }
 
     onSaveRecurrence(option.rule);
     closeMenu();
@@ -1183,8 +1204,12 @@ export function TaskDatePicker({
           }}
           onSaveRecurrence={(rule) => {
             setIsTimeMenuOpen(false);
+            const previousRecurrence = displayRecurrence;
             setDisplayRecurrence(rule);
-            onSaveRecurrence?.(rule);
+
+            void Promise.resolve(onSaveRecurrence?.(rule)).catch(() => {
+              setDisplayRecurrence(previousRecurrence);
+            });
           }}
         />
       </div>

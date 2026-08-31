@@ -36,6 +36,7 @@ import {
 } from "@/lib/calendar-layout";
 import {
   bindCalendarTaskDrag,
+  CALENDAR_ALL_DAY_TO_TIMED_DEFAULT_DURATION_MINUTES,
   getActiveCalendarDropSlot,
   getCalendarTaskDragPreviewDuration,
   type CalendarTaskDragState,
@@ -92,6 +93,9 @@ type CalendarMultiDayViewProps = {
   defaultListId?: string | null;
   fullWidth?: boolean;
   externalDropTargetDateKey?: string | null;
+  externalDropTargetTimeMinutes?: number | null;
+  externalDraggingTaskId?: string | null;
+  externalDraggingTaskName?: string | null;
   onPeriodLabelChange?: (label: string) => void;
 } & CalendarSidebarSyncProps;
 
@@ -208,6 +212,9 @@ export function CalendarMultiDayView({
   defaultListId = null,
   fullWidth = false,
   externalDropTargetDateKey = null,
+  externalDropTargetTimeMinutes = null,
+  externalDraggingTaskId = null,
+  externalDraggingTaskName = null,
   onPeriodLabelChange,
   sidebarFocusDate,
   sidebarJumpRequestId,
@@ -651,7 +658,7 @@ export function CalendarMultiDayView({
                   const activeDropSlot = getActiveCalendarDropSlot(
                     dropTargetSlot,
                     externalDropTargetDateKey,
-                    null,
+                    externalDropTargetTimeMinutes,
                   );
                   const isDropTarget =
                     activeDropSlot?.dateKey === dateKey &&
@@ -749,7 +756,7 @@ export function CalendarMultiDayView({
               const activeDropSlot = getActiveCalendarDropSlot(
                 dropTargetSlot,
                 externalDropTargetDateKey,
-                null,
+                externalDropTargetTimeMinutes,
               );
               const isTimedDropTarget =
                 activeDropSlot?.dateKey === dateKey &&
@@ -918,6 +925,22 @@ export function CalendarMultiDayView({
                           taskName={draggingTask.name}
                           startMinutes={selectedSlotMinutes}
                           durationMinutes={dragPreviewDuration}
+                        />
+                      ) : showDragSlotMarker &&
+                        externalDraggingTaskId &&
+                        externalDraggingTaskName &&
+                        selectedSlotMinutes !== null ? (
+                        <CalendarTaskDropPreview
+                          top={selectedSlotTop}
+                          height={getCalendarTaskPreviewHeight(
+                            CALENDAR_ALL_DAY_TO_TIMED_DEFAULT_DURATION_MINUTES,
+                            HOUR_HEIGHT_PX,
+                          )}
+                          taskName={externalDraggingTaskName}
+                          startMinutes={selectedSlotMinutes}
+                          durationMinutes={
+                            CALENDAR_ALL_DAY_TO_TIMED_DEFAULT_DURATION_MINUTES
+                          }
                         />
                       ) : isActiveTimedDay ? (
                         <CalendarNewTaskSlotPreview

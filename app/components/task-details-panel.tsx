@@ -6,7 +6,13 @@ import { LuCheck, LuCode, LuHeading1, LuHeading2, LuHeading3, LuHistory, LuPilcr
 import { renameTask, updateTaskDueDate, updateTaskDueTime, updateTaskRecurrence } from "@/app/actions/todo";
 import type { TaskRecurrenceRule } from "@/lib/task-recurrence";
 import { serializeRecurrenceRule } from "@/lib/task-recurrence";
-import { fetchTaskById, saveTaskDetails, saveTaskDetailsKeepalive, saveTaskNameKeepalive } from "@/lib/task-details-api";
+import {
+  fetchTaskById,
+  invalidateTaskDetailsFetchCache,
+  saveTaskDetails,
+  saveTaskDetailsKeepalive,
+  saveTaskNameKeepalive,
+} from "@/lib/task-details-api";
 import {
   resolveTaskDetailsForSave,
   taskDetailsHasContent,
@@ -3282,8 +3288,10 @@ export function TaskDetailsPanel({
         current.dueTimeMinutes === taskSnapshot.dueTimeMinutes &&
         current.dueDurationMinutes === taskSnapshot.dueDurationMinutes &&
         current.dueTimeZone === taskSnapshot.dueTimeZone;
+      const recurrenceSame =
+        current.recurrenceRule === taskSnapshot.recurrenceRule;
 
-      if (dueDateSame && dueTimeSame) return current;
+      if (dueDateSame && dueTimeSame && recurrenceSame) return current;
 
       return {
         ...current,
@@ -3291,6 +3299,7 @@ export function TaskDetailsPanel({
         dueTimeMinutes: taskSnapshot.dueTimeMinutes,
         dueDurationMinutes: taskSnapshot.dueDurationMinutes,
         dueTimeZone: taskSnapshot.dueTimeZone,
+        recurrenceRule: taskSnapshot.recurrenceRule ?? null,
       };
     });
   }, [
@@ -3300,6 +3309,7 @@ export function TaskDetailsPanel({
     taskSnapshot?.dueTimeMinutes,
     taskSnapshot?.dueDurationMinutes,
     taskSnapshot?.dueTimeZone,
+    taskSnapshot?.recurrenceRule,
     isDateMenuOpen,
     syncExternalTaskName,
   ]);
@@ -4599,19 +4609,15 @@ export function TaskDetailsPanel({
     const editor = editorRef.current;
     if (!editor) return;
 
+    setAddBlockMenu(null);
+    setSlashCommandMenu(null);
+    closeFormatMenu();
+
     const clickedLine = (event.target as HTMLElement).closest(".detail-line");
     if (clickedLine instanceof HTMLElement && isTitleLine(editor, clickedLine)) {
       event.preventDefault();
       return;
     }
-
-    const selection = window.getSelection();
-    const hasTextSelection =
-      selection !== null &&
-      !selection.isCollapsed &&
-      selection.rangeCount > 0 &&
-      editor.contains(selection.anchorNode) &&
-      selection.toString().trim().length > 0;
 
     const activeLine =
       (clickedLine instanceof HTMLElement ? clickedLine : null) ??
@@ -4625,44 +4631,7 @@ export function TaskDetailsPanel({
       activeLine.querySelector(".detail-image-wrapper")
     ) {
       event.preventDefault();
-      return;
     }
-
-    event.preventDefault();
-    setAddBlockMenu(null);
-    setSlashCommandMenu(null);
-
-    if (hasTextSelection && selection) {
-      const range = selection.getRangeAt(0);
-      rememberFormatSelection(editor, range);
-      setFormatMenu(getFormatMenuPositionFromRange(range, editor));
-      setFormatMenuFontSize(getDetailSelectionFontState(editor).size);
-      setFormatMenuBlockType(getActiveTextBlockType(editor));
-      setFormatMenuInlineFormats(getDetailSelectionInlineFormatState(editor));
-      closeFormatDropdowns();
-      setShowLinkMenu(false);
-      showLinkMenuRef.current = false;
-      return;
-    }
-
-    closeFormatMenu();
-    placeCaretAtPoint(editor, event.clientX, event.clientY);
-
-    const lineId = activeLine.dataset.lineId;
-    if (!lineId) return;
-
-    editor.focus();
-    syncEditorLineEmptyState(editor);
-
-    const position = getSlashCommandMenuPosition(activeLine);
-    setSlashCommandMenu({
-      top: position.top,
-      left: position.left,
-      lineId,
-      query: "",
-      selectedIndex: 0,
-      fromContextMenu: true,
-    });
   }
 
   function handleEditorWrapperPointerDownCapture(
@@ -4866,14 +4835,28 @@ export function TaskDetailsPanel({
       }
 
       const nextRecurrenceRule = serializeRecurrenceRule(rule);
-      setTask((current) =>
-        current
-          ? {
-              ...current,
-              recurrenceRule: nextRecurrenceRule,
-            }
-          : current,
-      );
+      invalidateTaskDetailsFetchCache(task.id);
+      setTask((current) => {
+        if (!current) return current;
+
+        taskDetailsCache.set(task.id, {
+          id: task.id,
+          name: current.name,
+          completed: current.completed,
+          isNote: current.isNote,
+          details: savedDetailsRef.current,
+          dueDate: current.dueDate,
+          dueTimeMinutes: current.dueTimeMinutes,
+          dueDurationMinutes: current.dueDurationMinutes,
+          dueTimeZone: current.dueTimeZone,
+          recurrenceRule: nextRecurrenceRule,
+        });
+
+        return {
+          ...current,
+          recurrenceRule: nextRecurrenceRule,
+        };
+      });
       if (!onSaveTaskRecurrence) {
         onRecurrenceUpdated?.(task.id, nextRecurrenceRule);
       }
@@ -5190,7 +5173,7 @@ export function TaskDetailsPanel({
             onPointerDownCapture={handleEditorWrapperPointerDownCapture}
           >
             {isImageDropActive && (
-              <div className="pointer-events-none absolute inset-0 z-30 rounded-md border-2 border-dashed border-blue-400 bg-blue-50/40 dark:border-blue-500 dark:bg-blue-950/20" />
+              <div className="pointer-events-none absolute inset-0 z-30 rounded-[30px] border-2 border-dashed border-blue-400 bg-blue-50/40 dark:border-blue-500 dark:bg-blue-950/20" />
             )}
 
             {pasteFormatPrompt && (

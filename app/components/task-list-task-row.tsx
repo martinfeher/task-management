@@ -89,7 +89,7 @@ type TaskListTaskRowProps = {
   onSaveTaskRecurrence: (
     taskId: string,
     rule: TaskRecurrenceRule | null,
-  ) => void;
+  ) => void | Promise<void>;
   onOpenTaskRowMenu: (task: TaskListItem, anchor: HTMLElement) => void;
   onTogglePriorityMenu: (taskId: string) => void;
   onToggleTaskPinned: (task: TaskListItem) => void;
@@ -547,7 +547,7 @@ export function TaskListTaskRow({
           <CiStickyNote
             aria-hidden="true"
             className="shrink-0 size-[19px]"
-            style={{ transform: "scaleX(0.9)" }}
+            style={{ transform: "scaleX(0.815)" }}
           />
         </span>
       ) : (

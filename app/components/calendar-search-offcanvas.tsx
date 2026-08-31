@@ -3,55 +3,12 @@
 import { useEffect, useMemo, useRef } from "react";
 import { LuX } from "react-icons/lu";
 import { formatDueTimeLabel } from "@/lib/task-due-time";
-import { fromDateKey, startOfDay } from "./calendar-mini-month";
+import {
+  formatCalendarTaskDueDateLabel,
+  getCalendarSidebarSearchResults,
+} from "@/lib/calendar-task-search";
+import { startOfDay } from "./calendar-mini-month";
 import type { SearchTask } from "./todo-app";
-
-const RESULT_LIMIT = 50;
-
-function isSameDay(a: Date, b: Date) {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
-}
-
-function formatTaskDueDateLabel(value: string) {
-  const date = fromDateKey(value);
-  if (!date) return value;
-
-  const today = startOfDay(new Date());
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-
-  if (isSameDay(date, today)) return "Today";
-  if (isSameDay(date, tomorrow)) return "Tomorrow";
-
-  return date.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-  });
-}
-
-function filterSearchTasks(tasks: SearchTask[], query: string) {
-  const trimmed = query.trim().toLowerCase();
-  if (!trimmed) return [];
-
-  const openMatches: SearchTask[] = [];
-  const completedMatches: SearchTask[] = [];
-
-  for (const task of tasks) {
-    if (!task.name.toLowerCase().includes(trimmed)) continue;
-
-    if (task.completed) {
-      completedMatches.push(task);
-    } else {
-      openMatches.push(task);
-    }
-  }
-
-  return [...openMatches, ...completedMatches].slice(0, RESULT_LIMIT);
-}
 
 type CalendarSearchOffcanvasProps = {
   open: boolean;
@@ -71,7 +28,7 @@ export function CalendarSearchOffcanvas({
   const panelRef = useRef<HTMLElement>(null);
 
   const results = useMemo(
-    () => filterSearchTasks(tasks, query),
+    () => getCalendarSidebarSearchResults(tasks, query, startOfDay(new Date())),
     [query, tasks],
   );
 
@@ -147,7 +104,7 @@ export function CalendarSearchOffcanvas({
               {results.map((task) => {
                 const dueTimeLabel = formatDueTimeLabel(task.dueTimeMinutes);
                 const dueDateLabel = task.dueDate
-                  ? formatTaskDueDateLabel(task.dueDate)
+                  ? formatCalendarTaskDueDateLabel(task.dueDate)
                   : null;
                 const scheduleLabel = dueTimeLabel
                   ? `${dueDateLabel ?? "Scheduled"} · ${dueTimeLabel}`

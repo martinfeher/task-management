@@ -135,7 +135,7 @@ function PreviewDaySection({
                   className="flex gap-2 border-l-2 border-zinc-200 pl-2 dark:border-zinc-700"
                 >
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+                    <p className="truncate text-[13px] font-medium text-zinc-700 dark:text-zinc-50">
                       {task.name}
                     </p>
                     {timeLabel ? (

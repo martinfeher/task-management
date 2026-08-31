@@ -25,7 +25,7 @@ async function main() {
     const [versionRow] = await postgres.$queryRaw<{ version: string }[]>`
       SELECT version()
     `;
-    const [listCount, taskCount, tagColumns] = await Promise.all([
+    const [listCount, taskCount, tagColumns, taskColumns] = await Promise.all([
       postgres.todoList.count(),
       postgres.task.count(),
       postgres.$queryRaw<Array<{ column_name: string }>>`
@@ -35,10 +35,23 @@ async function main() {
           AND table_name = 'Tag'
           AND column_name = 'position'
       `,
+      postgres.$queryRaw<Array<{ column_name: string }>>`
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'Task'
+          AND column_name = 'isNote'
+      `,
     ]);
 
     if (tagColumns.length === 0) {
       throw new Error('Tag.position column is missing after schema ensure');
+    }
+
+    if (taskColumns.length === 0) {
+      throw new Error(
+        'Task.isNote column is missing. Run: npm run db:migrate:deploy',
+      );
     }
 
     await postgres.tag.findMany({
@@ -51,7 +64,7 @@ async function main() {
     console.log("Connection: OK");
     console.log(`Server: ${versionRow.version}`);
     console.log(`Data: ${listCount} lists, ${taskCount} tasks`);
-    console.log("Schema: Tag.position is available");
+    console.log("Schema: Tag.position and Task.isNote are available");
   } finally {
     await postgres.$disconnect();
   }

@@ -717,6 +717,8 @@ export function TodoApp({
   const [isListCalendarOpen, setIsListCalendarOpen] = useState(
     bootState.isListCalendarOpen,
   );
+  const [listCalendarShowingDetails, setListCalendarShowingDetails] =
+    useState(false);
   const isCompactLayout = useMediaQuery(COMPACT_LAYOUT_MEDIA_QUERY);
   const [sidebarDrawerOpen, setSidebarDrawerOpen] = useState(false);
   const [listCalendarView, setListCalendarView] = useState<ListCalendarView>(
@@ -2756,6 +2758,7 @@ export function TodoApp({
   const closeListCalendar = useCallback(() => {
     setIsListCalendarOpen(false);
     setIsListCalendarPreview(false);
+    setListCalendarShowingDetails(false);
     setCalendarExternalDropTarget(null);
     listCalendarReturnTaskIdRef.current = null;
 
@@ -2797,15 +2800,21 @@ export function TodoApp({
     setIsListCalendarPreview(false);
 
     if (isListCalendarOpen) {
+      if (listCalendarShowingDetails) {
+        setListCalendarShowingDetails(false);
+        return;
+      }
       closeListCalendar();
       return;
     }
 
     setIsListCalendarOpen(true);
+    setListCalendarShowingDetails(false);
   }, [
     cancelListCalendarPreviewClose,
     closeListCalendar,
     isListCalendarOpen,
+    listCalendarShowingDetails,
     selectedListId,
   ]);
 
@@ -2813,7 +2822,9 @@ export function TodoApp({
     async (taskId: string) => {
       if (isListCalendarOpen) {
         listCalendarReturnTaskIdRef.current = null;
-        setIsListCalendarOpen(false);
+        await selectTask(taskId);
+        setListCalendarShowingDetails(true);
+        return;
       }
       await selectTask(taskId);
       setFocusTaskTitleRequest((current) => current + 1);
@@ -2839,6 +2850,7 @@ export function TodoApp({
 
     setIsListCalendarOpen(false);
     setIsListCalendarPreview(false);
+    setListCalendarShowingDetails(false);
     listCalendarReturnTaskIdRef.current = null;
     setCalendarExternalDropTarget(null);
   }, [selectedListId, pathname]);
@@ -2901,20 +2913,29 @@ export function TodoApp({
     displayedActiveView === "today" ||
     displayedActiveView === "important";
   const showListCalendar = isListCalendarOpen || isListCalendarPreview;
+  const showListCalendarPanel =
+    showListCalendar && !(isListCalendarOpen && listCalendarShowingDetails);
   const showRightPanel =
     selectedTaskId !== null || showListCalendar || useFixedWidthTaskListPanel;
-  const showTaskDetails = selectedTaskId !== null && !showListCalendar;
+  const showTaskDetails =
+    selectedTaskId !== null &&
+    (!showListCalendar || (isListCalendarOpen && listCalendarShowingDetails));
   const compactDetailView =
     isCompactLayout && (selectedTaskId !== null || showListCalendar);
   const compactShowTaskList = !isCompactLayout || !compactDetailView;
 
   const handleCompactBack = useCallback(() => {
+    if (isListCalendarOpen && listCalendarShowingDetails) {
+      setListCalendarShowingDetails(false);
+      return;
+    }
     if (isListCalendarOpen) {
       setIsListCalendarOpen(false);
+      setListCalendarShowingDetails(false);
       return;
     }
     setSelectedTaskId(null);
-  }, [isListCalendarOpen]);
+  }, [isListCalendarOpen, listCalendarShowingDetails]);
 
   const selectedTaskSnapshot = useMemo(() => {
     if (!selectedTaskId) return null;
@@ -3127,7 +3148,7 @@ export function TodoApp({
                 isCompactLayout ? "min-w-0" : "min-w-[350px]"
               }`}
             >
-              {showListCalendar ? (
+              {showListCalendarPanel ? (
                 <CalendarViewsPanel
                   tasks={taskListItems}
                   searchTasks={searchTasks}
@@ -3261,7 +3282,7 @@ export function TodoApp({
                 onOpenSidebar={() => setSidebarDrawerOpen(true)}
               />
             </div>
-            {showListCalendar ? (
+            {showListCalendarPanel ? (
               <div className="flex min-h-0 min-w-[350px] flex-1 flex-col overflow-hidden">
                 <CalendarViewsPanel
                   tasks={taskListItems}

@@ -99,7 +99,7 @@ export function CalendarMiniMonthDayPreview({
         role="tooltip"
       >
         <div className="border-b border-zinc-100 px-4 py-2.5 dark:border-zinc-800">
-          <span className="text-[11px] font-bold tracking-[0.02em] text-zinc-900 dark:text-zinc-50">
+          <span className="text-[13px] font-bold tracking-[0.02em] text-zinc-800 dark:text-zinc-50">
             {formatPreviewWeekday(day)}
           </span>
           <span className="ml-2 text-[11px] font-normal text-zinc-400 dark:text-zinc-500">
@@ -112,7 +112,7 @@ export function CalendarMiniMonthDayPreview({
 
             return (
               <li key={getCalendarTaskKey(task)} className="py-1.5">
-                <p className="truncate text-sm font-semibold leading-snug text-zinc-900 dark:text-zinc-50">
+                <p className="truncate text-[13px] font-medium text-zinc-700  leading-snug dark:text-zinc-50">
                   {task.name}
                 </p>
                 {timeLabel ? (

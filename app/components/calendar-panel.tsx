@@ -26,7 +26,6 @@ import {
 import { getCalendarTaskKey } from "@/lib/calendar-recurring-tasks";
 import { CalendarMultiWeekView } from "./calendar-weeks-view";
 import { CalendarViewSidebarLayout } from "./calendar-view-sidebar-layout";
-import { CalendarSearchOffcanvas } from "./calendar-search-offcanvas";
 import { CalendarWeekView } from "./calendar-week-view";
 import {
   CalendarTaskHoverButton,
@@ -195,7 +194,6 @@ function CalendarViewTabs({
   monthNavigation,
   searchQuery,
   onSearchQueryChange,
-  onSearchFocus,
   periodLabelAction,
 }: {
   activeView: CalendarViewTab;
@@ -210,7 +208,6 @@ function CalendarViewTabs({
   monthNavigation?: CalendarMonthNavigation | null;
   searchQuery: string;
   onSearchQueryChange: (query: string) => void;
-  onSearchFocus?: () => void;
   periodLabelAction?: ReactNode;
 }) {
   const tabButtonClassName = (isActive: boolean) =>
@@ -325,7 +322,7 @@ function CalendarViewTabs({
           );
         })}
       </div>
-      <div className="flex w-full justify-end">
+      <div className="flex w-full justify-end pr-[25px]!">
         <label className="relative flex h-9 w-full max-w-[220px] items-center rounded-full border border-zinc-200 bg-[#f9f9fa] px-3 dark:border-zinc-700 dark:bg-zinc-900">
           <IoIosSearch
             className="size-4 shrink-0 text-zinc-400 dark:text-zinc-500"
@@ -335,7 +332,6 @@ function CalendarViewTabs({
             type="search"
             value={searchQuery}
             onChange={(event) => onSearchQueryChange(event.target.value)}
-            onFocus={onSearchFocus}
             placeholder="Search"
             aria-label="Search calendar tasks"
             className="min-w-0 flex-1 bg-transparent pl-2 text-sm text-zinc-800 outline-none placeholder:text-zinc-400 dark:text-zinc-100 dark:placeholder:text-zinc-500"
@@ -1134,7 +1130,6 @@ export function CalendarViewsPanel({
   );
   const [sidebarJumpRequestId, setSidebarJumpRequestId] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   const calendarSearchTasks = useMemo(() => {
     if (searchTasks) return searchTasks;
@@ -1151,17 +1146,6 @@ export function CalendarViewsPanel({
         : [],
     );
   }, [searchTasks, tasks]);
-
-  useEffect(() => {
-    if (searchQuery.trim()) {
-      setIsSearchOpen(true);
-    }
-  }, [searchQuery]);
-
-  const handleCalendarSearchClose = useCallback(() => {
-    setIsSearchOpen(false);
-    setSearchQuery("");
-  }, []);
 
   useEffect(() => {
     if (!persistViewSession) {
@@ -1227,17 +1211,17 @@ export function CalendarViewsPanel({
 
   const handleCalendarSearchSelect = useCallback(
     (task: SearchTask) => {
-      if (!task.dueDate) return;
+      if (task.dueDate) {
+        const focusDate = fromDateKey(task.dueDate);
+        if (focusDate) {
+          handleSidebarFocusDateChange(focusDate);
+          setSidebarJumpRequestId((requestId) => requestId + 1);
+        }
+      }
 
-      const focusDate = fromDateKey(task.dueDate);
-      if (!focusDate) return;
-
-      handleSidebarFocusDateChange(focusDate);
-      setSidebarJumpRequestId((requestId) => requestId + 1);
       onSelectTask(task.id);
-      handleCalendarSearchClose();
     },
-    [handleCalendarSearchClose, handleSidebarFocusDateChange, onSelectTask],
+    [handleSidebarFocusDateChange, onSelectTask],
   );
 
   function handleSidebarSelectDate(date: Date) {
@@ -1292,6 +1276,13 @@ export function CalendarViewsPanel({
         onSelectTask={onSelectTask}
         onToggleTask={onToggleTask}
         checkAnimatingTaskIds={checkAnimatingTaskIds}
+        searchQuery={searchQuery}
+        searchTasks={calendarSearchTasks}
+        onSelectSearchTask={handleCalendarSearchSelect}
+        onDetailsSaved={onDetailsSaved}
+        onTaskHasDetailsKnown={onTaskHasDetailsKnown}
+        onTaskRenamed={onTaskRenamed}
+        onDueDateUpdated={onDueDateUpdated}
         sidebarPosition={sidebarPosition}
         sidebarMinViewportWidth={sidebarMinViewportWidth}
       >
@@ -1322,19 +1313,7 @@ export function CalendarViewsPanel({
         monthNavigation={monthNavigation}
         searchQuery={searchQuery}
         onSearchQueryChange={setSearchQuery}
-        onSearchFocus={() => {
-          if (searchQuery.trim()) {
-            setIsSearchOpen(true);
-          }
-        }}
         periodLabelAction={periodLabelAction}
-      />
-      <CalendarSearchOffcanvas
-        open={isSearchOpen}
-        query={searchQuery}
-        tasks={calendarSearchTasks}
-        onClose={handleCalendarSearchClose}
-        onSelectTask={handleCalendarSearchSelect}
       />
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       {activeView === "month" ? (
@@ -1439,6 +1418,9 @@ export function CalendarViewsPanel({
             defaultListId={defaultListId}
             fullWidth={fullWidth}
             externalDropTargetDateKey={externalDropTargetDateKey}
+            externalDropTargetTimeMinutes={externalDropTargetTimeMinutes}
+            externalDraggingTaskId={externalDraggingTaskId}
+            externalDraggingTaskName={externalDraggingTaskName}
             onPeriodLabelChange={handlePeriodLabelChange}
             {...sidebarSyncProps}
           />,

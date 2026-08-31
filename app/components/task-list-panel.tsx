@@ -1526,11 +1526,11 @@ export function TaskListPanel({
     }
   }
 
-  function handleSaveTaskRecurrence(
+  async function handleSaveTaskRecurrence(
     taskId: string,
     rule: TaskRecurrenceRule | null,
   ) {
-    void onSetTaskRecurrence?.(taskId, rule);
+    await onSetTaskRecurrence?.(taskId, rule);
   }
 
   function handleConvertTaskToNote(taskId: string) {
