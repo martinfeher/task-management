@@ -430,7 +430,7 @@ body {
 }
 
 .search-modal-panel.is-entered .search-modal-body-inner {
-  min-height: min(520px, calc(75vh - 7rem));
+  min-height: min(460px, calc(75vh - 11rem));
 }
 
 @media (prefers-color-scheme: dark) {
@@ -460,7 +460,7 @@ body {
   }
 
   .search-modal-panel.is-entered .search-modal-body-inner {
-    min-height: min(520px, calc(75vh - 7rem));
+    min-height: min(460px, calc(75vh - 11rem));
   }
 }
 
@@ -1110,6 +1110,10 @@ body {
   border: 1px solid rgb(235 235 235);
   box-shadow: var(--calendar-task-hover-preview-shadow);
   animation: calendar-task-preview-in 160ms ease-out;
+}
+
+.calendar-timed-grid-scroll {
+  scrollbar-gutter: stable;
 }
 
 @keyframes format-toolbar-surface-enter-above {

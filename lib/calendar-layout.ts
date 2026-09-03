@@ -41,28 +41,19 @@ export function getCalendarWeekdayLabel(
   return labels[getCalendarMondayFirstDayIndex(date)];
 }
 
-export const CALENDAR_ALL_DAY_ROW_MIN_HEIGHT_PX = 40;
-export const CALENDAR_ALL_DAY_ROW_MAX_HEIGHT_PX = 92;
+export const CALENDAR_ALL_DAY_ROW_HEIGHT_PX = 57;
+export const CALENDAR_ALL_DAY_ROW_MIN_HEIGHT_PX = CALENDAR_ALL_DAY_ROW_HEIGHT_PX;
+export const CALENDAR_ALL_DAY_ROW_MAX_HEIGHT_PX = CALENDAR_ALL_DAY_ROW_HEIGHT_PX;
+export const CALENDAR_HOUR_COLUMN_WIDTH_PX = 49;
 export const CALENDAR_ALL_DAY_CELL_PADDING_CLASS = "p-1.5";
-const CALENDAR_ALL_DAY_CELL_PADDING_Y_PX = 12;
 export const CALENDAR_ALL_DAY_TASK_HEIGHT_PX = 19;
-const CALENDAR_ALL_DAY_TASK_GAP_PX = 4;
 
-export function getCalendarAllDayRowHeightPx(maxStackedItemCount: number) {
-  const itemCount = Math.max(1, maxStackedItemCount);
-  const stackHeight =
-    CALENDAR_ALL_DAY_CELL_PADDING_Y_PX +
-    itemCount * CALENDAR_ALL_DAY_TASK_HEIGHT_PX +
-    Math.max(0, itemCount - 1) * CALENDAR_ALL_DAY_TASK_GAP_PX;
-
-  return Math.max(
-    CALENDAR_ALL_DAY_ROW_MIN_HEIGHT_PX,
-    Math.min(CALENDAR_ALL_DAY_ROW_MAX_HEIGHT_PX, stackHeight),
-  );
+export function getCalendarAllDayRowHeightPx(_maxStackedItemCount = 1) {
+  return CALENDAR_ALL_DAY_ROW_HEIGHT_PX;
 }
 
 export function calendarAllDayLabelCellClassName(extra = "") {
-  return `flex items-start ${CALENDAR_ALL_DAY_CELL_PADDING_CLASS} text-[11px] text-zinc-400 ${extra}`.trim();
+  return `flex items-center justify-center text-center ${CALENDAR_ALL_DAY_CELL_PADDING_CLASS} text-[11px] text-zinc-400 ${extra}`.trim();
 }
 
 export function calendarAllDayCellClassName(extra = "") {
@@ -111,14 +102,45 @@ export function getCalendarShellClassName(
 export const CALENDAR_VIEW_WRAPPER_CLASS = "flex min-h-0 flex-1 flex-col";
 export const CALENDAR_VIEW_SURFACE_CLASS =
   "flex min-h-0 flex-1 flex-col overflow-hidden bg-white dark:bg-zinc-950";
+/** Sticky offset for all-day rows sitting below day headers in week view. */
+export const CALENDAR_WEEK_HEADER_HEIGHT_PX = 62;
+export const CALENDAR_WEEK_HEADER_STICKY_CLASS = "sticky top-0 z-30 bg-white dark:bg-zinc-950";
+export const CALENDAR_WEEK_ALLDAY_STICKY_CLASS =
+  "sticky z-20 bg-white dark:bg-zinc-950";
+/** Sticky offset for all-day rows sitting below day headers in multi-day view. */
+export const CALENDAR_DAYS_HEADER_HEIGHT_PX = 60;
+export const CALENDAR_DAYS_HEADER_STICKY_CLASS =
+  "sticky top-0 z-30 bg-white dark:bg-zinc-950";
+export const CALENDAR_DAYS_ALLDAY_STICKY_CLASS =
+  "sticky z-20 bg-white dark:bg-zinc-950";
 export const CALENDAR_TIMED_GRID_SCROLL_CLASS =
-  "min-h-0 flex-1 overflow-y-auto overflow-x-auto";
+  "calendar-timed-grid-scroll min-h-0 flex-1 overflow-auto";
 
 export const CALENDAR_DAY_COLUMN_DIVIDER_CLASS =
   "border-r border-zinc-200 dark:border-zinc-800";
 
 export const CALENDAR_HOUR_COLUMN_DIVIDER_CLASS =
   "border-r border-zinc-200 dark:border-zinc-800";
+
+export function formatCalendarHourLabel(hour: number) {
+  return String(hour).padStart(2, "0");
+}
+
+export function getCalendarTimedGridTemplateColumns(dayCount: number) {
+  return `${CALENDAR_HOUR_COLUMN_WIDTH_PX}px repeat(${dayCount}, minmax(0, 1fr))`;
+}
+
+export function getCalendarSingleDayGridTemplateColumns() {
+  return `${CALENDAR_HOUR_COLUMN_WIDTH_PX}px minmax(0, 1fr)`;
+}
+
+export function calendarHourLabelCellClassName(extra = "") {
+  return `relative text-center text-[11px] leading-none tabular-nums text-zinc-400 dark:text-zinc-500 ${extra}`.trim();
+}
+
+export function calendarHourLabelClassName(extra = "") {
+  return `absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 bg-white px-0.5 dark:bg-zinc-950 ${extra}`.trim();
+}
 
 export function getCalendarDayColumnDividerClass(
   dayIndex: number,

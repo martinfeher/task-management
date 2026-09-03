@@ -403,7 +403,7 @@ function MonthGrid({
               onClick={() => onSelectDate(day)}
               className={`relative mx-auto flex size-[29px] items-center justify-center rounded-full text-[13px] transition-colors cursor-pointer ${
                 isSelected
-                  ? "bg-slate-400 font-medium text-white"
+                  ? "bg-[#87a1cb] font-medium text-white"
                   : isSunday
                     ? "font-medium text-orange-700 hover:bg-slate-100 dark:hover:bg-zinc-800"
                     : "text-zinc-600 hover:bg-slate-100 dark:text-zinc-100 dark:hover:bg-zinc-800"

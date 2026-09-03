@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { CALENDAR_HOUR_COLUMN_WIDTH_PX } from "@/lib/calendar-layout";
 
 const CALENDAR_NOW_ACCENT = "#34a853";
 
@@ -25,7 +26,7 @@ type CalendarCurrentTimeLineProps = {
 export function CalendarCurrentTimeLine({
   now,
   top,
-  labelColumnWidth = 56,
+  labelColumnWidth = CALENDAR_HOUR_COLUMN_WIDTH_PX,
   className = "absolute inset-x-0 z-20",
   style,
   showLabel = true,

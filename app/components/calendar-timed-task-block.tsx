@@ -767,7 +767,7 @@ export function CalendarTimedTaskBlock({
               },
             );
           }}
-          className={`flex h-full flex-col justify-start overflow-hidden py-0.5 text-left leading-tight border border-white ${CALENDAR_TASK_FONT_CLASS} ${
+          className={`flex h-full flex-col justify-start overflow-hidden py-0.5 text-left leading-tight ${CALENDAR_TASK_FONT_CLASS} ${
             canInteract ? "cursor-move touch-none" : ""
           }`}
           style={{

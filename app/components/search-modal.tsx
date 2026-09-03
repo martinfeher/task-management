@@ -48,12 +48,14 @@ const SEARCH_RESULT_LIMIT = 50;
 const SEARCH_QUERY_SAVE_MS = 400;
 const detailsCache = new Map<string, string>();
 
-type SearchScope = "all" | "names" | "content";
+type SearchScope = "all" | "names" | "content" | "tasks" | "notes";
 
 const SEARCH_SCOPE_TABS: { id: SearchScope; label: string }[] = [
   { id: "all", label: "All" },
   { id: "names", label: "Names" },
-  { id: "content", label: "Task content" },
+  { id: "content", label: "Content" },
+  { id: "tasks", label: "Task" },
+  { id: "notes", label: "Notes" },
 ];
 
 type IndexedSearchTask = SearchTask & {
@@ -91,11 +93,22 @@ function buildSearchIndex(tasks: SearchTask[]) {
   });
 }
 
+function taskMatchesEntityType(
+  task: IndexedSearchTask,
+  scope: SearchScope,
+) {
+  if (scope === "tasks") return !task.isNote;
+  if (scope === "notes") return task.isNote;
+  return true;
+}
+
 function taskMatchesScope(
   task: IndexedSearchTask,
   query: string,
   scope: SearchScope,
 ) {
+  if (!taskMatchesEntityType(task, scope)) return false;
+
   const trimmed = query.trim().toLowerCase();
   const nameMatch = task.normalizedName.includes(trimmed);
   const contentMatch = task.normalizedDetails.includes(trimmed);
@@ -189,7 +202,7 @@ function SearchModalFooterAction({
 
 function SearchModalFooter() {
   return (
-    <div className="flex shrink-0 flex-wrap items-center gap-x-5 gap-y-2 border-t border-zinc-200 px-4 py-2.5 text-xs text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
+    <div className="flex shrink-0 flex-wrap items-center gap-x-5 gap-y-2 rounded-b-[24px] border-t border-zinc-200 bg-white px-4 py-2.5 text-xs text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
       <SearchModalFooterAction label="Select">
         <SearchModalShortcutKey>
           <LuArrowUp className="size-2.5" aria-hidden="true" />
@@ -616,10 +629,21 @@ export function SearchModal({
   const showSplitLayout = trimmedQuery.length > 0 && results.length > 0;
   const emptyStateMessage =
     searchScope === "names"
-      ? "Start typing to search task names"
+      ? "Start typing to search task and note names"
       : searchScope === "content"
-        ? "Start typing to search task content"
-        : "Start typing to search task names and content";
+        ? "Start typing to search content"
+        : searchScope === "tasks"
+          ? "Start typing to search tasks"
+          : searchScope === "notes"
+            ? "Start typing to search notes"
+            : "Start typing to search task names and content";
+  const noResultsMessage =
+    searchScope === "notes" ? "No notes found" : "No tasks found";
+  const isSearchingContent =
+    searchScope === "content" ||
+    searchScope === "all" ||
+    searchScope === "tasks" ||
+    searchScope === "notes";
   const origin = revealOrigin ?? getDefaultSearchRevealOrigin();
   const revealStyle = {
     "--search-reveal-x": `${origin.x}px`,
@@ -699,10 +723,9 @@ export function SearchModal({
             </p>
           ) : results.length === 0 ? (
             <p className="px-4 py-6 text-sm text-zinc-500 dark:text-zinc-400">
-              {isLoadingDetails &&
-              (searchScope === "content" || searchScope === "all")
-                ? "Searching task content..."
-                : "No tasks found"}
+              {isLoadingDetails && isSearchingContent
+                ? "Searching content..."
+                : noResultsMessage}
             </p>
           ) : (
             <>
@@ -821,9 +844,9 @@ export function SearchModal({
             </>
           )}
             </div>
-            <SearchModalFooter />
           </div>
         </div>
+        <SearchModalFooter />
       </div>
     </div>
   );

@@ -29,10 +29,18 @@ import {
   CALENDAR_VIEW_WRAPPER_CLASS,
   CALENDAR_TIMED_GRID_SCROLL_CLASS,
   CALENDAR_HOUR_COLUMN_DIVIDER_CLASS,
+  formatCalendarHourLabel,
+  calendarHourLabelCellClassName,
+  calendarHourLabelClassName,
   getCalendarDayColumnDividerClass,
   getCalendarTaskItemStyle,
   getCalendarWeekdayLabel,
   CALENDAR_TODAY_DATE_CIRCLE_CLASS,
+  CALENDAR_HOUR_COLUMN_WIDTH_PX,
+  getCalendarTimedGridTemplateColumns,
+  CALENDAR_DAYS_HEADER_HEIGHT_PX,
+  CALENDAR_DAYS_HEADER_STICKY_CLASS,
+  CALENDAR_DAYS_ALLDAY_STICKY_CLASS,
 } from "@/lib/calendar-layout";
 import {
   bindCalendarTaskDrag,
@@ -344,8 +352,8 @@ export function CalendarMultiDayView({
     currentTimeTop >= 0 &&
     currentTimeTop <= (HOUR_END - HOUR_START + 1) * HOUR_HEIGHT_PX;
 
-  const gridTemplateColumns = `56px repeat(${dayCount}, minmax(0, 1fr))`;
-  const minGridWidth = 56 + dayCount * 120;
+  const gridTemplateColumns = getCalendarTimedGridTemplateColumns(dayCount);
+  const minGridWidth = CALENDAR_HOUR_COLUMN_WIDTH_PX + dayCount * 120;
 
   function syncSidebarFocusToVisibleRange(start: Date) {
     if (!today || !onSidebarFocusDateChange) return;
@@ -606,135 +614,136 @@ export function CalendarMultiDayView({
               nextLabel="Next day"
             />
           </div>
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <div className="shrink-0 overflow-x-auto">
-              <div
-                className="grid border-b border-zinc-200 dark:border-zinc-800"
-                style={{ gridTemplateColumns, minWidth: minGridWidth }}
-              >
+          <div ref={timeScrollRef} className={CALENDAR_TIMED_GRID_SCROLL_CLASS}>
+            <div style={{ minWidth: minGridWidth }}>
+              <div className={CALENDAR_DAYS_HEADER_STICKY_CLASS}>
                 <div
-                  className={`bg-white dark:bg-zinc-950 ${CALENDAR_HOUR_COLUMN_DIVIDER_CLASS}`}
-                />
-                {visibleDays.map((day, dayIndex) => {
-                  const isToday = isSameDay(day, today);
-                  return (
-                    <div
-                      key={`head-${toDateKey(day)}`}
-                      className={`bg-white px-2 py-2 text-center dark:bg-zinc-950 ${getCalendarDayColumnDividerClass(dayIndex, visibleDays.length)}`}
-                    >
-                      <div className="text-xs font-medium uppercase tracking-wide text-zinc-400">
-                        {getCalendarWeekdayLabel(day)}
-                      </div>
-                      <div
-                        className={`mt-1 inline-flex size-7 items-center justify-center rounded-full text-sm ${
-                          isToday
-                            ? CALENDAR_TODAY_DATE_CIRCLE_CLASS
-                            : "font-medium text-zinc-700 dark:text-zinc-200"
-                        }`}
-                      >
-                        {day.getDate()}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-            <div className="shrink-0 overflow-x-auto">
-              <div
-                className="grid"
-                style={{ gridTemplateColumns, minWidth: minGridWidth }}
-              >
-                <div
-                  className={calendarAllDayLabelCellClassName(
-                    `bg-white dark:bg-zinc-950 ${CALENDAR_HOUR_COLUMN_DIVIDER_CLASS}`,
-                  )}
-                  style={{ height: allDayRowHeightPx }}
+                  className="grid"
+                  style={{ gridTemplateColumns, minWidth: minGridWidth }}
                 >
-                  All day
-                </div>
-                {visibleDays.map((day, dayIndex) => {
-                  const dateKey = toDateKey(day);
-                  const dayTasks = tasksByDate.get(dateKey)?.allDay ?? [];
-                  const activeDropSlot = getActiveCalendarDropSlot(
-                    dropTargetSlot,
-                    externalDropTargetDateKey,
-                    externalDropTargetTimeMinutes,
-                  );
-                  const isDropTarget =
-                    activeDropSlot?.dateKey === dateKey &&
-                    activeDropSlot.dueTimeMinutes === null;
-                  const isActiveDay =
-                    addTaskPopover !== null && isSameDay(day, addTaskPopover.date);
-                  const isActiveAllDay =
-                    isActiveDay && addTaskPopover?.dueTimeMinutes === null;
-
-                  return (
-                    <div
-                      key={`allday-${dateKey}`}
-                      data-calendar-day={dateKey}
-                      onClick={(event) => handleAllDayClick(event, day)}
-                      className={`${calendarAllDayCellClassName(
-                        `cursor-pointer border-b border-zinc-200 transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900/60 ${getCalendarDayColumnDividerClass(dayIndex, visibleDays.length)} ${
-                        isDropTarget
-                          ? "bg-blue-50 ring-1 ring-inset ring-blue-400 dark:bg-blue-950/30"
-                          : isActiveAllDay
-                            ? "bg-blue-50 ring-1 ring-inset ring-[#4873c7] dark:bg-blue-950/30"
-                            : "bg-white dark:bg-zinc-950"
-                      }`,
-                      )}`}
-                      style={{ height: allDayRowHeightPx }}
-                    >
-                      <div className="space-y-1">
-                        {dayTasks.map((task) => (
-                          <CalendarTaskHoverButton
-                            key={getCalendarTaskKey(task)}
-                            task={task}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              handleCalendarTaskClick(event, task);
-                            }}
-                            onPointerDown={(event) => {
-                              event.stopPropagation();
-                              handleCalendarTaskPointerDown(event, task, day);
-                            }}
-                            className={`${calendarAllDayTaskClassName(
-                              task.id === selectedTaskId,
-                              canDragTasks,
-                            )} calendar-task-row--single-line gap-1 overflow-hidden`}
-                            style={getCalendarTaskItemStyle(task.priority, task.calendarColor)}
-                          >
-                            <CalendarTaskTitle
-                              name={task.name}
-                              recurrenceRule={task.recurrenceRule}
-                            />
-                            <CalendarTaskCompletionCheckbox
-                              task={task}
-                              onToggleTask={onToggleTask}
-                              isCompleting={completingTaskIds?.has(task.id)}
-                              isCheckAnimating={checkAnimatingTaskIds?.has(task.id)}
-                              className="calendar-task-checkbox"
-                            />
-                          </CalendarTaskHoverButton>
-                        ))}
-                        {isActiveAllDay ? (
-                          <div
-                            aria-hidden="true"
-                            className="block h-4 truncate rounded bg-zinc-200/50 px-1.5 text-[11px] text-zinc-400 dark:bg-zinc-700"
-                          >
-                            {draftTaskName.trim() || ""}
-                          </div>
-                        ) : null}
+                  <div className="bg-white dark:bg-zinc-950" />
+                  {visibleDays.map((day, dayIndex) => {
+                    const isToday = isSameDay(day, today);
+                    return (
+                      <div
+                        key={`head-${toDateKey(day)}`}
+                        className={`border-b border-zinc-200 bg-white px-2 py-2 text-center dark:border-zinc-800 dark:bg-zinc-950 ${getCalendarDayColumnDividerClass(dayIndex, visibleDays.length)}`}
+                      >
+                        <div className="text-xs font-medium uppercase tracking-wide text-zinc-400">
+                          {getCalendarWeekdayLabel(day)}
+                        </div>
+                        <div
+                          className={`mt-1 inline-flex size-7 items-center justify-center rounded-full text-sm ${
+                            isToday
+                              ? CALENDAR_TODAY_DATE_CIRCLE_CLASS
+                              : "font-medium text-zinc-700 dark:text-zinc-200"
+                          }`}
+                        >
+                          {day.getDate()}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-            <div ref={timeScrollRef} className={CALENDAR_TIMED_GRID_SCROLL_CLASS}>
-          <div
-            className="relative grid"
-            style={{ gridTemplateColumns, minWidth: minGridWidth }}
-          >
+              <div
+                className={CALENDAR_DAYS_ALLDAY_STICKY_CLASS}
+                style={{ top: CALENDAR_DAYS_HEADER_HEIGHT_PX }}
+              >
+                <div
+                  className="grid"
+                  style={{ gridTemplateColumns, minWidth: minGridWidth }}
+                >
+                  <div
+                    className={calendarAllDayLabelCellClassName(
+                      `bg-white dark:bg-zinc-950 ${CALENDAR_HOUR_COLUMN_DIVIDER_CLASS}`,
+                    )}
+                    style={{ height: allDayRowHeightPx }}
+                  >
+                    All day
+                  </div>
+                  {visibleDays.map((day, dayIndex) => {
+                    const dateKey = toDateKey(day);
+                    const dayTasks = tasksByDate.get(dateKey)?.allDay ?? [];
+                    const activeDropSlot = getActiveCalendarDropSlot(
+                      dropTargetSlot,
+                      externalDropTargetDateKey,
+                      externalDropTargetTimeMinutes,
+                    );
+                    const isDropTarget =
+                      activeDropSlot?.dateKey === dateKey &&
+                      activeDropSlot.dueTimeMinutes === null;
+                    const isActiveDay =
+                      addTaskPopover !== null && isSameDay(day, addTaskPopover.date);
+                    const isActiveAllDay =
+                      isActiveDay && addTaskPopover?.dueTimeMinutes === null;
+
+                    return (
+                      <div
+                        key={`allday-${dateKey}`}
+                        data-calendar-day={dateKey}
+                        onClick={(event) => handleAllDayClick(event, day)}
+                        className={`${calendarAllDayCellClassName(
+                          `cursor-pointer border-b border-zinc-200 transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900/60 ${getCalendarDayColumnDividerClass(dayIndex, visibleDays.length)} ${
+                          isDropTarget
+                            ? "bg-blue-50 ring-1 ring-inset ring-blue-400 dark:bg-blue-950/30"
+                            : isActiveAllDay
+                              ? "bg-blue-50 ring-1 ring-inset ring-[#4873c7] dark:bg-blue-950/30"
+                              : "bg-white dark:bg-zinc-950"
+                        }`,
+                        )}`}
+                        style={{ height: allDayRowHeightPx }}
+                      >
+                        <div className="space-y-1">
+                          {dayTasks.map((task) => (
+                            <CalendarTaskHoverButton
+                              key={getCalendarTaskKey(task)}
+                              task={task}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleCalendarTaskClick(event, task);
+                              }}
+                              onPointerDown={(event) => {
+                                event.stopPropagation();
+                                handleCalendarTaskPointerDown(event, task, day);
+                              }}
+                              className={`${calendarAllDayTaskClassName(
+                                task.id === selectedTaskId,
+                                canDragTasks,
+                              )} calendar-task-row--single-line gap-1 overflow-hidden`}
+                              style={getCalendarTaskItemStyle(task.priority, task.calendarColor)}
+                            >
+                              <CalendarTaskTitle
+                                name={task.name}
+                                recurrenceRule={task.recurrenceRule}
+                              />
+                              <CalendarTaskCompletionCheckbox
+                                task={task}
+                                onToggleTask={onToggleTask}
+                                isCompleting={completingTaskIds?.has(task.id)}
+                                isCheckAnimating={checkAnimatingTaskIds?.has(task.id)}
+                                className="calendar-task-checkbox"
+                              />
+                            </CalendarTaskHoverButton>
+                          ))}
+                          {isActiveAllDay ? (
+                            <div
+                              aria-hidden="true"
+                              className="block h-4 truncate rounded bg-zinc-200/50 px-1.5 text-[11px] text-zinc-400 dark:bg-zinc-700"
+                            >
+                              {draftTaskName.trim() || ""}
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              <div
+                className="relative grid"
+                style={{ gridTemplateColumns, minWidth: minGridWidth }}
+              >
             <div
               ref={hourColumnRef}
               className={`relative ${CALENDAR_HOUR_COLUMN_DIVIDER_CLASS}`}
@@ -742,10 +751,12 @@ export function CalendarMultiDayView({
               {hours.map((hour) => (
                 <div
                   key={hour}
-                  className="relative px-2 py-2 text-[11px] text-zinc-400 dark:text-zinc-500"
+                  className={calendarHourLabelCellClassName()}
                   style={{ height: HOUR_HEIGHT_PX }}
                 >
-                  {String(hour).padStart(2, "0")}:00
+                  <span className={calendarHourLabelClassName()}>
+                    {formatCalendarHourLabel(hour)}
+                  </span>
                 </div>
               ))}
             </div>
@@ -973,7 +984,7 @@ export function CalendarMultiDayView({
                 className="absolute inset-x-0 z-20"
               />
             ) : null}
-          </div>
+              </div>
             </div>
           </div>
         </div>

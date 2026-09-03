@@ -1189,12 +1189,13 @@ export function TaskListPanel({
 
     startTitleEdit(task);
 
-    const selectTaskForClick =
-      onSelectTaskImmediate ?? onSelectTaskQuiet ?? onSelectTask;
+    const selectTaskForClick = isListCalendarOpen
+      ? onSelectTask
+      : (onSelectTaskImmediate ?? onSelectTaskQuiet ?? onSelectTask);
     const taskId = task.id;
     const previousSelectedTaskId = selectedTaskIdRef.current;
     queueMicrotask(() => {
-      if (taskId !== previousSelectedTaskId) {
+      if (taskId !== previousSelectedTaskId || isListCalendarOpen) {
         selectTaskForClick(taskId);
       }
     });

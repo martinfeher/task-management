@@ -2987,7 +2987,7 @@ export function TodoApp({
 
   return (
     <>
-      <div className="flex h-dvh min-h-0 flex-1 overflow-hidden">
+      <div className="flex h-dvh overflow-hidden">
         <Sidebar
           lists={lists}
           labels={visibleLabels}
@@ -3326,6 +3326,26 @@ export function TodoApp({
                   externalDraggingTaskName={
                     calendarExternalDropTarget?.taskName ?? null
                   }
+                />
+              </div>
+            ) : null}
+            {showTaskDetails ? (
+              <div className="flex min-h-0 min-w-[350px] flex-1 flex-col overflow-hidden">
+                <TaskDetailsPanel
+                  taskId={selectedTaskId}
+                  taskSnapshot={selectedTaskSnapshot}
+                  focusNoteAtEndRequest={focusNoteAtEndRequest}
+                  focusTaskTitleRequest={focusTaskTitleRequest}
+                  suppressDetailsTitleFocusRef={suppressDetailsTitleFocusRef}
+                  registerSaveController={registerDetailsSaveController}
+                  onDetailsSaved={handleDetailsSaved}
+                  onTaskHasDetailsKnown={handleTaskHasDetailsKnown}
+                  onTaskRenamed={handleTaskRenamed}
+                  onDueDateUpdated={handleDueDateUpdated}
+                  onToggleTask={toggleTask}
+                  onRecurrenceUpdated={handleRecurrenceUpdated}
+                  onSaveTaskRecurrence={setTaskRecurrence}
+                  onBack={isCompactLayout ? handleCompactBack : undefined}
                 />
               </div>
             ) : null}

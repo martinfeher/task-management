@@ -1,4 +1,10 @@
-import { fromDateKey, startOfDay, toDateKey } from "@/app/components/calendar-mini-month";
+import {
+  fromDateKey,
+  formatSelectedDay,
+  MINI_CALENDAR_LOCALE,
+  startOfDay,
+  toDateKey,
+} from "@/app/components/calendar-mini-month";
 import type { SearchTask, TaskListItem } from "@/app/components/todo-app";
 import {
   getRecurringOccurrenceDateKeys,
@@ -41,25 +47,21 @@ export function formatCalendarTaskDueDateLabel(value: string) {
   if (isSameDay(date, today)) return "Today";
   if (isSameDay(date, tomorrow)) return "Tomorrow";
 
-  return date.toLocaleDateString(undefined, {
+  return new Intl.DateTimeFormat(MINI_CALENDAR_LOCALE, {
     weekday: "short",
     month: "short",
     day: "numeric",
-  });
+  }).format(date);
 }
 
 export function formatCalendarSidebarDateHeading(value: string) {
   const date = fromDateKey(value);
   if (!date) return value;
 
-  return date.toLocaleDateString(undefined, {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  });
+  return formatSelectedDay(date);
 }
 
-function expandCalendarTasksFromDate<T extends SchedulableTask>(
+function collectCalendarTasksFromDate<T extends SchedulableTask>(
   tasks: T[],
   fromDate: Date,
   lookaheadDays = SIDEBAR_OCCURRENCE_LOOKAHEAD_DAYS,
@@ -67,7 +69,7 @@ function expandCalendarTasksFromDate<T extends SchedulableTask>(
   const fromKey = toDateKey(startOfDay(fromDate));
   const rangeEnd = startOfDay(fromDate);
   rangeEnd.setDate(rangeEnd.getDate() + lookaheadDays);
-  const expanded: T[] = [];
+  const collected: T[] = [];
 
   for (const task of tasks) {
     if (!task.dueDate) continue;
@@ -77,7 +79,7 @@ function expandCalendarTasksFromDate<T extends SchedulableTask>(
 
     if (!rule) {
       if (anchorKey >= fromKey) {
-        expanded.push(task);
+        collected.push(task);
       }
       continue;
     }
@@ -88,18 +90,16 @@ function expandCalendarTasksFromDate<T extends SchedulableTask>(
       startOfDay(fromDate),
       rangeEnd,
     );
+    const nextKey = occurrenceKeys.find((key) => key >= fromKey);
+    if (!nextKey) continue;
 
-    for (const dateKey of occurrenceKeys) {
-      if (dateKey < fromKey) continue;
-
-      expanded.push({
-        ...task,
-        dueDate: `${dateKey}T12:00:00.000Z`,
-      });
-    }
+    collected.push({
+      ...task,
+      dueDate: `${nextKey}T12:00:00.000Z`,
+    });
   }
 
-  return expanded;
+  return collected;
 }
 
 export function expandCalendarSearchTasksFromDate(
@@ -107,7 +107,7 @@ export function expandCalendarSearchTasksFromDate(
   fromDate: Date,
   lookaheadDays = SIDEBAR_OCCURRENCE_LOOKAHEAD_DAYS,
 ): SearchTask[] {
-  return expandCalendarTasksFromDate(tasks, fromDate, lookaheadDays);
+  return collectCalendarTasksFromDate(tasks, fromDate, lookaheadDays);
 }
 
 export function compareCalendarTaskSchedule(a: SchedulableTask, b: SchedulableTask) {
@@ -138,8 +138,8 @@ export function getCalendarSidebarUpcomingTasks(
   tasks: TaskListItem[],
   fromDate: Date,
 ) {
-  const expanded = expandCalendarTasksFromDate(tasks, fromDate);
-  return [...expanded].sort(compareCalendarTaskSchedule);
+  const upcoming = collectCalendarTasksFromDate(tasks, fromDate);
+  return [...upcoming].sort(compareCalendarTaskSchedule);
 }
 
 export type CalendarSidebarTaskGroup = {

@@ -58,6 +58,8 @@ export function getFullMonthDays(year: number, month: number) {
 
 const MINI_CALENDAR_LOCALE = "en-US";
 
+export { MINI_CALENDAR_LOCALE };
+
 export function formatMonthYear(date: Date) {
   return new Intl.DateTimeFormat(MINI_CALENDAR_LOCALE, {
     month: "long",
@@ -206,7 +208,7 @@ export function CalendarMiniMonth({
         {MINI_WEEKDAY_LABELS.map((label, index) => (
           <div
             key={`${label}-${index}`}
-            className={`flex h-[21px] items-center justify-center text-[12px] ${
+            className={`flex h-[21px] items-center justify-center text-[12px] mb-2 ${
               index === todayWeekdayIndex
                 ? "text-[#618fea] font-500 dark:text-[#7da2ff]"
                 : "text-zinc-500"

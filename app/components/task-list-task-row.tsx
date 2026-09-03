@@ -540,15 +540,22 @@ export function TaskListTaskRow({
 
       {task.isNote ? (
         <span
-          className="task-list-checkbox flex size-[24px] shrink-0 items-center  text-[#979797]"
+          className="group/note-icon relative task-list-checkbox flex size-[24px] shrink-0 items-center text-[#979797]"
           aria-label="Note"
-          title="Note"
+          aria-describedby={`note-icon-tooltip-${task.id}`}
         >
           <CiStickyNote
             aria-hidden="true"
             className="shrink-0 size-[19px]"
-            style={{ transform: "scaleX(0.815)" }}
+            style={{ transform: "scaleX(0.785)" }}
           />
+          <span
+            id={`note-icon-tooltip-${task.id}`}
+            role="tooltip"
+            className="add-task-date-tooltip pointer-events-none absolute bottom-[calc(100%+10px)] left-1/2 z-40 -translate-x-1/2 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity group-hover/note-icon:opacity-100"
+          >
+            Note
+          </span>
         </span>
       ) : (
         <TaskCompletionCheckbox
@@ -570,7 +577,7 @@ export function TaskListTaskRow({
       )}
 
       <div
-        className={`ml-[7px] flex min-w-0 flex-1 flex-col justify-center ${checkedContentDim}`}
+        className={`${task.isNote ? "ml-0" : "ml-[7px]"} flex min-w-0 flex-1 flex-col justify-center ${checkedContentDim}`}
         style={{ transition: dimTransition }}
       >
         {editingTaskId === task.id ? (

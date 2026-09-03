@@ -60,6 +60,10 @@ import {
   CALENDAR_VIEW_WRAPPER_CLASS,
   getCalendarAllDayRowHeightPx,
   getCalendarShellClassName,
+  formatCalendarHourLabel,
+  calendarHourLabelCellClassName,
+  calendarHourLabelClassName,
+  getCalendarSingleDayGridTemplateColumns,
 } from "@/lib/calendar-layout";
 import type { CalendarSidebarSyncProps } from "./calendar-view-sidebar-layout";
 
@@ -128,11 +132,6 @@ function toDateKey(date: Date) {
 function fromDateKey(value: string) {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : startOfDay(date);
-}
-
-function formatHourLabel(hour: number) {
-  if (hour === 12) return "Noon";
-  return `${String(hour).padStart(2, "0")}:00`;
 }
 
 export function CalendarDayView({
@@ -566,7 +565,10 @@ export function CalendarDayView({
             />
           </div>
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <div className="grid w-full shrink-0 grid-cols-[56px_minmax(0,1fr)]">
+        <div
+          className="grid w-full shrink-0"
+          style={{ gridTemplateColumns: getCalendarSingleDayGridTemplateColumns() }}
+        >
           <div
             className={calendarAllDayLabelCellClassName(
               "shrink-0 bg-white dark:bg-zinc-950",
@@ -629,15 +631,20 @@ export function CalendarDayView({
 
         <div ref={timeScrollRef} className="overflow-y-auto h-screen">
 
-          <div className="relative grid w-full min-w-[420px] grid-cols-[56px_minmax(0,1fr)]">
+          <div
+            className="relative grid w-full min-w-[420px]"
+            style={{ gridTemplateColumns: getCalendarSingleDayGridTemplateColumns() }}
+          >
             <div className="relative">
               {hours.map((hour) => (
                 <div
                   key={hour}
-                  className="px-2 py-2 text-[11px] text-zinc-400 dark:text-zinc-500"
+                  className={calendarHourLabelCellClassName()}
                   style={{ height: HOUR_HEIGHT_PX }}
                 >
-                  {formatHourLabel(hour)}
+                  <span className={calendarHourLabelClassName()}>
+                    {formatCalendarHourLabel(hour)}
+                  </span>
                 </div>
               ))}
 

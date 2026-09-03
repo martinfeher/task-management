@@ -253,7 +253,7 @@ function getFormatToolbarPopoverClass(formatMenu: FormatMenuState) {
 const FORMAT_TOOLBAR_ROW_CLASS = "flex items-center gap-0.5 px-1.5 py-1";
 
 const FORMAT_TOOLBAR_TEXT_BUTTON_CLASS =
-  `flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-[16px] ${FORMAT_TOOLBAR_ICON_COLOR} transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800`;
+  `flex h-8 min-w-8 items-center justify-center rounded-[9px] px-2 cursor-pointer text-[16px] ${FORMAT_TOOLBAR_ICON_COLOR} transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800`;
 
 const FORMAT_TOOLBAR_ICON_BUTTON_CLASS =
   `flex h-8 w-8 items-center justify-center rounded-lg ${FORMAT_TOOLBAR_ICON_COLOR} transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800`;
