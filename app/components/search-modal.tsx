@@ -14,6 +14,7 @@ import { BiSearch } from "react-icons/bi";
 import { LuArrowDown, LuArrowUp, LuCornerDownLeft } from "react-icons/lu";
 import { fetchTaskById } from "@/lib/task-details-api";
 import { buildTodoPath } from "@/lib/todo-routes";
+import { openInNewTabFromClick } from "@/lib/open-in-new-tab";
 import { taskDetailsHasContent } from "@/lib/task-details-content";
 import {
   fetchLastSearchQuery,
@@ -229,9 +230,14 @@ function SearchModalFooter() {
 type SearchTaskPreviewPanelProps = {
   task: SearchTask | null;
   onOpenTask?: (task: SearchTask) => void;
+  onClose?: () => void;
 };
 
-function SearchTaskPreviewPanel({ task, onOpenTask }: SearchTaskPreviewPanelProps) {
+function SearchTaskPreviewPanel({
+  task,
+  onOpenTask,
+  onClose,
+}: SearchTaskPreviewPanelProps) {
   const taskId = task?.id ?? null;
   const details = task?.details ?? "";
   const hasDetails = task?.hasDetails ?? false;
@@ -308,8 +314,21 @@ function SearchTaskPreviewPanel({ task, onOpenTask }: SearchTaskPreviewPanelProp
     : (fetchedDetails ?? detailsCache.get(task.id) ?? "");
   const hasContent = taskDetailsHasContent(previewDetails);
 
-  function handleOpenTask() {
-    if (task && onOpenTask) {
+  function handleOpenTask(event?: React.MouseEvent) {
+    if (!task) return;
+
+    if (
+      event &&
+      openInNewTabFromClick(
+        event,
+        buildTodoPath({ kind: "task", taskId: task.id }),
+      )
+    ) {
+      onClose?.();
+      return;
+    }
+
+    if (onOpenTask) {
       onOpenTask(task);
     }
   }
@@ -318,7 +337,7 @@ function SearchTaskPreviewPanel({ task, onOpenTask }: SearchTaskPreviewPanelProp
     <div className="flex h-full flex-col overflow-hidden">
       <button
         type="button"
-        onClick={handleOpenTask}
+        onClick={(event) => handleOpenTask(event)}
         className="border-b border-zinc-100 px-5 py-4 text-left transition-colors hover:bg-zinc-100/80 dark:border-zinc-800 dark:hover:bg-zinc-800/50 cursor-pointer"
       >
         <h3
@@ -336,7 +355,7 @@ function SearchTaskPreviewPanel({ task, onOpenTask }: SearchTaskPreviewPanelProp
       </button>
       <button
         type="button"
-        onClick={handleOpenTask}
+        onClick={(event) => handleOpenTask(event)}
         className="min-h-0 overflow-y-auto px-5 py-4 text-left transition-colors hover:bg-zinc-100/60 dark:hover:bg-zinc-800/30 cursor-pointer"
       >
         {isLoading ? (
@@ -576,7 +595,18 @@ export function SearchModal({
     };
   }, [activeIndex, onClose, open, results]);
 
-  function selectTask(task: SearchTask) {
+  function selectTask(task: SearchTask, event?: React.MouseEvent) {
+    if (
+      event &&
+      openInNewTabFromClick(
+        event,
+        buildTodoPath({ kind: "task", taskId: task.id }),
+      )
+    ) {
+      onClose();
+      return;
+    }
+
     onSelectTask(task.id, task.listId);
     onClose();
   }
@@ -806,7 +836,7 @@ export function SearchModal({
                             />
                             <button
                               type="button"
-                              onClick={() => selectTask(task)}
+                              onClick={(event) => selectTask(task, event)}
                               className="min-w-0 flex-1 py-2.5 text-left"
                             >
                               <span
@@ -837,7 +867,8 @@ export function SearchModal({
                 <div className="min-h-0 min-w-0 flex-1 bg-zinc-50/60 dark:bg-zinc-950/40">
                   <SearchTaskPreviewPanel
                     task={previewTask}
-                    onOpenTask={selectTask}
+                    onOpenTask={(task) => selectTask(task)}
+                    onClose={onClose}
                   />
                 </div>
               </div>

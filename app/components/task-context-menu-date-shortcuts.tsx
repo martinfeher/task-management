@@ -1,5 +1,6 @@
 "use client";
 
+import { useId, type MouseEvent, type ReactNode } from "react";
 import { BiSun } from "react-icons/bi";
 import {
   getNextWeekendSaturdayDateKey,
@@ -60,23 +61,65 @@ function CustomDateIcon({ className }: { className?: string }) {
   );
 }
 
+function DateShortcutButton({
+  label,
+  tooltipId,
+  tooltipAlign = "center",
+  onClick,
+  children,
+}: {
+  label: string;
+  tooltipId: string;
+  tooltipAlign?: "start" | "center" | "end";
+  onClick: (event: MouseEvent<HTMLButtonElement>) => void;
+  children: ReactNode;
+}) {
+  const tooltipPositionClass =
+    tooltipAlign === "start"
+      ? "left-0 task-context-menu-tooltip-start"
+      : tooltipAlign === "end"
+        ? "right-0 left-auto task-context-menu-tooltip-end"
+        : "left-1/2 -translate-x-1/2";
+
+  return (
+    <div className="group/date-option relative cursor-pointer">
+      <button
+        type="button"
+        aria-label={label}
+        aria-describedby={tooltipId}
+        className="flex size-8 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800"
+        onClick={onClick}
+      >
+        {children}
+      </button>
+      <span
+        id={tooltipId}
+        role="tooltip"
+        className={`add-task-date-tooltip pointer-events-none absolute bottom-[calc(100%+6px)] z-50 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity group-hover/date-option:opacity-100 ${tooltipPositionClass}`}
+      >
+        {label}
+      </span>
+    </div>
+  );
+}
+
 export function TaskContextMenuDateShortcuts({
   onSelectDate,
   onOpenCustomDatePicker,
 }: TaskContextMenuDateShortcutsProps) {
   const todayDay = new Date().getDate();
+  const tooltipBaseId = useId();
 
   return (
-    <div className="px-3 py-2">
-      <div className="mb-[3px] text-xs font-medium text-zinc-350 dark:text-zinc-500">
+    <div className="overflow-visible px-3 pt-[6px]">
+      <div className="mb-[1px] text-[11px] font-medium text-zinc-350 dark:text-zinc-500">
         Date
       </div>
-      <div className="flex items-center justify-between">
-        <button
-          type="button"
-          aria-label="Set date to today"
-          title="Today"
-          className="flex size-8 items-center justify-center rounded-full transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800"
+      <div className="flex items-center justify-between overflow-visible">
+        <DateShortcutButton
+          label="Today"
+          tooltipId={`${tooltipBaseId}-today`}
+          tooltipAlign="start"
           onClick={(event) => {
             event.stopPropagation();
             onSelectDate(getTodayDateKey());
@@ -86,43 +129,38 @@ export function TaskContextMenuDateShortcuts({
             day={todayDay}
             className="size-[22px] text-emerald-500"
           />
-        </button>
-        <button
-          type="button"
-          aria-label="Set date to tomorrow"
-          title="Tomorrow"
-          className="flex size-8 items-center justify-center rounded-full transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800"
+        </DateShortcutButton>
+        <DateShortcutButton
+          label="Tomorrow"
+          tooltipId={`${tooltipBaseId}-tomorrow`}
           onClick={(event) => {
             event.stopPropagation();
             onSelectDate(getTomorrowDateKey());
           }}
         >
           <BiSun className="size-[22px] text-amber-600" aria-hidden="true" />
-        </button>
-        <button
-          type="button"
-          aria-label="Set date to next weekend"
-          title="Next weekend"
-          className="flex size-8 items-center justify-center rounded-full transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800"
+        </DateShortcutButton>
+        <DateShortcutButton
+          label="Next weekend"
+          tooltipId={`${tooltipBaseId}-next-weekend`}
           onClick={(event) => {
             event.stopPropagation();
             onSelectDate(getNextWeekendSaturdayDateKey());
           }}
         >
           <WeekendSofaIcon className="size-[22px] text-[#5b8def]" />
-        </button>
-        <button
-          type="button"
-          aria-label="Pick a custom date"
-          title="Pick date"
-          className="flex size-8 items-center justify-center rounded-full transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800"
+        </DateShortcutButton>
+        <DateShortcutButton
+          label="Custom date"
+          tooltipId={`${tooltipBaseId}-custom-date`}
+          tooltipAlign="end"
           onClick={(event) => {
             event.stopPropagation();
             onOpenCustomDatePicker();
           }}
         >
           <CustomDateIcon className="size-[22px] text-zinc-400" />
-        </button>
+        </DateShortcutButton>
       </div>
     </div>
   );

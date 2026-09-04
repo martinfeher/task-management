@@ -8,6 +8,7 @@ import {
   createTask,
   createSubtask,
   createTodoList,
+  deleteTask as deleteTaskInDb,
   deleteLabel as deleteLabelInDb,
   deleteTodoList,
   getLabels,
@@ -2622,6 +2623,119 @@ export function TodoApp({
     return updatedLabels;
   }
 
+  function findTaskListId(taskId: string) {
+    for (const [listId, listTasks] of Object.entries(tasksByList)) {
+      if (listTasks.some((item) => item.id === taskId)) {
+        return listId;
+      }
+    }
+
+    return null;
+  }
+
+  function getSubtaskInsertIndex(tasks: Task[], parentId: string) {
+    const parentIndex = tasks.findIndex((item) => item.id === parentId);
+    if (parentIndex < 0) return tasks.length;
+
+    let insertIndex = parentIndex + 1;
+    while (
+      insertIndex < tasks.length &&
+      tasks[insertIndex]?.parentId === parentId
+    ) {
+      insertIndex += 1;
+    }
+
+    return insertIndex;
+  }
+
+  async function addSubtask(parentId: string): Promise<TaskListItem | null> {
+    const parentListId = findTaskListId(parentId);
+    if (!parentListId) return null;
+
+    const parentTask = (tasksByList[parentListId] ?? []).find(
+      (item) => item.id === parentId,
+    );
+    if (!parentTask || parentTask.parentId || parentTask.isNote) {
+      return null;
+    }
+
+    try {
+      const subtask = await createSubtask(parentId, "Subtask");
+      const newTask: TaskListItem = {
+        id: subtask.id,
+        name: subtask.name,
+        completed: false,
+        details: "",
+        hasDetails: false,
+        dueDate: null,
+        dueTimeMinutes: null,
+        dueDurationMinutes: null,
+        dueTimeZone: "floating",
+        calendarColor: null,
+        recurrenceRule: null,
+        priority: null,
+        pinned: false,
+        important: false,
+        isNote: false,
+        parentId: subtask.parentId,
+        labels: [],
+        listId: parentListId,
+        listName: lists.find((list) => list.id === parentListId)?.name,
+      };
+
+      setTasksByList((current) => {
+        const listTasks = current[parentListId] ?? [];
+        const insertIndex = getSubtaskInsertIndex(listTasks, parentId);
+
+        return {
+          ...current,
+          [parentListId]: [
+            ...listTasks.slice(0, insertIndex),
+            newTask,
+            ...listTasks.slice(insertIndex),
+          ],
+        };
+      });
+
+      return newTask;
+    } catch {
+      return null;
+    }
+  }
+
+  async function deleteTaskById(taskId: string) {
+    const listId = findTaskListId(taskId);
+    if (!listId) return;
+
+    const listTasks = tasksByList[listId] ?? [];
+    const childIds = listTasks
+      .filter((item) => item.parentId === taskId)
+      .map((item) => item.id);
+    const removedIds = new Set([taskId, ...childIds]);
+
+    if (selectedTaskId && removedIds.has(selectedTaskId)) {
+      await detailsSaveControllerRef.current?.flushSave();
+    }
+
+    await deleteTaskInDb(taskId);
+
+    setTasksByList((current) => {
+      const next = { ...current };
+
+      for (const currentListId of Object.keys(next)) {
+        next[currentListId] = next[currentListId].filter(
+          (item) => !removedIds.has(item.id),
+        );
+      }
+
+      return next;
+    });
+
+    if (selectedTaskId && removedIds.has(selectedTaskId)) {
+      setSelectedTaskId(null);
+    }
+  }
+
   async function moveTaskToList(
     taskId: string,
     sourceListId: string,
@@ -3120,6 +3234,8 @@ export function TodoApp({
                   onSetTaskPinned={setTaskPinned}
                   onSetTaskImportant={setTaskImportant}
                   onConvertTaskToNote={toggleTaskNoteType}
+                  onAddSubtask={addSubtask}
+                  onDeleteTask={deleteTaskById}
                   onToggleTaskLabel={toggleTaskLabel}
                   onLabelsChanged={refreshLabels}
                   onMoveTaskToList={moveTaskToList}
@@ -3263,6 +3379,8 @@ export function TodoApp({
                 onSetTaskPinned={setTaskPinned}
                 onSetTaskImportant={setTaskImportant}
                 onConvertTaskToNote={toggleTaskNoteType}
+                onAddSubtask={addSubtask}
+                onDeleteTask={deleteTaskById}
                 onToggleTaskLabel={toggleTaskLabel}
                 onLabelsChanged={refreshLabels}
                 onMoveTaskToList={moveTaskToList}

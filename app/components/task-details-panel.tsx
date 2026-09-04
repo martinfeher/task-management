@@ -78,9 +78,11 @@ import {
 } from "./detail-image-resize";
 import {
   applyLinkToSelection,
+  findDetailLinkFromTarget,
   getLinkEditorState,
   getLinkFromSelection,
   normalizeLinks,
+  openDetailLinkInNewTab,
   removeLinkFromSelection,
 } from "./detail-links";
 import {
@@ -250,13 +252,19 @@ function getFormatToolbarPopoverClass(formatMenu: FormatMenuState) {
   return `format-toolbar-popover format-toolbar-popover--${placement} format-toolbar-popover--${align}`;
 }
 
+const TASK_DETAILS_BLOCK_MENU_CLASS =
+  "task-details-block-menu fixed z-50 min-w-[168px] py-0!";
+
+const TASK_DETAILS_BLOCK_MENU_ITEM_CLASS =
+  "flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-900 hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800";
+
 const FORMAT_TOOLBAR_ROW_CLASS = "flex items-center gap-0.5 px-1.5 py-1";
 
 const FORMAT_TOOLBAR_TEXT_BUTTON_CLASS =
   `flex h-8 min-w-8 items-center justify-center rounded-[9px] px-2 cursor-pointer text-[16px] ${FORMAT_TOOLBAR_ICON_COLOR} transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800`;
 
 const FORMAT_TOOLBAR_ICON_BUTTON_CLASS =
-  `flex h-8 w-8 items-center justify-center rounded-lg ${FORMAT_TOOLBAR_ICON_COLOR} transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800`;
+  `flex h-8 w-8 items-center justify-center rounded-lg ${FORMAT_TOOLBAR_ICON_COLOR} transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer`;
 
 const TASK_DETAILS_DATE_MENU_HOVER_CLOSE_MS = 120;
 
@@ -2838,12 +2846,6 @@ export function TaskDetailsPanel({
     }
 
     requestAnimationFrame(() => {
-      if (state.hasExistingLink || state.text) {
-        linkTextInputRef.current?.focus();
-        linkTextInputRef.current?.select();
-        return;
-      }
-
       linkUrlInputRef.current?.focus();
       linkUrlInputRef.current?.select();
     });
@@ -3937,13 +3939,8 @@ export function TaskDetailsPanel({
     syncEditorLineEmptyState(editor);
 
     requestAnimationFrame(() => {
-      if (state.text) {
-        linkTextInputRef.current?.focus();
-        linkTextInputRef.current?.select();
-        return;
-      }
-
       linkUrlInputRef.current?.focus();
+      linkUrlInputRef.current?.select();
     });
   }
 
@@ -4276,6 +4273,16 @@ export function TaskDetailsPanel({
   function handleEditorMouseDown(event: React.MouseEvent<HTMLDivElement>) {
     const editor = editorRef.current;
     if (!editor) return;
+
+    const link = findDetailLinkFromTarget(event.target, editor);
+    if (link) {
+      if (event.metaKey || event.ctrlKey) {
+        event.preventDefault();
+        event.stopPropagation();
+        openDetailLinkInNewTab(link);
+      }
+      return;
+    }
 
     beginEditorPointerInteraction();
 
@@ -4691,10 +4698,10 @@ export function TaskDetailsPanel({
       return;
     }
 
-    const link = (event.target as HTMLElement).closest("a.detail-link");
-    if (link instanceof HTMLAnchorElement && (event.metaKey || event.ctrlKey)) {
+    const link = findDetailLinkFromTarget(event.target, editor);
+    if (link && (event.metaKey || event.ctrlKey)) {
       event.preventDefault();
-      window.open(link.href, "_blank", "noopener,noreferrer");
+      openDetailLinkInNewTab(link);
       return;
     }
 
@@ -5214,7 +5221,7 @@ export function TaskDetailsPanel({
               onKeyDown={handleEditorKeyDown}
               onKeyUp={handleEditorKeyUp}
               onScroll={updateLineControls}
-              className="task-details-editor min-h-[650px] w-full resize-y overflow-auto rounded-xl bg-white py-2 pl-[30px] pr-3 text-[17px] leading-[1.75] text-[#555555] outline-none transition-colors dark:bg-zinc-950 dark:text-zinc-300 [&_.detail-line[data-line-type=bullet]]:pl-1 [&_.detail-line[data-line-type=checklist]]:cursor-pointer [&_.detail-line[data-line-type=checklist]]:pl-1 [&_.detail-line[data-line-type=h1]]:text-[24px] [&_.detail-line[data-line-type=h1]]:font-bold [&_.detail-line[data-line-type=h1]]:leading-[32px] [&_.detail-line[data-line-type=h1]]:text-[#4B4B4B] dark:[&_.detail-line[data-line-type=h1]]:text-[#F5F5F5] [&_.detail-line[data-line-type=h2]]:text-[1.3125rem] [&_.detail-line[data-line-type=h2]]:font-semibold [&_.detail-line[data-line-type=h2]]:leading-[1.6875rem] [&_.detail-line[data-line-type=h3]]:text-[1.125rem] [&_.detail-line[data-line-type=h3]]:font-semibold [&_.detail-line[data-line-type=h3]]:leading-[1.5rem] [&_.detail-line[data-line-type=numbered]]:pl-1 [&_mark]:bg-yellow-200 dark:[&_mark]:bg-yellow-300/30 [&_s]:line-through [&_strike]:line-through [&_u]:underline"
+              className="task-details-editor min-h-[650px] w-full resize-y overflow-auto rounded-xl bg-white py-2 pl-[30px] pr-3 text-[17px] leading-[1.75] text-[#555555] outline-none transition-colors dark:bg-zinc-950 dark:text-zinc-300 [&_.detail-line[data-line-type=bullet]]:pl-1 [&_.detail-line[data-line-type=checklist]]:cursor-pointer [&_.detail-line[data-line-type=checklist]]:pl-1 [&_.detail-line[data-line-type=h1]]:text-[28px] [&_.detail-line[data-line-type=h1]]:font-bold [&_.detail-line[data-line-type=h1]]:leading-[36px] [&_.detail-line[data-line-type=h1]]:text-[#4B4B4B] dark:[&_.detail-line[data-line-type=h1]]:text-[#F5F5F5] [&_.detail-line[data-line-type=h2]]:text-[23px] [&_.detail-line[data-line-type=h2]]:font-semibold [&_.detail-line[data-line-type=h2]]:leading-[30px] [&_.detail-line[data-line-type=h3]]:text-[19px] [&_.detail-line[data-line-type=h3]]:font-semibold [&_.detail-line[data-line-type=h3]]:leading-[26px] [&_.detail-line[data-line-type=numbered]]:pl-1 [&_mark]:bg-yellow-200 dark:[&_mark]:bg-yellow-300/30 [&_s]:line-through [&_strike]:line-through [&_u]:underline"
             />
 
             {dropIndicator && (
@@ -5278,7 +5285,7 @@ export function TaskDetailsPanel({
         <div
           ref={addBlockMenuRef}
           role="menu"
-          className="fixed z-50 min-w-[168px] rounded-md border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
+          className={TASK_DETAILS_BLOCK_MENU_CLASS}
           style={{ top: addBlockMenu.top, left: addBlockMenu.left }}
         >
           {ADD_BLOCK_OPTIONS.map((option, index) => (
@@ -5292,7 +5299,7 @@ export function TaskDetailsPanel({
               <button
                 type="button"
                 role="menuitem"
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-900 hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800"
+                className={TASK_DETAILS_BLOCK_MENU_ITEM_CLASS}
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => handleInsertBlockType(option.type)}
               >
@@ -5319,7 +5326,7 @@ export function TaskDetailsPanel({
             ref={slashCommandMenuRef}
             role="menu"
             aria-label="Block type commands"
-            className="fixed z-50 min-w-[168px] rounded-md border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
+            className={TASK_DETAILS_BLOCK_MENU_CLASS}
             style={{
               top: slashCommandMenu.top,
               left: slashCommandMenu.left,
@@ -5346,7 +5353,7 @@ export function TaskDetailsPanel({
                 <button
                   type="button"
                   role="menuitem"
-                  className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-900 hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800 ${
+                  className={`${TASK_DETAILS_BLOCK_MENU_ITEM_CLASS} ${
                     index === selectedIndex
                       ? "bg-zinc-100 dark:bg-zinc-800"
                       : ""
@@ -5382,7 +5389,7 @@ export function TaskDetailsPanel({
             }}
           >
           {showLinkMenu ? (
-            <div className="space-y-2 px-2 py-2">
+            <div className="flex w-[min(280px,calc(100vw-2rem))] flex-col gap-2.5 p-2.5">
               <input
                 ref={linkTextInputRef}
                 type="text"
@@ -5390,7 +5397,7 @@ export function TaskDetailsPanel({
                 onChange={(event) => setLinkText(event.target.value)}
                 placeholder="Display text"
                 aria-label="Link display text"
-                className="w-[min(280px,calc(100vw-2rem))] rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-50"
+                className="w-full rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-50"
                 onMouseDown={(event) => event.stopPropagation()}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {
@@ -5411,7 +5418,7 @@ export function TaskDetailsPanel({
                 onChange={(event) => setLinkUrl(event.target.value)}
                 placeholder="Paste or type a link"
                 aria-label="Link URL"
-                className="w-[min(280px,calc(100vw-2rem))] rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-50"
+                className="w-full rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-50"
                 onMouseDown={(event) => event.stopPropagation()}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {
@@ -5614,7 +5621,7 @@ export function TaskDetailsPanel({
                     }}
                   >
                     <LuRemoveFormatting
-                      className={`${FORMAT_TOOLBAR_ICON_SIZE_CLASS} text-[#5e5e66] dark:text-[#ffffff]`}
+                      className={`${FORMAT_TOOLBAR_ICON_SIZE_CLASS} text-[#5e5e66] dark:text-[#ffffff] cursor-pointer`}
                     />
                   </button>
                 </FormatToolbarTooltipWrap>

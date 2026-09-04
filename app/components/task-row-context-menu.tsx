@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { BiChevronRight } from "react-icons/bi";
 import { TaskContextMenuDateShortcuts } from "./task-context-menu-date-shortcuts";
 import { TaskMoveToSelector } from "./task-move-to-selector";
@@ -36,6 +37,8 @@ type TaskRowContextMenuProps = {
   onSelectTaskPriority: (priority: number) => void;
   onClearTaskPriority: () => void;
   onConvertTaskToNote: () => void;
+  onAddSubtask: () => void;
+  onDeleteTask: () => void;
   hasDueDateActions: boolean;
   hasPriorityActions: boolean;
   hasNoteActions: boolean;
@@ -43,6 +46,8 @@ type TaskRowContextMenuProps = {
   hasImportantActions: boolean;
   hasLabelActions: boolean;
   hasMoveActions: boolean;
+  hasSubtaskActions: boolean;
+  hasDeleteActions: boolean;
 };
 
 const menuClassName =
@@ -50,6 +55,9 @@ const menuClassName =
 
 const menuItemClassName =
   "flex h-[35px] w-full items-center px-3 text-left text-sm text-zinc-900 hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800";
+
+const deleteMenuItemClassName =
+  "flex h-[35px] w-full items-center px-3 text-left text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40";
 
 function MainMenuItems({
   task,
@@ -61,16 +69,22 @@ function MainMenuItems({
   hasDueDateActions,
   hasLabelActions,
   hasMoveActions,
+  hasSubtaskActions,
+  hasDeleteActions,
   onClose,
   onToggleTaskPinned,
   onToggleTaskImportant,
   onOpenLabelMenu,
   onOpenMoveMenu,
+  onMoveMouseEnter,
+  onMoveMouseLeave,
   onSetTaskDueDate,
   onOpenCustomDatePicker,
   onSelectTaskPriority,
   onClearTaskPriority,
   onConvertTaskToNote,
+  onAddSubtask,
+  onDeleteTask,
 }: Pick<
   TaskRowContextMenuProps,
   | "task"
@@ -82,6 +96,8 @@ function MainMenuItems({
   | "hasDueDateActions"
   | "hasLabelActions"
   | "hasMoveActions"
+  | "hasSubtaskActions"
+  | "hasDeleteActions"
   | "onClose"
   | "onToggleTaskPinned"
   | "onToggleTaskImportant"
@@ -92,7 +108,12 @@ function MainMenuItems({
   | "onSelectTaskPriority"
   | "onClearTaskPriority"
   | "onConvertTaskToNote"
->) {
+  | "onAddSubtask"
+  | "onDeleteTask"
+> & {
+  onMoveMouseEnter?: () => void;
+  onMoveMouseLeave?: () => void;
+}) {
   const menuWidthClass =
     hasDueDateActions || hasPriorityActions ? "w-[196px]" : "w-36";
   const prioritySelector = hasPriorityActions ? (
@@ -125,17 +146,48 @@ function MainMenuItems({
       ) : null}
       {hasDueDateActions && hasPriorityActions ? prioritySelector : null}
       {!hasDueDateActions && hasPriorityActions ? prioritySelector : null}
-      {hasNoteActions ? (
+      {hasSubtaskActions ? (
         <button
           type="button"
           role="menuitem"
           className={menuItemClassName}
           onClick={(event) => {
             event.stopPropagation();
-            onConvertTaskToNote();
+            onAddSubtask();
           }}
         >
-          {task.isNote ? "turn into Task" : "convert to Note"}
+          Add subtask
+        </button>
+      ) : null}
+      {hasLabelActions ? (
+        <button
+          type="button"
+          role="menuitem"
+          className={menuItemClassName}
+          onClick={(event) => {
+            event.stopPropagation();
+            onOpenLabelMenu();
+          }}
+        >
+          {task.labels.length > 0 ? "Labels" : "Add label"}
+        </button>
+      ) : null}
+      {hasMoveActions ? (
+        <button
+          type="button"
+          role="menuitem"
+          className={`${menuItemClassName} justify-between ${
+            view === "moveTo" ? "bg-zinc-100 dark:bg-zinc-800" : ""
+          }`}
+          onMouseEnter={onMoveMouseEnter}
+          onMouseLeave={onMoveMouseLeave}
+          onClick={(event) => {
+            event.stopPropagation();
+            onOpenMoveMenu();
+          }}
+        >
+          Move to
+          <BiChevronRight className="size-4 shrink-0 text-zinc-400" aria-hidden />
         </button>
       ) : null}
       {hasPinActions ? (
@@ -164,33 +216,30 @@ function MainMenuItems({
           {task.important ? "Remove from important" : "Mark as important"}
         </button>
       ) : null}
-      {hasMoveActions ? (
-        <button
-          type="button"
-          role="menuitem"
-          className={`${menuItemClassName} justify-between ${
-            view === "moveTo" ? "bg-zinc-100 dark:bg-zinc-800" : ""
-          }`}
-          onClick={(event) => {
-            event.stopPropagation();
-            onOpenMoveMenu();
-          }}
-        >
-          Move to
-          <BiChevronRight className="size-4 shrink-0 text-zinc-400" aria-hidden />
-        </button>
-      ) : null}
-      {hasLabelActions ? (
+      {hasNoteActions ? (
         <button
           type="button"
           role="menuitem"
           className={menuItemClassName}
           onClick={(event) => {
             event.stopPropagation();
-            onOpenLabelMenu();
+            onConvertTaskToNote();
           }}
         >
-          {task.labels.length > 0 ? "Labels" : "Add label"}
+          {task.isNote ? "turn into Task" : "convert to Note"}
+        </button>
+      ) : null}
+      {hasDeleteActions ? (
+        <button
+          type="button"
+          role="menuitem"
+          className={deleteMenuItemClassName}
+          onClick={(event) => {
+            event.stopPropagation();
+            onDeleteTask();
+          }}
+        >
+          Delete
         </button>
       ) : null}
     </div>
@@ -223,6 +272,8 @@ export function TaskRowContextMenu({
   onSelectTaskPriority,
   onClearTaskPriority,
   onConvertTaskToNote,
+  onAddSubtask,
+  onDeleteTask,
   hasDueDateActions,
   hasPriorityActions,
   hasNoteActions,
@@ -230,56 +281,92 @@ export function TaskRowContextMenu({
   hasImportantActions,
   hasLabelActions,
   hasMoveActions,
+  hasSubtaskActions,
+  hasDeleteActions,
 }: TaskRowContextMenuProps) {
+  const [isMoveHoverPreviewOpen, setIsMoveHoverPreviewOpen] = useState(false);
+  const moveHoverCloseTimerRef = useRef<number | null>(null);
+
+  const clearMoveHoverCloseTimer = () => {
+    if (moveHoverCloseTimerRef.current !== null) {
+      window.clearTimeout(moveHoverCloseTimerRef.current);
+      moveHoverCloseTimerRef.current = null;
+    }
+  };
+
+  const openMoveHoverPreview = () => {
+    if (!hasMoveActions) return;
+
+    clearMoveHoverCloseTimer();
+    setIsMoveHoverPreviewOpen((current) => {
+      if (!current) {
+        onMoveQueryChange("");
+      }
+      return true;
+    });
+  };
+
+  const scheduleCloseMoveHoverPreview = () => {
+    clearMoveHoverCloseTimer();
+    moveHoverCloseTimerRef.current = window.setTimeout(() => {
+      moveHoverCloseTimerRef.current = null;
+      setIsMoveHoverPreviewOpen(false);
+    }, 120);
+  };
+
+  useEffect(() => {
+    return () => {
+      clearMoveHoverCloseTimer();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (view !== "main") {
+      setIsMoveHoverPreviewOpen(false);
+    }
+  }, [view]);
+
+  const showMoveFlyout = view === "moveTo" || isMoveHoverPreviewOpen;
+
+  const mainMenuProps = {
+    task,
+    view: showMoveFlyout ? ("moveTo" as const) : view,
+    hasPinActions,
+    hasImportantActions,
+    hasPriorityActions,
+    hasNoteActions,
+    hasDueDateActions,
+    hasLabelActions,
+    hasMoveActions,
+    hasSubtaskActions,
+    hasDeleteActions,
+    onClose,
+    onToggleTaskPinned,
+    onToggleTaskImportant,
+    onOpenLabelMenu,
+    onOpenMoveMenu,
+    onMoveMouseEnter: openMoveHoverPreview,
+    onMoveMouseLeave: scheduleCloseMoveHoverPreview,
+    onSetTaskDueDate,
+    onOpenCustomDatePicker,
+    onSelectTaskPriority,
+    onClearTaskPriority,
+    onConvertTaskToNote,
+    onAddSubtask,
+    onDeleteTask,
+  };
+
   const menu = (
     <>
-      {view === "main" && (
-        <MainMenuItems
-          task={task}
-          view={view}
-          hasPinActions={hasPinActions}
-          hasImportantActions={hasImportantActions}
-          hasPriorityActions={hasPriorityActions}
-          hasNoteActions={hasNoteActions}
-          hasDueDateActions={hasDueDateActions}
-          hasLabelActions={hasLabelActions}
-          hasMoveActions={hasMoveActions}
-          onClose={onClose}
-          onToggleTaskPinned={onToggleTaskPinned}
-          onToggleTaskImportant={onToggleTaskImportant}
-          onOpenLabelMenu={onOpenLabelMenu}
-          onOpenMoveMenu={onOpenMoveMenu}
-          onSetTaskDueDate={onSetTaskDueDate}
-          onOpenCustomDatePicker={onOpenCustomDatePicker}
-          onSelectTaskPriority={onSelectTaskPriority}
-          onClearTaskPriority={onClearTaskPriority}
-          onConvertTaskToNote={onConvertTaskToNote}
-        />
-      )}
+      {view === "main" && !showMoveFlyout && <MainMenuItems {...mainMenuProps} />}
 
-      {view === "moveTo" && (
-        <div className="flex items-start gap-1">
-          <MainMenuItems
-            task={task}
-            view={view}
-            hasPinActions={hasPinActions}
-            hasImportantActions={hasImportantActions}
-            hasPriorityActions={hasPriorityActions}
-            hasNoteActions={hasNoteActions}
-            hasDueDateActions={hasDueDateActions}
-            hasLabelActions={hasLabelActions}
-            hasMoveActions={hasMoveActions}
-            onClose={onClose}
-            onToggleTaskPinned={onToggleTaskPinned}
-            onToggleTaskImportant={onToggleTaskImportant}
-            onOpenLabelMenu={onOpenLabelMenu}
-            onOpenMoveMenu={onOpenMoveMenu}
-            onSetTaskDueDate={onSetTaskDueDate}
-            onOpenCustomDatePicker={onOpenCustomDatePicker}
-            onSelectTaskPriority={onSelectTaskPriority}
-            onClearTaskPriority={onClearTaskPriority}
-            onConvertTaskToNote={onConvertTaskToNote}
-          />
+      {view === "main" && showMoveFlyout && (
+        <div
+          className="flex items-start gap-1"
+          onMouseEnter={openMoveHoverPreview}
+          onMouseLeave={scheduleCloseMoveHoverPreview}
+        >
+          <MainMenuItems {...mainMenuProps} />
           <TaskMoveToSelector
             lists={lists}
             currentListId={currentListId}
@@ -287,6 +374,26 @@ export function TaskRowContextMenu({
             onQueryChange={onMoveQueryChange}
             onSelectList={onMoveTaskToList}
             onCancel={onClose}
+            autoFocus={false}
+          />
+        </div>
+      )}
+
+      {view === "moveTo" && (
+        <div
+          className="flex items-start gap-1"
+          onMouseEnter={openMoveHoverPreview}
+          onMouseLeave={scheduleCloseMoveHoverPreview}
+        >
+          <MainMenuItems {...mainMenuProps} />
+          <TaskMoveToSelector
+            lists={lists}
+            currentListId={currentListId}
+            query={moveQuery}
+            onQueryChange={onMoveQueryChange}
+            onSelectList={onMoveTaskToList}
+            onCancel={onClose}
+            autoFocus
           />
         </div>
       )}

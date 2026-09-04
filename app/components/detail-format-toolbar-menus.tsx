@@ -52,15 +52,15 @@ export const FORMAT_TOOLBAR_DROPDOWN_MENU_CLASS =
   "overflow-hidden rounded-lg border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900 min-w-[168px] cursor-pointer";
 
 export const FORMAT_TOOLBAR_DROPDOWN_ITEM_CLASS =
-  "flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-zinc-900 transition-colors hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800";
+  "flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm text-zinc-900 transition-colors hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800";
 
 export const FORMAT_TOOLBAR_FONT_FAMILY_TRIGGER_CLASS =
-  `flex h-8 cursor-pointer items-center gap-0.5 rounded-lg px-2 text-[12.5px] ${FORMAT_TOOLBAR_ICON_COLOR} transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800`;
+  `flex h-8 cursor-pointer items-center gap-0.5 rounded-lg px-0 text-[13px] ${FORMAT_TOOLBAR_ICON_COLOR} transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800`;
 
 export const FORMAT_TOOLBAR_FONT_FAMILY_ITEM_CLASS =
   "flex w-full items-center gap-2 px-3 py-1.5 text-left text-[15px] text-[#48484a] transition-colors hover:bg-zinc-100 dark:text-[#fbfbfb] dark:hover:bg-zinc-800 cursor-pointer";
 
-export const FORMAT_TOOLBAR_FONT_SIZE_TEXT_CLASS = "text-[14px]";
+export const FORMAT_TOOLBAR_FONT_SIZE_TEXT_CLASS = "text-[14px] px-0";
 /** 15% brighter than #83a1e0 / Tailwind blue-300 (#93c5fd) */
 export const FORMAT_TOOLBAR_FONT_SIZE_SELECTED_COLOR =
   "text-[#96afe5] dark:text-[#a3cefd]";
@@ -801,7 +801,7 @@ export function DetailFormatFontSizeDropdown({
         </>
       }
     >
-      <div className="grid grid-cols-4 gap-0.5 px-2 py-2">
+      <div className="grid grid-cols-4 gap-0.5 px-1 py-1">
         {DETAIL_FONT_SIZE_OPTIONS.map((option) => (
           <button
             key={option}

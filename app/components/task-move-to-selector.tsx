@@ -13,6 +13,7 @@ type TaskMoveToSelectorProps = {
   onSelectList: (listId: string) => void;
   onCancel: () => void;
   showCurrentList?: boolean;
+  autoFocus?: boolean;
 };
 
 function getListIcon(name: string) {
@@ -31,15 +32,18 @@ export function TaskMoveToSelector({
   onSelectList,
   onCancel,
   showCurrentList = false,
+  autoFocus = true,
 }: TaskMoveToSelectorProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const trimmedQuery = query.trim();
 
   useEffect(() => {
+    if (!autoFocus) return;
+
     requestAnimationFrame(() => {
       inputRef.current?.focus();
     });
-  }, []);
+  }, [autoFocus]);
 
   const filteredLists = useMemo(() => {
     const candidates = showCurrentList

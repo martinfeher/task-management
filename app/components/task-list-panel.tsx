@@ -45,6 +45,8 @@ import {
   type SidebarListDragTarget,
 } from "@/lib/sidebar-list-drag";
 import { formatShortDayMonth } from "@/lib/date-format";
+import { openInNewTabFromClick } from "@/lib/open-in-new-tab";
+import { buildTodoPath } from "@/lib/todo-routes";
 import type { TaskPriorityLevel } from "@/lib/task-priority";
 import {
   buildVisibleTasks,
@@ -320,7 +322,7 @@ function sortTasks(
 }
 
 const TASK_ROW_CONTEXT_MENU_WIDTH = 220;
-const TASK_ROW_CONTEXT_MENU_HEIGHT = 280;
+const TASK_ROW_CONTEXT_MENU_HEIGHT = 350;
 
 function clampPointerContextMenuPosition(x: number, y: number) {
   if (typeof window === "undefined") {
@@ -392,6 +394,8 @@ type TaskListPanelProps = {
   onSetTaskPinned?: (taskId: string, pinned: boolean) => void;
   onSetTaskImportant?: (taskId: string, important: boolean) => void;
   onConvertTaskToNote?: (taskId: string) => void | Promise<void>;
+  onAddSubtask?: (taskId: string) => TaskListItem | null | Promise<TaskListItem | null>;
+  onDeleteTask?: (taskId: string) => void | Promise<void>;
   onToggleTaskLabel?: (
     taskId: string,
     labelId: string,
@@ -456,6 +460,8 @@ export function TaskListPanel({
   onSetTaskPinned,
   onSetTaskImportant,
   onConvertTaskToNote,
+  onAddSubtask,
+  onDeleteTask,
   onToggleTaskLabel,
   onLabelsChanged,
   onMoveTaskToList,
@@ -498,6 +504,9 @@ export function TaskListPanel({
     useState(false);
   const [isAddTaskFormResetting, setIsAddTaskFormResetting] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [selectAllTitleEditTaskId, setSelectAllTitleEditTaskId] = useState<
+    string | null
+  >(null);
   const [titleDraft, setTitleDraft] = useState("");
   const titleDraftRef = useRef(titleDraft);
   titleDraftRef.current = titleDraft;
@@ -1129,13 +1138,18 @@ export function TaskListPanel({
 
   const handleTitleEditReady = useCallback(() => {
     titleEditReadyRef.current = true;
+    setSelectAllTitleEditTaskId(null);
     if (titleEditSession?.taskId === editingTaskIdRef.current) {
       clearTaskListTitleEdit();
     }
   }, [titleEditSession]);
 
-  function startTitleEdit(task: TaskListItem) {
+  function startTitleEdit(
+    task: TaskListItem,
+    options?: { selectAll?: boolean },
+  ) {
     titleEditReadyRef.current = false;
+    setSelectAllTitleEditTaskId(options?.selectAll ? task.id : null);
     stashTaskListTitleEdit(task.id, task.name);
     onListTitleEditStart?.();
     setEditingTaskId(task.id);
@@ -1174,9 +1188,19 @@ export function TaskListPanel({
     }, 5000);
   }
 
-  function handleTaskClick(task: TaskListItem) {
+  function handleTaskClick(task: TaskListItem, event?: React.MouseEvent) {
     if (suppressRowClickRef.current) {
       suppressRowClickRef.current = false;
+      return;
+    }
+
+    if (
+      event &&
+      openInNewTabFromClick(
+        event,
+        buildTodoPath({ kind: "task", taskId: task.id }),
+      )
+    ) {
       return;
     }
 
@@ -1537,6 +1561,21 @@ export function TaskListPanel({
   function handleConvertTaskToNote(taskId: string) {
     closeTaskMenus();
     void onConvertTaskToNote?.(taskId);
+  }
+
+  async function handleAddSubtask(taskId: string) {
+    if (!onAddSubtask) return;
+
+    closeTaskMenus();
+    const subtask = await onAddSubtask(taskId);
+    if (!subtask) return;
+
+    startTitleEdit(subtask, { selectAll: true });
+  }
+
+  function handleDeleteTask(taskId: string) {
+    closeTaskMenus();
+    void onDeleteTask?.(taskId);
   }
 
   function handleSelectTaskPriority(taskId: string, priority: number) {
@@ -2157,6 +2196,7 @@ export function TaskListPanel({
           selectedTaskId={selectedTaskId}
           editingTaskId={editingTaskId}
           titleDraft={titleDraft}
+          selectAllTitleOnEdit={selectAllTitleEditTaskId === task.id}
           showDragHandle={canReorder || enableCalendarDragDrop || enableSidebarListDragDrop}
           onTitleEditReady={handleTitleEditReady}
           openDatePickerTaskId={openDatePickerTaskId}
@@ -2211,6 +2251,8 @@ export function TaskListPanel({
           onSelectTaskPriority={handleSelectTaskPriority}
           onClearTaskPriority={handleClearTaskPriority}
           onConvertTaskToNote={() => handleConvertTaskToNote(task.id)}
+          onAddSubtask={handleAddSubtask}
+          onDeleteTask={handleDeleteTask}
           onCloseTaskMenu={closeTaskMenus}
           hasDueDateActions={Boolean(onSetTaskDueDate)}
           hasPriorityActions={Boolean(onSetTaskPriority)}
@@ -2219,6 +2261,8 @@ export function TaskListPanel({
           hasImportantActions={Boolean(onSetTaskImportant)}
           hasLabelActions={hasLabelActions}
           hasMoveActions={hasMoveActions}
+          hasSubtaskActions={Boolean(onAddSubtask) && !task.parentId && !task.isNote}
+          hasDeleteActions={Boolean(onDeleteTask)}
           useWiderRowPadding={useWiderRowPadding}
         />
       );
@@ -2296,6 +2340,8 @@ export function TaskListPanel({
               onConvertTaskToNote={() =>
                 handleConvertTaskToNote(pointerMenuTask.id)
               }
+              onAddSubtask={() => handleAddSubtask(pointerMenuTask.id)}
+              onDeleteTask={() => handleDeleteTask(pointerMenuTask.id)}
               hasDueDateActions={Boolean(onSetTaskDueDate)}
               hasPriorityActions={Boolean(onSetTaskPriority)}
               hasNoteActions={Boolean(onConvertTaskToNote)}
@@ -2303,6 +2349,12 @@ export function TaskListPanel({
               hasImportantActions={Boolean(onSetTaskImportant)}
               hasLabelActions={Boolean(onToggleTaskLabel)}
               hasMoveActions={Boolean(onMoveTaskToList) && lists.length > 1}
+              hasSubtaskActions={
+                Boolean(onAddSubtask) &&
+                !pointerMenuTask.parentId &&
+                !pointerMenuTask.isNote
+              }
+              hasDeleteActions={Boolean(onDeleteTask)}
             />
           </div>,
           document.body,

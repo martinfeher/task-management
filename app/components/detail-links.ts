@@ -127,3 +127,23 @@ export function normalizeLinks(editor: HTMLElement) {
     anchor.rel = "noopener noreferrer";
   });
 }
+
+export function findDetailLinkFromTarget(
+  target: EventTarget | null,
+  editor?: HTMLElement | null,
+) {
+  if (!(target instanceof HTMLElement)) return null;
+
+  const anchor = target.closest(`a.${DETAIL_LINK_CLASS}, a[href]`);
+  if (!(anchor instanceof HTMLAnchorElement)) return null;
+  if (editor && !editor.contains(anchor)) return null;
+  if (!anchor.href) return null;
+
+  return anchor;
+}
+
+export function openDetailLinkInNewTab(link: HTMLAnchorElement) {
+  if (!link.href) return;
+
+  window.open(link.href, "_blank", "noopener,noreferrer");
+}

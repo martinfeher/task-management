@@ -43,6 +43,7 @@ type TaskListTaskRowProps = {
   selectedTaskId: string | null;
   editingTaskId: string | null;
   titleDraft: string;
+  selectAllTitleOnEdit?: boolean;
   onTitleEditReady?: () => void;
   showDragHandle: boolean;
   openDatePickerTaskId: string | null;
@@ -62,7 +63,7 @@ type TaskListTaskRowProps = {
   taskPriorityMenuRef: RefObject<HTMLDivElement | null>;
   taskContextMenuRef: RefObject<HTMLDivElement | null>;
   dueDateLabel: string | null;
-  onTaskClick: (task: TaskListItem) => void;
+  onTaskClick: (task: TaskListItem, event?: React.MouseEvent) => void;
   onTaskContextMenu: (
     event: React.MouseEvent<HTMLLIElement>,
     task: TaskListItem,
@@ -106,6 +107,8 @@ type TaskListTaskRowProps = {
   onSelectTaskPriority: (taskId: string, priority: number) => void;
   onClearTaskPriority: (taskId: string) => void;
   onConvertTaskToNote: (taskId: string) => void;
+  onAddSubtask: (taskId: string) => void;
+  onDeleteTask: (taskId: string) => void;
   onCloseTaskMenu: () => void;
   hasDueDateActions: boolean;
   hasPriorityActions: boolean;
@@ -114,6 +117,8 @@ type TaskListTaskRowProps = {
   hasImportantActions: boolean;
   hasLabelActions: boolean;
   hasMoveActions: boolean;
+  hasSubtaskActions: boolean;
+  hasDeleteActions: boolean;
   useWiderRowPadding?: boolean;
 };
 
@@ -221,6 +226,7 @@ export function TaskListTaskRow({
   selectedTaskId,
   editingTaskId,
   titleDraft,
+  selectAllTitleOnEdit = false,
   onTitleEditReady,
   showDragHandle,
   openDatePickerTaskId,
@@ -268,6 +274,8 @@ export function TaskListTaskRow({
   onSelectTaskPriority,
   onClearTaskPriority,
   onConvertTaskToNote,
+  onAddSubtask,
+  onDeleteTask,
   onCloseTaskMenu,
   hasDueDateActions,
   hasPriorityActions,
@@ -276,6 +284,8 @@ export function TaskListTaskRow({
   hasImportantActions,
   hasLabelActions,
   hasMoveActions,
+  hasSubtaskActions,
+  hasDeleteActions,
   useWiderRowPadding = false,
 }: TaskListTaskRowProps) {
   const titleInputRef = useRef<HTMLInputElement>(null);
@@ -287,10 +297,14 @@ export function TaskListTaskRow({
     if (!input) return;
 
     input.focus({ preventScroll: true });
-    const end = input.value.length;
-    input.setSelectionRange(end, end);
+    if (selectAllTitleOnEdit) {
+      input.select();
+    } else {
+      const end = input.value.length;
+      input.setSelectionRange(end, end);
+    }
     onTitleEditReady?.();
-  }, [editingTaskId, onTitleEditReady, task.id, titleDraft]);
+  }, [editingTaskId, onTitleEditReady, selectAllTitleOnEdit, task.id, titleDraft]);
 
   const rowMenuView = getRowMenuView(task.id, openMoveMenuTaskId);
   const isLabelMenuOpen = openLabelMenuTaskId === task.id;
@@ -498,7 +512,7 @@ export function TaskListTaskRow({
       data-task-id={task.id}
       aria-current={task.id === selectedTaskId ? "true" : undefined}
       aria-label={isCompleting ? `${task.name} completed` : undefined}
-      onClick={isCompleting ? undefined : () => onTaskClick(task)}
+      onClick={isCompleting ? undefined : (event) => onTaskClick(task, event)}
       onContextMenu={
         isCompleting ? undefined : (event) => onTaskContextMenu(event, task)
       }
@@ -534,7 +548,7 @@ export function TaskListTaskRow({
           } ${checkedContentDim}`}
           style={{ transition: dimTransition }}
         >
-          <InteractIcon className="size-3.5 text-[#c3c6cc] group-hover:text-[#7e828b]" />
+          <InteractIcon className="size-3.5 text-[#c3c6cc] group-hover:text-[#6f7174]" />
         </span>
       ) : null}
 
@@ -833,6 +847,14 @@ export function TaskListTaskRow({
                     onConvertTaskToNote(task.id);
                     onCloseTaskMenu();
                   }}
+                  onAddSubtask={() => {
+                    onAddSubtask(task.id);
+                    onCloseTaskMenu();
+                  }}
+                  onDeleteTask={() => {
+                    onDeleteTask(task.id);
+                    onCloseTaskMenu();
+                  }}
                   hasDueDateActions={hasDueDateActions}
                   hasPriorityActions={hasPriorityActions}
                   hasNoteActions={hasNoteActions}
@@ -840,6 +862,8 @@ export function TaskListTaskRow({
                   hasImportantActions={hasImportantActions}
                   hasLabelActions={hasLabelActions}
                   hasMoveActions={hasMoveActions}
+                  hasSubtaskActions={hasSubtaskActions}
+                  hasDeleteActions={hasDeleteActions}
                 />
               </div>
             ) : null}
