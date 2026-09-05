@@ -1059,6 +1059,10 @@ function editorHasLiveExtendedTextSelection(editor: HTMLElement): boolean {
   );
 }
 
+function isMultiClickMouseEvent(event: Pick<MouseEvent, "detail">) {
+  return event.detail >= 2;
+}
+
 function collapseEditorSelectionAtPoint(
   editor: HTMLElement,
   clientX: number,
@@ -2153,13 +2157,13 @@ export function TaskDetailsPanel({
     isEditorPointerDownRef.current = false;
     setLineControlsPointerEventsEnabled(true);
 
-    requestAnimationFrame(() => {
+    window.setTimeout(() => {
       const editor = editorRef.current;
       if (editor && !editorHasLiveExtendedTextSelection(editor)) {
         syncEditorLineEmptyState(editor);
       }
       updateLineControls();
-    });
+    }, 0);
   }
 
   useEffect(() => {
@@ -3690,7 +3694,7 @@ export function TaskDetailsPanel({
         return;
       }
 
-      if (editor && editor.contains(target) && !event.shiftKey) {
+      if (editor && editor.contains(target) && !event.shiftKey && !isMultiClickMouseEvent(event)) {
         savedFormatSelectionRef.current = null;
         savedFormatLineIdsRef.current = [];
         if (formatMenuTimerRef.current !== null) {
@@ -4405,7 +4409,9 @@ export function TaskDetailsPanel({
 
     beginEditorPointerInteraction();
 
-    if (!event.shiftKey) {
+    const isMultiClick = isMultiClickMouseEvent(event);
+
+    if (!event.shiftKey && !isMultiClick) {
       savedFormatSelectionRef.current = null;
       savedFormatLineIdsRef.current = [];
       if (formatMenuTimerRef.current !== null) {
@@ -4460,7 +4466,7 @@ export function TaskDetailsPanel({
     clickedLineRef.current = line;
     pendingClickLineRef.current = line;
 
-    if (isDetailLineEmpty(line)) {
+    if (isDetailLineEmpty(line) && !isMultiClick) {
       event.preventDefault();
       focusDetailLine(editor, line);
       syncEditorLineEmptyState(editor);
@@ -4807,6 +4813,29 @@ export function TaskDetailsPanel({
         requestSave("flush");
       },
     );
+  }
+
+  function handleEditorDoubleClick() {
+    window.setTimeout(() => {
+      const editor = editorRef.current;
+      const selection = window.getSelection();
+      if (
+        !editor ||
+        !selection?.rangeCount ||
+        selection.isCollapsed ||
+        !selection.anchorNode ||
+        !editor.contains(selection.anchorNode)
+      ) {
+        return;
+      }
+
+      rememberFormatSelection(editor, selection.getRangeAt(0));
+      if (task?.isNote) {
+        syncFormatMenuFontState();
+      }
+      updateFormatMenu();
+      updateLineControls();
+    }, 0);
   }
 
   function handleEditorClick(event: React.MouseEvent<HTMLDivElement>) {
@@ -5375,6 +5404,7 @@ export function TaskDetailsPanel({
               onMouseUp={handleEditorMouseUp}
               onContextMenu={handleEditorContextMenu}
               onMouseDown={handleEditorMouseDown}
+              onDoubleClick={handleEditorDoubleClick}
               onClick={handleEditorClick}
               onKeyDown={handleEditorKeyDown}
               onKeyUp={handleEditorKeyUp}

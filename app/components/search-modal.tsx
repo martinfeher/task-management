@@ -196,7 +196,7 @@ function SearchModalFooterAction({
   return (
     <div className="flex items-center gap-1.5">
       <span>{label}</span>
-      <div className="flex items-center gap-0.5">{children}</div>
+      <div className="flex items-center">{children}</div>
     </div>
   );
 }
@@ -717,7 +717,7 @@ export function SearchModal({
             />
           </div>
           <div
-            className="mt-3 flex flex-wrap gap-2"
+            className="mt-2 flex flex-wrap gap-2"
             role="tablist"
             aria-label="Search scope"
           >
@@ -731,7 +731,7 @@ export function SearchModal({
                 className={`rounded-full px-[13px] py-[5px] text-xs font-medium transition-colors cursor-pointer ${
                   searchScope === tab.id
                     ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                    : "bg-zinc-200 text-zinc-600 hover:bg-zinc-400 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                    : "bg-zinc-200 text-zinc-600 hover:bg-zinc-300 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
                 }`}
               >
                 {tab.label}

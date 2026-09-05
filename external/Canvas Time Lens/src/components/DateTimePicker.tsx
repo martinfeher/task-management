@@ -287,7 +287,7 @@ export function DateTimePicker() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 border-t border-border bg-muted/60 p-3">
+          <div className="flex items-center gap-2 border-t border-border bg-muted/60 px-3 pt-1">
             <button
               onClick={() => setTime(null)}
               className="text-xs font-medium text-muted-foreground transition hover:text-destructive"

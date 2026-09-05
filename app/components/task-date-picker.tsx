@@ -1046,7 +1046,7 @@ function TaskTimeMenu({
         <button
           type="button"
           onClick={handleClearTime}
-          className="text-[12px] font-medium transition-colors hover:opacity-80 cursor-pointer"
+          className="text-[12px] font-medium transition-colors hover:opacity-80 cursor-pointer ml-2"
           style={{ color: PICKER_MUTED_FG }}
         >
           Clear time
@@ -1259,7 +1259,7 @@ export function TaskDatePicker({
       </div>
 
       <div
-        className="flex gap-2 overflow-visible border-b p-2"
+        className="flex gap-2 overflow-visible p-2"
         style={{ borderColor: PICKER_BORDER }}
       >
         {quickOptions.map((option) => (
@@ -1308,7 +1308,7 @@ export function TaskDatePicker({
       </div>
 
       <div className="border-t border-zinc-200 dark:border-zinc-700">
-        <div className="flex items-center justify-between px-[11px] py-[7px]">
+        <div className="flex items-center justify-between px-[11px] py-[6px]">
           <h4 className="text-sm font-semibold text-zinc-750 dark:text-zinc-50">
             {formatMonthYear(viewMonth)}
           </h4>
