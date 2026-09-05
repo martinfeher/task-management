@@ -2,6 +2,7 @@ import {
   ensureBlockLines,
   getActiveLineElement,
   getLinesInSelection,
+  getSelectedBlockLinesInRange,
   isCodeLine,
   isTitleLine,
 } from "./detail-lines";
@@ -51,6 +52,35 @@ function getLineHeightFromLine(line: HTMLElement) {
   return DEFAULT_DETAIL_LINE_HEIGHT;
 }
 
+function filterLineHeightTargetLines(
+  editor: HTMLElement,
+  lines: HTMLElement[],
+) {
+  return lines.filter(
+    (line) =>
+      !isTitleLine(editor, line) &&
+      !isCodeLine(line) &&
+      !line.querySelector(".detail-image-wrapper"),
+  );
+}
+
+function getReadOnlyLinesForLineHeight(editor: HTMLElement) {
+  ensureBlockLines(editor);
+
+  const selection = window.getSelection();
+  if (!selection?.rangeCount || !editor.contains(selection.anchorNode)) {
+    return [];
+  }
+
+  const range = selection.getRangeAt(0);
+  if (range.collapsed) {
+    const activeLine = getActiveLineElement(editor);
+    return activeLine ? [activeLine] : [];
+  }
+
+  return getSelectedBlockLinesInRange(editor, range);
+}
+
 function getTargetLinesForLineHeight(
   editor: HTMLElement,
   savedRange?: Range | null,
@@ -63,11 +93,9 @@ function getTargetLinesForLineHeight(
     selection?.addRange(savedRange.cloneRange());
   }
 
-  const lines = getLinesInSelection(editor).filter(
-    (line) =>
-      !isTitleLine(editor, line) &&
-      !isCodeLine(line) &&
-      !line.querySelector(".detail-image-wrapper"),
+  const lines = filterLineHeightTargetLines(
+    editor,
+    getLinesInSelection(editor),
   );
 
   if (lines.length > 0) {
@@ -93,7 +121,10 @@ export function getDetailSelectionLineHeight(editor: HTMLElement): DetailLineHei
     return DEFAULT_DETAIL_LINE_HEIGHT;
   }
 
-  const lines = getTargetLinesForLineHeight(editor);
+  const lines = filterLineHeightTargetLines(
+    editor,
+    getReadOnlyLinesForLineHeight(editor),
+  );
   if (lines.length === 0) {
     return DEFAULT_DETAIL_LINE_HEIGHT;
   }
