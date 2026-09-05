@@ -5,6 +5,8 @@ import {
   getSelectedBlockLinesInRange,
   isCodeLine,
   isTitleLine,
+  clearFixedLineDimensions,
+  stripTrailingBreakFromNonEmptyLine,
 } from "./detail-lines";
 
 export const DEFAULT_DETAIL_LINE_HEIGHT = 1.75;
@@ -47,6 +49,11 @@ function getLineHeightFromLine(line: HTMLElement) {
   const inline = line.style.lineHeight.trim();
   if (inline) {
     return normalizeDetailLineHeight(inline);
+  }
+
+  const cssVar = line.style.getPropertyValue("--detail-line-height").trim();
+  if (cssVar) {
+    return normalizeDetailLineHeight(cssVar);
   }
 
   return DEFAULT_DETAIL_LINE_HEIGHT;
@@ -132,6 +139,27 @@ export function getDetailSelectionLineHeight(editor: HTMLElement): DetailLineHei
   return getLineHeightFromLine(lines[0]);
 }
 
+export function resetDetailLineHeightOnLines(lines: HTMLElement[]) {
+  let changed = false;
+
+  for (const line of lines) {
+    const hadCustomLineHeight =
+      line.style.lineHeight.trim() !== "" ||
+      line.style.getPropertyValue("--detail-line-height").trim() !== "";
+
+    line.style.removeProperty("--detail-line-height");
+    line.style.removeProperty("line-height");
+    clearFixedLineDimensions(line);
+    stripTrailingBreakFromNonEmptyLine(line);
+
+    if (hadCustomLineHeight) {
+      changed = true;
+    }
+  }
+
+  return changed;
+}
+
 export function applyDetailLineHeight(
   editor: HTMLElement,
   lineHeight: DetailLineHeightOption,
@@ -144,11 +172,17 @@ export function applyDetailLineHeight(
   editor.focus();
 
   for (const line of lines) {
+    clearFixedLineDimensions(line);
+
     if (isDefaultDetailLineHeight(normalized)) {
+      line.style.removeProperty("--detail-line-height");
       line.style.removeProperty("line-height");
     } else {
+      line.style.setProperty("--detail-line-height", String(normalized));
       line.style.lineHeight = String(normalized);
     }
+
+    stripTrailingBreakFromNonEmptyLine(line);
   }
 
   return true;

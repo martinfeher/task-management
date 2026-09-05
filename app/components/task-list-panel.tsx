@@ -21,6 +21,7 @@ import { TaskSetDateIcon } from "./task-set-date-icon";
 import { TaskCompletionCheckbox } from "./task-completion-checkbox";
 import {
   TaskListTaskRow,
+  getTaskListItemDividerClass,
   getTaskRowLeftBorderClass,
   isTaskDatePickerTriggerElement,
 } from "./task-list-task-row";
@@ -2279,7 +2280,7 @@ export function TaskListPanel({
         <li
           key={`${task.id}-subtask-connector`}
           aria-hidden="true"
-          className="flex h-4 items-center border-b border-zinc-100 py-0 pr-2 dark:border-zinc-900"
+          className="task-list-item-divider flex h-4 items-center py-0 pr-2"
           style={{
             paddingLeft: SUBTASK_ROOT_LEFT_PX + SUBTASK_INDENT_PX + SUBTASK_ICON_INDENT_PX,
           }}
@@ -2499,7 +2500,7 @@ export function TaskListPanel({
                             onClick={() =>
                               applySort(option.field, option.direction)
                             }
-                            className="flex h-[32px] w-full cursor-pointer items-center px-3 text-left text-[13px] text-zinc-650 transition-colors hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-zinc-800/80"
+                            className="flex h-[32px] w-full cursor-pointer items-center px-3 text-left text-[13px] text-zinc-650  hover:text-zinc-800 transition-colors hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-zinc-800/80"
                           >
                             {option.label}
                           </button>
@@ -2864,7 +2865,7 @@ export function TaskListPanel({
                     {completedTasks.map((task) => (
                       <li
                         key={task.id}
-                        className={`group flex min-h-[35px] items-center border-b border-zinc-100 ml-[10px] py-1 pr-2 pl-[5px] dark:border-zinc-900 cursor-pointer ${getTaskRowLeftBorderClass(
+                        className={`group ${getTaskListItemDividerClass(task)} flex min-h-[35px] items-center ml-[10px] py-1 pr-2 pl-[5px] cursor-pointer! ${getTaskRowLeftBorderClass(
                           task.id,
                           selectedTaskId,
                         )} ${

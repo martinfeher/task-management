@@ -44,6 +44,9 @@ import {
   isChecklistToggleClick,
   isCodeLine,
   isDetailLineEmpty,
+  isBodyPlaceholderLine,
+  isCaretAtStartOfLine,
+  getDetailLineFromNode,
   isTitleLine,
   type LineBlockType,
   placeCaretInLine,
@@ -51,6 +54,7 @@ import {
   focusNoteAtEnd,
   focusTaskTitle,
   focusDetailLine,
+  selectAllDetailEditorContent,
   removeImageWrapper,
   reorderLine,
   getEditorTitle,
@@ -89,6 +93,7 @@ import {
   applyDetailLineHeight,
   DEFAULT_DETAIL_LINE_HEIGHT,
   getDetailSelectionLineHeight,
+  isDefaultDetailLineHeight,
   type DetailLineHeightOption,
 } from "./detail-line-height";
 import {
@@ -100,6 +105,8 @@ import {
   getDetailSelectionFontState,
   getPasteBatchPromptPosition,
   insertPasteFragmentAtSelection,
+  isDefaultAppFont,
+  isDefaultDetailFontSize,
   PASTE_FORMAT_PROMPT_MS,
   pastedHtmlHasFormatting,
   preparePasteFragment,
@@ -1063,6 +1070,25 @@ function isMultiClickMouseEvent(event: Pick<MouseEvent, "detail">) {
   return event.detail >= 2;
 }
 
+function shouldPlaceCaretAtLineStart(line: HTMLElement) {
+  return isDetailLineEmpty(line) || isBodyPlaceholderLine(line);
+}
+
+function scheduleCaretAtLineStart(editor: HTMLElement, line: HTMLElement) {
+  const place = () => {
+    const selection = window.getSelection();
+    if (!selection?.isCollapsed || !editor.contains(line)) return;
+    if (!shouldPlaceCaretAtLineStart(line)) return;
+    if (isCaretAtStartOfLine(line)) return;
+
+    focusDetailLine(editor, line);
+  };
+
+  place();
+  requestAnimationFrame(place);
+  window.setTimeout(place, 0);
+}
+
 function collapseEditorSelectionAtPoint(
   editor: HTMLElement,
   clientX: number,
@@ -1073,6 +1099,12 @@ function collapseEditorSelectionAtPoint(
 
   const probe = getCaretRangeFromPoint(clientX, clientY);
   if (probe && editor.contains(probe.startContainer)) {
+    const probeLine = getDetailLineFromNode(probe.startContainer, editor);
+    if (probeLine && shouldPlaceCaretAtLineStart(probeLine)) {
+      placeCaretInLine(probeLine);
+      return;
+    }
+
     try {
       selection.removeAllRanges();
       selection.addRange(probe);
@@ -1084,6 +1116,11 @@ function collapseEditorSelectionAtPoint(
 
   const line = getLineElementAtPoint(editor, clientY);
   if (line && editor.contains(line)) {
+    if (shouldPlaceCaretAtLineStart(line)) {
+      placeCaretInLine(line);
+      return;
+    }
+
     const lineRect = line.getBoundingClientRect();
     const midpoint = lineRect.left + lineRect.width / 2;
     if (clientX >= midpoint) {
@@ -1102,18 +1139,17 @@ function resolveFormatMenuRange(
   savedRange: Range | null,
 ): Range | null {
   const selection = window.getSelection();
-
-  if (
+  const selectionInEditor = Boolean(
     selection?.rangeCount &&
-    selection.anchorNode &&
-    editor.contains(selection.anchorNode)
-  ) {
+      ((selection.anchorNode && editor.contains(selection.anchorNode)) ||
+        (selection.focusNode && editor.contains(selection.focusNode))),
+  );
+
+  if (selectionInEditor && selection) {
     const current = selection.getRangeAt(0);
     if (!current.collapsed && current.toString().trim()) {
       return current.cloneRange();
     }
-
-    return null;
   }
 
   if (
@@ -1128,6 +1164,211 @@ function resolveFormatMenuRange(
   }
 
   return null;
+}
+
+function rangeHasFormatableEditorContent(
+  editor: HTMLElement,
+  range: Range,
+) {
+  if (range.collapsed || !range.toString().trim()) {
+    return false;
+  }
+
+  let matchedLines: HTMLElement[] = [];
+
+  for (const line of getLineElements(editor)) {
+    try {
+      if (range.intersectsNode(line)) {
+        matchedLines.push(line);
+      }
+    } catch {
+      // Ignore lines the range cannot test against.
+    }
+  }
+
+  if (matchedLines.length === 0) {
+    matchedLines = getSelectedBlockLinesInRange(editor, range);
+  }
+
+  return matchedLines.some(
+    (line) =>
+      !isCodeLine(line) &&
+      !line.querySelector(".detail-image-wrapper"),
+  );
+}
+
+const FORMATTED_INLINE_TAGS = new Set([
+  "B",
+  "STRONG",
+  "I",
+  "EM",
+  "U",
+  "S",
+  "STRIKE",
+  "MARK",
+  "SUB",
+  "SUP",
+  "FONT",
+  "A",
+]);
+
+function lineHasCustomLineHeight(line: HTMLElement) {
+  const inline = line.style.lineHeight.trim();
+  const cssVar = line.style.getPropertyValue("--detail-line-height").trim();
+
+  if (inline) {
+    const parsed = Number.parseFloat(inline);
+    if (Number.isFinite(parsed) && !isDefaultDetailLineHeight(parsed)) {
+      return true;
+    }
+  }
+
+  if (cssVar) {
+    const parsed = Number.parseFloat(cssVar);
+    if (Number.isFinite(parsed) && !isDefaultDetailLineHeight(parsed)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function elementHasAppliedTextColor(element: HTMLElement) {
+  const inlineColor = element.style.color.trim();
+  if (!inlineColor) return false;
+
+  return (
+    !colorsEquivalent(inlineColor, DEFAULT_TEXT_COLOR) &&
+    !colorsEquivalent(inlineColor, "#555555") &&
+    !colorsEquivalent(inlineColor, "#71717a")
+  );
+}
+
+function elementHasClearableFormatting(element: HTMLElement) {
+  if (FORMATTED_INLINE_TAGS.has(element.tagName)) {
+    return true;
+  }
+
+  if (element.tagName === "FONT") {
+    if (
+      element.hasAttribute("face") ||
+      element.hasAttribute("size") ||
+      element.hasAttribute("color")
+    ) {
+      return true;
+    }
+  }
+
+  if (elementHasAppliedTextColor(element)) return true;
+
+  const explicitBg = getExplicitBackgroundColor(element);
+  if (explicitBg && isHighlightColor(explicitBg)) return true;
+
+  if (element.tagName === "MARK") return true;
+
+  if (
+    element.style.fontSize &&
+    !isDefaultDetailFontSize(element.style.fontSize)
+  ) {
+    return true;
+  }
+
+  if (
+    element.style.fontFamily &&
+    !isDefaultAppFont(element.style.fontFamily)
+  ) {
+    return true;
+  }
+
+  const fontWeight = element.style.fontWeight.trim();
+  if (fontWeight && fontWeight !== "normal" && fontWeight !== "400") {
+    return true;
+  }
+
+  const fontStyle = element.style.fontStyle.trim();
+  if (fontStyle && fontStyle !== "normal") {
+    return true;
+  }
+
+  const textDecoration = element.style.textDecorationLine.trim();
+  if (textDecoration && textDecoration !== "none") {
+    return true;
+  }
+
+  return false;
+}
+
+function rangeHasClearableFormatting(range: Range, editor: HTMLElement) {
+  const lines = getSelectedBlockLinesInRange(editor, range).filter(
+    (line) =>
+      !isCodeLine(line) &&
+      !isTitleLine(editor, line) &&
+      !line.querySelector(".detail-image-wrapper"),
+  );
+
+  for (const line of lines) {
+    if (lineHasCustomLineHeight(line)) return true;
+
+    const lineType = line.dataset.lineType ?? "text";
+    if (
+      lineType === "bullet" ||
+      lineType === "numbered" ||
+      lineType === "checklist"
+    ) {
+      return true;
+    }
+  }
+
+  const walker = document.createTreeWalker(
+    range.commonAncestorContainer,
+    NodeFilter.SHOW_ELEMENT,
+    {
+      acceptNode(node) {
+        if (!(node instanceof HTMLElement)) return NodeFilter.FILTER_REJECT;
+        if (!editor.contains(node)) return NodeFilter.FILTER_REJECT;
+        if (!range.intersectsNode(node)) return NodeFilter.FILTER_REJECT;
+        if (node.closest(".detail-image-wrapper")) return NodeFilter.FILTER_REJECT;
+
+        return elementHasClearableFormatting(node)
+          ? NodeFilter.FILTER_ACCEPT
+          : NodeFilter.FILTER_SKIP;
+      },
+    },
+  );
+
+  return walker.nextNode() !== null;
+}
+
+function selectionHasNonDefaultFormatting(
+  editor: HTMLElement,
+  savedRange?: Range | null,
+) {
+  const range = resolveFormatMenuRange(editor, savedRange ?? null);
+  if (!range || !rangeHasFormatableEditorContent(editor, range)) {
+    return false;
+  }
+
+  return rangeHasClearableFormatting(range, editor);
+}
+
+function captureLiveEditorFormatSelection(editor: HTMLElement) {
+  const selection = window.getSelection();
+  if (
+    !selection?.rangeCount ||
+    selection.isCollapsed ||
+    !selection.toString().trim()
+  ) {
+    return null;
+  }
+
+  if (
+    !(selection.anchorNode && editor.contains(selection.anchorNode)) &&
+    !(selection.focusNode && editor.contains(selection.focusNode))
+  ) {
+    return null;
+  }
+
+  return selection.getRangeAt(0).cloneRange();
 }
 
 const FORMAT_MENU_ABOVE_SELECTION_GAP = 10;
@@ -1289,6 +1530,8 @@ export function TaskDetailsPanel({
     useState<DetailLineHeightOption>(DEFAULT_DETAIL_LINE_HEIGHT);
   const [formatMenuInlineFormats, setFormatMenuInlineFormats] =
     useState<FormatMenuInlineFormats>(DEFAULT_FORMAT_MENU_INLINE_FORMATS);
+  const [showHeaderClearFormatting, setShowHeaderClearFormatting] =
+    useState(false);
   const [recentFormatColors, setRecentFormatColors] = useState<RecentFormatColor[]>(
     () => readRecentFormatColors(),
   );
@@ -1372,6 +1615,9 @@ export function TaskDetailsPanel({
   const inputNormalizeFrameRef = useRef<number | null>(null);
   const inputNormalizeTimerRef = useRef<number | null>(null);
   const formatMenuTimerRef = useRef<number | null>(null);
+  const formatMenuRevealTimerRef = useRef<number | null>(null);
+  const formatMenuRevealFrameRef = useRef<number | null>(null);
+  const formatMenuVisibleRef = useRef(false);
   const lineControlsTimerRef = useRef<number | null>(null);
   const titleSyncTimerRef = useRef<number | null>(null);
   const clipboardNoticeTimerRef = useRef<number | null>(null);
@@ -2046,8 +2292,8 @@ export function TaskDetailsPanel({
     if (addBlockMenu && activeLineControlsRef.current) {
       line = activeLineControlsRef.current;
     } else if (
+      isMouseOverEditorRef.current &&
       hoveredLine &&
-      pointerInGutterRef.current &&
       !isTitleLine(editor, hoveredLine) &&
       !hoveredLine.querySelector(".detail-image-wrapper") &&
       !isCodeLine(hoveredLine)
@@ -2089,7 +2335,9 @@ export function TaskDetailsPanel({
     const isEmpty = isDetailLineEmpty(line);
     const keepAddBlockMenuOpen =
       Boolean(addBlockMenu) && activeLineControlsRef.current === line;
-    const showControls = keepAddBlockMenuOpen || pointerInGutterRef.current;
+    const showControls =
+      keepAddBlockMenuOpen ||
+      (isMouseOverEditorRef.current && hoveredLine === line);
 
     setLineControls([
       {
@@ -2166,17 +2414,6 @@ export function TaskDetailsPanel({
     }, 0);
   }
 
-  useEffect(() => {
-    function handleDocumentMouseUp() {
-      finishEditorPointerInteraction();
-    }
-
-    document.addEventListener("mouseup", handleDocumentMouseUp);
-    return () => {
-      document.removeEventListener("mouseup", handleDocumentMouseUp);
-    };
-  }, [updateLineControls]);
-
   const runEditorNormalization = useCallback(
     (mode: "light" | "full") => {
       const editor = editorRef.current;
@@ -2240,15 +2477,29 @@ export function TaskDetailsPanel({
     setOpenHeaderFormatDropdown(null);
   }, []);
 
-  const closeFormatMenu = useCallback(() => {
+  const closeFormatMenu = useCallback((options?: { clearSavedSelection?: boolean }) => {
     setFormatMenu(null);
+    formatMenuVisibleRef.current = false;
     closeFormatDropdowns();
     setShowLinkMenu(false);
     showLinkMenuRef.current = false;
     setLinkHasExisting(false);
     savedLinkSelectionRef.current = null;
-    savedFormatSelectionRef.current = null;
-    savedFormatLineIdsRef.current = [];
+    if (options?.clearSavedSelection !== false) {
+      savedFormatSelectionRef.current = null;
+      savedFormatLineIdsRef.current = [];
+      setShowHeaderClearFormatting(false);
+    } else {
+      const editor = editorRef.current;
+      setShowHeaderClearFormatting(
+        editor
+          ? selectionHasNonDefaultFormatting(
+              editor,
+              savedFormatSelectionRef.current,
+            )
+          : false,
+      );
+    }
   }, [closeFormatDropdowns]);
 
   const dismissFormatMenu = useCallback(() => {
@@ -2341,6 +2592,12 @@ export function TaskDetailsPanel({
     setFormatMenuFontFamily(getDetailSelectionFontState(editor).familyId);
     setFormatMenuLineHeight(getDetailSelectionLineHeight(editor));
     setFormatMenuBlockType(getActiveTextBlockType(editor));
+    setShowHeaderClearFormatting(
+      selectionHasNonDefaultFormatting(
+        editor,
+        savedFormatSelectionRef.current,
+      ),
+    );
   }, []);
 
   const syncFormatMenuFontState = useCallback(() => {
@@ -2756,12 +3013,6 @@ export function TaskDetailsPanel({
       return;
     }
 
-    const activeLine = getActiveLineElement(editor);
-    if (isTitleLine(editor, activeLine)) {
-      closeFormatMenu();
-      return;
-    }
-
     if (
       selection?.rangeCount &&
       selection.anchorNode &&
@@ -2785,6 +3036,7 @@ export function TaskDetailsPanel({
           placement: "above",
           anchorBottom: linkRect.bottom,
         });
+        formatMenuVisibleRef.current = true;
 
         requestAnimationFrame(() => {
           linkUrlInputRef.current?.focus();
@@ -2807,8 +3059,22 @@ export function TaskDetailsPanel({
       editor,
       savedFormatSelectionRef.current,
     );
-    if (!range) {
-      closeFormatMenu();
+    if (!range || !rangeHasFormatableEditorContent(editor, range)) {
+      const hasPendingSelection =
+        editorHasLiveExtendedTextSelection(editor) ||
+        Boolean(
+          savedFormatSelectionRef.current &&
+            !savedFormatSelectionRef.current.collapsed &&
+            savedFormatSelectionRef.current.toString().trim(),
+        );
+      setShowHeaderClearFormatting(
+        hasPendingSelection &&
+          selectionHasNonDefaultFormatting(
+            editor,
+            savedFormatSelectionRef.current,
+          ),
+      );
+      closeFormatMenu({ clearSavedSelection: !hasPendingSelection });
       return;
     }
 
@@ -2816,6 +3082,7 @@ export function TaskDetailsPanel({
     setShowLinkMenu(false);
     showLinkMenuRef.current = false;
     setFormatMenu(getFormatMenuPositionFromRange(range, editor));
+    formatMenuVisibleRef.current = true;
 
     const fontState = getDetailSelectionFontState(editor);
     setFormatMenuFontSize(fontState.size);
@@ -2823,8 +3090,76 @@ export function TaskDetailsPanel({
     setFormatMenuLineHeight(getDetailSelectionLineHeight(editor));
     setFormatMenuBlockType(getActiveTextBlockType(editor));
     setFormatMenuInlineFormats(getDetailSelectionInlineFormatState(editor));
+    setShowHeaderClearFormatting(
+      selectionHasNonDefaultFormatting(
+        editor,
+        savedFormatSelectionRef.current,
+      ),
+    );
     closeFormatDropdowns();
   }, [closeFormatDropdowns, closeFormatMenu, rememberFormatSelection, syncFormatMenuSelectionState]);
+
+  const scheduleFormatMenuReveal = useCallback(() => {
+    if (formatMenuRevealFrameRef.current !== null) {
+      window.cancelAnimationFrame(formatMenuRevealFrameRef.current);
+    }
+    if (formatMenuRevealTimerRef.current !== null) {
+      window.clearTimeout(formatMenuRevealTimerRef.current);
+      formatMenuRevealTimerRef.current = null;
+    }
+    if (formatMenuTimerRef.current !== null) {
+      window.clearTimeout(formatMenuTimerRef.current);
+      formatMenuTimerRef.current = null;
+    }
+
+    let attempt = 0;
+
+    const runAttempt = () => {
+      attempt += 1;
+      const editor = editorRef.current;
+      if (!editor) return;
+
+      const liveRange = captureLiveEditorFormatSelection(editor);
+      if (liveRange) {
+        rememberFormatSelection(editor, liveRange);
+      }
+
+      updateFormatMenu();
+
+      const resolvedRange = resolveFormatMenuRange(
+        editor,
+        savedFormatSelectionRef.current,
+      );
+      const shouldHaveMenu = Boolean(
+        resolvedRange &&
+          rangeHasFormatableEditorContent(editor, resolvedRange),
+      );
+
+      if (shouldHaveMenu && !formatMenuVisibleRef.current && attempt < 5) {
+        formatMenuRevealTimerRef.current = window.setTimeout(() => {
+          formatMenuRevealTimerRef.current = null;
+          runAttempt();
+        }, attempt <= 1 ? 0 : 16);
+      }
+    };
+
+    formatMenuRevealFrameRef.current = window.requestAnimationFrame(() => {
+      formatMenuRevealFrameRef.current = null;
+      runAttempt();
+    });
+  }, [rememberFormatSelection, updateFormatMenu]);
+
+  useEffect(() => {
+    function handleDocumentMouseUp() {
+      finishEditorPointerInteraction();
+      scheduleFormatMenuReveal();
+    }
+
+    document.addEventListener("mouseup", handleDocumentMouseUp);
+    return () => {
+      document.removeEventListener("mouseup", handleDocumentMouseUp);
+    };
+  }, [scheduleFormatMenuReveal]);
 
   const applyFormat = useCallback(
     (
@@ -2866,10 +3201,22 @@ export function TaskDetailsPanel({
     const activeLine = getActiveLineElement(editor);
     if (isCodeLine(activeLine)) return;
 
-    if (
-      !stripFormattingInSelection(editor, savedFormatSelectionRef.current)
-    ) {
+    const savedRange = savedFormatSelectionRef.current?.cloneRange() ?? null;
+
+    const changedFormatting = stripFormattingInSelection(editor, savedRange);
+
+    if (!changedFormatting) {
       return;
+    }
+
+    const selection = window.getSelection();
+    if (
+      selection?.rangeCount &&
+      selection.anchorNode &&
+      editor.contains(selection.anchorNode) &&
+      !selection.isCollapsed
+    ) {
+      rememberFormatSelection(editor, selection.getRangeAt(0));
     }
 
     syncEditorLineEmptyState(editor);
@@ -2877,12 +3224,13 @@ export function TaskDetailsPanel({
     recordHistorySnapshot();
     scheduleAutoSave();
     closeFormatDropdowns();
-    if (editor) {
-      setFormatMenuBlockType(getActiveTextBlockType(editor));
-      setFormatMenuInlineFormats(getDetailSelectionInlineFormatState(editor));
-    }
+    setFormatMenuBlockType(getActiveTextBlockType(editor));
+    setFormatMenuInlineFormats(DEFAULT_FORMAT_MENU_INLINE_FORMATS);
+    setFormatMenuLineHeight(DEFAULT_DETAIL_LINE_HEIGHT);
+    setShowHeaderClearFormatting(false);
     updateLineControls();
   }, [
+    rememberFormatSelection,
     recordHistorySnapshot,
     scheduleAutoSave,
     syncEditorContent,
@@ -3176,6 +3524,8 @@ export function TaskDetailsPanel({
       isApplyingHistoryRef.current = true;
       editor.innerHTML = html;
       ensureBlockLines(editor);
+      ensureTitleLine(editor);
+      syncEditorLineEmptyState(editor);
       historyIndexRef.current = index;
       previousTextRef.current = editor.textContent ?? "";
       syncEditorContent();
@@ -3665,6 +4015,14 @@ export function TaskDetailsPanel({
         window.clearTimeout(formatMenuTimerRef.current);
       }
 
+      if (formatMenuRevealTimerRef.current !== null) {
+        window.clearTimeout(formatMenuRevealTimerRef.current);
+      }
+
+      if (formatMenuRevealFrameRef.current !== null) {
+        window.cancelAnimationFrame(formatMenuRevealFrameRef.current);
+      }
+
       if (clipboardNoticeTimerRef.current !== null) {
         window.clearTimeout(clipboardNoticeTimerRef.current);
       }
@@ -3755,38 +4113,45 @@ export function TaskDetailsPanel({
     }
 
     function handleSelectionChange() {
-      // While the mouse button is held down inside the editor, the browser is
-      // actively extending a native text selection. Any synchronous DOM
-      // traversal/layout work here (line lookups, getBoundingClientRect,
-      // range.intersectsNode over every line, etc.) can interrupt that native
-      // extension, most noticeably breaking backward (right-to-left) drags.
-      // Defer all of this bookkeeping until mouseup.
-      if (isEditorPointerDownRef.current) return;
-
       const editor = editorRef.current;
+
+      if (isEditorPointerDownRef.current) {
+        const pendingLine = pendingClickLineRef.current;
+        if (
+          editor &&
+          pendingLine &&
+          isBodyPlaceholderLine(pendingLine) &&
+          editor.contains(pendingLine)
+        ) {
+          const selection = window.getSelection();
+          if (
+            selection?.isCollapsed &&
+            !isCaretAtStartOfLine(pendingLine)
+          ) {
+            placeCaretInLine(pendingLine);
+          }
+        }
+        return;
+      }
+
       if (!editor) return;
 
       const selection = window.getSelection();
       const selectionInEditor =
         Boolean(selection?.rangeCount) &&
-        selection?.anchorNode != null &&
-        editor.contains(selection.anchorNode);
+        ((selection?.anchorNode != null &&
+          editor.contains(selection.anchorNode)) ||
+          (selection?.focusNode != null &&
+            editor.contains(selection.focusNode)));
 
       if (selectionInEditor) {
         if (!editorHasLiveExtendedTextSelection(editor)) {
           syncEditorLineEmptyState(editor);
         }
 
-        if (
-          selection?.rangeCount &&
-          !selection.isCollapsed &&
-          editor.contains(selection.anchorNode)
-        ) {
-          rememberFormatSelection(editor, selection.getRangeAt(0));
-        }
-
-        if (task?.isNote) {
-          syncFormatMenuFontState();
+        const liveRange = captureLiveEditorFormatSelection(editor);
+        if (liveRange) {
+          rememberFormatSelection(editor, liveRange);
         }
       }
 
@@ -3795,10 +4160,19 @@ export function TaskDetailsPanel({
           window.clearTimeout(formatMenuTimerRef.current);
         }
 
-        formatMenuTimerRef.current = window.setTimeout(() => {
+        const shouldShowFormatMenuImmediately =
+          !isEditorPointerDownRef.current &&
+          editorHasLiveExtendedTextSelection(editor);
+
+        if (shouldShowFormatMenuImmediately) {
           formatMenuTimerRef.current = null;
-          updateFormatMenu();
-        }, FORMAT_MENU_DEBOUNCE_MS);
+          scheduleFormatMenuReveal();
+        } else {
+          formatMenuTimerRef.current = window.setTimeout(() => {
+            formatMenuTimerRef.current = null;
+            scheduleFormatMenuReveal();
+          }, FORMAT_MENU_DEBOUNCE_MS);
+        }
       }
 
       scheduleLineControlsUpdate();
@@ -3811,7 +4185,7 @@ export function TaskDetailsPanel({
       document.removeEventListener("mousedown", handleClickOutside, true);
       document.removeEventListener("selectionchange", handleSelectionChange);
     };
-  }, [closeFormatMenu, rememberFormatSelection, requestSave, scheduleLineControlsUpdate, syncFormatMenuFontState, task?.isNote, updateFormatMenu]);
+  }, [closeFormatMenu, rememberFormatSelection, requestSave, scheduleFormatMenuReveal, scheduleLineControlsUpdate]);
 
   useLayoutEffect(() => {
     if (!formatMenu || !formatMenuRef.current) return;
@@ -4373,7 +4747,12 @@ export function TaskDetailsPanel({
     const editor = editorRef.current;
     const activeLine = editor ? getActiveLineElement(editor) : null;
 
-    if (editor && activeLine && isDetailLineEmpty(activeLine)) {
+    if (
+      editor &&
+      activeLine &&
+      shouldPlaceCaretAtLineStart(activeLine) &&
+      !isEditorPointerDownRef.current
+    ) {
       focusDetailLine(editor, activeLine);
     }
 
@@ -4466,10 +4845,14 @@ export function TaskDetailsPanel({
     clickedLineRef.current = line;
     pendingClickLineRef.current = line;
 
-    if (isDetailLineEmpty(line) && !isMultiClick) {
+    if (
+      isBodyPlaceholderLine(line) &&
+      !isMultiClick &&
+      !event.shiftKey &&
+      !editorHasLiveExtendedTextSelection(editor)
+    ) {
       event.preventDefault();
       focusDetailLine(editor, line);
-      syncEditorLineEmptyState(editor);
     }
 
     updateLineControls();
@@ -4623,6 +5006,21 @@ export function TaskDetailsPanel({
   }
 
   function handleEditorKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (
+      (event.metaKey || event.ctrlKey) &&
+      event.key.toLowerCase() === "a" &&
+      !event.shiftKey
+    ) {
+      const editor = editorRef.current;
+      if (editor) {
+        event.preventDefault();
+        if (selectAllDetailEditorContent(editor)) {
+          scheduleFormatMenuReveal();
+        }
+      }
+      return;
+    }
+
     if (slashCommandMenu) {
       const filtered = getSlashCommandOptions(slashCommandMenu.query);
       const selectedIndex = Math.min(
@@ -4703,7 +5101,7 @@ export function TaskDetailsPanel({
 
     formatMenuTimerRef.current = window.setTimeout(() => {
       formatMenuTimerRef.current = null;
-      updateFormatMenu();
+      scheduleFormatMenuReveal();
     }, FORMAT_MENU_DEBOUNCE_MS);
 
     if (task?.isNote) {
@@ -4714,37 +5112,23 @@ export function TaskDetailsPanel({
   }
 
   function handleEditorMouseUp() {
+    const editor = editorRef.current;
+    const pendingLine = pendingClickLineRef.current;
+    pendingClickLineRef.current = null;
+
     finishEditorPointerInteraction();
+    scheduleFormatMenuReveal();
 
-    requestAnimationFrame(() => {
-      const editor = editorRef.current;
-      if (!editor) {
-        pendingClickLineRef.current = null;
-        return;
-      }
+    if (
+      editor &&
+      pendingLine &&
+      !isTitleLine(editor, pendingLine) &&
+      shouldPlaceCaretAtLineStart(pendingLine)
+    ) {
+      scheduleCaretAtLineStart(editor, pendingLine);
+    }
 
-      const selection = window.getSelection();
-      const hasTextSelection =
-        Boolean(selection?.rangeCount) &&
-        selection?.anchorNode != null &&
-        !selection.isCollapsed &&
-        editor.contains(selection.anchorNode) &&
-        selection.toString().trim().length > 0;
-
-      if (hasTextSelection && selection) {
-        rememberFormatSelection(editor, selection.getRangeAt(0));
-        if (task?.isNote) {
-          syncFormatMenuFontState();
-        }
-        updateFormatMenu();
-      } else {
-        savedFormatSelectionRef.current = null;
-        updateFormatMenu();
-      }
-
-      pendingClickLineRef.current = null;
-      updateLineControls();
-    });
+    updateLineControls();
   }
 
   function handleEditorContextMenu(event: React.MouseEvent<HTMLDivElement>) {
@@ -4816,26 +5200,8 @@ export function TaskDetailsPanel({
   }
 
   function handleEditorDoubleClick() {
-    window.setTimeout(() => {
-      const editor = editorRef.current;
-      const selection = window.getSelection();
-      if (
-        !editor ||
-        !selection?.rangeCount ||
-        selection.isCollapsed ||
-        !selection.anchorNode ||
-        !editor.contains(selection.anchorNode)
-      ) {
-        return;
-      }
-
-      rememberFormatSelection(editor, selection.getRangeAt(0));
-      if (task?.isNote) {
-        syncFormatMenuFontState();
-      }
-      updateFormatMenu();
-      updateLineControls();
-    }, 0);
+    scheduleFormatMenuReveal();
+    updateLineControls();
   }
 
   function handleEditorClick(event: React.MouseEvent<HTMLDivElement>) {
@@ -4902,6 +5268,14 @@ export function TaskDetailsPanel({
         })();
       }
       return;
+    }
+
+    if (
+      clickedLine instanceof HTMLElement &&
+      !isTitleLine(editor, clickedLine) &&
+      shouldPlaceCaretAtLineStart(clickedLine)
+    ) {
+      scheduleCaretAtLineStart(editor, clickedLine);
     }
 
     if (task?.isNote) {
@@ -5210,6 +5584,7 @@ export function TaskDetailsPanel({
                     Undo
                   </span>
                 </div>
+                
                 <div className="group/redo relative">
                   <button
                     type="button"
@@ -5231,6 +5606,30 @@ export function TaskDetailsPanel({
                     Redo
                   </span>
                 </div>
+                {showHeaderClearFormatting ? (
+                  <div className="group/clear-format relative">
+                    <button
+                      type="button"
+                      aria-label="Clear formatting"
+                      aria-describedby="task-details-clear-formatting-tooltip"
+                      onMouseDown={(event) => {
+                        event.preventDefault();
+                        captureFormatSelectionFromEditor();
+                        clearFormatting();
+                      }}
+                      className="flex h-10 min-w-[2.25rem] cursor-pointer items-center justify-center rounded-full px-2.5 text-zinc-500 transition-colors hover:bg-zinc-200 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                    >
+                      <LuRemoveFormatting className="size-[18px]" />
+                    </button>
+                    <span
+                      id="task-details-clear-formatting-tooltip"
+                      role="tooltip"
+                      className={`${TASK_DETAILS_TOOLTIP_CLASS} group-hover/clear-format:opacity-100`}
+                    >
+                      Clear formatting
+                    </span>
+                  </div>
+                ) : null}
                 <div className="group/history relative">
                   <button
                     type="button"
@@ -5409,7 +5808,7 @@ export function TaskDetailsPanel({
               onKeyDown={handleEditorKeyDown}
               onKeyUp={handleEditorKeyUp}
               onScroll={updateLineControls}
-              className="task-details-editor min-h-[650px] w-full resize-y overflow-auto rounded-xl bg-white py-2 pl-[30px] pr-3 text-[17px] leading-[1.75] text-[#555555] outline-none transition-colors dark:bg-zinc-950 dark:text-zinc-300 [&_.detail-line[data-line-type=bullet]]:pl-1 [&_.detail-line[data-line-type=checklist]]:cursor-pointer [&_.detail-line[data-line-type=checklist]]:pl-1 [&_.detail-line[data-line-type=h1]]:text-[28px] [&_.detail-line[data-line-type=h1]]:font-bold [&_.detail-line[data-line-type=h1]]:leading-[36px] [&_.detail-line[data-line-type=h1]]:text-[#4B4B4B] dark:[&_.detail-line[data-line-type=h1]]:text-[#F5F5F5] [&_.detail-line[data-line-type=h2]]:text-[23px] [&_.detail-line[data-line-type=h2]]:font-semibold [&_.detail-line[data-line-type=h2]]:leading-[30px] [&_.detail-line[data-line-type=h3]]:text-[19px] [&_.detail-line[data-line-type=h3]]:font-semibold [&_.detail-line[data-line-type=h3]]:leading-[26px] [&_.detail-line[data-line-type=numbered]]:pl-1 [&_mark]:bg-yellow-200 dark:[&_mark]:bg-yellow-300/30 [&_s]:line-through [&_strike]:line-through [&_u]:underline"
+              className="task-details-editor min-h-[650px] w-full resize-y overflow-auto rounded-xl bg-white py-[2px] pl-[30px] pr-3 text-[17px] text-[#555555] outline-none transition-colors dark:bg-zinc-950 dark:text-zinc-300 [&_.detail-line[data-line-type=bullet]]:pl-1 [&_.detail-line[data-line-type=checklist]]:cursor-pointer [&_.detail-line[data-line-type=checklist]]:pl-1 [&_.detail-line[data-line-type=h1]]:text-[26px] [&_.detail-line[data-line-type=h1]]:font-bold [&_.detail-line[data-line-type=h1]]:leading-[36px] [&_.detail-line[data-line-type=h1]]:text-[#4B4B4B] dark:[&_.detail-line[data-line-type=h1]]:text-[#F5F5F5] [&_.detail-line[data-line-type=h2]]:text-[23px] [&_.detail-line[data-line-type=h2]]:font-semibold [&_.detail-line[data-line-type=h2]]:leading-[30px] [&_.detail-line[data-line-type=h3]]:text-[19px] [&_.detail-line[data-line-type=h3]]:font-semibold [&_.detail-line[data-line-type=h3]]:leading-[26px] [&_.detail-line[data-line-type=numbered]]:pl-1 [&_mark]:bg-yellow-200 dark:[&_mark]:bg-yellow-300/30 [&_s]:line-through [&_strike]:line-through [&_u]:underline"
             />
 
             {dropIndicator && (
@@ -5583,7 +5982,7 @@ export function TaskDetailsPanel({
                 onChange={(event) => setLinkText(event.target.value)}
                 placeholder="Display text"
                 aria-label="Link display text"
-                className="w-full rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-50"
+                className="w-full rounded-[10px] border border-zinc-200 bg-white px-2.5 py-1.5 text-sm text-zinc-900 outline-none dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-50"
                 onMouseDown={(event) => event.stopPropagation()}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {
@@ -5604,7 +6003,7 @@ export function TaskDetailsPanel({
                 onChange={(event) => setLinkUrl(event.target.value)}
                 placeholder="Paste or type a link"
                 aria-label="Link URL"
-                className="w-full rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-50"
+                className="w-full rounded-[10px] border border-zinc-200 bg-white px-2.5 py-1.5 text-sm text-zinc-900 outline-none dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-50"
                 onMouseDown={(event) => event.stopPropagation()}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {
@@ -5635,7 +6034,7 @@ export function TaskDetailsPanel({
                   <button
                     type="button"
                     onClick={applyLink}
-                    className="rounded-md bg-[#4873c7] px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-[#3f68bd]"
+                    className="rounded-full bg-[#4873c7] px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-[#3f68bd]"
                   >
                     Apply
                   </button>

@@ -135,7 +135,7 @@ const TASK_ROW_LEFT_BORDER_COLOR_CLASS = "border-l-[#dADFeF]";
 
 // Schedule/time subline: base #98979c, row hover 20% darker → #79787c
 const TASK_ROW_SCHEDULE_COLOR_CLASS =
-  "text-[#98979c] group-hover:text-[#79787c]";
+  "text-[#afafaf] group-hover:text-[#79787c]";
 const TASK_ROW_SCHEDULE_TRANSITION_CLASS =
   "transition-colors duration-200 ease-in-out";
 
@@ -161,6 +161,21 @@ function formatTaskListScheduleSubline(
   }
 
   return dueDateLabel;
+}
+
+export function getTaskListItemDividerClass(task: {
+  isNote: boolean;
+  dueDate: string | null;
+}) {
+  if (task.isNote) {
+    return "task-list-item-divider task-list-item-divider--note";
+  }
+
+  if (task.dueDate) {
+    return "task-list-item-divider task-list-item-divider--dated";
+  }
+
+  return "task-list-item-divider";
 }
 
 export function getTaskRowLeftBorderClass(
@@ -321,6 +336,7 @@ export function TaskListTaskRow({
   const rowPaddingLeft = basePaddingLeft + depth * SUBTASK_INDENT_PX;
   const isSelected = task.id === selectedTaskId;
   const leftBorderClass = getTaskRowLeftBorderClass(task.id, selectedTaskId);
+  const dividerClass = getTaskListItemDividerClass(task);
   const hideDueDate = isCheckAnimating || isCompleting;
   const checkedContentDim = hideDueDate ? "opacity-50" : "opacity-100";
   const checkedTextStyle = hideDueDate
@@ -374,6 +390,7 @@ export function TaskListTaskRow({
     !task.isNote && (task.dueDate || dueTimeLabel !== null),
   );
   const hasRecurrence = Boolean(parseRecurrenceRule(task.recurrenceRule));
+  const rowMinHeightClass = showDueSchedule ? "min-h-[35px]" : "min-h-[37px]";
 
   function handleDatePickerTrigger(
     event: React.SyntheticEvent<HTMLButtonElement>,
@@ -521,7 +538,7 @@ export function TaskListTaskRow({
           ? (event) => onTaskDragStart(event, task.id)
           : undefined
       }
-      className={`group flex min-h-[35px] items-center rounded-r-[3px] border-b border-zinc-100 py-1.5 pr-2 pl-0 dark:border-zinc-900 ${leftBorderClass} ${
+      className={`group ${dividerClass} flex ${rowMinHeightClass} items-center rounded-r-[3px] py-1.5 pr-2 pl-0 ${leftBorderClass} ${
       // className={`group flex min-h-[35px] items-center rounded-r-[3px] border-b border-zinc-100 py-1 pr-2 pl-[1px] dark:border-zinc-900 ${
         isCompleting
           ? showCompletionBackground
@@ -604,12 +621,12 @@ export function TaskListTaskRow({
             onClick={(event) => event.stopPropagation()}
             onBlur={() => onCommitTitleEdit(task)}
             onKeyDown={(event) => onTitleKeyDown(event, task)}
-            className="min-w-0 w-full border-0 bg-transparent p-0 text-left text-sm leading-[19px] text-zinc-900 outline-none dark:text-zinc-50"
+            className="min-w-0 w-full border-0 bg-transparent p-0 text-left text-[15px] leading-[20px] text-zinc-900 outline-none dark:text-zinc-50"
           />
         ) : (
           <span
             data-task-truncate-measure
-            className={`min-w-0 truncate text-left text-sm leading-[19px] transition-colors ${checkedTextStyle}`}
+            className={`min-w-0 truncate text-left text-[15px] leading-[20px] transition-colors ${checkedTextStyle}`}
             style={{ transitionDuration: `${CHECKED_ROW_DIM_MS}ms` }}
           >
             {task.name}

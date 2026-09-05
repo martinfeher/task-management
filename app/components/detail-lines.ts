@@ -112,6 +112,7 @@ export function ensureBlockLines(editor: HTMLElement) {
         line.dataset.lineId = generateLineId();
       }
     });
+    flattenNestedDetailLines(editor);
     normalizeImageLines(editor);
     return;
   }
@@ -1371,25 +1372,90 @@ export function isDetailLineEmpty(line: HTMLElement) {
   return isLineEmpty(line);
 }
 
+export function isBodyPlaceholderLine(line: HTMLElement) {
+  const editor = line.parentElement;
+  if (!editor) return false;
+
+  const lines = getLineElements(editor);
+  const index = lines.indexOf(line);
+  if (index <= 0) return false;
+  if (!isLineEmpty(line)) return false;
+  if (!isBodyPlaceholderCandidateLine(line)) return false;
+
+  return index === lines.length - 1;
+}
+
+export function getDetailLineFromNode(node: Node | null, editor: HTMLElement) {
+  let current: Node | null = node;
+
+  while (current && current !== editor) {
+    if (
+      current instanceof HTMLElement &&
+      current.classList.contains(DETAIL_LINE_CLASS)
+    ) {
+      return current;
+    }
+    current = current.parentNode;
+  }
+
+  return null;
+}
+
+export function isCaretAtStartOfLine(line: HTMLElement) {
+  const selection = window.getSelection();
+  if (!selection?.isCollapsed) return false;
+
+  const { focusNode, focusOffset } = selection;
+  if (!focusNode) return false;
+
+  if (focusNode === line) {
+    return focusOffset === 0;
+  }
+
+  if (focusNode.parentElement === line) {
+    const childIndex = Array.from(line.childNodes).indexOf(focusNode as ChildNode);
+    return childIndex === 0 && focusOffset === 0;
+  }
+
+  return false;
+}
+
+function normalizeEmptyLineForCaret(line: HTMLElement) {
+  if (line.querySelector(".detail-image-wrapper")) return;
+
+  if (!line.querySelector("br")) {
+    line.innerHTML = "<br>";
+    return;
+  }
+
+  if (!(line.textContent ?? "").replace(/[\u00a0\u200B]/g, " ").trim()) {
+    line.textContent = "";
+    line.innerHTML = "<br>";
+  }
+}
+
 export function placeCaretInLine(line: HTMLElement) {
   const selection = window.getSelection();
   if (!selection) return;
 
-  if (isLineEmpty(line) && !line.querySelector("br")) {
+  if (isLineEmpty(line) || isBodyPlaceholderLine(line)) {
+    normalizeEmptyLineForCaret(line);
+
+    const range = document.createRange();
+    range.setStart(line, 0);
+    range.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    return;
+  }
+
+  if (!line.querySelector("br")) {
     line.innerHTML = "<br>";
   }
 
   const range = document.createRange();
-  const br = line.querySelector("br");
-
-  if (isLineEmpty(line) && br) {
-    range.setStartBefore(br);
-    range.collapse(true);
-  } else {
-    range.selectNodeContents(line);
-    range.collapse(true);
-  }
-
+  range.selectNodeContents(line);
+  range.collapse(true);
   selection.removeAllRanges();
   selection.addRange(range);
 }
@@ -1469,6 +1535,64 @@ export function focusDetailLine(editor: HTMLElement, line: HTMLElement) {
   placeCaretInLine(line);
 }
 
+function setRangeEndAtLineEnd(range: Range, line: HTMLElement) {
+  const endRange = document.createRange();
+  endRange.selectNodeContents(line);
+  range.setEnd(endRange.endContainer, endRange.endOffset);
+}
+
+export function selectAllEditorBodyContent(editor: HTMLElement) {
+  ensureBlockLines(editor);
+  ensureTitleLine(editor);
+
+  const bodyLines = getLineElements(editor).slice(1);
+  if (bodyLines.length === 0) return false;
+
+  let lastSelectableIndex = bodyLines.length - 1;
+  while (
+    lastSelectableIndex >= 0 &&
+    isBodyPlaceholderLine(bodyLines[lastSelectableIndex])
+  ) {
+    lastSelectableIndex -= 1;
+  }
+
+  if (lastSelectableIndex < 0) return false;
+
+  const firstLine = bodyLines[0];
+  const lastLine = bodyLines[lastSelectableIndex];
+  const range = document.createRange();
+  range.setStart(firstLine, 0);
+  setRangeEndAtLineEnd(range, lastLine);
+
+  const selection = window.getSelection();
+  if (!selection) return false;
+
+  editor.focus();
+  selection.removeAllRanges();
+  selection.addRange(range);
+  return true;
+}
+
+export function selectAllDetailEditorContent(editor: HTMLElement) {
+  ensureBlockLines(editor);
+  ensureTitleLine(editor);
+
+  const activeLine = getActiveLineElement(editor);
+  if (activeLine && isTitleLine(editor, activeLine)) {
+    const range = document.createRange();
+    range.selectNodeContents(activeLine);
+    const selection = window.getSelection();
+    if (!selection) return false;
+
+    editor.focus();
+    selection.removeAllRanges();
+    selection.addRange(range);
+    return true;
+  }
+
+  return selectAllEditorBodyContent(editor);
+}
+
 function isDetailsHtmlEmpty(html: string) {
   const trimmed = html.trim();
   if (
@@ -1487,6 +1611,87 @@ function isDetailsHtmlEmpty(html: string) {
   return getLineElements(container).every((line) => isLineEmpty(line));
 }
 
+function stripLineTransientState(line: HTMLElement) {
+  delete line.dataset.empty;
+  delete line.dataset.bodyPlaceholder;
+  stripLinePollutedStyles(line);
+}
+
+const ALLOWED_DETAIL_LINE_STYLE_PROPERTIES = new Set([
+  "--detail-line-height",
+  "line-height",
+  "font-size",
+  "font-family",
+  "color",
+  "background-color",
+  "text-align",
+  "text-decoration",
+  "font-weight",
+  "font-style",
+]);
+
+function stripLinePollutedStyles(line: HTMLElement) {
+  line.style.removeProperty("height");
+  line.style.removeProperty("min-height");
+  line.style.removeProperty("max-height");
+
+  if (!line.style.cssText.trim()) {
+    line.removeAttribute("style");
+    return;
+  }
+
+  for (const property of Array.from(line.style)) {
+    if (!ALLOWED_DETAIL_LINE_STYLE_PROPERTIES.has(property)) {
+      line.style.removeProperty(property);
+    }
+  }
+
+  if (!line.style.cssText.trim()) {
+    line.removeAttribute("style");
+  }
+}
+
+function lineHasNestedDetailLines(line: HTMLElement) {
+  return line.querySelector(`:scope > .${DETAIL_LINE_CLASS}`) !== null;
+}
+
+function lineHasOwnTextContent(line: HTMLElement) {
+  const clone = line.cloneNode(true) as HTMLElement;
+  clone
+    .querySelectorAll(`:scope > .${DETAIL_LINE_CLASS}`)
+    .forEach((nested) => nested.remove());
+
+  return Boolean((clone.textContent ?? "").replace(/\u00a0|\u200B/g, " ").trim());
+}
+
+export function flattenNestedDetailLines(editor: HTMLElement) {
+  let changed = false;
+
+  while (true) {
+    const containerLine = getLineElements(editor).find(lineHasNestedDetailLines);
+    if (!containerLine) break;
+
+    const nestedLines = Array.from(
+      containerLine.querySelectorAll(`:scope > .${DETAIL_LINE_CLASS}`),
+    ) as HTMLElement[];
+
+    for (const nestedLine of nestedLines) {
+      stripLineTransientState(nestedLine);
+      containerLine.before(nestedLine);
+    }
+
+    if (!lineHasOwnTextContent(containerLine)) {
+      containerLine.remove();
+    } else {
+      splitBlockLinesOnBreaks(editor);
+    }
+
+    changed = true;
+  }
+
+  return changed;
+}
+
 function isBodyPlaceholderCandidateLine(line: HTMLElement) {
   return (
     !line.querySelector(".detail-image-wrapper") && !isCodeLine(line)
@@ -1497,50 +1702,106 @@ function isBodyLineWithContent(line: HTMLElement) {
   return !isLineEmpty(line) || line.querySelector(".detail-image-wrapper") !== null;
 }
 
-function ensureTrailingBodyPlaceholderLine(editor: HTMLElement) {
+function isRemovableTrailingEmptyBodyLine(line: HTMLElement) {
+  return (
+    isLineEmpty(line) &&
+    !isCodeLine(line) &&
+    !line.querySelector(".detail-image-wrapper")
+  );
+}
+
+function syncTrailingBodyPlaceholderLine(editor: HTMLElement) {
   const lines = getLineElements(editor);
   if (lines.length <= 1) return;
 
   const bodyLines = lines.slice(1);
   const bodyHasContent = bodyLines.some(isBodyLineWithContent);
-  if (!bodyHasContent) return;
 
-  const lastLine = lines[lines.length - 1];
-  if (isBodyLineWithContent(lastLine)) {
+  if (!bodyHasContent) {
+    while (bodyLines.length > 1) {
+      bodyLines.pop()?.remove();
+    }
+
+    if (getLineElements(editor).length === 1) {
+      editor.appendChild(createLineElement("<br>", "text"));
+    }
+
+    return;
+  }
+
+  let currentLines = getLineElements(editor);
+  while (currentLines.length > 1) {
+    const lastLine = currentLines[currentLines.length - 1];
+    if (!isRemovableTrailingEmptyBodyLine(lastLine)) break;
+    lastLine.remove();
+    currentLines = getLineElements(editor);
+  }
+
+  const lastLine = getLineElements(editor).at(-1);
+  if (lastLine && isBodyLineWithContent(lastLine)) {
     editor.appendChild(createLineElement("<br>", "text"));
   }
 }
 
+export function clearFixedLineDimensions(line: HTMLElement) {
+  line.style.removeProperty("height");
+  line.style.removeProperty("min-height");
+  line.style.removeProperty("max-height");
+}
+
+export function stripTrailingBreakFromNonEmptyLine(line: HTMLElement) {
+  if (isLineEmpty(line)) return false;
+
+  let changed = false;
+
+  while (line.lastChild) {
+    const last = line.lastChild;
+
+    if (last instanceof HTMLBRElement) {
+      line.removeChild(last);
+      changed = true;
+      continue;
+    }
+
+    if (
+      last instanceof Text &&
+      !(last.textContent ?? "").replace(/\u00a0/g, " ").trim()
+    ) {
+      line.removeChild(last);
+      changed = true;
+      continue;
+    }
+
+    break;
+  }
+
+  return changed;
+}
+
 export function syncLineEmptyState(editor: HTMLElement) {
+  flattenNestedDetailLines(editor);
   normalizeImageLines(editor);
   normalizeCodeLines(editor);
   normalizeChecklistLines(editor);
-  ensureTrailingBodyPlaceholderLine(editor);
+  syncTrailingBodyPlaceholderLine(editor);
 
   const lines = getLineElements(editor);
-  const lastLineIndex = lines.length - 1;
-  const bodyContentEmpty = lines.slice(1).every((line) => !isBodyLineWithContent(line));
 
   lines.forEach((line, index) => {
+    if (index > 0 && !isCodeLine(line)) {
+      clearFixedLineDimensions(line);
+    }
+
     const isEmpty = isLineEmpty(line);
 
     if (isEmpty) {
       line.dataset.empty = "true";
     } else {
       delete line.dataset.empty;
+      stripTrailingBreakFromNonEmptyLine(line);
     }
 
-    const showBodyPlaceholder =
-      isEmpty &&
-      index > 0 &&
-      isBodyPlaceholderCandidateLine(line) &&
-      (bodyContentEmpty ? index === 1 : index === lastLineIndex);
-
-    if (showBodyPlaceholder) {
-      line.dataset.bodyPlaceholder = "true";
-    } else {
-      delete line.dataset.bodyPlaceholder;
-    }
+    delete line.dataset.bodyPlaceholder;
   });
 }
 
@@ -1576,11 +1837,15 @@ export function buildEditorHtmlFromTask(title: string, detailsHtml: string) {
     detailsRoot.innerHTML = detailsHtml;
     ensureBlockLines(detailsRoot);
     getLineElements(detailsRoot).forEach((line) => {
-      editor.appendChild(line.cloneNode(true));
+      const clone = line.cloneNode(true) as HTMLElement;
+      stripLineTransientState(clone);
+      editor.appendChild(clone);
     });
   } else {
     editor.appendChild(createLineElement("<br>", "text"));
   }
+
+  syncLineEmptyState(editor);
 
   return editor.innerHTML;
 }
@@ -1595,13 +1860,26 @@ export function splitEditorContent(html: string) {
   editor.innerHTML = html;
   ensureBlockLines(editor);
   ensureTitleLine(editor);
+  syncLineEmptyState(editor);
 
   const lines = getLineElements(editor);
   const title = getEditorTitle(editor);
   const detailsRoot = document.createElement("div");
 
-  lines.slice(1).forEach((line) => {
-    detailsRoot.appendChild(line.cloneNode(true));
+  const bodyLines = lines.slice(1).map((line) => {
+    const clone = line.cloneNode(true) as HTMLElement;
+    stripLineTransientState(clone);
+    return clone;
+  });
+
+  while (bodyLines.length > 0) {
+    const lastLine = bodyLines[bodyLines.length - 1];
+    if (!isRemovableTrailingEmptyBodyLine(lastLine)) break;
+    bodyLines.pop();
+  }
+
+  bodyLines.forEach((line) => {
+    detailsRoot.appendChild(line);
   });
 
   const detailsHtml = detailsRoot.innerHTML.trim();

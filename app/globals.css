@@ -113,7 +113,6 @@ body {
   color-scheme: light;
   caret-color: #171717;
   cursor: text;
-  line-height: 1.75;
   scrollbar-gutter: stable;
 }
 
@@ -126,9 +125,13 @@ body {
 .task-details-editor .detail-line {
   display: block;
   position: relative;
-  min-height: 1.75em;
+  line-height: var(--detail-line-height, 1.75);
   caret-color: #171717;
   -webkit-user-drag: none;
+}
+
+.task-details-editor .detail-line:not([data-empty="true"]) > br:last-child {
+  display: none;
 }
 
 .task-details-editor .detail-line:not([data-line-type="code"]) {
@@ -164,12 +167,35 @@ body {
   clear: both;
 }
 
-.task-details-editor .detail-line[data-line-type="h1"][data-empty="true"]::before,
-.task-details-editor .detail-line[data-body-placeholder="true"]::before {
+.task-details-editor .detail-line[data-line-type="h1"][data-empty="true"]::before {
   position: absolute;
   left: 0;
   top: 0;
   font-family: var(--font-app), ui-sans-serif, system-ui, sans-serif !important;
+}
+
+.task-details-editor
+  .detail-line[data-empty="true"]:last-child:not([data-line-type="h1"]):not([data-line-type="code"]):not(
+    :has(.detail-image-wrapper)
+  ):not([data-line-type="bullet"]):not([data-line-type="numbered"]):not(
+    [data-line-type="checklist"]
+  )::before {
+  font-family: var(--font-app), ui-sans-serif, system-ui, sans-serif !important;
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+.task-details-editor
+  .detail-line[data-empty="true"]:not([data-line-type="code"]):not(:has(.detail-image-wrapper)) {
+  min-height: calc(1em * var(--detail-line-height, 1.75));
+}
+
+@supports (height: 1lh) {
+  .task-details-editor
+    .detail-line[data-empty="true"]:not([data-line-type="code"]):not(:has(.detail-image-wrapper)) {
+    min-height: 1lh;
+  }
 }
 
 .detail-line[data-line-type="bullet"]::before {
@@ -183,13 +209,16 @@ body {
 }
 
 .dark .task-details-editor .detail-line[data-line-type="h1"][data-empty="true"]::before,
-.dark .task-details-editor .detail-line[data-body-placeholder="true"]::before,
 .dark .task-details-editor
-  .detail-line[data-body-placeholder="true"][data-line-type="bullet"]::after,
+  .detail-line[data-empty="true"]:last-child:not([data-line-type="h1"]):not([data-line-type="code"]):not(
+    :has(.detail-image-wrapper)
+  ):not([data-line-type="bullet"]):not([data-line-type="numbered"]):not([data-line-type="checklist"])::before,
 .dark .task-details-editor
-  .detail-line[data-body-placeholder="true"][data-line-type="numbered"]::after,
+  .detail-line[data-empty="true"]:last-child[data-line-type="bullet"]::after,
 .dark .task-details-editor
-  .detail-line[data-body-placeholder="true"][data-line-type="checklist"]::after {
+  .detail-line[data-empty="true"]:last-child[data-line-type="numbered"]::after,
+.dark .task-details-editor
+  .detail-line[data-empty="true"]:last-child[data-line-type="checklist"]::after {
   color: #52525b;
 }
 
@@ -248,6 +277,10 @@ body {
   color: #4B4B4B;
 }
 
+.task-details-editor .detail-line[data-line-type="h1"] + .detail-line {
+  margin-top: -2px;
+}
+
 .detail-line[data-line-type="h1"][data-empty="true"]::before {
   content: "Title";
   color: #a1a1aa;
@@ -256,25 +289,32 @@ body {
 }
 
 .task-details-editor
-  .detail-line[data-body-placeholder="true"]:not([data-line-type="bullet"]):not(
-    [data-line-type="numbered"]
-  ):not([data-line-type="checklist"])::before {
-  content: "+ start writing or press / to access commands";
+  .detail-line[data-empty="true"]:last-child:not([data-line-type="h1"]):not([data-line-type="code"]):not(
+    :has(.detail-image-wrapper)
+  ):not([data-line-type="bullet"]):not([data-line-type="numbered"]):not(
+    [data-line-type="checklist"]
+  )::before {
+  content: "start writing or press / to access commands";
+  position: absolute;
+  left: 0;
+  top: 0;
   color: #d4d4d8;
   pointer-events: none;
+  user-select: none;
   font-size: 16px;
   font-family: var(--font-app), ui-sans-serif, system-ui, sans-serif !important;
 }
 
 .task-details-editor
-  .detail-line[data-body-placeholder="true"][data-line-type="bullet"]::after,
+  .detail-line[data-empty="true"]:last-child[data-line-type="bullet"]::after,
 .task-details-editor
-  .detail-line[data-body-placeholder="true"][data-line-type="numbered"]::after,
+  .detail-line[data-empty="true"]:last-child[data-line-type="numbered"]::after,
 .task-details-editor
-  .detail-line[data-body-placeholder="true"][data-line-type="checklist"]::after {
-  content: "+ start writing or press / to access commands";
+  .detail-line[data-empty="true"]:last-child[data-line-type="checklist"]::after {
+  content: "start writing or press / to access commands";
   color: #d4d4d8;
   pointer-events: none;
+  user-select: none;
   margin-left: 0.25rem;
   font-family: var(--font-app), ui-sans-serif, system-ui, sans-serif !important;
 }
@@ -803,13 +843,12 @@ body {
   pointer-events: none;
   color: #3f3f46;
 }
-
 .search-result-content-preview .detail-line {
-  min-height: 1.75em;
+  line-height: var(--detail-line-height, 1.75);
 }
 
 .search-result-content-preview .detail-line[data-empty="true"]::before,
-.search-result-content-preview .detail-line[data-body-placeholder="true"]::before {
+.search-result-content-preview .detail-line[data-empty="true"]::after {
   content: none !important;
 }
 
@@ -898,6 +937,7 @@ body {
   z-index: 30;
   border-radius: 8px;
   cursor: grabbing;
+  opacity: 0.93;
   background-color: #ffffff !important;
   border-bottom-color: transparent !important;
   box-shadow:
@@ -1418,6 +1458,65 @@ body {
   transform-origin: center center;
   opacity: 1;
   border-radius: 50%;
+}
+
+.task-list-item-divider {
+  background-size: 100% 1px;
+  background-position: bottom left;
+  background-repeat: no-repeat;
+}
+
+.task-list-item-divider--dated {
+  background-image: linear-gradient(
+    to right,
+    transparent 4.5%,
+    rgb(244 244 245) 4.5%
+  );
+}
+
+.task-list-item-divider--note {
+  background-image: linear-gradient(
+    to right,
+    transparent 3%,
+    rgb(244 244 245) 3%
+  );
+}
+
+.task-list-item-divider:not(.task-list-item-divider--dated):not(
+    .task-list-item-divider--note
+  ) {
+  background-image: linear-gradient(
+    to right,
+    transparent 4.5%,
+    rgb(244 244 245) 4.5%
+  );
+}
+
+.dark .task-list-item-divider--dated {
+  background-image: linear-gradient(
+    to right,
+    transparent 4.5%,
+    rgb(24 24 27) 4.5%
+  );
+}
+
+.dark .task-list-item-divider--note {
+  background-image: linear-gradient(
+    to right,
+    transparent 3%,
+    rgb(24 24 27) 3%
+  );
+}
+
+.dark
+  .task-list-item-divider:not(.task-list-item-divider--dated):not(
+    .task-list-item-divider--note
+  ) {
+  background-image: linear-gradient(
+    to right,
+    transparent 15%,
+    rgb(24 24 27) 15%
+  );
 }
 
 .task-list-checkbox .checkbox__label::after {

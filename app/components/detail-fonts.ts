@@ -5,8 +5,13 @@ import {
   getLineSelectionRange,
   getSelectedBlockLinesInRange,
   isCodeLine,
+  isTitleLine,
   renumberNumberedLines,
 } from "./detail-lines";
+import {
+  DEFAULT_DETAIL_LINE_HEIGHT,
+  resetDetailLineHeightOnLines,
+} from "./detail-line-height";
 
 export const PASTE_BATCH_ATTR = "data-paste-batch";
 export const DEFAULT_DETAIL_FONT_SIZE = "17px";
@@ -672,6 +677,12 @@ export function stripFormattingInSelection(
   );
   if (lines.length === 0) return false;
 
+  const lineHeightTargets = lines.filter(
+    (line) =>
+      !isTitleLine(editor, line) &&
+      !line.querySelector(".detail-image-wrapper"),
+  );
+
   const lineSelections = lines
     .map((line) => ({
       line,
@@ -695,8 +706,10 @@ export function stripFormattingInSelection(
     renumberNumberedLines(editor);
   }
 
+  const resetLineHeight = resetDetailLineHeightOnLines(lineHeightTargets);
+
   if (insertedNodes.length === 0) {
-    return clearedListTypes;
+    return clearedListTypes || resetLineHeight;
   }
 
   const nextRange = document.createRange();
