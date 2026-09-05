@@ -41,7 +41,7 @@ export function getCalendarWeekdayLabel(
   return labels[getCalendarMondayFirstDayIndex(date)];
 }
 
-export const CALENDAR_ALL_DAY_ROW_HEIGHT_PX = 57;
+export const CALENDAR_ALL_DAY_ROW_HEIGHT_PX = 47;
 export const CALENDAR_ALL_DAY_ROW_MIN_HEIGHT_PX = CALENDAR_ALL_DAY_ROW_HEIGHT_PX;
 export const CALENDAR_ALL_DAY_ROW_MAX_HEIGHT_PX = CALENDAR_ALL_DAY_ROW_HEIGHT_PX;
 export const CALENDAR_HOUR_COLUMN_WIDTH_PX = 49;
@@ -113,8 +113,9 @@ export const CALENDAR_DAYS_HEADER_STICKY_CLASS =
   "sticky top-0 z-30 bg-white dark:bg-zinc-950";
 export const CALENDAR_DAYS_ALLDAY_STICKY_CLASS =
   "sticky z-20 bg-white dark:bg-zinc-950";
-export const CALENDAR_TIMED_GRID_SCROLL_CLASS =
-  "calendar-timed-grid-scroll min-h-0 flex-1 overflow-auto";
+export const CALENDAR_GRID_SCROLL_CLASS =
+  "calendar-grid-scroll min-h-0 flex-1 overflow-auto";
+export const CALENDAR_TIMED_GRID_SCROLL_CLASS = CALENDAR_GRID_SCROLL_CLASS;
 
 export const CALENDAR_DAY_COLUMN_DIVIDER_CLASS =
   "border-r border-zinc-200 dark:border-zinc-800";
@@ -123,7 +124,15 @@ export const CALENDAR_HOUR_COLUMN_DIVIDER_CLASS =
   "border-r border-zinc-200 dark:border-zinc-800";
 
 export function formatCalendarHourLabel(hour: number) {
-  return String(hour).padStart(2, "0");
+  const normalized = ((hour % 24) + 24) % 24;
+  const period = normalized >= 12 ? "pm" : "am";
+  const hours12 = normalized % 12 || 12;
+
+  return `${hours12}${period}`;
+}
+
+export function shouldShowCalendarHourLabel(hour: number) {
+  return hour !== 0;
 }
 
 export function getCalendarTimedGridTemplateColumns(dayCount: number) {
@@ -135,11 +144,11 @@ export function getCalendarSingleDayGridTemplateColumns() {
 }
 
 export function calendarHourLabelCellClassName(extra = "") {
-  return `relative text-center text-[11px] leading-none tabular-nums text-zinc-400 dark:text-zinc-500 ${extra}`.trim();
+  return `relative text-[11px] leading-none tabular-nums text-zinc-400 dark:text-zinc-500 ${extra}`.trim();
 }
 
 export function calendarHourLabelClassName(extra = "") {
-  return `absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 bg-white px-0.5 dark:bg-zinc-950 ${extra}`.trim();
+  return `absolute w-[32px] flex justify-end items-center right-[11px] top-0 -translate-y-1/2 bg-white px-0 dark:bg-zinc-950 ${extra}`.trim();
 }
 
 export function getCalendarDayColumnDividerClass(

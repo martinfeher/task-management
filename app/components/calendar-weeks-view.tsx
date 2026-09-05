@@ -26,6 +26,7 @@ import {
   getCalendarTaskItemStyle,
   getCalendarWeekStart,
   CALENDAR_TODAY_DATE_CIRCLE_CLASS,
+  CALENDAR_GRID_SCROLL_CLASS,
 } from "@/lib/calendar-layout";
 import type { CalendarSidebarSyncProps } from "./calendar-view-sidebar-layout";
 import {
@@ -481,7 +482,7 @@ export function CalendarMultiWeekView({
           ))}
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className={CALENDAR_GRID_SCROLL_CLASS}>
           <div
             className="grid h-full min-h-full grid-cols-7"
             style={{

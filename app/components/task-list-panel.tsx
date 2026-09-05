@@ -410,6 +410,7 @@ type TaskListPanelProps = {
   showListCalendarButton?: boolean;
   isListCalendarOpen?: boolean;
   isListCalendarPreview?: boolean;
+  listCalendarShowingDetails?: boolean;
   listCalendarButtonRef?: RefObject<HTMLButtonElement | null>;
   onListCalendarClick?: () => void;
   onListCalendarHoverStart?: () => void;
@@ -468,6 +469,7 @@ export function TaskListPanel({
   showListCalendarButton = false,
   isListCalendarOpen = false,
   isListCalendarPreview = false,
+  listCalendarShowingDetails = false,
   listCalendarButtonRef,
   onListCalendarClick,
   onListCalendarHoverStart,
@@ -480,6 +482,8 @@ export function TaskListPanel({
   showSidebarMenu = false,
   onOpenSidebar,
 }: TaskListPanelProps) {
+  const isListCalendarToggleActive =
+    (isListCalendarOpen && !listCalendarShowingDetails) || isListCalendarPreview;
   const [newTaskName, setNewTaskName] = useState("");
   const newTaskParsePreview = useMemo(() => {
     if (!newTaskName.trim()) return null;
@@ -2421,10 +2425,10 @@ export function TaskListPanel({
                       onClick={onListCalendarClick}
                       onMouseEnter={() => onListCalendarHoverStart?.()}
                       onMouseLeave={() => onListCalendarHoverEnd?.()}
-                      aria-pressed={isListCalendarOpen}
+                      aria-pressed={isListCalendarToggleActive}
                       aria-label={`Calendar - ${title}`}
                       className={`group flex w-full items-center overflow-hidden rounded-lg py-[4px] pl-[9px] pr-[9px] transition-[background-color,padding,max-width,opacity] cursor-pointer ${
-                        isListCalendarOpen || isListCalendarPreview
+                        isListCalendarToggleActive
                           ? "bg-[#4873c7] text-white"
                           : "bg-[#eceef0] text-zinc-700 hover:bg-zinc-250 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
                       }`}
@@ -2435,7 +2439,7 @@ export function TaskListPanel({
                       />
                       <span
                         className={`overflow-hidden whitespace-nowrap text-[12px] font-medium transition-[max-width,opacity,padding] duration-200 ease-out ${
-                          isListCalendarOpen || isListCalendarPreview
+                          isListCalendarToggleActive
                             ? "max-w-[12rem] pl-1.5 opacity-100"
                             : "max-w-0 opacity-0 group-hover:max-w-[12rem] group-hover:pl-1.5 group-hover:opacity-100"
                         }`}
@@ -2485,7 +2489,7 @@ export function TaskListPanel({
                     <div className="absolute right-0 top-full z-50 min-w-[180px] pt-1">
                       <div
                         role="menu"
-                        className="overflow-hidden rounded-md border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
+                        className="task-list-sort-menu py-1"
                       >
                         {SORT_OPTIONS.map((option) => (
                           <button
@@ -2495,7 +2499,7 @@ export function TaskListPanel({
                             onClick={() =>
                               applySort(option.field, option.direction)
                             }
-                            className="flex h-[35px] w-full cursor-pointer items-center px-3 text-left text-sm text-zinc-700 transition-colors hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-zinc-800/80"
+                            className="flex h-[32px] w-full cursor-pointer items-center px-3 text-left text-[13px] text-zinc-650 transition-colors hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-zinc-800/80"
                           >
                             {option.label}
                           </button>
@@ -2834,7 +2838,7 @@ export function TaskListPanel({
                 type="button"
                 onClick={() => setIsCompletedOpen((open) => !open)}
                 aria-expanded={isCompletedOpen}
-                className="flex w-full items-center gap-1.5 px-4 py-2.5 text-left text-sm text-[#777b7e] transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-900/40"
+                className="flex w-full items-center gap-1.5 pl-1 pr-4 py-2.5 text-left text-sm outline-none text-[#777b7e] transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-900/40"
               >
                 <BiChevronDown
                   className={`size-4 shrink-0 text-zinc-400 transition-transform ${
@@ -2860,7 +2864,7 @@ export function TaskListPanel({
                     {completedTasks.map((task) => (
                       <li
                         key={task.id}
-                        className={`group flex min-h-[35px] items-center border-b border-zinc-100 ml-[23px] py-1 pr-2 pl-[5px] dark:border-zinc-900 ${getTaskRowLeftBorderClass(
+                        className={`group flex min-h-[35px] items-center border-b border-zinc-100 ml-[10px] py-1 pr-2 pl-[5px] dark:border-zinc-900 cursor-pointer ${getTaskRowLeftBorderClass(
                           task.id,
                           selectedTaskId,
                         )} ${
@@ -2874,7 +2878,7 @@ export function TaskListPanel({
                           checkKey={task.id}
                           checked
                           persistCheckmark
-                          className="task-list-checkbox self-center"
+                          className="task-list-checkbox task-list-completed-checkbox self-center"
                           onChange={() => onToggleTask(task.id)}
                           onClick={(event) => event.stopPropagation()}
                           aria-label={`Reopen ${task.name}`}

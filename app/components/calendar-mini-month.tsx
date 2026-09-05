@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { CALENDAR_TODAY_DATE_CIRCLE_CLASS } from "@/lib/calendar-layout";
 import { BiChevronLeft, BiChevronRight } from "react-icons/bi";
 import type { TaskListItem } from "./todo-app";
@@ -67,12 +67,70 @@ export function formatMonthYear(date: Date) {
   }).format(date);
 }
 
+export function formatDayMonthYear(date: Date) {
+  const day = date.getDate();
+  const month = new Intl.DateTimeFormat(MINI_CALENDAR_LOCALE, {
+    month: "long",
+  }).format(date);
+
+  return `${day} ${month} ${date.getFullYear()}`;
+}
+
 export function formatSelectedDay(date: Date) {
   return new Intl.DateTimeFormat(MINI_CALENDAR_LOCALE, {
     weekday: "long",
     month: "long",
     day: "numeric",
   }).format(date);
+}
+
+function formatMiniCalendarNavMonthLabel(date: Date) {
+  return new Intl.DateTimeFormat(MINI_CALENDAR_LOCALE, {
+    month: "long",
+    year: "numeric",
+  }).format(date);
+}
+
+function MiniMonthNavButton({
+  direction,
+  monthLabel,
+  tooltipId,
+  onClick,
+  children,
+}: {
+  direction: "previous" | "next";
+  monthLabel: string;
+  tooltipId: string;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  const tooltipPositionClass =
+    direction === "previous"
+      ? "right-0 task-context-menu-tooltip-end"
+      : "left-0 task-context-menu-tooltip-start";
+
+  return (
+    <div className="group/mini-month-nav relative">
+      <button
+        type="button"
+        aria-label={`Go to ${monthLabel}`}
+        aria-describedby={tooltipId}
+        onClick={onClick}
+        className={`flex size-6 items-center justify-center rounded-full text-zinc-450 transition-colors hover:bg-zinc-100 hover:text-zinc-800 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 cursor-pointer ${
+          direction === "previous" ? "mr-[2px]" : ""
+        }`}
+      >
+        {children}
+      </button>
+      <span
+        id={tooltipId}
+        role="tooltip"
+        className={`add-task-date-tooltip pointer-events-none absolute bottom-[calc(100%+6px)] z-50 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity group-hover/mini-month-nav:opacity-100 ${tooltipPositionClass}`}
+      >
+        {monthLabel}
+      </span>
+    </div>
+  );
 }
 
 export function buildTasksByDate(
@@ -175,32 +233,46 @@ export function CalendarMiniMonth({
     () => getFullMonthDays(monthDate.getFullYear(), monthDate.getMonth()),
     [monthDate],
   );
+  const previousMonthLabel = useMemo(
+    () =>
+      formatMiniCalendarNavMonthLabel(
+        new Date(monthDate.getFullYear(), monthDate.getMonth() - 1, 1, 12, 0, 0, 0),
+      ),
+    [monthDate],
+  );
+  const nextMonthLabel = useMemo(
+    () =>
+      formatMiniCalendarNavMonthLabel(
+        new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 1, 12, 0, 0, 0),
+      ),
+    [monthDate],
+  );
+  const tooltipBaseId = useId();
   const todayWeekdayIndex = getMondayFirstWeekdayIndex(today);
 
   return (
     <div className="border-b border-zinc-200 px-2 py-2 dark:border-zinc-800">
       <div className="mb-1.5 flex items-center justify-between gap-1.5">
-        <h4 className="min-w-0 truncate text-[17.5px] font-semibold text-[#5f5f5f] dark:text-zinc-50">
+        <h4 className="min-w-0 truncate text-[17.5px] font-semibold text-[#3f3f3f] dark:text-zinc-50">
           {formatMonthYear(monthDate)}
         </h4>
         <div className="flex shrink-0 items-center gap-0.5">
-          <button
-            type="button"
-            aria-label="Previous month"
+          <MiniMonthNavButton
+            direction="previous"
+            monthLabel={previousMonthLabel}
+            tooltipId={`${tooltipBaseId}-previous-month`}
             onClick={onPreviousMonth}
-            className="flex size-5 items-center justify-center rounded-full text-zinc-450 transition-colors hover:bg-zinc-100 hover:text-zinc-800 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 cursor-pointer"
           >
-            <BiChevronLeft className="size-4" />
-          </button>
-     
-          <button
-            type="button"
-            aria-label="Next month"
+            <BiChevronLeft className="size-5" />
+          </MiniMonthNavButton>
+          <MiniMonthNavButton
+            direction="next"
+            monthLabel={nextMonthLabel}
+            tooltipId={`${tooltipBaseId}-next-month`}
             onClick={onNextMonth}
-            className="flex size-5 items-center justify-center rounded-full text-zinc-450 transition-colors hover:bg-zinc-100 hover:text-zinc-800 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 cursor-pointer"
           >
-            <BiChevronRight className="size-4" />
-          </button>
+            <BiChevronRight className="size-5" />
+          </MiniMonthNavButton>
         </div>
       </div>
 

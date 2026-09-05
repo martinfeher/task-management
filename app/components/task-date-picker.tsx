@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type SyntheticEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type SyntheticEvent } from "react";
 import {
   BiChevronDown,
   BiChevronLeft,
@@ -11,10 +11,14 @@ import {
 import { CalendarOff, Repeat } from "lucide-react";
 import {
   formatDueTimeLabel,
+  formatDurationInputText,
   formatTime24Hour,
   generateTimeListOptions,
+  DEFAULT_TIME_PICKER_DURATION_MINUTES,
+  isPresetDurationMinutes,
   normalizeDueTimeMinutes,
   normalizeDueTimeZone,
+  parseTypedDuration,
   parseTypedTime,
   TIME_PICKER_DURATION_OPTIONS,
   TIME_PRESETS,
@@ -44,6 +48,7 @@ type TaskDatePickerProps = {
   onSaveRecurrence?: (
     rule: TaskRecurrenceRule | null,
   ) => void | Promise<void>;
+  onRecurrenceMenuOpenChange?: (open: boolean) => void;
   className?: string;
 };
 
@@ -60,6 +65,29 @@ const PICKER_MUTED_FG = "#71717a";
 const PICKER_FOREGROUND = "#1c2030";
 const PICKER_POPOVER_SHADOW =
   "0 12px 40px -8px rgba(15, 23, 42, 0.18), 0 2px 8px rgba(15, 23, 42, 0.06)";
+
+function lightenHexColor(hex: string, amount: number) {
+  const normalized = hex.replace("#", "");
+  const channels = [
+    Number.parseInt(normalized.slice(0, 2), 16),
+    Number.parseInt(normalized.slice(2, 4), 16),
+    Number.parseInt(normalized.slice(4, 6), 16),
+  ];
+
+  return `#${channels
+    .map((channel) =>
+      Math.round(channel + (255 - channel) * amount)
+        .toString(16)
+        .padStart(2, "0"),
+    )
+    .join("")}`;
+}
+
+const PICKER_DURATION_SCROLL_THUMB = lightenHexColor("#a1a1aa", 0.15);
+const PICKER_DURATION_SCROLL_THUMB_HOVER = lightenHexColor("#71717a", 0.15);
+const PICKER_DURATION_SCROLL_TRACK = lightenHexColor("#f4f4f5", 0.15);
+const PICKER_DURATION_SCROLL_THUMB_DARK = lightenHexColor("#71717a", 0.15);
+const PICKER_DURATION_SCROLL_TRACK_DARK = lightenHexColor("#27272a", 0.15);
 
 const WEEKDAY_LABELS = ["M", "T", "W", "T", "F", "S", "S"];
 
@@ -369,7 +397,7 @@ function MonthGrid({
     <div>
       {showHeading && (
         <div className="mb-2 flex items-center justify-between px-3">
-          <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+          <h4 className="text-sm font-semibold text-zinc-750 dark:text-zinc-50">
             {formatMonthYear(monthDate)}
           </h4>
         </div>
@@ -411,10 +439,10 @@ function MonthGrid({
             >
               {day.getDate()}
               {isToday && !isSelected ? (
-                <span className="absolute bottom-0.5 left-1/2 size-1 -translate-x-1/2 rounded-full bg-emerald-500" />
+                <span className="absolute bottom-0.5 left-1/2 size-1 -translate-x-1/2 rounded-full bg-gray-300" />
               ) : null}
               {isRecurring && !isSelected ? (
-                <span className="absolute bottom-0.5 left-1/2 size-1 -translate-x-1/2 rounded-full bg-emerald-500" />
+                <span className="absolute bottom-0.5 left-1/2 size-1 -translate-x-1/2 rounded-full bg-gray-300" />
               ) : null}
             </button>
           );
@@ -497,6 +525,9 @@ function TaskRecurrenceMenu({
         aria-label="Repeat"
         aria-haspopup="listbox"
         aria-expanded={isOpen}
+        onPointerDown={(event) => {
+          event.stopPropagation();
+        }}
         onClick={() => {
           if (disabled) return;
           const nextOpen = !isOpen;
@@ -534,6 +565,9 @@ function TaskRecurrenceMenu({
           role="listbox"
           aria-label="Repeat options"
           className="absolute bottom-full left-0 right-0 z-40 mb-1 overflow-hidden rounded-xl border bg-white p-1"
+          onPointerDown={(event) => {
+            event.stopPropagation();
+          }}
           style={{
             borderColor: PICKER_BORDER,
             boxShadow: PICKER_POPOVER_SHADOW,
@@ -596,11 +630,58 @@ function TaskTimeMenu({
   const [durationMinutes, setDurationMinutes] = useState(
     initialDueTime.dueDurationMinutes,
   );
+  const [isCustomDurationOpen, setIsCustomDurationOpen] = useState(() =>
+    isPresetDurationMinutes(initialDueTime.dueDurationMinutes)
+      ? false
+      : initialDueTime.dueDurationMinutes !== null,
+  );
+  const [typedDuration, setTypedDuration] = useState(() => {
+    const initialDuration = initialDueTime.dueDurationMinutes;
+    if (
+      initialDuration !== null &&
+      !isPresetDurationMinutes(initialDuration)
+    ) {
+      return formatDurationInputText(initialDuration);
+    }
+
+    return "";
+  });
+  const [durationInputError, setDurationInputError] = useState(false);
   const [timeInputError, setTimeInputError] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const timeInputRef = useRef<HTMLInputElement>(null);
+  const customDurationInputRef = useRef<HTMLInputElement>(null);
+  const hadTimeAtOpenRef = useRef(initialMinutes !== null);
+  const hasAppliedDefaultDurationRef = useRef(false);
   const hasInitialScrolledRef = useRef(false);
   const timeOptions = useMemo(() => generateTimeListOptions(), []);
+
+  function resolveDurationWhenSettingTime(
+    minutes: number | null,
+    duration: number | null,
+  ) {
+    if (minutes === null) return duration;
+
+    if (
+      duration === null &&
+      !hasAppliedDefaultDurationRef.current &&
+      !hadTimeAtOpenRef.current &&
+      initialDueTime.dueDurationMinutes === null
+    ) {
+      hasAppliedDefaultDurationRef.current = true;
+      return DEFAULT_TIME_PICKER_DURATION_MINUTES;
+    }
+
+    return duration;
+  }
+
+  function applyDurationIfDefault(minutes: number | null, duration: number | null) {
+    const nextDuration = resolveDurationWhenSettingTime(minutes, duration);
+    if (nextDuration !== duration) {
+      setDurationMinutes(nextDuration);
+    }
+    return nextDuration;
+  }
 
   useLayoutEffect(() => {
     if (!listRef.current || hasInitialScrolledRef.current) return;
@@ -635,10 +716,11 @@ function TaskTimeMenu({
   }
 
   function selectTime(minutes: number) {
+    const nextDuration = applyDurationIfDefault(minutes, durationMinutes);
     setDraftMinutes(minutes);
     setTypedTime(formatTime24Hour(minutes));
     setTimeInputError(false);
-    persistDueTime(minutes, durationMinutes, { keepOpen: true });
+    persistDueTime(minutes, nextDuration, { keepOpen: true });
   }
 
   function commitTypedTime() {
@@ -671,13 +753,71 @@ function TaskTimeMenu({
 
     const minutes = resolveDraftMinutes();
     if (minutes !== null) {
-      persistDueTime(minutes, durationMinutes, { keepOpen: true });
+      const nextDuration = applyDurationIfDefault(minutes, durationMinutes);
+      persistDueTime(minutes, nextDuration, { keepOpen: true });
     }
   }
 
   function handleClearTime() {
+    hadTimeAtOpenRef.current = false;
+    hasAppliedDefaultDurationRef.current = false;
+    setDurationMinutes(null);
+    setIsCustomDurationOpen(false);
+    setTypedDuration("");
+    setDurationInputError(false);
     persistDueTime(null, null, { keepOpen: true });
   }
+
+  function selectDuration(minutes: number) {
+    setIsCustomDurationOpen(false);
+    setTypedDuration("");
+    setDurationInputError(false);
+    setDurationMinutes(minutes);
+
+    const draftMinutes = resolveDraftMinutes();
+    if (draftMinutes !== null) {
+      persistDueTime(draftMinutes, minutes, { keepOpen: true });
+    }
+  }
+
+  function openCustomDuration() {
+    setIsCustomDurationOpen(true);
+    setDurationInputError(false);
+
+    if (
+      durationMinutes !== null &&
+      !isPresetDurationMinutes(durationMinutes)
+    ) {
+      setTypedDuration(formatDurationInputText(durationMinutes));
+    }
+
+    requestAnimationFrame(() => customDurationInputRef.current?.focus());
+  }
+
+  function commitTypedDuration() {
+    const parsed = parseTypedDuration(typedDuration);
+    if (parsed === null) {
+      if (typedDuration.trim()) {
+        setDurationInputError(true);
+      }
+      return false;
+    }
+
+    setDurationMinutes(parsed);
+    setTypedDuration(formatDurationInputText(parsed));
+    setDurationInputError(false);
+
+    const draftMinutes = resolveDraftMinutes();
+    if (draftMinutes !== null) {
+      persistDueTime(draftMinutes, parsed, { keepOpen: true });
+    }
+
+    return true;
+  }
+
+  const isCustomDurationSelected =
+    isCustomDurationOpen ||
+    (durationMinutes !== null && !isPresetDurationMinutes(durationMinutes));
 
   return (
     <div
@@ -804,7 +944,18 @@ function TaskTimeMenu({
         >
           Duration
         </span>
-        <div className="mt-2 flex flex-wrap gap-2">
+        <div
+          className="task-picker-duration-scroll mt-2 flex flex-nowrap gap-2 pb-1"
+          style={
+            {
+              "--duration-scroll-thumb": PICKER_DURATION_SCROLL_THUMB,
+              "--duration-scroll-thumb-hover": PICKER_DURATION_SCROLL_THUMB_HOVER,
+              "--duration-scroll-track": PICKER_DURATION_SCROLL_TRACK,
+              "--duration-scroll-thumb-dark": PICKER_DURATION_SCROLL_THUMB_DARK,
+              "--duration-scroll-track-dark": PICKER_DURATION_SCROLL_TRACK_DARK,
+            } as CSSProperties
+          }
+        >
           {TIME_PICKER_DURATION_OPTIONS.map((option) => {
             const isSelected = durationMinutes === option.value;
 
@@ -812,14 +963,8 @@ function TaskTimeMenu({
               <button
                 key={option.label}
                 type="button"
-                onClick={() => {
-                  setDurationMinutes(option.value);
-                  const minutes = resolveDraftMinutes();
-                  if (minutes !== null) {
-                    persistDueTime(minutes, option.value, { keepOpen: true });
-                  }
-                }}
-                className="rounded-full border px-2.5 py-1 text-[12px] transition-colors cursor-pointer border-[#d5d5d5]"
+                onClick={() => selectDuration(option.value)}
+                className="shrink-0 rounded-full border px-2.5 py-1 text-[12px] transition-colors cursor-pointer border-[#d5d5d5]"
                 style={
                   isSelected
                     ? {
@@ -836,7 +981,62 @@ function TaskTimeMenu({
               </button>
             );
           })}
+          <button
+            type="button"
+            onClick={openCustomDuration}
+            className="shrink-0 rounded-full border px-2.5 py-1 text-[12px] transition-colors cursor-pointer border-[#d5d5d5]"
+            style={
+              isCustomDurationSelected
+                ? {
+                    backgroundColor: PICKER_ACCENT_SOFT,
+                    color: PICKER_ACCENT,
+                  }
+                : {
+                    borderColor: PICKER_BORDER,
+                    color: PICKER_FOREGROUND,
+                  }
+            }
+          >
+            Custom
+          </button>
         </div>
+        {isCustomDurationOpen ? (
+          <div className="mt-2">
+            <input
+              ref={customDurationInputRef}
+              type="text"
+              value={typedDuration}
+              onChange={(event) => {
+                setTypedDuration(event.target.value);
+                if (durationInputError) setDurationInputError(false);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  commitTypedDuration();
+                }
+              }}
+              onBlur={() => {
+                if (typedDuration.trim()) {
+                  commitTypedDuration();
+                }
+              }}
+              onPointerDown={(event) => event.stopPropagation()}
+              placeholder="Type a duration — e.g. 45m, 1h"
+              aria-invalid={durationInputError}
+              className="w-full rounded-xl border bg-white px-3 py-1.5 text-[13px] outline-none placeholder:text-zinc-400"
+              style={{
+                borderColor: durationInputError ? "#ef4444" : PICKER_BORDER,
+                color: durationInputError ? "#ef4444" : PICKER_FOREGROUND,
+              }}
+            />
+            {durationInputError ? (
+              <p className="mt-1 text-[12px] text-red-500">
+                Enter a valid duration, e.g. 45m or 1h
+              </p>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       <div
@@ -865,6 +1065,7 @@ export function TaskDatePicker({
   onSelectDate,
   onSaveDueTime,
   onSaveRecurrence,
+  onRecurrenceMenuOpenChange,
   className,
 }: TaskDatePickerProps) {
   const today = useMemo(() => startOfDay(new Date()), []);
@@ -1108,7 +1309,7 @@ export function TaskDatePicker({
 
       <div className="border-t border-zinc-200 dark:border-zinc-700">
         <div className="flex items-center justify-between px-[11px] py-[7px]">
-          <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+          <h4 className="text-sm font-semibold text-zinc-750 dark:text-zinc-50">
             {formatMonthYear(viewMonth)}
           </h4>
           <div className="flex items-center gap-1">
@@ -1201,6 +1402,7 @@ export function TaskDatePicker({
           disabled={!onSaveRecurrence}
           onOpenChange={(open) => {
             if (open) setIsTimeMenuOpen(false);
+            onRecurrenceMenuOpenChange?.(open);
           }}
           onSaveRecurrence={(rule) => {
             setIsTimeMenuOpen(false);

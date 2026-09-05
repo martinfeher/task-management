@@ -33,6 +33,7 @@ import {
   formatCalendarHourLabel,
   calendarHourLabelCellClassName,
   calendarHourLabelClassName,
+  shouldShowCalendarHourLabel,
   getCalendarDayColumnDividerClass,
   getCalendarWeekStart,
   getCalendarWeekdayLabel,
@@ -679,7 +680,7 @@ export function CalendarWeekView({
     <div className={CALENDAR_VIEW_WRAPPER_CLASS}>
       <div className={getCalendarShellClassName(fullWidth)}>
         <div className={CALENDAR_VIEW_SURFACE_CLASS}>
-          <div className="flex shrink-0 items-center justify-start px-3 pt-1 pb-2">
+          <div className="flex shrink-0 items-center justify-start px-3 pt-1">
             <CalendarPeriodNavigation
               onToday={goToToday}
               onPrevious={goToPreviousWeek}
@@ -723,17 +724,17 @@ export function CalendarWeekView({
                               key={`head-${toDateKey(day)}`}
                               type="button"
                               onClick={() => handleDayHeaderSelect(day)}
-                              className={`px-2 py-2 text-center transition-colors cursor-pointer ${getWeekDayColumnDividerClass(dayIndex, weekDays, isSelectedWeekDay)} ${
+                              className={`pt-2 pb-[5px] py-2 text-center transition-colors cursor-pointer ${getWeekDayColumnDividerClass(dayIndex, weekDays, isSelectedWeekDay)} ${
                                 isSelectedDay
                                   ? `${SELECTED_WEEK_DAY_COLUMN_CLASS} rounded-t-[8px] ${SELECTED_WEEK_DAY_ROW_BORDER_CLASS}`
                                   : `${SELECTED_WEEK_DAY_ROW_BORDER_CLASS} bg-white dark:bg-zinc-950`
                               }`}
                             >
-                              <div className="text-[14px] font-medium uppercase tracking-wide text-[#222222] dark:text-zinc-200">
+                              <div className="text-[14px] font-medium uppercase tracking-wide text-[#393939] dark:text-zinc-200">
                                 {getCalendarWeekdayLabel(day)}
                               </div>
                               <div
-                                className={`mt-1 inline-flex size-7 items-center justify-center rounded-full text-sm ${
+                                className={`mt-px inline-flex size-7 items-center justify-center rounded-full text-sm ${
                                   isToday
                                     ? CALENDAR_TODAY_DATE_CIRCLE_CLASS
                                     : " text-[#999999] dark:text-zinc-400"
@@ -854,9 +855,11 @@ export function CalendarWeekView({
                         className={calendarHourLabelCellClassName()}
                         style={{ height: hourHeightPx }}
                       >
-                        <span className={calendarHourLabelClassName()}>
-                          {formatCalendarHourLabel(hour)}
-                        </span>
+                        {shouldShowCalendarHourLabel(hour) ? (
+                          <div className={calendarHourLabelClassName()}>
+                            {formatCalendarHourLabel(hour)}
+                          </div>
+                        ) : null}
                       </div>
                     ))}
                   </div>

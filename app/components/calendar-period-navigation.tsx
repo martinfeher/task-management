@@ -26,6 +26,12 @@ type CalendarPeriodNavigationProps = {
   enableArrowKeyNavigation?: boolean;
 };
 
+const CALENDAR_PERIOD_NAV_ARROW_BUTTON_CLASS =
+  "flex size-6 mx-[1px] shrink-0 cursor-pointer items-center justify-center rounded-full text-gray-300 transition-colors hover:bg-zinc-150 dark:text-zinc-300 dark:hover:bg-zinc-700/80";
+
+const CALENDAR_PERIOD_NAV_TODAY_BUTTON_CLASS =
+  "inline-flex px-[8px] w-auto h-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-[14px] text-gray-700 transition-colors hover:bg-zinc-150 hover:text-gray-800 dark:text-zinc-200 dark:hover:bg-zinc-700/80";
+
 function CalendarPeriodNavigationCenter({
   centerLabel,
   isViewingToday = true,
@@ -101,7 +107,7 @@ function CalendarPeriodNavigationCenter({
           onMouseEnter={openPopover}
           onMouseLeave={scheduleClosePopover}
         >
-          <span className="block min-w-0 truncate rounded-full px-3 py-1.5 text-sm font-medium text-zinc-700 dark:text-zinc-200 cursor-pointer">
+          <span className="block min-w-0 truncate rounded-full px-[4px] py-1.5 text-[14px] text-gray-700 dark:text-zinc-200 cursor-pointer">
             {centerLabel}
           </span>
         </div>
@@ -144,7 +150,7 @@ function CalendarPeriodNavigationCenter({
     <button
       type="button"
       onClick={onToday}
-      className="cursor-pointer rounded-full px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-150 dark:text-zinc-200 dark:hover:bg-zinc-700/80"
+      className={CALENDAR_PERIOD_NAV_TODAY_BUTTON_CLASS}
     >
       Today
     </button>
@@ -186,13 +192,13 @@ export function CalendarPeriodNavigation({
 
   return (
     <div
-      className={`inline-flex h-9 items-center gap-0.5 overflow-visible rounded-full bg-zinc-100/90 p-0.5 dark:bg-zinc-800/70 ${className}`.trim()}
+      className={`calendar-period-navigation inline-flex h-9 items-center gap-0.5 overflow-visible rounded-full bg-slate-100/60 px-0.5 py-px dark:bg-zinc-800/70 ${className}`.trim()}
     >
       <button
         type="button"
         aria-label={previousLabel}
         onClick={onPrevious}
-        className="flex size-8 cursor-pointer items-center justify-center rounded-full text-zinc-600 transition-colors hover:bg-zinc-150 dark:text-zinc-300 dark:hover:bg-zinc-700/80"
+        className={CALENDAR_PERIOD_NAV_ARROW_BUTTON_CLASS}
       >
         <BiChevronLeft className="size-5" />
       </button>
@@ -205,7 +211,7 @@ export function CalendarPeriodNavigation({
         type="button"
         aria-label={nextLabel}
         onClick={onNext}
-        className="flex size-8 cursor-pointer items-center justify-center rounded-full text-zinc-600 transition-colors hover:bg-zinc-150 dark:text-zinc-300 dark:hover:bg-zinc-700/80"
+        className={`${CALENDAR_PERIOD_NAV_ARROW_BUTTON_CLASS} text-gray-400`}
       >
         <BiChevronRight className="size-5" />
       </button>

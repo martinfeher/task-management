@@ -3,7 +3,7 @@
 import { useRef } from "react";
 import { LuChevronDown } from "react-icons/lu";
 import {
-  DETAIL_FONT_FAMILY_OPTIONS,
+  getDetailFontFamilyLabel,
   getFormatToolbarFontFamilyOptions,
   type DetailFontFamilyId,
 } from "./detail-fonts";
@@ -36,10 +36,7 @@ export function DetailFontFamilyControl({
 }: DetailFontFamilyControlProps) {
   const closeTimerRef = useRef<number | null>(null);
   const fontOptions = getFormatToolbarFontFamilyOptions();
-  const label =
-    DETAIL_FONT_FAMILY_OPTIONS.find((option) => option.id === value)?.label ??
-    fontOptions[0]?.label ??
-    "Sans Serif";
+  const label = getDetailFontFamilyLabel(value);
 
   const buttonClassName = formatToolbar
     ? "flex h-8 min-w-[72px] cursor-pointer items-center justify-center rounded-lg px-2 text-[13px] text-zinc-700 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-zinc-200 dark:hover:bg-zinc-800"
@@ -105,9 +102,11 @@ export function DetailFontFamilyControl({
                 key={option.id}
                 type="button"
                 role="option"
-                aria-selected={option.id === value}
+                aria-selected={value !== "mixed" && option.id === value}
                 className={`${formatToolbar ? FORMAT_TOOLBAR_FONT_FAMILY_ITEM_CLASS : menuItemClassName} ${
-                  option.id === value ? "bg-zinc-100 dark:bg-zinc-800" : ""
+                  value !== "mixed" && option.id === value
+                    ? "bg-zinc-100 dark:bg-zinc-800"
+                    : ""
                 }`}
                 style={option.value ? { fontFamily: option.value } : undefined}
                 onMouseDown={(event) => event.preventDefault()}

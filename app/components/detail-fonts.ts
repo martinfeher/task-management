@@ -21,7 +21,8 @@ export type DetailFontFamilyId =
   | "serif"
   | "monospace"
   | "lora"
-  | "great-vibes";
+  | "great-vibes"
+  | "mixed";
 
 export const DETAIL_FONT_FAMILY_OPTIONS: {
   id: DetailFontFamilyId;
@@ -122,6 +123,17 @@ export type DetailSelectionFontState = {
   familyId: DetailFontFamilyId;
   size: DetailFontSizeOption;
 };
+
+export function getDetailFontFamilyLabel(familyId: DetailFontFamilyId) {
+  if (familyId === "mixed") {
+    return "Mixed";
+  }
+
+  return (
+    DETAIL_FONT_FAMILY_OPTIONS.find((option) => option.id === familyId)?.label ??
+    "Sans Serif"
+  );
+}
 
 const FORMATTING_TAGS = new Set([
   "B",
@@ -359,6 +371,107 @@ function getSelectionElement(editor: HTMLElement) {
   return null;
 }
 
+function getFontFamilyIdAtNode(
+  node: Node | null,
+  editor: HTMLElement,
+): DetailFontFamilyId {
+  if (!node) {
+    return getAppFontFamilyId();
+  }
+
+  let current: Node | null = node;
+  if (current.nodeType === Node.TEXT_NODE) {
+    current = current.parentElement;
+  }
+
+  while (current && current !== editor) {
+    if (!(current instanceof HTMLElement)) {
+      current = current.parentNode;
+      continue;
+    }
+
+    const inlineFamily = current.style.fontFamily;
+    if (inlineFamily) {
+      return matchDetailFontFamilyId(inlineFamily);
+    }
+
+    current = current.parentNode;
+  }
+
+  let element: Node | null = node;
+  if (element.nodeType === Node.TEXT_NODE) {
+    element = element.parentElement;
+  }
+
+  while (element && element !== editor) {
+    if (element instanceof HTMLElement) {
+      return matchDetailFontFamilyId(
+        window.getComputedStyle(element).fontFamily,
+      );
+    }
+    element = element.parentNode;
+  }
+
+  return getAppFontFamilyId();
+}
+
+function collectTextNodesInRange(range: Range) {
+  const textNodes: Text[] = [];
+
+  if (range.commonAncestorContainer.nodeType === Node.TEXT_NODE) {
+    textNodes.push(range.commonAncestorContainer as Text);
+    return textNodes;
+  }
+
+  const walker = document.createTreeWalker(
+    range.commonAncestorContainer,
+    NodeFilter.SHOW_TEXT,
+    {
+      acceptNode(node) {
+        return range.intersectsNode(node)
+          ? NodeFilter.FILTER_ACCEPT
+          : NodeFilter.FILTER_REJECT;
+      },
+    },
+  );
+
+  while (walker.nextNode()) {
+    if (walker.currentNode instanceof Text) {
+      textNodes.push(walker.currentNode);
+    }
+  }
+
+  return textNodes;
+}
+
+function hasSelectedTextInRange(textNode: Text, range: Range) {
+  const content = textNode.textContent ?? "";
+  if (!content) return false;
+
+  const start =
+    textNode === range.startContainer ? range.startOffset : 0;
+  const end = textNode === range.endContainer ? range.endOffset : content.length;
+
+  return start < end;
+}
+
+function collectUniqueFontFamilyIdsInRange(
+  range: Range,
+  editor: HTMLElement,
+): DetailFontFamilyId[] {
+  const unique = new Set<DetailFontFamilyId>();
+
+  for (const textNode of collectTextNodesInRange(range)) {
+    if (!hasSelectedTextInRange(textNode, range)) {
+      continue;
+    }
+
+    unique.add(getFontFamilyIdAtNode(textNode, editor));
+  }
+
+  return Array.from(unique);
+}
+
 export function getDetailSelectionFontState(
   editor: HTMLElement,
 ): DetailSelectionFontState {
@@ -371,6 +484,25 @@ export function getDetailSelectionFontState(
   }
 
   const range = selection.getRangeAt(0);
+  let familyId: DetailFontFamilyId;
+
+  if (!selection.isCollapsed && !range.collapsed) {
+    const familyIds = collectUniqueFontFamilyIdsInRange(range, editor);
+
+    if (familyIds.length > 1) {
+      familyId = "mixed";
+    } else if (familyIds.length === 1) {
+      familyId = familyIds[0];
+    } else {
+      familyId = getFontFamilyIdAtNode(range.startContainer, editor);
+    }
+  } else {
+    familyId = getFontFamilyIdAtNode(
+      selection.focusNode ?? selection.anchorNode ?? range.startContainer,
+      editor,
+    );
+  }
+
   let node: Node | null = selection.isCollapsed
     ? selection.focusNode ?? selection.anchorNode
     : range.startContainer;
@@ -385,17 +517,12 @@ export function getDetailSelectionFontState(
       continue;
     }
 
-    const inlineFamily = node.style.fontFamily;
     const inlineSize = node.style.fontSize;
 
-    if (inlineFamily || inlineSize) {
+    if (inlineSize) {
       return {
-        familyId: inlineFamily
-          ? matchDetailFontFamilyId(inlineFamily)
-          : getAppFontFamilyId(),
-        size: inlineSize
-          ? matchDetailFontSize(inlineSize)
-          : DEFAULT_DETAIL_FONT_SIZE_PX,
+        familyId,
+        size: matchDetailFontSize(inlineSize),
       };
     }
 
@@ -405,14 +532,14 @@ export function getDetailSelectionFontState(
   const element = getSelectionElement(editor);
   if (!element) {
     return {
-      familyId: getAppFontFamilyId(),
+      familyId,
       size: DEFAULT_DETAIL_FONT_SIZE_PX,
     };
   }
 
   const computed = window.getComputedStyle(element);
   return {
-    familyId: matchDetailFontFamilyId(computed.fontFamily),
+    familyId,
     size: matchDetailFontSize(computed.fontSize),
   };
 }
@@ -780,6 +907,8 @@ export function applyDetailFontFamily(
   restoreSelectionRange(range);
 
   if (!canApplyDetailFont(editor)) return false;
+
+  if (familyId === "mixed") return false;
 
   const option = DETAIL_FONT_FAMILY_OPTIONS.find((item) => item.id === familyId);
   if (!option) return false;

@@ -34,6 +34,8 @@ import {
   useCalendarTaskHoverPreview,
 } from "./calendar-task-hover-preview";
 import { CalendarTaskColorMenuProvider } from "./calendar-task-color-menu";
+import { CalendarTaskTitle } from "./calendar-task-title";
+import { CalendarTaskCompletionCheckbox } from "./calendar-timed-task-block";
 import {
   getCompletionAnimationMs,
   TaskCompletionCheckbox,
@@ -48,7 +50,7 @@ import {
   CALENDAR_TASK_DRAG_THRESHOLD_PX,
   getCalendarTaskDragSurface,
 } from "@/lib/calendar-task-drag";
-import { getCalendarShellClassName, calendarTaskItemClassName, getCalendarTaskItemStyle, CALENDAR_WEEKDAY_LABELS, getCalendarDayColumnDividerClass, CALENDAR_TODAY_DATE_CIRCLE_CLASS } from "@/lib/calendar-layout";
+import { getCalendarShellClassName, calendarAllDayTaskClassName, getCalendarTaskItemStyle, CALENDAR_WEEKDAY_LABELS, getCalendarDayColumnDividerClass, CALENDAR_TODAY_DATE_CIRCLE_CLASS, CALENDAR_GRID_SCROLL_CLASS } from "@/lib/calendar-layout";
 import {
   readCalendarViewSession,
   saveCalendarViewSession,
@@ -158,7 +160,7 @@ function CalendarViewCounter({
         aria-label="Decrease"
         disabled={value <= min}
         onClick={() => onChange(Math.max(min, value - 1))}
-        className="flex size-[15px] cursor-pointer items-center justify-center rounded-full bg-[#f5f5f8] pb-px text-[13px] leading-none text-[#b3b3c0] transition-colors hover:bg-[#F1F5F9] hover:text-zinc-900 disabled:cursor-not-allowed dark:hover:text-zinc-50"
+        className="flex size-[15px] cursor-pointer items-center justify-center rounded-full bg-[#f5f5f8] pb-[1px] text-[13px] leading-none text-[#b3b3c0] transition-colors hover:bg-[#F1F5F9] hover:text-zinc-900 disabled:cursor-not-allowed dark:hover:text-zinc-50"
       >
         −
       </button>
@@ -211,18 +213,18 @@ function CalendarViewTabs({
   periodLabelAction?: ReactNode;
 }) {
   const tabButtonClassName = (isActive: boolean) =>
-    `rounded-full px-3.5 py-1.5 text-sm transition-colors hover:bg-[#F1F5F9] cursor-pointer ${
+    `rounded-full px-3.5 py-1.5 text-[14px] transition-colors hover:bg-[#F1F5F9] cursor-pointer ${
       isActive
-        ? "bg-[#e8F2F6] text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50"
+        ? "bg-[#e8F2F6] text-zinc-750 dark:bg-zinc-800 dark:text-zinc-50"
         : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
     }`;
 
   return (
-    <div className="mb-2 grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-4 pl-4 pr-[15px] pt-4">
+    <div className={`relative z-40 ${activeView === "month" ? "mb-[26px]" : "mb-2"} grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-4 pl-4 pr-[15px] pt-3`}>
       {periodLabel ? (
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-2">
-            <h2 className="truncate text-lg text-zinc-900 dark:text-zinc-50 text-[26px]">
+            <h2 className="truncate text-lg text-zinc-700 dark:text-zinc-50 text-[25px]">
               <span className="font-semibold">{periodLabel}</span>
               {periodLabelSuffix ? (
                 <span className="font-normal"> {periodLabelSuffix}</span>
@@ -261,7 +263,7 @@ function CalendarViewTabs({
       ) : (
         <div />
       )}
-      <div className="inline-flex flex-wrap items-center justify-center gap-0.5 rounded-full border border-zinc-200 bg-white px-1 py-1 shadow-[0_1px_3px_rgba(0,0,0,0.06)] dark:border-zinc-700 dark:bg-zinc-900">
+      <div className="calendar-view-tabs inline-flex flex-wrap items-center justify-center gap-0.5 rounded-full bg-white px-1 py-1 dark:border-zinc-700 dark:bg-zinc-900">
         {PRIMARY_CALENDAR_VIEW_TABS.map((tab) => (
           <button
             key={tab.id}
@@ -299,10 +301,10 @@ function CalendarViewTabs({
                 type="button"
                 onClick={() => onChange(option.id)}
                 aria-pressed={isActive}
-                className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors cursor-pointer ${
+                className={`rounded-full px-3.5 py-1.5 text-[14px] font-medium transition-colors cursor-pointer ${
                   isActive
-                    ? "text-zinc-900 dark:text-zinc-50"
-                    : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
+                    ? "text-zinc-700 dark:text-zinc-50"
+                    : "text-zinc-600 hover:text-zinc-850 dark:text-zinc-400 dark:hover:text-zinc-200"
                 }`}
               >
                 {option.label}
@@ -322,6 +324,7 @@ function CalendarViewTabs({
           );
         })}
       </div>
+      {activeView !== "month" ? (
       <div className="flex w-full justify-end pr-[25px]!">
         <label className="relative flex h-9 w-full max-w-[220px] items-center rounded-full border border-zinc-200 bg-[#f9f9fa] px-3 dark:border-zinc-700 dark:bg-zinc-900">
           <IoIosSearch
@@ -334,10 +337,13 @@ function CalendarViewTabs({
             onChange={(event) => onSearchQueryChange(event.target.value)}
             placeholder="Search"
             aria-label="Search calendar tasks"
-            className="min-w-0 flex-1 bg-transparent pl-2 text-sm text-zinc-800 outline-none placeholder:text-zinc-400 dark:text-zinc-100 dark:placeholder:text-zinc-500"
+            className="h-9 min-w-0 flex-1 appearance-none bg-transparent py-0 pl-2 text-sm leading-9 text-zinc-800 outline-none placeholder:text-zinc-400 dark:text-zinc-100 dark:placeholder:text-zinc-500 [&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-decoration]:appearance-none"
           />
         </label>
       </div>
+      ) : (
+        <div />
+      )}
     </div>
   );
 }
@@ -833,7 +839,7 @@ export function CalendarMonthView({
       {sidebar}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <div className={getCalendarShellClassName(fullWidth)}>
-          <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className={CALENDAR_GRID_SCROLL_CLASS}>
             <div
               className="grid h-full min-h-full grid-cols-7"
               style={{
@@ -912,14 +918,23 @@ export function CalendarMonthView({
                           event.stopPropagation();
                           handleCalendarTaskPointerDown(event, task, day);
                         }}
-                        className={`block w-full truncate rounded px-2 py-0.5 text-left transition-colors touch-none ${
-                          onSetTaskDueDate
-                            ? "cursor-move"
-                            : ""
-                        } ${calendarTaskItemClassName(task.id === selectedTaskId)}`}
+                        className={`${calendarAllDayTaskClassName(
+                          task.id === selectedTaskId,
+                          Boolean(onSetTaskDueDate),
+                        )} calendar-task-row--single-line gap-1 overflow-hidden`}
                         style={getCalendarTaskItemStyle(task.priority, task.calendarColor)}
                       >
-                        {task.name}
+                        <CalendarTaskTitle
+                          name={task.name}
+                          recurrenceRule={task.recurrenceRule}
+                        />
+                        <CalendarTaskCompletionCheckbox
+                          task={task}
+                          onToggleTask={onToggleTask}
+                          isCompleting={completingTaskIds?.has(task.id)}
+                          isCheckAnimating={checkAnimatingTaskIds?.has(task.id)}
+                          className="calendar-task-checkbox"
+                        />
                       </CalendarTaskHoverButton>
                     ))}
                     {isActiveDay ? (

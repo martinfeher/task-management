@@ -19,12 +19,47 @@ export const DURATION_OPTIONS = [
 ] as const;
 
 export const TIME_PICKER_DURATION_OPTIONS = [
-  { value: null, label: "None" },
   { value: 15, label: "15m" },
   { value: 30, label: "30m" },
   { value: 60, label: "1h" },
   { value: 120, label: "2h" },
 ] as const;
+
+export const DEFAULT_TIME_PICKER_DURATION_MINUTES = 30;
+
+export function isPresetDurationMinutes(minutes: number | null) {
+  if (minutes === null) return false;
+
+  return TIME_PICKER_DURATION_OPTIONS.some((option) => option.value === minutes);
+}
+
+export function formatDurationInputText(minutes: number) {
+  if (minutes % 60 === 0) {
+    const hours = minutes / 60;
+    if (hours >= 1) return `${hours}h`;
+  }
+
+  return `${minutes}m`;
+}
+
+export function parseTypedDuration(input: string): number | null {
+  const trimmed = input.trim().toLowerCase();
+  if (!trimmed) return null;
+
+  const hourMatch = trimmed.match(/^(\d+(?:\.\d+)?)\s*(hours?|hrs?|h)$/);
+  if (hourMatch) {
+    return normalizeDueDurationMinutes(
+      Math.round(parseFloat(hourMatch[1]) * 60),
+    );
+  }
+
+  const minuteMatch = trimmed.match(/^(\d+)\s*(minutes?|mins?|min|m)?$/);
+  if (minuteMatch) {
+    return normalizeDueDurationMinutes(parseInt(minuteMatch[1], 10));
+  }
+
+  return null;
+}
 
 export const TIME_PRESETS = [
   { id: "morning", label: "Morning", minutes: 9 * 60 },

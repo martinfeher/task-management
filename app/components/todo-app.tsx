@@ -2115,8 +2115,10 @@ export function TodoApp({
       ],
     }));
 
-    if (!options?.keepFormOpen) {
-      selectNewTaskAndFocusDetails(task.id);
+    if (options?.keepFormOpen) {
+      await selectNewTaskInList(task.id);
+    } else {
+      await selectNewTaskAndFocusDetails(task.id);
     }
   }
 
@@ -2936,8 +2938,8 @@ export function TodoApp({
     async (taskId: string) => {
       if (isListCalendarOpen) {
         listCalendarReturnTaskIdRef.current = null;
-        await selectTask(taskId);
         setListCalendarShowingDetails(true);
+        await selectTask(taskId);
         return;
       }
       await selectTask(taskId);
@@ -3242,6 +3244,7 @@ export function TodoApp({
                   showListCalendarButton={displayedListId !== null}
                   isListCalendarOpen={isListCalendarOpen}
                   isListCalendarPreview={isListCalendarPreview}
+                  listCalendarShowingDetails={listCalendarShowingDetails}
                   listCalendarButtonRef={listCalendarButtonRef}
                   onListCalendarClick={toggleListCalendar}
                   onListCalendarHoverStart={openListCalendarPreview}
@@ -3387,6 +3390,7 @@ export function TodoApp({
                 showListCalendarButton={displayedListId !== null}
                 isListCalendarOpen={isListCalendarOpen}
                 isListCalendarPreview={isListCalendarPreview}
+                listCalendarShowingDetails={listCalendarShowingDetails}
                 listCalendarButtonRef={listCalendarButtonRef}
                 onListCalendarClick={toggleListCalendar}
                 onListCalendarHoverStart={openListCalendarPreview}

@@ -157,9 +157,10 @@ export function bindCalendarTaskDrag(
   function resolveSlotFromDragPoint(clientX: number, clientY: number) {
     return resolveCalendarSlotFromPoint(
       clientX,
-      clientY - grabOffsetY,
+      clientY,
       hourStart,
       hourHeightPx,
+      clientY - grabOffsetY,
     );
   }
 

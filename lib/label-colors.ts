@@ -205,7 +205,7 @@ function getContrastTextColor(hex: string) {
 }
 
 export function getLabelPillClassName(_palette: LabelColor) {
-  return "truncate rounded-full px-[8px] py-0.5 text-[10px] font-medium";
+  return "truncate rounded-full px-[8px] py-0.5 text-[10px] font-medium opacity-85";
   // return "truncate rounded-full pl-2 pr-1 py-0.5 text-[10px] font-medium";
 }
 

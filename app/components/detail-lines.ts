@@ -1487,25 +1487,41 @@ function isDetailsHtmlEmpty(html: string) {
   return getLineElements(container).every((line) => isLineEmpty(line));
 }
 
-export type SyncLineEmptyStateOptions = {
-  hoveredLine?: HTMLElement | null;
-};
+function isBodyPlaceholderCandidateLine(line: HTMLElement) {
+  return (
+    !line.querySelector(".detail-image-wrapper") && !isCodeLine(line)
+  );
+}
 
-export function syncLineEmptyState(
-  editor: HTMLElement,
-  options?: SyncLineEmptyStateOptions,
-) {
+function isBodyLineWithContent(line: HTMLElement) {
+  return !isLineEmpty(line) || line.querySelector(".detail-image-wrapper") !== null;
+}
+
+function ensureTrailingBodyPlaceholderLine(editor: HTMLElement) {
+  const lines = getLineElements(editor);
+  if (lines.length <= 1) return;
+
+  const bodyLines = lines.slice(1);
+  const bodyHasContent = bodyLines.some(isBodyLineWithContent);
+  if (!bodyHasContent) return;
+
+  const lastLine = lines[lines.length - 1];
+  if (isBodyLineWithContent(lastLine)) {
+    editor.appendChild(createLineElement("<br>", "text"));
+  }
+}
+
+export function syncLineEmptyState(editor: HTMLElement) {
   normalizeImageLines(editor);
   normalizeCodeLines(editor);
   normalizeChecklistLines(editor);
+  ensureTrailingBodyPlaceholderLine(editor);
 
-  const activeLine = getActiveLineElement(editor);
-  const hoveredLine =
-    options?.hoveredLine && editor.contains(options.hoveredLine)
-      ? options.hoveredLine
-      : null;
+  const lines = getLineElements(editor);
+  const lastLineIndex = lines.length - 1;
+  const bodyContentEmpty = lines.slice(1).every((line) => !isBodyLineWithContent(line));
 
-  getLineElements(editor).forEach((line, index) => {
+  lines.forEach((line, index) => {
     const isEmpty = isLineEmpty(line);
 
     if (isEmpty) {
@@ -1517,9 +1533,8 @@ export function syncLineEmptyState(
     const showBodyPlaceholder =
       isEmpty &&
       index > 0 &&
-      (line === activeLine || line === hoveredLine) &&
-      !line.querySelector(".detail-image-wrapper") &&
-      !isCodeLine(line);
+      isBodyPlaceholderCandidateLine(line) &&
+      (bodyContentEmpty ? index === 1 : index === lastLineIndex);
 
     if (showBodyPlaceholder) {
       line.dataset.bodyPlaceholder = "true";

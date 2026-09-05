@@ -86,6 +86,12 @@ import {
   removeLinkFromSelection,
 } from "./detail-links";
 import {
+  applyDetailLineHeight,
+  DEFAULT_DETAIL_LINE_HEIGHT,
+  getDetailSelectionLineHeight,
+  type DetailLineHeightOption,
+} from "./detail-line-height";
+import {
   applyDetailFontFamily,
   applyDetailFontSize,
   clearPasteBatchMarkers,
@@ -1169,6 +1175,14 @@ function getFormatMenuPositionFromRange(range: Range, editor: HTMLElement) {
 
 const FORMAT_MENU_VIEWPORT_PADDING = 8;
 
+/** Matches `pl-[30px]` on `.task-details-editor` — line controls live in this gutter. */
+const TASK_DETAILS_LINE_CONTROLS_GUTTER_PX = 30;
+
+function isPointerInLineControlsGutter(clientX: number, editor: HTMLElement) {
+  const rect = editor.getBoundingClientRect();
+  return clientX - rect.left <= TASK_DETAILS_LINE_CONTROLS_GUTTER_PX;
+}
+
 function clampFormatMenuPosition(
   position: FormatMenuState,
   menuWidth: number,
@@ -1267,6 +1281,8 @@ export function TaskDetailsPanel({
     useState<DetailFontFamilyId>(() => getAppFontFamilyId());
   const [formatMenuBlockType, setFormatMenuBlockType] =
     useState<TextBlockType>("text");
+  const [formatMenuLineHeight, setFormatMenuLineHeight] =
+    useState<DetailLineHeightOption>(DEFAULT_DETAIL_LINE_HEIGHT);
   const [formatMenuInlineFormats, setFormatMenuInlineFormats] =
     useState<FormatMenuInlineFormats>(DEFAULT_FORMAT_MENU_INLINE_FORMATS);
   const [recentFormatColors, setRecentFormatColors] = useState<RecentFormatColor[]>(
@@ -1313,13 +1329,22 @@ export function TaskDetailsPanel({
   const dateMenuRef = useRef<HTMLDivElement>(null);
   const dateMenuCloseTimerRef = useRef<number | null>(null);
   const dateMenuHoverDismissedRef = useRef(false);
+  const isRecurrenceMenuOpenRef = useRef(false);
   const dateButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!isDateMenuOpen) {
+      isRecurrenceMenuOpenRef.current = false;
+    }
+  }, [isDateMenuOpen]);
+
   const lineControlsRef = useRef<HTMLDivElement>(null);
   const hoveredLineRef = useRef<HTMLElement | null>(null);
   const clickedLineRef = useRef<HTMLElement | null>(null);
   const pendingClickLineRef = useRef<HTMLElement | null>(null);
   const activeLineControlsRef = useRef<HTMLElement | null>(null);
   const isMouseOverEditorRef = useRef(false);
+  const pointerInGutterRef = useRef(false);
   const isEditorPointerDownRef = useRef(false);
   const dragStateRef = useRef<{
     sourceIndex: number;
@@ -1376,8 +1401,22 @@ export function TaskDetailsPanel({
   taskStateRef.current = task;
   taskSnapshotRef.current = taskSnapshot;
 
+  function shouldDeferEditorStructureSync(editor: HTMLElement) {
+    return (
+      isEditorPointerDownRef.current ||
+      editorHasLiveExtendedTextSelection(editor)
+    );
+  }
+
   function syncEditorLineEmptyState(editor: HTMLElement) {
-    syncLineEmptyState(editor, { hoveredLine: hoveredLineRef.current });
+    if (shouldDeferEditorStructureSync(editor)) return;
+
+    const before = normalizeDetails(editor.innerHTML);
+    syncLineEmptyState(editor);
+    const after = normalizeDetails(editor.innerHTML);
+    if (before !== after) {
+      detailsRef.current = after;
+    }
   }
 
   function setLineControlsPointerEventsEnabled(enabled: boolean) {
@@ -1983,12 +2022,16 @@ export function TaskDetailsPanel({
     }
 
     if (dragStateRef.current) return;
-    if (isEditorPointerDownRef.current) return;
+    if (isEditorPointerDownRef.current) {
+      setLineControls([]);
+      return;
+    }
+    if (editorHasLiveExtendedTextSelection(editor)) {
+      setLineControls([]);
+      return;
+    }
 
     let line: HTMLElement | null = null;
-    const editorFocused = editor.contains(document.activeElement);
-    const pendingLine = pendingClickLineRef.current;
-    const activeLine = editorFocused ? getActiveLineElement(editor) : null;
     const hoveredLine =
       isMouseOverEditorRef.current &&
       hoveredLineRef.current &&
@@ -2000,66 +2043,56 @@ export function TaskDetailsPanel({
       line = activeLineControlsRef.current;
     } else if (
       hoveredLine &&
+      pointerInGutterRef.current &&
       !isTitleLine(editor, hoveredLine) &&
       !hoveredLine.querySelector(".detail-image-wrapper") &&
       !isCodeLine(hoveredLine)
     ) {
       line = hoveredLine;
-    } else if (pendingLine && editor.contains(pendingLine)) {
-      line = pendingLine;
-      clickedLineRef.current = pendingLine;
-    } else if (editorFocused) {
-      line = activeLine ?? clickedLineRef.current;
-      if (line) {
-        clickedLineRef.current = line;
-      }
-    } else if (clickedLineRef.current && editor.contains(clickedLineRef.current)) {
-      line = clickedLineRef.current;
     } else {
-      clickedLineRef.current = null;
+      activeLineControlsRef.current = null;
       setLineControls([]);
       return;
     }
 
     if (!line || !editor.contains(line)) {
+      activeLineControlsRef.current = null;
       setLineControls([]);
       return;
     }
 
     if (getLineIndex(editor, line) === 0) {
+      activeLineControlsRef.current = null;
       setLineControls([]);
       return;
     }
 
     const lineId = line.dataset.lineId;
     if (!lineId) {
+      activeLineControlsRef.current = null;
       setLineControls([]);
       return;
     }
 
     const position = getLineControlsPositionForLine(line, wrapper);
     if (!position) {
+      activeLineControlsRef.current = null;
       setLineControls([]);
       return;
     }
 
     activeLineControlsRef.current = line;
     const isEmpty = isDetailLineEmpty(line);
-    const isLineHovered = hoveredLine === line;
-    const isLineActive =
-      pendingLine === line ||
-      (editorFocused && activeLine === line) ||
-      clickedLineRef.current === line;
     const keepAddBlockMenuOpen =
       Boolean(addBlockMenu) && activeLineControlsRef.current === line;
+    const showControls = keepAddBlockMenuOpen || pointerInGutterRef.current;
 
     setLineControls([
       {
         lineId,
         top: position.top,
-        showPlus:
-          isEmpty && (isLineHovered || isLineActive || keepAddBlockMenuOpen),
-        showDrag: !isEmpty && (isLineHovered || isLineActive),
+        showPlus: isEmpty && showControls,
+        showDrag: !isEmpty && showControls,
       },
     ]);
   }, [addBlockMenu]);
@@ -2101,24 +2134,37 @@ export function TaskDetailsPanel({
   function beginEditorPointerInteraction() {
     isEditorPointerDownRef.current = true;
     setLineControlsPointerEventsEnabled(false);
+    setLineControls([]);
+
+    if (inputNormalizeTimerRef.current !== null) {
+      window.clearTimeout(inputNormalizeTimerRef.current);
+      inputNormalizeTimerRef.current = null;
+    }
+
+    if (inputNormalizeFrameRef.current !== null) {
+      window.cancelAnimationFrame(inputNormalizeFrameRef.current);
+      inputNormalizeFrameRef.current = null;
+    }
   }
 
-  function endEditorPointerInteraction() {
+  function finishEditorPointerInteraction() {
     if (!isEditorPointerDownRef.current) return;
 
     isEditorPointerDownRef.current = false;
     setLineControlsPointerEventsEnabled(true);
 
-    const editor = editorRef.current;
-    if (editor) {
-      syncEditorLineEmptyState(editor);
-    }
-    updateLineControls();
+    requestAnimationFrame(() => {
+      const editor = editorRef.current;
+      if (editor && !editorHasLiveExtendedTextSelection(editor)) {
+        syncEditorLineEmptyState(editor);
+      }
+      updateLineControls();
+    });
   }
 
   useEffect(() => {
     function handleDocumentMouseUp() {
-      endEditorPointerInteraction();
+      finishEditorPointerInteraction();
     }
 
     document.addEventListener("mouseup", handleDocumentMouseUp);
@@ -2131,6 +2177,7 @@ export function TaskDetailsPanel({
     (mode: "light" | "full") => {
       const editor = editorRef.current;
       if (!editor) return;
+      if (shouldDeferEditorStructureSync(editor)) return;
 
       ensureBlockLines(editor);
       ensureTitleLine(editor);
@@ -2288,6 +2335,7 @@ export function TaskDetailsPanel({
     setFormatMenuInlineFormats(getDetailSelectionInlineFormatState(editor));
     setFormatMenuFontSize(getDetailSelectionFontState(editor).size);
     setFormatMenuFontFamily(getDetailSelectionFontState(editor).familyId);
+    setFormatMenuLineHeight(getDetailSelectionLineHeight(editor));
     setFormatMenuBlockType(getActiveTextBlockType(editor));
   }, []);
 
@@ -2344,6 +2392,7 @@ export function TaskDetailsPanel({
     const fontState = getDetailSelectionFontState(editor);
     setFormatMenuFontSize(fontState.size);
     setFormatMenuFontFamily(fontState.familyId);
+    setFormatMenuLineHeight(getDetailSelectionLineHeight(editor));
     setFormatMenuBlockType(getActiveTextBlockType(editor));
 
     if (previousRange) {
@@ -2454,6 +2503,37 @@ export function TaskDetailsPanel({
       closeFormatDropdowns,
       handleDetailFontApplied,
       rememberFormatSelection,
+    ],
+  );
+
+  const applyFormatLineHeight = useCallback(
+    (lineHeight: DetailLineHeightOption) => {
+      const editor = editorRef.current;
+      if (!editor) return;
+
+      const savedRange = savedFormatSelectionRef.current?.cloneRange() ?? null;
+      if (
+        savedRange &&
+        editor.contains(savedRange.commonAncestorContainer)
+      ) {
+        restoreEditorSelectionRange(savedRange);
+      }
+
+      captureFormatSelectionFromEditor();
+      const rangeToApply =
+        savedFormatSelectionRef.current?.cloneRange() ?? savedRange;
+
+      if (applyDetailLineHeight(editor, lineHeight, rangeToApply)) {
+        setFormatMenuLineHeight(lineHeight);
+        handleDetailFontApplied();
+      }
+
+      closeFormatDropdowns();
+    },
+    [
+      captureFormatSelectionFromEditor,
+      closeFormatDropdowns,
+      handleDetailFontApplied,
     ],
   );
 
@@ -2711,6 +2791,7 @@ export function TaskDetailsPanel({
         const fontState = getDetailSelectionFontState(editor);
         setFormatMenuFontSize(fontState.size);
         setFormatMenuFontFamily(fontState.familyId);
+        setFormatMenuLineHeight(getDetailSelectionLineHeight(editor));
         setFormatMenuBlockType(getActiveTextBlockType(editor));
         setFormatMenuInlineFormats(getDetailSelectionInlineFormatState(editor));
         closeFormatDropdowns();
@@ -2735,6 +2816,7 @@ export function TaskDetailsPanel({
     const fontState = getDetailSelectionFontState(editor);
     setFormatMenuFontSize(fontState.size);
     setFormatMenuFontFamily(fontState.familyId);
+    setFormatMenuLineHeight(getDetailSelectionLineHeight(editor));
     setFormatMenuBlockType(getActiveTextBlockType(editor));
     setFormatMenuInlineFormats(getDetailSelectionInlineFormatState(editor));
     closeFormatDropdowns();
@@ -3169,6 +3251,7 @@ export function TaskDetailsPanel({
         ensureBlockLines(editor);
         ensureTitleLine(editor);
         syncEditorLineEmptyState(editor);
+        detailsRef.current = normalizeDetails(editor.innerHTML);
         previousTextRef.current = editor.textContent ?? "";
         hydratedTaskIdRef.current = currentTaskId;
         resetHistory(readEditorContent());
@@ -3213,6 +3296,7 @@ export function TaskDetailsPanel({
 
     const editor = editorRef.current;
     if (!editor) return;
+    if (shouldDeferEditorStructureSync(editor)) return;
 
     const targetHtml = detailsRef.current;
     const editorHtml = normalizeDetails(editor.innerHTML);
@@ -3228,6 +3312,7 @@ export function TaskDetailsPanel({
     ensureBlockLines(editor);
     ensureTitleLine(editor);
     syncEditorLineEmptyState(editor);
+    detailsRef.current = normalizeDetails(editor.innerHTML);
     previousTextRef.current = editor.textContent ?? "";
     hydratedTaskIdRef.current = task.id;
     resetHistory(readEditorContent());
@@ -3594,7 +3679,16 @@ export function TaskDetailsPanel({
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       const target = event.target as Node;
+      const targetElement = target instanceof Element ? target : null;
       const editor = editorRef.current;
+
+      if (
+        targetElement?.closest(
+          "[data-task-date-picker-root], [data-task-date-picker-menu]",
+        )
+      ) {
+        return;
+      }
 
       if (editor && editor.contains(target) && !event.shiftKey) {
         savedFormatSelectionRef.current = null;
@@ -3675,7 +3769,9 @@ export function TaskDetailsPanel({
         editor.contains(selection.anchorNode);
 
       if (selectionInEditor) {
-        syncEditorLineEmptyState(editor);
+        if (!editorHasLiveExtendedTextSelection(editor)) {
+          syncEditorLineEmptyState(editor);
+        }
 
         if (
           selection?.rangeCount &&
@@ -4182,7 +4278,9 @@ export function TaskDetailsPanel({
 
     const editor = editorRef.current;
     if (editor) {
-      syncEditorLineEmptyState(editor);
+      if (!editorHasLiveExtendedTextSelection(editor)) {
+        syncEditorLineEmptyState(editor);
+      }
     }
 
     if (inputNormalizeTimerRef.current !== null) {
@@ -4195,7 +4293,10 @@ export function TaskDetailsPanel({
       inputNormalizeFrameRef.current = null;
     }
 
-    runEditorNormalization("full");
+    if (!editor || !editorHasLiveExtendedTextSelection(editor)) {
+      runEditorNormalization("full");
+    }
+
     flushHistorySnapshot();
     requestSave("immediate");
     scheduleLineControlsUpdate();
@@ -4207,11 +4308,17 @@ export function TaskDetailsPanel({
     const editor = editorRef.current;
     if (!editor || dragStateRef.current) return;
 
-    ensureBlockLines(editor);
+    if (!isEditorPointerDownRef.current) {
+      ensureBlockLines(editor);
+    }
 
     const line = getLineElementAtPoint(editor, event.clientY);
     hoveredLineRef.current = line;
-    if (!isEditorPointerDownRef.current) {
+    pointerInGutterRef.current = isPointerInLineControlsGutter(
+      event.clientX,
+      editor,
+    );
+    if (!shouldDeferEditorStructureSync(editor)) {
       syncEditorLineEmptyState(editor);
       updateLineControls();
     }
@@ -4226,8 +4333,14 @@ export function TaskDetailsPanel({
     if (!editor || dragStateRef.current) return;
 
     hoveredLineRef.current = getLineElementAtPoint(editor, event.clientY);
-    syncEditorLineEmptyState(editor);
-    updateLineControls();
+    pointerInGutterRef.current = isPointerInLineControlsGutter(
+      event.clientX,
+      editor,
+    );
+    if (!shouldDeferEditorStructureSync(editor)) {
+      syncEditorLineEmptyState(editor);
+      updateLineControls();
+    }
   }
 
   function handleEditorWrapperMouseLeave(
@@ -4244,6 +4357,7 @@ export function TaskDetailsPanel({
 
     isMouseOverEditorRef.current = false;
     hoveredLineRef.current = null;
+    pointerInGutterRef.current = false;
     const editor = editorRef.current;
     if (editor) {
       syncEditorLineEmptyState(editor);
@@ -4259,7 +4373,7 @@ export function TaskDetailsPanel({
       focusDetailLine(editor, activeLine);
     }
 
-    if (editor) {
+    if (editor && !shouldDeferEditorStructureSync(editor)) {
       syncEditorLineEmptyState(editor);
     }
 
@@ -4268,6 +4382,11 @@ export function TaskDetailsPanel({
     }
 
     updateLineControls();
+  }
+
+  function handleEditorDragStart(event: React.DragEvent<HTMLDivElement>) {
+    // Prevent the browser from drag-moving selected contenteditable text.
+    event.preventDefault();
   }
 
   function handleEditorMouseDown(event: React.MouseEvent<HTMLDivElement>) {
@@ -4304,6 +4423,10 @@ export function TaskDetailsPanel({
     if (hoverLine) {
       hoveredLineRef.current = hoverLine;
     }
+    pointerInGutterRef.current = isPointerInLineControlsGutter(
+      event.clientX,
+      editor,
+    );
 
     const clickResult = handleClickBelowLastLine(editor, event.clientY);
     if (clickResult) {
@@ -4585,10 +4708,15 @@ export function TaskDetailsPanel({
   }
 
   function handleEditorMouseUp() {
-    endEditorPointerInteraction();
+    finishEditorPointerInteraction();
 
-    const editor = editorRef.current;
-    if (editor) {
+    requestAnimationFrame(() => {
+      const editor = editorRef.current;
+      if (!editor) {
+        pendingClickLineRef.current = null;
+        return;
+      }
+
       const selection = window.getSelection();
       const hasTextSelection =
         Boolean(selection?.rangeCount) &&
@@ -4607,9 +4735,10 @@ export function TaskDetailsPanel({
         savedFormatSelectionRef.current = null;
         updateFormatMenu();
       }
-    }
 
-    pendingClickLineRef.current = null;
+      pendingClickLineRef.current = null;
+      updateLineControls();
+    });
   }
 
   function handleEditorContextMenu(event: React.MouseEvent<HTMLDivElement>) {
@@ -4766,6 +4895,8 @@ export function TaskDetailsPanel({
   }
 
   function scheduleDateMenuClose() {
+    if (isRecurrenceMenuOpenRef.current) return;
+
     clearDateMenuCloseTimer();
     dateMenuCloseTimerRef.current = window.setTimeout(() => {
       dateMenuCloseTimerRef.current = null;
@@ -4773,14 +4904,31 @@ export function TaskDetailsPanel({
     }, TASK_DETAILS_DATE_MENU_HOVER_CLOSE_MS);
   }
 
+  function isMovingWithinDateMenuSurface(relatedTarget: EventTarget | null) {
+    if (!(relatedTarget instanceof Node)) return false;
+
+    return (
+      dateMenuRef.current?.contains(relatedTarget) === true ||
+      dateButtonRef.current?.contains(relatedTarget) === true
+    );
+  }
+
+  function handleDateMenuMouseLeave(event: React.MouseEvent) {
+    if (isMovingWithinDateMenuSurface(event.relatedTarget)) return;
+
+    dateMenuHoverDismissedRef.current = false;
+    scheduleDateMenuClose();
+  }
+
+  function handleDatePickerMouseLeave(event: React.MouseEvent) {
+    if (isMovingWithinDateMenuSurface(event.relatedTarget)) return;
+
+    scheduleDateMenuClose();
+  }
+
   function handleDateMenuMouseEnter() {
     if (dateMenuHoverDismissedRef.current) return;
     openDateMenu();
-  }
-
-  function handleDateMenuMouseLeave() {
-    dateMenuHoverDismissedRef.current = false;
-    scheduleDateMenuClose();
   }
 
   function handleDateButtonClick() {
@@ -4982,7 +5130,10 @@ export function TaskDetailsPanel({
                 {isDateMenuOpen && (
                   <div
                     ref={dateMenuRef}
+                    data-task-date-picker-menu
                     className="absolute left-0 top-full z-50 pt-1.5"
+                    onMouseEnter={clearDateMenuCloseTimer}
+                    onMouseLeave={handleDatePickerMouseLeave}
                   >
                     <TaskDatePicker
                       dueDate={task.dueDate}
@@ -4997,6 +5148,12 @@ export function TaskDetailsPanel({
                         void handleSaveDueTime(dueTime, options)
                       }
                       onSaveRecurrence={(rule) => void handleSaveRecurrence(rule)}
+                      onRecurrenceMenuOpenChange={(open) => {
+                        isRecurrenceMenuOpenRef.current = open;
+                        if (open) {
+                          clearDateMenuCloseTimer();
+                        }
+                      }}
                     />
                   </div>
                 )}
@@ -5212,6 +5369,7 @@ export function TaskDetailsPanel({
               suppressContentEditableWarning
               onInput={handleEditorInput}
               onPaste={handleEditorPaste}
+              onDragStart={handleEditorDragStart}
               onBlur={handleEditorBlur}
               onFocus={handleEditorFocus}
               onMouseUp={handleEditorMouseUp}
@@ -5231,12 +5389,11 @@ export function TaskDetailsPanel({
               />
             )}
 
-            {lineControls.length > 0 && (
-              <div
-                ref={lineControlsRef}
-                className="pointer-events-none absolute inset-0 z-10"
-              >
-                {lineControls.map(({ lineId, top, showPlus, showDrag }) => (
+            <div
+              ref={lineControlsRef}
+              className="pointer-events-none absolute inset-0 z-10"
+            >
+              {lineControls.map(({ lineId, top, showPlus, showDrag }) => (
                   <div
                     key={lineId}
                     className="pointer-events-none absolute left-1 flex h-[1.75em] -translate-y-1/2 items-center"
@@ -5272,7 +5429,6 @@ export function TaskDetailsPanel({
                   </div>
                 ))}
               </div>
-            )}
           </div>
         </div>
       ) : (
@@ -5628,8 +5784,15 @@ export function TaskDetailsPanel({
 
                 <DetailFormatOverflowMenu
                   open={openFormatDropdown === "overflow"}
-                  onOpenChange={(open) => setFormatDropdownOpen("overflow", open)}
+                  onOpenChange={(open) => {
+                    setFormatDropdownOpen("overflow", open);
+                    if (open) {
+                      syncFormatMenuFontState();
+                    }
+                  }}
                   menuRef={formatOverflowMenuRef}
+                  lineHeight={formatMenuLineHeight}
+                  onSelectLineHeight={applyFormatLineHeight}
                   onStrikethrough={() => applyFormat("strikeThrough")}
                   onSuperscript={() => applyFormat("superscript")}
                   onSubscript={() => applyFormat("subscript")}

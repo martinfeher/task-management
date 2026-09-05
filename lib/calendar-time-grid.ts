@@ -274,6 +274,7 @@ export function resolveCalendarSlotFromPoint(
   clientY: number,
   hourStart = CALENDAR_HOUR_START,
   hourHeightPx = 52,
+  timeAnchorClientY: number = clientY,
 ): CalendarDropSlot | null {
   const element = document.elementFromPoint(clientX, clientY);
   if (!(element instanceof Element)) return null;
@@ -299,7 +300,7 @@ export function resolveCalendarSlotFromPoint(
   );
 
   const rect = dayCell.getBoundingClientRect();
-  const y = clientY - rect.top;
+  const y = timeAnchorClientY - rect.top;
 
   return {
     dateKey,

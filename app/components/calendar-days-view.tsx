@@ -32,6 +32,7 @@ import {
   formatCalendarHourLabel,
   calendarHourLabelCellClassName,
   calendarHourLabelClassName,
+  shouldShowCalendarHourLabel,
   getCalendarDayColumnDividerClass,
   getCalendarTaskItemStyle,
   getCalendarWeekdayLabel,
@@ -79,6 +80,23 @@ const HOUR_START = CALENDAR_HOUR_START;
 const HOUR_END = CALENDAR_HOUR_END;
 const HOUR_HEIGHT_PX = 52;
 const GRID_TOP_OFFSET_PX = 0;
+const SELECTED_DAY_COLUMN_CLASS = "bg-[#f6f6f9]";
+const SELECTED_DAY_ROW_BORDER_CLASS =
+  "border-b border-zinc-200 dark:border-zinc-800";
+
+function getSelectedDayColumnDividerClass(
+  dayIndex: number,
+  days: Date[],
+  isSelectedDay: (day: Date) => boolean,
+) {
+  if (dayIndex >= days.length - 1) return "";
+
+  if (isSelectedDay(days[dayIndex]) || isSelectedDay(days[dayIndex + 1])) {
+    return "";
+  }
+
+  return getCalendarDayColumnDividerClass(dayIndex, days.length);
+}
 type CalendarMultiDayViewProps = {
   tasks: TaskListItem[];
   lists: TodoList[];
@@ -395,6 +413,14 @@ export function CalendarMultiDayView({
     onSidebarFocusDateChange?.(current);
   }
 
+  function handleDaySelect(day: Date) {
+    onSidebarFocusDateChange?.(startOfDay(day));
+  }
+
+  function isSelectedDay(day: Date) {
+    return sidebarFocusDate !== undefined && isSameDay(day, sidebarFocusDate);
+  }
+
   function closeAddTaskPopover() {
     setAddTaskPopover(null);
     setDraftTaskName("");
@@ -410,6 +436,7 @@ export function CalendarMultiDayView({
     event: React.MouseEvent<HTMLElement>,
     day: Date,
   ) {
+    handleDaySelect(day);
     setModalTaskId(null);
 
     if (!onAddCalendarTask || lists.length === 0) return;
@@ -433,6 +460,7 @@ export function CalendarMultiDayView({
     }
 
     event.stopPropagation();
+    handleDaySelect(day);
     setModalTaskId(null);
 
     if (!onAddCalendarTask || lists.length === 0) return;
@@ -604,7 +632,7 @@ export function CalendarMultiDayView({
     <div className={CALENDAR_VIEW_WRAPPER_CLASS}>
       <div className={getCalendarShellClassName(fullWidth)}>
         <div className={CALENDAR_VIEW_SURFACE_CLASS}>
-          <div className="flex shrink-0 items-center justify-start px-3 py-2">
+          <div className="flex shrink-0 items-center justify-start px-3 mb-[10px]">
             <CalendarPeriodNavigation
               onToday={goToToday}
               onPrevious={goToPreviousRange}
@@ -624,16 +652,24 @@ export function CalendarMultiDayView({
                   <div className="bg-white dark:bg-zinc-950" />
                   {visibleDays.map((day, dayIndex) => {
                     const isToday = isSameDay(day, today);
+                    const isDaySelected = isSelectedDay(day);
+
                     return (
-                      <div
+                      <button
                         key={`head-${toDateKey(day)}`}
-                        className={`border-b border-zinc-200 bg-white px-2 py-2 text-center dark:border-zinc-800 dark:bg-zinc-950 ${getCalendarDayColumnDividerClass(dayIndex, visibleDays.length)}`}
+                        type="button"
+                        onClick={() => handleDaySelect(day)}
+                        className={`px-2 pb-2 pt-1 text-center transition-colors cursor-pointer ${getSelectedDayColumnDividerClass(dayIndex, visibleDays, isSelectedDay)} ${
+                          isDaySelected
+                            ? `${SELECTED_DAY_COLUMN_CLASS} rounded-t-[8px] ${SELECTED_DAY_ROW_BORDER_CLASS}`
+                            : `${SELECTED_DAY_ROW_BORDER_CLASS} bg-white dark:bg-zinc-950`
+                        }`}
                       >
                         <div className="text-xs font-medium uppercase tracking-wide text-zinc-400">
                           {getCalendarWeekdayLabel(day)}
                         </div>
                         <div
-                          className={`mt-1 inline-flex size-7 items-center justify-center rounded-full text-sm ${
+                          className={`mt-px inline-flex size-7 items-center justify-center rounded-full text-sm ${
                             isToday
                               ? CALENDAR_TODAY_DATE_CIRCLE_CLASS
                               : "font-medium text-zinc-700 dark:text-zinc-200"
@@ -641,7 +677,7 @@ export function CalendarMultiDayView({
                         >
                           {day.getDate()}
                         </div>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -677,6 +713,7 @@ export function CalendarMultiDayView({
                       addTaskPopover !== null && isSameDay(day, addTaskPopover.date);
                     const isActiveAllDay =
                       isActiveDay && addTaskPopover?.dueTimeMinutes === null;
+                    const isDaySelected = isSelectedDay(day);
 
                     return (
                       <div
@@ -684,12 +721,14 @@ export function CalendarMultiDayView({
                         data-calendar-day={dateKey}
                         onClick={(event) => handleAllDayClick(event, day)}
                         className={`${calendarAllDayCellClassName(
-                          `cursor-pointer border-b border-zinc-200 transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900/60 ${getCalendarDayColumnDividerClass(dayIndex, visibleDays.length)} ${
+                          `cursor-pointer transition-colors ${getSelectedDayColumnDividerClass(dayIndex, visibleDays, isSelectedDay)} ${
                           isDropTarget
                             ? "bg-blue-50 ring-1 ring-inset ring-blue-400 dark:bg-blue-950/30"
                             : isActiveAllDay
                               ? "bg-blue-50 ring-1 ring-inset ring-[#4873c7] dark:bg-blue-950/30"
-                              : "bg-white dark:bg-zinc-950"
+                              : isDaySelected
+                                ? `${SELECTED_DAY_COLUMN_CLASS} ${SELECTED_DAY_ROW_BORDER_CLASS}`
+                                : `${SELECTED_DAY_ROW_BORDER_CLASS} bg-white hover:bg-zinc-50 dark:bg-zinc-950 dark:hover:bg-zinc-900/60`
                         }`,
                         )}`}
                         style={{ height: allDayRowHeightPx }}
@@ -754,9 +793,11 @@ export function CalendarMultiDayView({
                   className={calendarHourLabelCellClassName()}
                   style={{ height: HOUR_HEIGHT_PX }}
                 >
-                  <span className={calendarHourLabelClassName()}>
-                    {formatCalendarHourLabel(hour)}
-                  </span>
+                  {shouldShowCalendarHourLabel(hour) ? (
+                    <div className={calendarHourLabelClassName()}>
+                      {formatCalendarHourLabel(hour)}
+                    </div>
+                  ) : null}
                 </div>
               ))}
             </div>
@@ -776,6 +817,7 @@ export function CalendarMultiDayView({
                 addTaskPopover !== null && isSameDay(day, addTaskPopover.date);
               const isActiveTimedDay =
                 isActiveDay && addTaskPopover?.dueTimeMinutes !== null;
+              const isDaySelected = isSelectedDay(day);
               const showDragSlotMarker =
                 resizingTaskId === null &&
                 resizePreview === null &&
@@ -808,8 +850,12 @@ export function CalendarMultiDayView({
                   data-hour-start={HOUR_START}
                   data-hour-height={HOUR_HEIGHT_PX}
                   data-grid-top-offset={GRID_TOP_OFFSET_PX}
-                  className={`relative ${getCalendarDayColumnDividerClass(dayIndex, visibleDays.length)} ${
-                    isTimedDropTarget ? "bg-blue-50/40 dark:bg-blue-950/20" : ""
+                  className={`relative ${getSelectedDayColumnDividerClass(dayIndex, visibleDays, isSelectedDay)} ${
+                    isTimedDropTarget
+                      ? "bg-blue-50/40 dark:bg-blue-950/20"
+                      : isDaySelected
+                        ? SELECTED_DAY_COLUMN_CLASS
+                        : ""
                   }`}
                   onClick={(event) => handleTimeGridClick(event, day)}
                 >

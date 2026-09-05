@@ -2,24 +2,28 @@
 
 import {
   useRef,
+  useState,
   type ComponentType,
   type CSSProperties,
   type ReactNode,
   type RefObject,
 } from "react";
+import { AiOutlineLineHeight } from "react-icons/ai";
 import { HiNumberedList } from "react-icons/hi2";
 import { IoTextOutline } from "react-icons/io5";
 import { LuChevronDown } from "react-icons/lu";
 import { VscChecklist } from "react-icons/vsc";
 import type { DetailTextBlockType, LineBlockType } from "./detail-lines";
 import {
-  DETAIL_FONT_FAMILY_OPTIONS,
   DETAIL_FONT_SIZE_OPTIONS,
+  getDetailFontFamilyLabel,
   getFormatToolbarFontFamilyOptions,
   type DetailFontFamilyId,
   type DetailFontSizeOption,
 } from "./detail-fonts";
 import { BulletListIcon } from "./line-control-icons";
+import { DetailLineHeightControl } from "./detail-line-height-control";
+import type { DetailLineHeightOption } from "./detail-line-height";
 
 export type FormatToolbarDropdown =
   | "highlight"
@@ -724,10 +728,7 @@ export function DetailFormatFontFamilyDropdown({
   onSelectFamily,
 }: DetailFormatFontFamilyDropdownProps) {
   const formatToolbarFontOptions = getFormatToolbarFontFamilyOptions();
-  const familyLabel =
-    DETAIL_FONT_FAMILY_OPTIONS.find((option) => option.id === familyId)?.label ??
-    formatToolbarFontOptions[0]?.label ??
-    "Sans Serif";
+  const familyLabel = getDetailFontFamilyLabel(familyId);
 
   return (
     <FormatToolbarDropdownShell
@@ -754,7 +755,9 @@ export function DetailFormatFontFamilyDropdown({
           type="button"
           role="menuitem"
           className={`${FORMAT_TOOLBAR_FONT_FAMILY_ITEM_CLASS} ${
-            option.id === familyId ? "bg-zinc-100 dark:bg-zinc-800" : ""
+            familyId !== "mixed" && option.id === familyId
+              ? "bg-zinc-100 dark:bg-zinc-800"
+              : ""
           }`}
           style={option.value ? { fontFamily: option.value } : undefined}
           onMouseDown={(event) => event.preventDefault()}
@@ -830,6 +833,8 @@ type DetailFormatOverflowMenuProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   menuRef?: RefObject<HTMLDivElement | null>;
+  lineHeight: DetailLineHeightOption;
+  onSelectLineHeight: (lineHeight: DetailLineHeightOption) => void;
   onStrikethrough: () => void;
   onSuperscript: () => void;
   onSubscript: () => void;
@@ -839,10 +844,15 @@ export function DetailFormatOverflowMenu({
   open,
   onOpenChange,
   menuRef,
+  lineHeight,
+  onSelectLineHeight,
   onStrikethrough,
   onSuperscript,
   onSubscript,
 }: DetailFormatOverflowMenuProps) {
+  const [lineHeightPanelOpen, setLineHeightPanelOpen] = useState(false);
+  const lineHeightOpen = open && lineHeightPanelOpen;
+
   return (
     <FormatToolbarDropdownShell
       open={open}
@@ -913,6 +923,40 @@ export function DetailFormatOverflowMenu({
           </span>
           Subscript
         </button>
+        <div>
+          <button
+            type="button"
+            role="menuitem"
+            aria-haspopup="listbox"
+            aria-expanded={lineHeightOpen}
+            className={`${FORMAT_TOOLBAR_OVERFLOW_MENU_ITEM_CLASS} ${
+              lineHeightOpen ? "bg-zinc-100 dark:bg-zinc-800" : ""
+            }`}
+            style={{ fontSize: "13px" }}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => setLineHeightPanelOpen((current) => !current)}
+          >
+            <span className={FORMAT_TOOLBAR_OVERFLOW_MENU_ICON_CLASS}>
+              <AiOutlineLineHeight
+                className={`${FORMAT_TOOLBAR_ICON_SIZE_CLASS} ${FORMAT_TOOLBAR_ICON_COLOR_MUTED}`}
+                aria-hidden="true"
+              />
+            </span>
+            Line height
+          </button>
+
+          {lineHeightOpen ? (
+            <DetailLineHeightControl
+              value={lineHeight}
+              onSelect={(nextLineHeight) => {
+                onSelectLineHeight(nextLineHeight);
+                setLineHeightPanelOpen(false);
+                onOpenChange(false);
+              }}
+              className="mx-1 mb-1 max-h-40 border-0 shadow-none"
+            />
+          ) : null}
+        </div>
       </div>
     </FormatToolbarDropdownShell>
   );

@@ -6,7 +6,7 @@ import { CalendarTaskTitle } from "./calendar-task-title";
 import { CalendarCurrentTimeLine } from "./calendar-current-time-line";
 import { CalendarNewTaskSlotPreview } from "./calendar-new-task-slot-preview";
 import { CalendarPeriodNavigation } from "./calendar-period-navigation";
-import { formatMonthYear } from "./calendar-mini-month";
+import { formatDayMonthYear } from "./calendar-mini-month";
 import {
   CalendarTaskModal,
   getCalendarTaskSnapshot,
@@ -63,7 +63,9 @@ import {
   formatCalendarHourLabel,
   calendarHourLabelCellClassName,
   calendarHourLabelClassName,
+  shouldShowCalendarHourLabel,
   getCalendarSingleDayGridTemplateColumns,
+  CALENDAR_TIMED_GRID_SCROLL_CLASS,
 } from "@/lib/calendar-layout";
 import type { CalendarSidebarSyncProps } from "./calendar-view-sidebar-layout";
 
@@ -273,7 +275,7 @@ export function CalendarDayView({
 
   useEffect(() => {
     if (!selectedDay) return;
-    onPeriodLabelChange?.(formatMonthYear(selectedDay));
+    onPeriodLabelChange?.(formatDayMonthYear(selectedDay));
   }, [onPeriodLabelChange, selectedDay]);
 
   useEffect(() => {
@@ -571,7 +573,7 @@ export function CalendarDayView({
         >
           <div
             className={calendarAllDayLabelCellClassName(
-              "shrink-0 bg-white dark:bg-zinc-950",
+              "shrink-0 bg-white dark:bg-zinc-950 pr-0",
             )}
             style={{ height: allDayRowHeightPx }}
           >
@@ -629,7 +631,7 @@ export function CalendarDayView({
           </div>
         </div>
 
-        <div ref={timeScrollRef} className="overflow-y-auto h-screen">
+        <div ref={timeScrollRef} className={CALENDAR_TIMED_GRID_SCROLL_CLASS}>
 
           <div
             className="relative grid w-full min-w-[420px]"
@@ -642,9 +644,11 @@ export function CalendarDayView({
                   className={calendarHourLabelCellClassName()}
                   style={{ height: HOUR_HEIGHT_PX }}
                 >
-                  <span className={calendarHourLabelClassName()}>
-                    {formatCalendarHourLabel(hour)}
-                  </span>
+                  {shouldShowCalendarHourLabel(hour) ? (
+                    <div className={calendarHourLabelClassName()}>
+                      {formatCalendarHourLabel(hour)}
+                    </div>
+                  ) : null}
                 </div>
               ))}
 
