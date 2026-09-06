@@ -999,7 +999,7 @@ body {
 .calendar-task-item-background,
 .calendar-task-drop-preview,
 .calendar-task-drag-source-placeholder {
-  background: var(--calendar-task-item-background, #bbd8fe);
+  background-color: var(--calendar-task-item-background, #bbd8fe);
 }
 
 .calendar-task-item-text,

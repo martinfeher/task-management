@@ -620,6 +620,10 @@ export function CalendarMultiDayView({
     draggingTaskPreview === null
       ? null
       : tasks.find((task) => task.id === draggingTaskPreview.taskId) ?? null;
+  const externalDraggingTask =
+    externalDraggingTaskId === null
+      ? null
+      : tasks.find((task) => task.id === externalDraggingTaskId) ?? null;
   const dragPreviewDuration =
     draggingTask && draggingTaskPreview
       ? getCalendarTaskDragPreviewDuration(
@@ -882,10 +886,7 @@ export function CalendarMultiDayView({
                       draggingTaskPreview?.taskId === task.id;
                     const isSourceColumn =
                       draggingTaskPreview?.sourceDateKey === dateKey;
-                    const hideDraggedBlock =
-                      isDraggingTask &&
-                      activeDropSlot?.dateKey &&
-                      activeDropSlot.dateKey !== dateKey;
+                    const hideDraggedBlock = isDraggingTask;
                     const sourcePlaceholder =
                       isDraggingTask && isSourceColumn ? (
                         <CalendarTaskDragSourcePlaceholder
@@ -894,6 +895,8 @@ export function CalendarMultiDayView({
                           taskName={task.name}
                           startMinutes={timing.dueTimeMinutes}
                           durationMinutes={timing.dueDurationMinutes}
+                          priority={task.priority}
+                          calendarColor={task.calendarColor}
                         />
                       ) : null;
 
@@ -971,8 +974,7 @@ export function CalendarMultiDayView({
                     <>
                       {showDragSlotMarker &&
                       draggingTask &&
-                      dragPreviewDuration !== null &&
-                      !timedTasks.some((task) => task.id === draggingTask.id) ? (
+                      dragPreviewDuration !== null ? (
                         <CalendarTaskDropPreview
                           top={selectedSlotTop}
                           height={getCalendarTaskPreviewHeight(
@@ -982,6 +984,8 @@ export function CalendarMultiDayView({
                           taskName={draggingTask.name}
                           startMinutes={selectedSlotMinutes}
                           durationMinutes={dragPreviewDuration}
+                          priority={draggingTask.priority}
+                          calendarColor={draggingTask.calendarColor}
                         />
                       ) : showDragSlotMarker &&
                         externalDraggingTaskId &&
@@ -998,6 +1002,8 @@ export function CalendarMultiDayView({
                           durationMinutes={
                             CALENDAR_ALL_DAY_TO_TIMED_DEFAULT_DURATION_MINUTES
                           }
+                          priority={externalDraggingTask?.priority ?? null}
+                          calendarColor={externalDraggingTask?.calendarColor ?? null}
                         />
                       ) : isActiveTimedDay ? (
                         <CalendarNewTaskSlotPreview

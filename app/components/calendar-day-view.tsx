@@ -48,6 +48,7 @@ import {
   bindCalendarTaskDrag,
   getActiveCalendarDropSlot,
   CALENDAR_ALL_DAY_TO_TIMED_DEFAULT_DURATION_MINUTES,
+  getCalendarTaskDragPreviewDuration,
   type CalendarTaskDragState,
 } from "@/lib/calendar-task-drag";
 import {
@@ -479,6 +480,21 @@ export function CalendarDayView({
 
   const dateKey = toDateKey(selectedDay);
   const isToday = isSameDay(selectedDay, today);
+  const externalDraggingTask =
+    externalDraggingTaskId === null
+      ? null
+      : tasks.find((task) => task.id === externalDraggingTaskId) ?? null;
+  const draggingTask =
+    draggingTaskPreview === null
+      ? null
+      : tasks.find((task) => task.id === draggingTaskPreview.taskId) ?? null;
+  const dragPreviewDuration =
+    draggingTask && draggingTaskPreview
+      ? getCalendarTaskDragPreviewDuration(
+          draggingTask,
+          draggingTaskPreview.sourceTimeMinutes,
+        )
+      : null;
   const isActiveDay =
     addTaskPopover !== null && isSameDay(selectedDay, addTaskPopover.date);
   const activeDropSlot = getActiveCalendarDropSlot(
@@ -681,6 +697,27 @@ export function CalendarDayView({
                   GRID_TOP_OFFSET_PX,
                 );
                 const isDraggingTask = draggingTaskPreview?.taskId === task.id;
+                const height = Math.max(
+                  24,
+                  (timing.dueDurationMinutes / 60) * HOUR_HEIGHT_PX,
+                );
+
+                if (isDraggingTask) {
+                  return (
+                    <Fragment key={getCalendarTaskKey(task)}>
+                      <CalendarTaskDragSourcePlaceholder
+                        top={baseTop}
+                        height={height}
+                        taskName={task.name}
+                        startMinutes={timing.dueTimeMinutes}
+                        durationMinutes={timing.dueDurationMinutes}
+                        priority={task.priority}
+                        calendarColor={task.calendarColor}
+                      />
+                    </Fragment>
+                  );
+                }
+
                 const top = getCalendarTaskDragPreviewTop({
                   baseTop,
                   isDraggingTask,
@@ -692,10 +729,6 @@ export function CalendarDayView({
                   hourHeightPx: HOUR_HEIGHT_PX,
                   gridTopOffsetPx: GRID_TOP_OFFSET_PX,
                 });
-                const height = Math.max(
-                  24,
-                  (timing.dueDurationMinutes / 60) * HOUR_HEIGHT_PX,
-                );
 
                 if (
                   top < GRID_TOP_OFFSET_PX ||
@@ -706,15 +739,6 @@ export function CalendarDayView({
 
                 return (
                   <Fragment key={getCalendarTaskKey(task)}>
-                    {isDraggingTask ? (
-                      <CalendarTaskDragSourcePlaceholder
-                        top={baseTop}
-                        height={height}
-                        taskName={task.name}
-                        startMinutes={timing.dueTimeMinutes}
-                        durationMinutes={timing.dueDurationMinutes}
-                      />
-                    ) : null}
                     <CalendarTimedTaskBlock
                       task={task}
                       day={selectedDay}
@@ -774,6 +798,21 @@ export function CalendarDayView({
                       onTimeChange={handleNewTaskTimeChange}
                     />
                   ) : showDragSlotMarker &&
+                    draggingTask &&
+                    dragPreviewDuration !== null ? (
+                    <CalendarTaskDropPreview
+                      top={selectedSlotTop}
+                      height={getCalendarTaskPreviewHeight(
+                        dragPreviewDuration,
+                        HOUR_HEIGHT_PX,
+                      )}
+                      taskName={draggingTask.name}
+                      startMinutes={selectedSlotMinutes}
+                      durationMinutes={dragPreviewDuration}
+                      priority={draggingTask.priority}
+                      calendarColor={draggingTask.calendarColor}
+                    />
+                  ) : showDragSlotMarker &&
                     externalDraggingTaskId &&
                     externalDraggingTaskName ? (
                     <CalendarTaskDropPreview
@@ -787,6 +826,8 @@ export function CalendarDayView({
                       durationMinutes={
                         CALENDAR_ALL_DAY_TO_TIMED_DEFAULT_DURATION_MINUTES
                       }
+                      priority={externalDraggingTask?.priority ?? null}
+                      calendarColor={externalDraggingTask?.calendarColor ?? null}
                     />
                   ) : null}
                 </>

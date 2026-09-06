@@ -369,6 +369,8 @@ type TaskListPanelProps = {
   showHeader?: boolean;
   showAddTask?: boolean;
   isLabelFilter?: boolean;
+  preselectedLabelId?: string | null;
+  preselectedLabelName?: string | null;
   listId?: string | null;
   onAddTask: (name: string, options?: AddTaskOptions) => void | Promise<void>;
   onToggleTask: (taskId: string) => void;
@@ -444,6 +446,8 @@ export function TaskListPanel({
   showHeader = true,
   showAddTask = false,
   isLabelFilter = false,
+  preselectedLabelId = null,
+  preselectedLabelName = null,
   listId = null,
   onAddTask,
   onToggleTask,
@@ -696,11 +700,11 @@ export function TaskListPanel({
     setNewTaskDueDate(null);
     setNewTaskDueTime(null);
     setNewTaskPriority(null);
-    setAddTaskLabelIds([]);
+    setAddTaskLabelIds(preselectedLabelId ? [preselectedLabelId] : []);
     setActiveSort(null);
     setIsCompletedOpen(false);
     finishTitleEdit();
-  }, [viewResetKey]);
+  }, [viewResetKey, preselectedLabelId]);
 
   useEffect(() => {
     if (panelWidth != null) return;
@@ -930,7 +934,7 @@ export function TaskListPanel({
   }, [showAddTask]);
 
   useEffect(() => {
-    if (!isAddTaskLabelMenuOpen) return;
+    if (!isAddTaskLabelMenuOpen && !preselectedLabelId) return;
 
     let cancelled = false;
 
@@ -949,7 +953,7 @@ export function TaskListPanel({
     return () => {
       cancelled = true;
     };
-  }, [isAddTaskLabelMenuOpen]);
+  }, [isAddTaskLabelMenuOpen, preselectedLabelId]);
 
   useEffect(() => {
     isAddTaskDatePickerOpenRef.current = isAddTaskDatePickerOpen;
@@ -1003,7 +1007,7 @@ export function TaskListPanel({
 
   function resetNewTaskMetadata() {
     setNewTaskPriority(null);
-    setAddTaskLabelIds([]);
+    setAddTaskLabelIds(preselectedLabelId ? [preselectedLabelId] : []);
     setAddTaskLabelQuery("");
     setIsAddTaskLabelMenuOpen(false);
     setIsAddTaskPriorityMenuOpen(false);
@@ -1068,7 +1072,9 @@ export function TaskListPanel({
     const manualLabel =
       addTaskLabelIds.length > 0
         ? addTaskAvailableLabels.find((item) => item.id === addTaskLabelIds[0])
-            ?.label ?? null
+            ?.label ??
+          preselectedLabelName ??
+          null
         : null;
 
     const addOptions: AddTaskOptions = {

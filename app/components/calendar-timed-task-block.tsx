@@ -139,6 +139,8 @@ export function CalendarTaskDropPreview({
   taskName,
   startMinutes,
   durationMinutes,
+  priority = null,
+  calendarColor = null,
   variant = "drop",
 }: {
   top: number;
@@ -146,6 +148,8 @@ export function CalendarTaskDropPreview({
   taskName: string;
   startMinutes?: number;
   durationMinutes?: number;
+  priority?: number | null;
+  calendarColor?: string | null;
   variant?: "drop" | "source";
 }) {
   const availableHeight =
@@ -165,7 +169,11 @@ export function CalendarTaskDropPreview({
   return (
     <div
       aria-hidden="true"
-      style={{ top, height }}
+      style={{
+        top,
+        height,
+        ...getCalendarTaskItemStyle(priority, calendarColor),
+      }}
       className={`${previewClassName} pointer-events-none absolute ${horizontalInsetClass} overflow-hidden rounded select-none ${calendarTaskItemClassName()}`}
     >
       <div
@@ -201,12 +209,16 @@ export function CalendarTaskDragSourcePlaceholder({
   taskName,
   startMinutes,
   durationMinutes,
+  priority = null,
+  calendarColor = null,
 }: {
   top: number;
   height: number;
   taskName: string;
   startMinutes: number;
   durationMinutes: number;
+  priority?: number | null;
+  calendarColor?: string | null;
 }) {
   return (
     <CalendarTaskDropPreview
@@ -216,6 +228,8 @@ export function CalendarTaskDragSourcePlaceholder({
       taskName={taskName}
       startMinutes={startMinutes}
       durationMinutes={durationMinutes}
+      priority={priority}
+      calendarColor={calendarColor}
     />
   );
 }

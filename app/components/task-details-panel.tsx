@@ -1298,6 +1298,67 @@ function elementHasClearableFormatting(element: HTMLElement) {
   return false;
 }
 
+function selectionBoundaryHasClearableFormatting(
+  node: Node,
+  editor: HTMLElement,
+): boolean {
+  let current: Node | null = node;
+
+  while (current && current !== editor) {
+    if (current instanceof HTMLElement && elementHasClearableFormatting(current)) {
+      return true;
+    }
+    current = current.parentNode;
+  }
+
+  return false;
+}
+
+function selectionHasActiveToolbarFormatting(editor: HTMLElement): boolean {
+  const selection = window.getSelection();
+  if (
+    !selection?.rangeCount ||
+    selection.isCollapsed ||
+    !selection.anchorNode ||
+    !editor.contains(selection.anchorNode)
+  ) {
+    return false;
+  }
+
+  const inline = getDetailSelectionInlineFormatState(editor);
+  if (inline.bold || inline.italic || inline.underline || inline.highlight) {
+    return true;
+  }
+
+  const textColor = getSelectionTextColor(editor);
+  if (
+    !colorsEquivalent(textColor, DEFAULT_TEXT_COLOR) &&
+    !colorsEquivalent(textColor, "#555555") &&
+    !colorsEquivalent(textColor, "#71717a")
+  ) {
+    return true;
+  }
+
+  const fontState = getDetailSelectionFontState(editor);
+  if (fontState.size !== DEFAULT_DETAIL_FONT_SIZE_PX) {
+    return true;
+  }
+
+  if (
+    fontState.familyId &&
+    fontState.familyId !== "sans-serif" &&
+    fontState.familyId !== "mixed"
+  ) {
+    return true;
+  }
+
+  if (!isDefaultDetailLineHeight(getDetailSelectionLineHeight(editor))) {
+    return true;
+  }
+
+  return getActiveTextBlockType(editor) !== "text";
+}
+
 function rangeHasClearableFormatting(range: Range, editor: HTMLElement) {
   const lines = getSelectedBlockLinesInRange(editor, range).filter(
     (line) =>
@@ -1310,33 +1371,45 @@ function rangeHasClearableFormatting(range: Range, editor: HTMLElement) {
     if (lineHasCustomLineHeight(line)) return true;
 
     const lineType = line.dataset.lineType ?? "text";
-    if (
-      lineType === "bullet" ||
-      lineType === "numbered" ||
-      lineType === "checklist"
-    ) {
+    if (lineType !== "text") {
       return true;
     }
   }
 
-  const walker = document.createTreeWalker(
-    range.commonAncestorContainer,
-    NodeFilter.SHOW_ELEMENT,
-    {
-      acceptNode(node) {
-        if (!(node instanceof HTMLElement)) return NodeFilter.FILTER_REJECT;
-        if (!editor.contains(node)) return NodeFilter.FILTER_REJECT;
-        if (!range.intersectsNode(node)) return NodeFilter.FILTER_REJECT;
-        if (node.closest(".detail-image-wrapper")) return NodeFilter.FILTER_REJECT;
+  if (selectionBoundaryHasClearableFormatting(range.startContainer, editor)) {
+    return true;
+  }
 
-        return elementHasClearableFormatting(node)
-          ? NodeFilter.FILTER_ACCEPT
-          : NodeFilter.FILTER_SKIP;
+  if (
+    range.endContainer !== range.startContainer &&
+    selectionBoundaryHasClearableFormatting(range.endContainer, editor)
+  ) {
+    return true;
+  }
+
+  for (const line of lines) {
+    const walker = document.createTreeWalker(
+      line,
+      NodeFilter.SHOW_ELEMENT,
+      {
+        acceptNode(node) {
+          if (!(node instanceof HTMLElement)) return NodeFilter.FILTER_REJECT;
+          if (!range.intersectsNode(node)) return NodeFilter.FILTER_REJECT;
+          if (node.closest(".detail-image-wrapper")) return NodeFilter.FILTER_REJECT;
+
+          return elementHasClearableFormatting(node)
+            ? NodeFilter.FILTER_ACCEPT
+            : NodeFilter.FILTER_SKIP;
+        },
       },
-    },
-  );
+    );
 
-  return walker.nextNode() !== null;
+    if (walker.nextNode() !== null) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function selectionHasNonDefaultFormatting(
@@ -1348,7 +1421,10 @@ function selectionHasNonDefaultFormatting(
     return false;
   }
 
-  return rangeHasClearableFormatting(range, editor);
+  return (
+    rangeHasClearableFormatting(range, editor) ||
+    selectionHasActiveToolbarFormatting(editor)
+  );
 }
 
 function captureLiveEditorFormatSelection(editor: HTMLElement) {
@@ -1562,6 +1638,7 @@ export function TaskDetailsPanel({
   const editorRef = useRef<HTMLDivElement>(null);
   const formatMenuRef = useRef<HTMLDivElement>(null);
   const headerFormatControlsRef = useRef<HTMLDivElement>(null);
+  const headerFormatActionsRef = useRef<HTMLDivElement>(null);
   const formatOverflowMenuRef = useRef<HTMLDivElement>(null);
   const linkUrlInputRef = useRef<HTMLInputElement>(null);
   const linkTextInputRef = useRef<HTMLInputElement>(null);
@@ -2477,6 +2554,34 @@ export function TaskDetailsPanel({
     setOpenHeaderFormatDropdown(null);
   }, []);
 
+  const syncHeaderClearFormattingState = useCallback(() => {
+    const editor = editorRef.current;
+    if (!editor) {
+      setShowHeaderClearFormatting(false);
+      return;
+    }
+
+    const hasExtendedSelection =
+      editorHasLiveExtendedTextSelection(editor) ||
+      Boolean(
+        savedFormatSelectionRef.current &&
+          !savedFormatSelectionRef.current.collapsed &&
+          savedFormatSelectionRef.current.toString().trim(),
+      );
+
+    if (!hasExtendedSelection) {
+      setShowHeaderClearFormatting(false);
+      return;
+    }
+
+    setShowHeaderClearFormatting(
+      selectionHasNonDefaultFormatting(
+        editor,
+        savedFormatSelectionRef.current,
+      ),
+    );
+  }, []);
+
   const closeFormatMenu = useCallback((options?: { clearSavedSelection?: boolean }) => {
     setFormatMenu(null);
     formatMenuVisibleRef.current = false;
@@ -2490,17 +2595,9 @@ export function TaskDetailsPanel({
       savedFormatLineIdsRef.current = [];
       setShowHeaderClearFormatting(false);
     } else {
-      const editor = editorRef.current;
-      setShowHeaderClearFormatting(
-        editor
-          ? selectionHasNonDefaultFormatting(
-              editor,
-              savedFormatSelectionRef.current,
-            )
-          : false,
-      );
+      syncHeaderClearFormattingState();
     }
-  }, [closeFormatDropdowns]);
+  }, [closeFormatDropdowns, syncHeaderClearFormattingState]);
 
   const dismissFormatMenu = useCallback(() => {
     if (formatMenuTimerRef.current !== null) {
@@ -2592,13 +2689,8 @@ export function TaskDetailsPanel({
     setFormatMenuFontFamily(getDetailSelectionFontState(editor).familyId);
     setFormatMenuLineHeight(getDetailSelectionLineHeight(editor));
     setFormatMenuBlockType(getActiveTextBlockType(editor));
-    setShowHeaderClearFormatting(
-      selectionHasNonDefaultFormatting(
-        editor,
-        savedFormatSelectionRef.current,
-      ),
-    );
-  }, []);
+    syncHeaderClearFormattingState();
+  }, [syncHeaderClearFormattingState]);
 
   const syncFormatMenuFontState = useCallback(() => {
     const editor = editorRef.current;
@@ -3067,13 +3159,7 @@ export function TaskDetailsPanel({
             !savedFormatSelectionRef.current.collapsed &&
             savedFormatSelectionRef.current.toString().trim(),
         );
-      setShowHeaderClearFormatting(
-        hasPendingSelection &&
-          selectionHasNonDefaultFormatting(
-            editor,
-            savedFormatSelectionRef.current,
-          ),
-      );
+      syncHeaderClearFormattingState();
       closeFormatMenu({ clearSavedSelection: !hasPendingSelection });
       return;
     }
@@ -3090,14 +3176,9 @@ export function TaskDetailsPanel({
     setFormatMenuLineHeight(getDetailSelectionLineHeight(editor));
     setFormatMenuBlockType(getActiveTextBlockType(editor));
     setFormatMenuInlineFormats(getDetailSelectionInlineFormatState(editor));
-    setShowHeaderClearFormatting(
-      selectionHasNonDefaultFormatting(
-        editor,
-        savedFormatSelectionRef.current,
-      ),
-    );
+    syncHeaderClearFormattingState();
     closeFormatDropdowns();
-  }, [closeFormatDropdowns, closeFormatMenu, rememberFormatSelection, syncFormatMenuSelectionState]);
+  }, [closeFormatDropdowns, closeFormatMenu, rememberFormatSelection, syncFormatMenuSelectionState, syncHeaderClearFormattingState]);
 
   const scheduleFormatMenuReveal = useCallback(() => {
     if (formatMenuRevealFrameRef.current !== null) {
@@ -3201,13 +3282,15 @@ export function TaskDetailsPanel({
     const activeLine = getActiveLineElement(editor);
     if (isCodeLine(activeLine)) return;
 
-    const savedRange = savedFormatSelectionRef.current?.cloneRange() ?? null;
+    const savedRange =
+      savedFormatSelectionRef.current?.cloneRange() ??
+      captureLiveEditorFormatSelection(editor);
 
-    const changedFormatting = stripFormattingInSelection(editor, savedRange);
-
-    if (!changedFormatting) {
+    if (!savedRange) {
       return;
     }
+
+    const changedFormatting = stripFormattingInSelection(editor, savedRange);
 
     const selection = window.getSelection();
     if (
@@ -3219,6 +3302,11 @@ export function TaskDetailsPanel({
       rememberFormatSelection(editor, selection.getRangeAt(0));
     }
 
+    if (!changedFormatting) {
+      syncHeaderClearFormattingState();
+      return;
+    }
+
     syncEditorLineEmptyState(editor);
     syncEditorContent();
     recordHistorySnapshot();
@@ -3227,8 +3315,11 @@ export function TaskDetailsPanel({
     setFormatMenuBlockType(getActiveTextBlockType(editor));
     setFormatMenuInlineFormats(DEFAULT_FORMAT_MENU_INLINE_FORMATS);
     setFormatMenuLineHeight(DEFAULT_DETAIL_LINE_HEIGHT);
-    setShowHeaderClearFormatting(false);
+    syncHeaderClearFormattingState();
     updateLineControls();
+    window.requestAnimationFrame(() => {
+      syncHeaderClearFormattingState();
+    });
   }, [
     rememberFormatSelection,
     recordHistorySnapshot,
@@ -3236,6 +3327,7 @@ export function TaskDetailsPanel({
     syncEditorContent,
     closeFormatDropdowns,
     updateLineControls,
+    syncHeaderClearFormattingState,
   ]);
 
   const openLinkMenu = useCallback(() => {
@@ -4071,6 +4163,10 @@ export function TaskDetailsPanel({
       }
 
       if (headerFormatControlsRef.current?.contains(target)) {
+        return;
+      }
+
+      if (headerFormatActionsRef.current?.contains(target)) {
         return;
       }
 
@@ -5562,7 +5658,10 @@ export function TaskDetailsPanel({
                 )}
               </div>
               <span className="text-[#cfcfcf] ml-2">|</span>
-              <div className="flex items-center overflow-visible rounded">
+              <div
+                ref={headerFormatActionsRef}
+                className="flex items-center overflow-visible rounded"
+              >
                 <div className="group/undo relative">
                   <button
                     type="button"
@@ -6018,7 +6117,7 @@ export function TaskDetailsPanel({
                 }}
               />
               <div className="flex items-center justify-between gap-2">
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                <p className="text-xs text-blue-600 dark:text-blue-400 ml-1">
                   Cmd/Ctrl+click to open
                 </p>
                 <div className="flex items-center gap-1">

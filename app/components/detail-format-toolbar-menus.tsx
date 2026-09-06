@@ -59,10 +59,10 @@ export const FORMAT_TOOLBAR_DROPDOWN_ITEM_CLASS =
   "flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm text-zinc-900 transition-colors hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800";
 
 export const FORMAT_TOOLBAR_FONT_FAMILY_TRIGGER_CLASS =
-  `flex h-8 cursor-pointer items-center gap-0.5 rounded-lg px-0 text-[13px] ${FORMAT_TOOLBAR_ICON_COLOR} transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800`;
+  `flex h-8 cursor-pointer items-center gap-0.5 rounded-lg px-1 text-[13px] ${FORMAT_TOOLBAR_ICON_COLOR} transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800`;
 
 export const FORMAT_TOOLBAR_FONT_FAMILY_ITEM_CLASS =
-  "flex w-full items-center gap-2 px-3 py-1.5 text-left text-[15px] text-[#48484a] transition-colors hover:bg-zinc-100 dark:text-[#fbfbfb] dark:hover:bg-zinc-800 cursor-pointer";
+  "flex w-full items-center px-3 py-1.5 text-left text-[14px] text-[#48484a] hover:text-[#292929] transition-colors hover:bg-zinc-100 dark:text-[#fbfbfb] dark:hover:bg-zinc-800 cursor-pointer";
 
 export const FORMAT_TOOLBAR_FONT_SIZE_TEXT_CLASS = "text-[14px] px-0";
 /** 15% brighter than #83a1e0 / Tailwind blue-300 (#93c5fd) */

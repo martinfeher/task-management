@@ -944,6 +944,10 @@ export function TodoApp({
       : sidebarHoverPreview.kind === "label"
         ? sidebarHoverPreview.labelId
         : null;
+  const displayedLabel =
+    displayedLabelId !== null
+      ? (labels.find((item) => item.id === displayedLabelId) ?? null)
+      : null;
 
   useEffect(() => {
     if (hasResizedTaskList) return;
@@ -2009,7 +2013,9 @@ export function TodoApp({
     const targetListId =
       options?.listId ??
       displayedListId ??
-      (displayedActiveView === "today" || displayedActiveView === "important"
+      (displayedLabelId ||
+      displayedActiveView === "today" ||
+      displayedActiveView === "important"
         ? (lists[0]?.id ?? null)
         : null);
     if (!targetListId) return;
@@ -2017,7 +2023,7 @@ export function TodoApp({
     const dueDateValue =
       options?.dueDate !== undefined
         ? options.dueDate
-        : displayedListId || displayedActiveView !== "today"
+        : displayedListId || displayedLabelId || displayedActiveView !== "today"
           ? null
           : getTodayDateValue();
     const markImportant = displayedActiveView === "important";
@@ -3213,11 +3219,14 @@ export function TodoApp({
                   expanded={isCompactLayout}
                   showAddTask={
                     displayedListId !== null ||
+                    displayedLabelId !== null ||
                     ((displayedActiveView === "today" ||
                       displayedActiveView === "important") &&
                       lists.length > 0)
                   }
                   isLabelFilter={displayedLabelId !== null}
+                  preselectedLabelId={displayedLabelId}
+                  preselectedLabelName={displayedLabel?.label ?? null}
                   listId={displayedListId}
                   onAddTask={addTask}
                   onToggleTask={toggleTask}
@@ -3359,11 +3368,14 @@ export function TodoApp({
                 expanded={!showListCalendar}
                 showAddTask={
                   displayedListId !== null ||
+                  displayedLabelId !== null ||
                   ((displayedActiveView === "today" ||
                     displayedActiveView === "important") &&
                     lists.length > 0)
                 }
                 isLabelFilter={displayedLabelId !== null}
+                preselectedLabelId={displayedLabelId}
+                preselectedLabelName={displayedLabel?.label ?? null}
                 listId={displayedListId}
                 onAddTask={addTask}
                 onToggleTask={toggleTask}
