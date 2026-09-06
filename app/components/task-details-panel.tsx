@@ -61,6 +61,7 @@ import {
   splitEditorContent,
   splitBlockLinesOnBreaks,
   splitLineAtCursor,
+  syncEditorBodyPlaceholderVisibility,
   syncLineEmptyState,
   toggleChecklistLine,
 } from "./detail-lines";
@@ -218,6 +219,7 @@ type TaskDetailsPanelProps = {
     rule: TaskRecurrenceRule | null,
   ) => Promise<void>;
   onBack?: () => void;
+  layout?: "default" | "modal";
 };
 
 type SaveStatus = "idle" | "loading" | "pending" | "saved" | "error";
@@ -228,6 +230,7 @@ type FormatMenuState = {
   alignLeft?: boolean;
   placement?: "above" | "below";
   anchorBottom?: number;
+  preferBelow?: boolean;
 };
 
 type SlashCommandMenuState = {
@@ -1448,6 +1451,30 @@ function captureLiveEditorFormatSelection(editor: HTMLElement) {
 }
 
 const FORMAT_MENU_ABOVE_SELECTION_GAP = 10;
+const FORMAT_MENU_BELOW_SELECTION_GAP = 3;
+const FORMAT_MENU_ESTIMATED_HEIGHT = 44;
+
+function shouldPlaceFormatMenuBelowTitle(
+  editor: HTMLElement,
+  range: Range,
+  selectedLines: HTMLElement[],
+  selectionTop: number,
+) {
+  const titleLine = getLineElements(editor)[0];
+  if (!titleLine || !isTitleLine(editor, titleLine)) return false;
+
+  if (selectedLines.some((line) => isTitleLine(editor, line))) {
+    return true;
+  }
+
+  const titleBottom = titleLine.getBoundingClientRect().bottom;
+  const toolbarBottomWhenAbove =
+    selectionTop -
+    FORMAT_MENU_ABOVE_SELECTION_GAP -
+    FORMAT_MENU_ESTIMATED_HEIGHT;
+
+  return toolbarBottomWhenAbove < titleBottom;
+}
 
 function getFormatMenuPositionFromRange(range: Range, editor: HTMLElement) {
   const selectedLines = getLineElements(editor).filter((line) =>
@@ -1482,15 +1509,34 @@ function getFormatMenuPositionFromRange(range: Range, editor: HTMLElement) {
     right = fallback.right;
   }
 
+  const anchorBottom =
+    rects.length > 0
+      ? Math.max(...rects.map((rect) => rect.bottom))
+      : range.getBoundingClientRect().bottom;
+  const shouldPlaceBelow = shouldPlaceFormatMenuBelowTitle(
+    editor,
+    range,
+    selectedLines,
+    top,
+  );
+
+  if (shouldPlaceBelow) {
+    return {
+      x: alignLeft ? left : left + (right - left) / 2,
+      y: anchorBottom + FORMAT_MENU_BELOW_SELECTION_GAP,
+      alignLeft,
+      placement: "below" as const,
+      anchorBottom,
+      preferBelow: true,
+    };
+  }
+
   return {
     x: alignLeft ? left : left + (right - left) / 2,
     y: top - FORMAT_MENU_ABOVE_SELECTION_GAP,
     alignLeft,
     placement: "above" as const,
-    anchorBottom:
-      rects.length > 0
-        ? Math.max(...rects.map((rect) => rect.bottom))
-        : range.getBoundingClientRect().bottom,
+    anchorBottom,
   };
 }
 
@@ -1531,16 +1577,28 @@ function clampFormatMenuPosition(
   const aboveTop = y - menuHeight;
   if (placement === "above" && aboveTop < FORMAT_MENU_VIEWPORT_PADDING) {
     placement = "below";
-    y = (anchorBottom ?? y + menuHeight + 16) + 8;
+    y =
+      (anchorBottom ?? y + menuHeight + 16) + FORMAT_MENU_BELOW_SELECTION_GAP;
   } else if (
     placement === "below" &&
     y + menuHeight > viewportHeight - FORMAT_MENU_VIEWPORT_PADDING
   ) {
-    placement = "above";
-    y = (anchorBottom ?? y) - FORMAT_MENU_ABOVE_SELECTION_GAP;
+    if (
+      !position.preferBelow &&
+      (anchorBottom ?? y) - menuHeight - FORMAT_MENU_ABOVE_SELECTION_GAP >=
+        FORMAT_MENU_VIEWPORT_PADDING
+    ) {
+      placement = "above";
+      y = (anchorBottom ?? y) - FORMAT_MENU_ABOVE_SELECTION_GAP;
+    } else {
+      y = Math.min(
+        y,
+        viewportHeight - menuHeight - FORMAT_MENU_VIEWPORT_PADDING,
+      );
+    }
   }
 
-  return { x, y, alignLeft, placement, anchorBottom };
+  return { x, y, alignLeft, placement, anchorBottom, preferBelow: position.preferBelow };
 }
 
 const TASK_DETAILS_SKELETON_BAR_CLASS =
@@ -1549,7 +1607,7 @@ const TASK_DETAILS_SKELETON_BAR_CLASS =
 function TaskDetailsSkeleton() {
   return (
     <div className="flex flex-col px-4 pb-4" aria-hidden="true">
-      <div className="min-h-[650px] rounded-xl bg-white py-3 pl-[60px] pr-3 dark:bg-zinc-950">
+      <div className="min-h-[850px] rounded-xl bg-white py-3 pl-[60px] pr-3 dark:bg-zinc-950">
         <div className={`h-7 w-1/2 rounded ${TASK_DETAILS_SKELETON_BAR_CLASS}`} />
         <div className={`mt-5 h-3.5 w-[92%] rounded ${TASK_DETAILS_SKELETON_BAR_CLASS}`} />
         <div className={`mt-2.5 h-3.5 w-[85%] rounded ${TASK_DETAILS_SKELETON_BAR_CLASS}`} />
@@ -1575,7 +1633,9 @@ export function TaskDetailsPanel({
   onRecurrenceUpdated,
   onSaveTaskRecurrence,
   onBack,
+  layout = "default",
 }: TaskDetailsPanelProps) {
+  const isModalLayout = layout === "modal";
   const [task, setTask] = useState<TaskDetails | null>(null);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [showClipboardNotice, setShowClipboardNotice] = useState(false);
@@ -1740,6 +1800,7 @@ export function TaskDetailsPanel({
 
     const before = normalizeDetails(editor.innerHTML);
     syncLineEmptyState(editor);
+    syncEditorBodyPlaceholderVisibility(editor);
     const after = normalizeDetails(editor.innerHTML);
     if (before !== after) {
       detailsRef.current = after;
@@ -2366,8 +2427,24 @@ export function TaskDetailsPanel({
         ? hoveredLineRef.current
         : null;
 
-    if (addBlockMenu && activeLineControlsRef.current) {
+    const editorHasFocus =
+      document.activeElement === editor ||
+      (document.activeElement instanceof Node &&
+        editor.contains(document.activeElement));
+    const activeLine = editorHasFocus ? getActiveLineElement(editor) : null;
+    const focusedBodyPlaceholderLine =
+      activeLine &&
+      editor.contains(activeLine) &&
+      isBodyPlaceholderLine(activeLine)
+        ? activeLine
+        : null;
+
+    if (slashCommandMenu && activeLineControlsRef.current) {
       line = activeLineControlsRef.current;
+    } else if (addBlockMenu && activeLineControlsRef.current) {
+      line = activeLineControlsRef.current;
+    } else if (focusedBodyPlaceholderLine) {
+      line = focusedBodyPlaceholderLine;
     } else if (
       isMouseOverEditorRef.current &&
       hoveredLine &&
@@ -2412,8 +2489,12 @@ export function TaskDetailsPanel({
     const isEmpty = isDetailLineEmpty(line);
     const keepAddBlockMenuOpen =
       Boolean(addBlockMenu) && activeLineControlsRef.current === line;
+    const keepSlashCommandMenuOpen =
+      Boolean(slashCommandMenu) && activeLineControlsRef.current === line;
     const showControls =
       keepAddBlockMenuOpen ||
+      keepSlashCommandMenuOpen ||
+      focusedBodyPlaceholderLine === line ||
       (isMouseOverEditorRef.current && hoveredLine === line);
 
     setLineControls([
@@ -2424,7 +2505,7 @@ export function TaskDetailsPanel({
         showDrag: !isEmpty && showControls,
       },
     ]);
-  }, [addBlockMenu]);
+  }, [addBlockMenu, slashCommandMenu]);
 
   const applyFocusTaskTitleIfReady = useCallback(
     (requestId: number) => {
@@ -4245,6 +4326,18 @@ export function TaskDetailsPanel({
           syncEditorLineEmptyState(editor);
         }
 
+        setSlashCommandMenu((current) => {
+          if (!current || !editor) return current;
+
+          const activeLine = getActiveLineElement(editor);
+          const activeLineId = activeLine?.dataset.lineId;
+          if (activeLineId && activeLineId !== current.lineId) {
+            return null;
+          }
+
+          return current;
+        });
+
         const liveRange = captureLiveEditorFormatSelection(editor);
         if (liveRange) {
           rememberFormatSelection(editor, liveRange);
@@ -4382,20 +4475,35 @@ export function TaskDetailsPanel({
       return;
     }
 
+    const lineId = activeLine.dataset.lineId;
+    if (!lineId) {
+      setSlashCommandMenu(null);
+      return;
+    }
+
     const parsed = parseSlashCommand(getLinePlainText(activeLine));
     if (!parsed) {
-      setSlashCommandMenu(null);
+      setSlashCommandMenu((current) => {
+        if (
+          current?.fromContextMenu &&
+          current.lineId === lineId &&
+          isDetailLineEmpty(activeLine)
+        ) {
+          const position = getSlashCommandMenuPosition(activeLine);
+          return {
+            ...current,
+            top: position.top,
+            left: position.left,
+          };
+        }
+
+        return null;
+      });
       return;
     }
 
     const filtered = getSlashCommandOptions(parsed.query);
     if (filtered.length === 0) {
-      setSlashCommandMenu(null);
-      return;
-    }
-
-    const lineId = activeLine.dataset.lineId;
-    if (!lineId) {
       setSlashCommandMenu(null);
       return;
     }
@@ -4413,9 +4521,31 @@ export function TaskDetailsPanel({
     }));
   }
 
+  function openSlashCommandMenuForLine(line: HTMLElement) {
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    const lineId = line.dataset.lineId;
+    if (!lineId) return;
+
+    activeLineControlsRef.current = line;
+    focusDetailLine(editor, line);
+    setAddBlockMenu(null);
+
+    const position = getSlashCommandMenuPosition(line);
+    setSlashCommandMenu({
+      top: position.top,
+      left: position.left,
+      lineId,
+      query: "",
+      selectedIndex: 0,
+      fromContextMenu: true,
+    });
+  }
+
   function cancelSlashCommand() {
     const editor = editorRef.current;
-    if (editor && slashCommandMenu) {
+    if (editor && slashCommandMenu && !slashCommandMenu.fromContextMenu) {
       const line = getLineById(editor, slashCommandMenu.lineId);
       if (line && lineHasSlashCommand(line)) {
         clearSlashCommandText(line);
@@ -4824,7 +4954,8 @@ export function TaskDetailsPanel({
     if (
       relatedTarget instanceof Node &&
       (lineControlsRef.current?.contains(relatedTarget) ||
-        addBlockMenuRef.current?.contains(relatedTarget))
+        addBlockMenuRef.current?.contains(relatedTarget) ||
+        slashCommandMenuRef.current?.contains(relatedTarget))
     ) {
       return;
     }
@@ -4970,6 +5101,16 @@ export function TaskDetailsPanel({
     if (!line) return;
 
     activeLineControlsRef.current = line;
+
+    if (isBodyPlaceholderLine(line)) {
+      if (slashCommandMenu?.lineId === lineId) {
+        setSlashCommandMenu(null);
+      } else {
+        openSlashCommandMenuForLine(line);
+      }
+      updateLineControls();
+      return;
+    }
 
     const rect = event.currentTarget.getBoundingClientRect();
     setSlashCommandMenu(null);
@@ -5561,7 +5702,12 @@ export function TaskDetailsPanel({
     <section
       ref={panelRef}
       data-task-details-panel
-      className="relative min-w-[300px] flex-1 bg-[#f8f8f9] "
+      data-task-details-layout={layout}
+      className={`relative min-w-[300px] flex-1 ${
+        isModalLayout
+          ? "flex h-full min-h-0 flex-col bg-white dark:bg-zinc-950"
+          : "bg-[#f8f8f9]"
+      }`}
       aria-busy={saveStatus === "loading" ? true : undefined}
     >
       <div className="relative flex items-center justify-between overflow-visible px-4 pt-1 pb-1">
@@ -5604,23 +5750,63 @@ export function TaskDetailsPanel({
                   aria-haspopup="dialog"
                   aria-expanded={isDateMenuOpen}
                   onClick={handleDateButtonClick}
-                  className="flex cursor-pointer items-center gap-1 rounded-full bg-[#eceef0] pl-3.5 pr-3 py-[7px] text-[12px] font-semibold uppercase tracking-wide text-zinc-600 transition-colors hover:bg-[#e0e2e5] dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+                  className={`flex cursor-pointer gap-[2px] rounded-full bg-[#eceef0] pl-3.5 pr-3 text-[12px] font-semibold uppercase tracking-wide text-zinc-600 transition-colors hover:bg-[#e0e2e5] dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700 ${
+                    isModalLayout
+                      ? "h-[33px] items-center"
+                      : dueDateLabel && dueTimeLabel
+                        ? "items-start py-[7px]"
+                        : dueDateLabel
+                          ? "h-8 items-center"
+                          : "items-center py-[7px]"
+                  }`}
                 >
-                  <span className={dueDateLabel ? "text-[11px]" : undefined}>Date</span>
+                  <div
+                    className={
+                      dueDateLabel
+                        ? `shrink-0 text-[12px] mb-[6px] ${
+                            isModalLayout ? "leading-none" : "leading-[13px]"
+                          }`
+                        : undefined
+                    }
+                  >
+                    Date
+                  </div>
 
                   {dueDateLabel ? (
-                    <span
-                      className="ml-px flex flex-col items-start normal-case tracking-normal"
+                    <div
+                      className={`relative ml-px flex flex-col normal-case tracking-normal ${
+                        isModalLayout
+                          ? "h-[17px] items-end justify-center"
+                          : `h-[17px] ${!dueTimeLabel ? "-mb-[4px]" : "mb-0"} items-end`
+                      }`}
                       title={
                         dueTimeLabel
                           ? `${dueDateLabel} • ${dueTimeLabel}`
                           : dueDateLabel || undefined
                       }
                     >
-                      <span className="font-normal text-[#5F5F5F] dark:text-zinc-300 text-[13px]">
+               
+                      <span
+                        className={`font-normal text-[#5F5F5F] dark:text-zinc-300 ${
+                          isModalLayout
+                            ? "text-[12px] leading-[12px]"
+                            : "text-[13px] leading-[13px]"
+                        }`}
+                      >
                         {dueDateLabel}
                       </span>
-                    </span>
+                      {dueTimeLabel ? (
+                        <div
+                          className={
+                            isModalLayout
+                              ? "font-normal text-[#9f9f9f] text-[7px] leading-[7px]"
+                              : "absolute -bottom-[5.5px] right-[2px] font-normal text-[#9f9f9f] text-[7px] leading-tight"
+                          }
+                        >
+                          {dueTimeLabel}
+                        </div>
+                      ) : null}
+                    </div>
                   ) : (
                     <PlusIcon className="ml-1 size-3 text-[#5F5F5F]" />
                   )}
@@ -5709,7 +5895,7 @@ export function TaskDetailsPanel({
                   <div className="group/clear-format relative">
                     <button
                       type="button"
-                      aria-label="Clear formatting"
+                      aria-label="Remove formatting"
                       aria-describedby="task-details-clear-formatting-tooltip"
                       onMouseDown={(event) => {
                         event.preventDefault();
@@ -5725,7 +5911,7 @@ export function TaskDetailsPanel({
                       role="tooltip"
                       className={`${TASK_DETAILS_TOOLTIP_CLASS} group-hover/clear-format:opacity-100`}
                     >
-                      Clear formatting
+                      Remove formatting
                     </span>
                   </div>
                 ) : null}
@@ -5814,34 +6000,6 @@ export function TaskDetailsPanel({
             </span>
           )}
         </div>
-        {taskId &&
-          saveStatus !== "loading" &&
-          (saveStatus !== "idle" ||
-            showClipboardNotice ||
-            lastSavedAt !== null) && (
-          <span className="flex flex-wrap items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
-            {showClipboardNotice ? <span>Clipboard</span> : null}
-            {metadataError ? (
-              <span className="text-red-600 dark:text-red-400">{metadataError}</span>
-            ) : null}
-            {saveStatus === "pending" ? <span>Unsaved changes</span> : null}
-            {saveStatus === "error" ? (
-              <span className="flex items-center gap-2 text-red-600 dark:text-red-400">
-                <span>{saveErrorMessage ?? "Something went wrong"}</span>
-                <button
-                  type="button"
-                  onClick={() => void saveDetails()}
-                  className="rounded-md border border-red-200 px-2 py-0.5 text-[11px] font-medium text-red-700 transition-colors hover:bg-red-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/40"
-                >
-                  Retry
-                </button>
-              </span>
-            ) : null}
-            {lastSavedAt && saveStatus === "saved" ? (
-              <span>Saved · {formatSaveTime(lastSavedAt)}</span>
-            ) : null}
-          </span>
-        )}
       </div>
 
       {taskId && saveStatus === "loading" && !task ? (
@@ -5850,10 +6008,16 @@ export function TaskDetailsPanel({
           <TaskDetailsSkeleton />
         </>
       ) : task ? (
-        <div className="flex flex-col px-4 pb-4">
+        <div
+          className={`flex flex-col px-4 ${
+            isModalLayout ? "min-h-0 flex-1 pb-4" : "pb-4"
+          }`}
+        >
           <div
             ref={editorWrapperRef}
-            className="relative overflow-visible text-[#555555]"
+            className={`relative overflow-visible text-[#555555] ${
+              isModalLayout ? "flex min-h-0 flex-1 flex-col" : ""
+            }`}
             onMouseEnter={handleEditorWrapperMouseEnter}
             onMouseLeave={handleEditorWrapperMouseLeave}
             onMouseMove={handleEditorWrapperMouseMove}
@@ -5907,7 +6071,11 @@ export function TaskDetailsPanel({
               onKeyDown={handleEditorKeyDown}
               onKeyUp={handleEditorKeyUp}
               onScroll={updateLineControls}
-              className="task-details-editor min-h-[650px] w-full resize-y overflow-auto rounded-xl bg-white py-[2px] pl-[30px] pr-3 text-[17px] text-[#555555] outline-none transition-colors dark:bg-zinc-950 dark:text-zinc-300 [&_.detail-line[data-line-type=bullet]]:pl-1 [&_.detail-line[data-line-type=checklist]]:cursor-pointer [&_.detail-line[data-line-type=checklist]]:pl-1 [&_.detail-line[data-line-type=h1]]:text-[26px] [&_.detail-line[data-line-type=h1]]:font-bold [&_.detail-line[data-line-type=h1]]:leading-[36px] [&_.detail-line[data-line-type=h1]]:text-[#4B4B4B] dark:[&_.detail-line[data-line-type=h1]]:text-[#F5F5F5] [&_.detail-line[data-line-type=h2]]:text-[23px] [&_.detail-line[data-line-type=h2]]:font-semibold [&_.detail-line[data-line-type=h2]]:leading-[30px] [&_.detail-line[data-line-type=h3]]:text-[19px] [&_.detail-line[data-line-type=h3]]:font-semibold [&_.detail-line[data-line-type=h3]]:leading-[26px] [&_.detail-line[data-line-type=numbered]]:pl-1 [&_mark]:bg-yellow-200 dark:[&_mark]:bg-yellow-300/30 [&_s]:line-through [&_strike]:line-through [&_u]:underline"
+              className={`task-details-editor w-full overflow-auto rounded-xl bg-white py-[2px] pl-[30px] pr-3 text-[17px] text-[#555555] outline-none transition-colors dark:bg-zinc-950 dark:text-zinc-300 [&_.detail-line[data-line-type=bullet]]:pl-1 [&_.detail-line[data-line-type=checklist]]:cursor-pointer [&_.detail-line[data-line-type=checklist]]:pl-1 [&_.detail-line[data-line-type=h1]]:text-[26px] [&_.detail-line[data-line-type=h1]]:font-bold [&_.detail-line[data-line-type=h1]]:leading-[36px] [&_.detail-line[data-line-type=h1]]:text-[#4B4B4B] dark:[&_.detail-line[data-line-type=h1]]:text-[#F5F5F5] [&_.detail-line[data-line-type=h2]]:text-[23px] [&_.detail-line[data-line-type=h2]]:font-semibold [&_.detail-line[data-line-type=h2]]:leading-[30px] [&_.detail-line[data-line-type=h3]]:text-[19px] [&_.detail-line[data-line-type=h3]]:font-semibold [&_.detail-line[data-line-type=h3]]:leading-[26px] [&_.detail-line[data-line-type=numbered]]:pl-1 [&_mark]:bg-yellow-200 dark:[&_mark]:bg-yellow-300/30 [&_s]:line-through [&_strike]:line-through [&_u]:underline ${
+                isModalLayout
+                  ? "min-h-0 flex-1 resize-none"
+                  : "min-h-[700px] resize-y"
+              }`}
             />
 
             {dropIndicator && (
@@ -5933,7 +6101,11 @@ export function TaskDetailsPanel({
                         aria-label="Add block below"
                         title="Add block below"
                         aria-haspopup="menu"
-                        aria-expanded={addBlockMenu !== null}
+                        aria-expanded={
+                          addBlockMenu !== null ||
+                          (slashCommandMenu?.lineId === lineId &&
+                            slashCommandMenu.fromContextMenu)
+                        }
                         className="pointer-events-auto flex size-[19px] cursor-grab items-center justify-center rounded rounded-lg px-[1px] py-[3px] text-zinc-350 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
                         onMouseDown={(event) => event.preventDefault()}
                         onClick={(event) => handlePlusClick(event, lineId)}
@@ -6291,12 +6463,12 @@ export function TaskDetailsPanel({
                 </FormatToolbarTooltipWrap>
 
                 <FormatToolbarTooltipWrap
-                  label="Clear formatting"
+                  label="Remove formatting"
                   tooltipId="format-toolbar-clear-tooltip"
                 >
                   <button
                     type="button"
-                    aria-label="Clear formatting"
+                    aria-label="Remove formatting"
                     aria-describedby="format-toolbar-clear-tooltip"
                     className={FORMAT_TOOLBAR_ICON_BUTTON_CLASS}
                     onMouseDown={(event) => {
@@ -6339,6 +6511,36 @@ export function TaskDetailsPanel({
         onRestore={applyRestoredTaskVersion}
       />
 
+      {taskId &&
+        saveStatus !== "loading" &&
+        (saveStatus !== "idle" ||
+          showClipboardNotice ||
+          lastSavedAt !== null) && (
+        <div className="pointer-events-none absolute bottom-3 right-4 z-10">
+          <span className="flex flex-wrap items-center justify-end gap-2 text-xs text-[#82828a] dark:text-[#acacb4]">
+            {showClipboardNotice ? <span>Clipboard</span> : null}
+            {metadataError ? (
+              <span className="text-red-600 dark:text-red-400">{metadataError}</span>
+            ) : null}
+            {saveStatus === "pending" ? <span>Unsaved changes</span> : null}
+            {saveStatus === "error" ? (
+              <span className="pointer-events-auto flex items-center gap-2 text-red-600 dark:text-red-400">
+                <span>{saveErrorMessage ?? "Something went wrong"}</span>
+                <button
+                  type="button"
+                  onClick={() => void saveDetails()}
+                  className="rounded-md border border-red-200 px-2 py-0.5 text-[11px] font-medium text-red-700 transition-colors hover:bg-red-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/40"
+                >
+                  Retry
+                </button>
+              </span>
+            ) : null}
+            {lastSavedAt && saveStatus === "saved" ? (
+              <span>Saved · {formatSaveTime(lastSavedAt)}</span>
+            ) : null}
+          </span>
+        </div>
+      )}
     </section>
   );
 }

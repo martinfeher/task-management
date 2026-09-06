@@ -174,7 +174,7 @@ export function CalendarTaskDropPreview({
         height,
         ...getCalendarTaskItemStyle(priority, calendarColor),
       }}
-      className={`${previewClassName} pointer-events-none absolute ${horizontalInsetClass} overflow-hidden rounded select-none ${calendarTaskItemClassName()}`}
+      className={`${previewClassName} pointer-events-none absolute ${horizontalInsetClass} overflow-hidden rounded-[5px] select-none ${calendarTaskItemClassName()}`}
     >
       <div
         className={`flex h-full flex-col py-0.5 text-left leading-tight ${CALENDAR_TASK_FONT_CLASS}`}
@@ -646,6 +646,11 @@ type CalendarTimedTaskBlockProps = {
   ) => void;
   onSetTaskDueDate?: (taskId: string, dateValue: string | null) => void;
   onSetTaskDueTime?: (taskId: string, dueTime: TaskDueTime) => void;
+  onSetTaskDueDateAndTime?: (
+    taskId: string,
+    dateValue: string | null,
+    dueTime: TaskDueTime,
+  ) => void;
   dragStateRef: MutableRefObject<CalendarTaskDragState | null>;
   suppressTaskClickRef: MutableRefObject<boolean>;
   setDropTargetSlot: (slot: CalendarDropSlot | null) => void;
@@ -654,6 +659,8 @@ type CalendarTimedTaskBlockProps = {
   onResizeStart?: (taskId: string) => void;
   onResizeEnd?: () => void;
   onDragStart?: () => void;
+  onDropped?: (taskId: string) => void;
+  isMaskedForDrop?: boolean;
   onToggleTask?: (taskId: string) => void;
   isCompleting?: boolean;
   isCheckAnimating?: boolean;
@@ -674,6 +681,7 @@ export function CalendarTimedTaskBlock({
   onTaskClick,
   onSetTaskDueDate,
   onSetTaskDueTime,
+  onSetTaskDueDateAndTime,
   dragStateRef,
   suppressTaskClickRef,
   setDropTargetSlot,
@@ -682,6 +690,8 @@ export function CalendarTimedTaskBlock({
   onResizeStart,
   onResizeEnd,
   onDragStart,
+  onDropped,
+  isMaskedForDrop = false,
   onToggleTask,
   isCompleting = false,
   isCheckAnimating = false,
@@ -707,6 +717,7 @@ export function CalendarTimedTaskBlock({
         top,
         height,
         ...getCalendarTaskItemStyle(task.priority, task.calendarColor),
+        opacity: isMaskedForDrop ? 0 : undefined,
       }}
       onContextMenu={(event) => {
         hoverHandlers.onMouseLeave?.();
@@ -764,6 +775,7 @@ export function CalendarTimedTaskBlock({
                 hourHeightPx,
                 onSetTaskDueDate,
                 onSetTaskDueTime,
+                onSetTaskDueDateAndTime,
                 dragStateRef,
                 suppressTaskClickRef,
                 setDropTargetSlot,
@@ -775,8 +787,11 @@ export function CalendarTimedTaskBlock({
                 onDragMove: (point, slot) => {
                   updateDragPreview?.(point.clientX, point.clientY, slot);
                 },
-                onDragEnd: () => {
+                onDragEnd: (didMove) => {
                   endDragPreview?.();
+                  if (didMove) {
+                    onDropped?.(task.id);
+                  }
                 },
               },
             );

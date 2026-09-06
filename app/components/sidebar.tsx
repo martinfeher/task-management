@@ -7,10 +7,13 @@ import { IoIosSearch } from "react-icons/io";
 import {
   getLabelColor,
 } from "@/lib/label-colors";
-import { LuArrowRight, LuPlus, LuStar } from "react-icons/lu";
+import { getInboxListId } from "@/lib/inbox-list";
+import { FiSettings } from "react-icons/fi";
+import { LuArrowRight, LuInbox, LuPlus, LuStar } from "react-icons/lu";
 import { PiDotsThreeBold } from "react-icons/pi";
 import { BsCalendar3 } from "react-icons/bs";
 import { useSidebarBackground } from "@/lib/sidebar-background";
+import { useImportantEnabled } from "@/lib/important-settings";
 
 import type {
   CompletedTask,
@@ -23,8 +26,10 @@ import type {
 import {
   getListDropIndex,
   getListRowElements,
+  mergeReorderedSidebarListIds,
   reorderListIds,
 } from "./list-reorder";
+import { InteractIcon } from "./line-control-icons";
 import {
   applyLabelRowShifts,
   getLabelDropIndex,
@@ -44,9 +49,15 @@ const SearchModal = dynamic(
   { ssr: false },
 );
 
+const SettingsModal = dynamic(
+  () => import("./settings-modal").then((module) => module.SettingsModal),
+  { ssr: false },
+);
+
 const NAV_ITEMS = [
   { label: "Search", action: "search" as const },
   { label: "Today", action: "today" as const },
+  { label: "Inbox", action: "inbox" as const },
   // { label: "Next 7 days", action: "next7days" as const },
   { label: "Important", action: "important" as const },
   { label: "Calendar", action: "calendar" as const },
@@ -66,6 +77,7 @@ type SidebarProps = {
   suppressListSelectionHighlightId?: string | null;
   selectedLabelId: string | null;
   isTodaySelected: boolean;
+  isInboxSelected: boolean;
   // isNext7DaysSelected: boolean;
   isImportantSelected: boolean;
   isCalendarSelected: boolean;
@@ -73,6 +85,7 @@ type SidebarProps = {
   onSelectList: (listId: string) => void;
   onSelectLabel: (labelId: string) => void;
   onSelectToday: () => void;
+  onSelectInbox: () => void;
   // onSelectNext7Days: () => void;
   onSelectImportant: () => void;
   onSelectCalendar: () => void;
@@ -138,6 +151,7 @@ export function Sidebar({
   suppressListSelectionHighlightId = null,
   selectedLabelId,
   isTodaySelected,
+  isInboxSelected,
   // isNext7DaysSelected,
   isImportantSelected,
   isCalendarSelected,
@@ -145,6 +159,7 @@ export function Sidebar({
   onSelectList,
   onSelectLabel,
   onSelectToday,
+  onSelectInbox,
   // onSelectNext7Days,
   onSelectImportant,
   onSelectCalendar,
@@ -168,6 +183,10 @@ export function Sidebar({
   taskDropHighlightListId = null,
 }: SidebarProps) {
   const { presentation: sidebarBackground } = useSidebarBackground();
+  const { importantEnabled } = useImportantEnabled();
+  const visibleNavItems = importantEnabled
+    ? NAV_ITEMS
+    : NAV_ITEMS.filter((item) => item.action !== "important");
   const closeDrawer = () => onDrawerClose?.();
   const [orderedLists, setOrderedLists] = useState(lists);
   const [orderedLabels, setOrderedLabels] = useState(labels);
@@ -178,6 +197,11 @@ export function Sidebar({
   const [isCompletedOpen, setIsCompletedOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchRevealOrigin, setSearchRevealOrigin] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsRevealOrigin, setSettingsRevealOrigin] = useState<{
     x: number;
     y: number;
   } | null>(null);
@@ -208,7 +232,9 @@ export function Sidebar({
     captureTarget: HTMLElement;
     sourceIndex: number;
     dropIndex: number;
-    listIds: string[];
+    sidebarListIds: string[];
+    fullListIds: string[];
+    inboxListId: string | null;
     pointerId: number;
   } | null>(null);
   const labelDragStateRef = useRef<{
@@ -263,6 +289,11 @@ export function Sidebar({
   function openSearchModal(origin: { x: number; y: number }) {
     setSearchRevealOrigin(origin);
     setIsSearchOpen(true);
+  }
+
+  function openSettingsModal(origin: { x: number; y: number }) {
+    setSettingsRevealOrigin(origin);
+    setIsSettingsOpen(true);
   }
 
   useEffect(() => {
@@ -339,9 +370,15 @@ export function Sidebar({
     removeLabel,
   ]);
 
+  const inboxListId = getInboxListId(lists);
+  const sidebarLists = inboxListId
+    ? orderedLists.filter((list) => list.id !== inboxListId)
+    : orderedLists;
+
   function isListSelected(listId: string) {
     return (
       !isTodaySelected &&
+      !isInboxSelected &&
       !isImportantSelected &&
       !isCalendarSelected &&
       !selectedLabelId &&
@@ -490,13 +527,19 @@ export function Sidebar({
     setDropIndicatorTop(null);
 
     if (dragState && onReorderLists) {
-      const nextIds = reorderListIds(
-        dragState.listIds,
+      const reorderedSidebarIds = reorderListIds(
+        dragState.sidebarListIds,
         dragState.sourceIndex,
         dragState.dropIndex,
       );
 
-      if (nextIds.join(",") !== dragState.listIds.join(",")) {
+      const nextIds = mergeReorderedSidebarListIds(
+        dragState.fullListIds,
+        dragState.inboxListId,
+        reorderedSidebarIds,
+      );
+
+      if (nextIds.join(",") !== dragState.fullListIds.join(",")) {
         const listMap = new Map(orderedLists.map((list) => [list.id, list]));
         setOrderedLists(
           nextIds
@@ -518,14 +561,17 @@ export function Sidebar({
     sourceRow: HTMLElement,
     pointerId: number,
     sourceIndex: number,
-    listIds: string[],
+    sidebarListIds: string[],
+    fullListIds: string[],
   ) {
     dragStateRef.current = {
       sourceRow,
       captureTarget: sourceRow,
       sourceIndex,
       dropIndex: sourceIndex,
-      listIds,
+      sidebarListIds,
+      fullListIds,
+      inboxListId,
       pointerId,
     };
 
@@ -539,7 +585,7 @@ export function Sidebar({
   }
 
   function handleListPointerDown(
-    event: React.PointerEvent<HTMLDivElement>,
+    event: React.PointerEvent<HTMLElement>,
     listId: string,
   ) {
     if (editingListId === listId) return;
@@ -557,11 +603,14 @@ export function Sidebar({
     const sourceIndex = rows.indexOf(dragRow);
     if (sourceIndex < 0) return;
 
-    const listIds = orderedLists.map((list) => list.id);
+    const sidebarListIds = sidebarLists.map((list) => list.id);
+    const fullListIds = orderedLists.map((list) => list.id);
     const startX = event.clientX;
     const startY = event.clientY;
     const pointerId = event.pointerId;
     let dragStarted = false;
+
+    event.preventDefault();
 
     function clearPendingListeners() {
       document.removeEventListener("pointermove", onPointerMove);
@@ -579,7 +628,13 @@ export function Sidebar({
 
       dragStarted = true;
       clearPendingListeners();
-      beginListDrag(dragRow, pointerId, sourceIndex, listIds);
+      beginListDrag(
+        dragRow,
+        pointerId,
+        sourceIndex,
+        sidebarListIds,
+        fullListIds,
+      );
     }
 
     function onPointerUp(upEvent: PointerEvent) {
@@ -855,7 +910,7 @@ export function Sidebar({
         />
       ) : null}
       <aside
-        className={`flex w-[250px] shrink-0 flex-col border-r border-zinc-200 dark:border-zinc-800 dark:bg-zinc-950 ${sidebarBackground.className} ${
+        className={`flex h-full min-h-0 w-[250px] shrink-0 flex-col border-r border-zinc-200 dark:border-zinc-800 dark:bg-zinc-950 ${sidebarBackground.className} ${
           compactDrawer
             ? `fixed inset-y-0 left-0 z-50 transition-transform duration-200 ease-out lg:static lg:translate-x-0 ${
                 drawerOpen ? "translate-x-0" : "-translate-x-full"
@@ -864,10 +919,11 @@ export function Sidebar({
         }`}
         style={sidebarBackground.style}
       >
-        <nav className="flex flex-col">
-          {NAV_ITEMS.map((item) => {
+        <nav className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+          {visibleNavItems.map((item) => {
             const isNavItemSelected =
               (item.action === "today" && isTodaySelected) ||
+              (item.action === "inbox" && isInboxSelected) ||
               // (item.action === "next7days" && isNext7DaysSelected) ||
               (item.action === "important" && isImportantSelected) ||
               (item.action === "calendar" && isCalendarSelected);
@@ -877,6 +933,7 @@ export function Sidebar({
 
             return (
             item.action === "today" ||
+            item.action === "inbox" ||
             item.action === "important" ||
             item.action === "calendar" ? (
             (() => {
@@ -890,6 +947,7 @@ export function Sidebar({
               tabIndex={0}
               onClick={() => {
                 if (item.action === "today") onSelectToday();
+                else if (item.action === "inbox") onSelectInbox();
                 else if (item.action === "important") onSelectImportant();
                 else onSelectCalendar();
                 closeDrawer();
@@ -898,6 +956,7 @@ export function Sidebar({
                 if (event.key !== "Enter" && event.key !== " ") return;
                 event.preventDefault();
                 if (item.action === "today") onSelectToday();
+                else if (item.action === "inbox") onSelectInbox();
                 else if (item.action === "important") onSelectImportant();
                 else onSelectCalendar();
                 closeDrawer();
@@ -911,6 +970,11 @@ export function Sidebar({
               {item.action === "today" ? (
                 <TodayCalendarIcon
                   className={`size-[19px] -ml-[2px] shrink-0 ${navIconColor}`}
+                />
+              ) : item.action === "inbox" ? (
+                <LuInbox
+                  className={`size-[15px] shrink-0 ${navIconColor}`}
+                  aria-hidden="true"
                 />
               ) : item.action === "important" ? (
                 <LuStar
@@ -973,8 +1037,8 @@ export function Sidebar({
             );
           })}
           
-          <hr className="my-2 border-zinc-200 dark:border-zinc-800" />
-          <div className="flex flex-col gap-2 px-4 pb-1 text-xs font-medium text-zinc-400 dark:text-zinc-500">Lists</div>
+          <hr className="mt-2 mb-1.5 border-zinc-200 dark:border-zinc-800" />
+          <div className="flex flex-col gap-2 px-4 text-xs font-medium text-zinc-400 dark:text-zinc-500">Lists</div>
           <div
             ref={listContainerRef}
             className="relative flex flex-col"
@@ -988,7 +1052,7 @@ export function Sidebar({
                 style={{ top: dropIndicatorTop }}
               />
             )}
-            {orderedLists.map((list) => {
+            {sidebarLists.map((list) => {
               const isNameHovered =
                 sidebarHoverPreview?.kind === "list" &&
                 sidebarHoverPreview.listId === list.id;
@@ -1004,7 +1068,6 @@ export function Sidebar({
             <div
               key={list.id}
               data-list-id={list.id}
-              onPointerDown={(event) => handleListPointerDown(event, list.id)}
               onClick={() => handleListClick(list.id)}
               onMouseLeave={() => {
                 if (isNameHovered) {
@@ -1019,9 +1082,22 @@ export function Sidebar({
                 isNameHovered || (isSelectedRow && sidebarHoverPreview === null)
                   ? "border-l-[2px] border-l-[#dadfdf]"
                   : "border-l-[2px] border-l-transparent"
-              }`}
+              } ${onReorderLists ? "touch-none" : ""}`}
             >
-              <div className="flex min-w-0 flex-1 items-center pl-[11px] pr-[40px] text-left text-sm text-zinc-800 dark:text-zinc-50">
+              {onReorderLists ? (
+                <span
+                  aria-hidden="true"
+                  className="flex size-[19px] shrink-0 cursor-grab items-center justify-center active:cursor-grabbing"
+                  onPointerDown={(event) => handleListPointerDown(event, list.id)}
+                >
+                  <InteractIcon className="size-3.5 text-[#aaabad] opacity-0 transition-opacity group-hover:opacity-100" />
+                </span>
+              ) : null}
+              <div
+                className={`flex min-w-0 flex-1 items-center pr-[40px] text-left text-sm text-zinc-800 dark:text-zinc-50 ${
+                  onReorderLists ? "pl-0 -ml-[4px]!" : "pl-[11px]"
+                }`}
+              >
                 {editingListId === list.id ? (
                   <input
                     ref={listNameInputRef}
@@ -1088,7 +1164,7 @@ export function Sidebar({
                   type="button"
                   aria-label={`Open menu for ${list.name}`}
                   aria-expanded={openMenuListId === list.id}
-                  className={`flex size-[22px] items-center justify-center rounded-[6px] text-zinc-500 transition-opacity hover:bg-zinc-200/80 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-zinc-50 cursor-pointer ${
+                  className={`flex size-[22px] items-center justify-center rounded-full text-zinc-500 transition-opacity hover:bg-zinc-200/80 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-zinc-50 cursor-pointer ${
                     openMenuListId === list.id
                       ? "opacity-100"
                       : "opacity-0 group-hover:opacity-100"
@@ -1208,7 +1284,7 @@ export function Sidebar({
                       type="button"
                       aria-label={`Open menu for ${item.label}`}
                       aria-expanded={openMenuLabelId === item.id}
-                      className={`flex size-[22px] items-center justify-center rounded-[6px] text-zinc-500 transition-opacity hover:bg-zinc-200/80 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-zinc-50 cursor-pointer ${
+                      className={`flex size-[22px] items-center justify-center rounded-full text-zinc-500 transition-opacity hover:bg-zinc-200/80 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-zinc-50 cursor-pointer ${
                         openMenuLabelId === item.id
                           ? "opacity-100"
                           : "opacity-0 group-hover:opacity-100"
@@ -1276,6 +1352,23 @@ export function Sidebar({
               ))}
           </div>
         </nav>
+
+        <div className="flex justify-end items-center shrink-0 border-t border-zinc-200 px-4 py-3 dark:border-zinc-800">
+          <button
+            type="button"
+            aria-label="Open settings"
+            onClick={(event) => {
+              openSettingsModal({
+                x: event.clientX,
+                y: event.clientY,
+              });
+              closeDrawer();
+            }}
+            className="flex size-8 items-center justify-center rounded-full text-[#7c92a0] transition-colors hover:bg-zinc-200/60 hover:text-zinc-900 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-50 cursor-pointer"
+          >
+            <FiSettings className="size-[18px]" aria-hidden="true" />
+          </button>
+        </div>
       </aside>
 
       <SearchModal
@@ -1290,6 +1383,12 @@ export function Sidebar({
           closeDrawer();
         }}
         onToggleTask={onToggleTask}
+      />
+
+      <SettingsModal
+        open={isSettingsOpen}
+        revealOrigin={settingsRevealOrigin}
+        onClose={() => setIsSettingsOpen(false)}
       />
 
       {openLabelMenuItem && labelMenuPosition ? (

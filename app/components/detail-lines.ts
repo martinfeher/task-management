@@ -1805,6 +1805,30 @@ export function syncLineEmptyState(editor: HTMLElement) {
   });
 }
 
+export function syncEditorBodyPlaceholderVisibility(editor: HTMLElement) {
+  const selection = window.getSelection();
+  const editorHasFocus =
+    document.activeElement === editor ||
+    (document.activeElement instanceof Node &&
+      editor.contains(document.activeElement));
+  const selectionInEditor =
+    Boolean(selection?.rangeCount) &&
+    ((selection?.anchorNode != null && editor.contains(selection.anchorNode)) ||
+      (selection?.focusNode != null && editor.contains(selection.focusNode)));
+
+  if (!editorHasFocus || !selectionInEditor) {
+    delete editor.dataset.hideBodyPlaceholder;
+    return;
+  }
+
+  const activeLine = getActiveLineElement(editor);
+  if (activeLine && !isLineEmpty(activeLine)) {
+    editor.dataset.hideBodyPlaceholder = "true";
+  } else {
+    delete editor.dataset.hideBodyPlaceholder;
+  }
+}
+
 export function ensureTitleLine(editor: HTMLElement) {
   ensureBlockLines(editor);
 

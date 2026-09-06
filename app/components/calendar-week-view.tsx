@@ -73,6 +73,9 @@ import {
   getActiveCalendarDropSlot,
   CALENDAR_ALL_DAY_TO_TIMED_DEFAULT_DURATION_MINUTES,
   getCalendarTaskDragPreviewDuration,
+  isCalendarTaskAtDragSource,
+  shouldShowCalendarInternalDragSlotMarker,
+  useCalendarTaskDropRevealMask,
   type CalendarTaskDragState,
 } from "@/lib/calendar-task-drag";
 
@@ -111,6 +114,11 @@ type CalendarWeekViewProps = {
   onToggleTask?: (taskId: string) => void;
   onSetTaskDueDate?: (taskId: string, dateValue: string | null) => void;
   onSetTaskDueTime?: (taskId: string, dueTime: TaskDueTime) => void;
+  onSetTaskDueDateAndTime?: (
+    taskId: string,
+    dateValue: string | null,
+    dueTime: TaskDueTime,
+  ) => void;
 } & CalendarTaskEditorCallbacks & {
   onAddCalendarTask?: (payload: {
     name: string;
@@ -245,6 +253,7 @@ export function CalendarWeekView({
   onToggleTask,
   onSetTaskDueDate,
   onSetTaskDueTime,
+  onSetTaskDueDateAndTime,
   onDetailsSaved,
   onTaskHasDetailsKnown,
   onTaskRenamed,
@@ -284,6 +293,8 @@ export function CalendarWeekView({
   const [resizePreview, setResizePreview] =
     useState<CalendarTaskResizePreview | null>(null);
   const [resizingTaskId, setResizingTaskId] = useState<string | null>(null);
+  const { markTaskJustDropped, isTaskMaskedForDrop } =
+    useCalendarTaskDropRevealMask();
   const dragStateRef = useRef<CalendarTaskDragState | null>(null);
   const resizingTaskIdRef = useRef<string | null>(null);
   const suppressTaskClickRef = useRef(false);
@@ -534,6 +545,7 @@ export function CalendarWeekView({
       hourHeightPx: hourHeightPx,
       onSetTaskDueDate,
       onSetTaskDueTime,
+      onSetTaskDueDateAndTime,
       dragStateRef,
       suppressTaskClickRef,
       setDropTargetSlot: handleSetDropTargetSlot,
@@ -549,8 +561,11 @@ export function CalendarWeekView({
       onDragMove: (point, slot) => {
         updateDragPreview?.(point.clientX, point.clientY, slot);
       },
-      onDragEnd: () => {
+      onDragEnd: (didMove) => {
         endDragPreview?.();
+        if (didMove) {
+          markTaskJustDropped(task.id);
+        }
       },
     });
   }
@@ -645,6 +660,10 @@ export function CalendarWeekView({
           draggingTaskPreview.sourceTimeMinutes,
         )
       : null;
+  const internalDragStillAtSource = shouldShowCalendarInternalDragSlotMarker(
+    draggingTask,
+    draggingTaskPreview,
+  );
   const timedGridMinMinutes = getMinutesFromCalendarGridY(
     effectiveGridTopOffset,
     gridHourStart,
@@ -820,7 +839,10 @@ export function CalendarWeekView({
                                     task.id === selectedTaskId,
                                     canDragTasks,
                                   )} calendar-task-row--single-line gap-1 overflow-hidden`}
-                                  style={getCalendarTaskItemStyle(task.priority, task.calendarColor)}
+                                  style={{
+                                    ...getCalendarTaskItemStyle(task.priority, task.calendarColor),
+                                    opacity: isTaskMaskedForDrop(task.id) ? 0 : undefined,
+                                  }}
                                 >
                                   <CalendarTaskTitle
                                     name={task.name}
@@ -894,7 +916,8 @@ export function CalendarWeekView({
                 resizePreview === null &&
                 isTimedDropTarget &&
                 !isActiveTimedDay &&
-                (activeDropSlot?.dueTimeMinutes ?? null) !== null;
+                (activeDropSlot?.dueTimeMinutes ?? null) !== null &&
+                internalDragStillAtSource;
               const selectedSlotMinutes = isActiveTimedDay
                 ? addTaskPopover.dueTimeMinutes
                 : isTimedDropTarget
@@ -967,15 +990,40 @@ export function CalendarWeekView({
                       draggingTaskPreview?.taskId === task.id;
                     const isSourceColumn =
                       draggingTaskPreview?.sourceDateKey === dateKey;
-                    const hideDraggedBlock = isDraggingTask;
+                    const hideDraggedBlock =
+                      isDraggingTask &&
+                      draggingTaskPreview !== null &&
+                      isCalendarTaskAtDragSource(task, draggingTaskPreview);
+                    const sourcePlaceholderTop =
+                      draggingTaskPreview?.sourceTimeMinutes == null
+                        ? baseTop
+                        : getTopForCalendarMinutes(
+                            draggingTaskPreview.sourceTimeMinutes,
+                            gridHourStart,
+                            hourHeightPx,
+                            effectiveGridTopOffset,
+                          );
+                    const sourcePlaceholderDuration =
+                      draggingTaskPreview?.sourceTimeMinutes == null
+                        ? timing.dueDurationMinutes
+                        : getCalendarTaskDragPreviewDuration(
+                            task,
+                            draggingTaskPreview.sourceTimeMinutes,
+                          );
                     const sourcePlaceholder =
-                      isDraggingTask && isSourceColumn ? (
+                      hideDraggedBlock && isSourceColumn ? (
                         <CalendarTaskDragSourcePlaceholder
-                          top={baseTop}
-                          height={height}
+                          top={sourcePlaceholderTop}
+                          height={Math.max(
+                            24,
+                            (sourcePlaceholderDuration / 60) * hourHeightPx,
+                          )}
                           taskName={task.name}
-                          startMinutes={timing.dueTimeMinutes}
-                          durationMinutes={timing.dueDurationMinutes}
+                          startMinutes={
+                            draggingTaskPreview?.sourceTimeMinutes ??
+                            timing.dueTimeMinutes
+                          }
+                          durationMinutes={sourcePlaceholderDuration}
                           priority={task.priority}
                           calendarColor={task.calendarColor}
                         />
@@ -1023,6 +1071,7 @@ export function CalendarWeekView({
                           onTaskClick={handleCalendarTaskClick}
                           onSetTaskDueDate={onSetTaskDueDate}
                           onSetTaskDueTime={onSetTaskDueTime}
+                          onSetTaskDueDateAndTime={onSetTaskDueDateAndTime}
                           dragStateRef={dragStateRef}
                           suppressTaskClickRef={suppressTaskClickRef}
                           setDropTargetSlot={handleSetDropTargetSlot}
@@ -1033,6 +1082,8 @@ export function CalendarWeekView({
                           onToggleTask={onToggleTask}
                           isCompleting={completingTaskIds?.has(task.id)}
                           isCheckAnimating={checkAnimatingTaskIds?.has(task.id)}
+                          isMaskedForDrop={isTaskMaskedForDrop(task.id)}
+                          onDropped={markTaskJustDropped}
                           onDragStart={() => {
                             setModalTaskId(null);
                             setDraggingTaskPreview({

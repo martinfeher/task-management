@@ -135,7 +135,14 @@ const TASK_ROW_LEFT_BORDER_COLOR_CLASS = "border-l-[#dADFeF]";
 
 // Schedule/time subline: base #98979c, row hover 20% darker → #79787c
 const TASK_ROW_SCHEDULE_COLOR_CLASS =
-  "text-[#afafaf] group-hover:text-[#79787c]";
+  "text-[#afafaf] group-hover:text-[#7696bf]";
+  // "text-[#afafaf] group-hover:text-[#6f90bf]";
+  // "text-[#afafaf] group-hover:text-[#6fa0cf]";
+  // "text-[#afafaf] group-hover:text-[#6a99c6]";
+  // "text-[#afafaf] group-hover:text-[#6793bc]";
+  // "text-[#afafaf] group-hover:text-[#67a3cc]";
+  // "text-[#afafaf] group-hover:text-[#699abd]";
+  // "text-[#afafaf] group-hover:text-[#8f8d93]";
 const TASK_ROW_SCHEDULE_TRANSITION_CLASS =
   "transition-colors duration-200 ease-in-out";
 
@@ -186,7 +193,7 @@ export function getTaskRowLeftBorderClass(
     return `${TASK_ROW_LEFT_BORDER_WIDTH_CLASS} ${TASK_ROW_LEFT_BORDER_COLOR_CLASS}`;
   }
 
-  return `${TASK_ROW_LEFT_BORDER_WIDTH_CLASS} border-l-transparent hover:shadow-[inset_2px_0_0_#DADFDF]`;
+  return `${TASK_ROW_LEFT_BORDER_WIDTH_CLASS} border-l-transparent hover:border-l-[#DADFDF] transition-[background-color,border-color]`;
 }
 
 function getRowMenuView(
@@ -333,7 +340,8 @@ export function TaskListTaskRow({
       rowMenuView !== null);
 
   const basePaddingLeft = useWiderRowPadding ? 22 : 0;
-  const rowPaddingLeft = basePaddingLeft + depth * SUBTASK_INDENT_PX;
+  const rowOuterPaddingLeft = depth * SUBTASK_INDENT_PX;
+  const rowContentPaddingLeft = basePaddingLeft;
   const isSelected = task.id === selectedTaskId;
   const leftBorderClass = getTaskRowLeftBorderClass(task.id, selectedTaskId);
   const dividerClass = getTaskListItemDividerClass(task);
@@ -553,7 +561,7 @@ export function TaskListTaskRow({
             : "hover:bg-[#faf6ff]"
       }`}
       style={{
-        paddingLeft: rowPaddingLeft,
+        paddingLeft: rowOuterPaddingLeft,
         ...(isCompleting ? completeDurationStyle : {}),
       }}
     >
@@ -569,6 +577,14 @@ export function TaskListTaskRow({
         </span>
       ) : null}
 
+      <div
+        className="flex min-w-0 flex-1 items-center"
+        style={
+          rowContentPaddingLeft > 0
+            ? { paddingLeft: rowContentPaddingLeft }
+            : undefined
+        }
+      >
       {task.isNote ? (
         <span
           className="group/note-icon relative task-list-checkbox flex size-[24px] shrink-0 items-center text-[#979797]"
@@ -742,7 +758,7 @@ export function TaskListTaskRow({
                 aria-haspopup="dialog"
                 aria-expanded={openDatePickerTaskId === task.id}
                 aria-describedby={`set-date-tooltip-${task.id}`}
-                className={`flex h-[19px] w-[19px] shrink-0 mr-1 items-center justify-center rounded-md text-zinc-400 transition-colors cursor-pointer hover:text-zinc-600 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 ${
+                className={`flex h-[19px] w-[19px] shrink-0 mr-1 items-center justify-center rounded-md text-zinc-400 transition-colors cursor-pointer hover:text-zinc-500 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 ${
                   task.dueDate ? "text-zinc-400 dark:text-zinc-300" : ""
                 }`}
                 onPointerDown={(event) => {
@@ -935,6 +951,7 @@ export function TaskListTaskRow({
           : null}
       </div>
       ) : null}
+      </div>
     </li>
   );
 }

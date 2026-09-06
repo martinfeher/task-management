@@ -106,15 +106,16 @@ export function CalendarTaskModal({
           type="button"
           aria-label="Close task editor"
           onClick={() => void handleClose()}
-          className="absolute right-3 top-3 z-20 flex size-8 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-zinc-200/80 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+          className="absolute right-2 top-2 z-20 flex size-8 items-center justify-center rounded-full text-zinc-500 transition-colors cursor-pointer hover:bg-zinc-200/80 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
         >
-          <LuX className="size-4" />
+          <LuX className="size-4 cursor-pointer" />
         </button>
 
-        <div className="min-h-0 flex-1 overflow-hidden">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <TaskDetailsPanel
             taskId={taskId}
             taskSnapshot={taskSnapshot}
+            layout="modal"
             focusNoteAtEndRequest={focusNoteAtEndRequest}
             registerSaveController={registerDetailsSaveController}
             onDetailsSaved={onDetailsSaved}

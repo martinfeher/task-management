@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useEffect,
   useRef,
   useState,
   type ComponentType,
@@ -851,7 +852,34 @@ export function DetailFormatOverflowMenu({
   onSubscript,
 }: DetailFormatOverflowMenuProps) {
   const [lineHeightPanelOpen, setLineHeightPanelOpen] = useState(false);
+  const lineHeightCloseTimerRef = useRef<number | null>(null);
   const lineHeightOpen = open && lineHeightPanelOpen;
+
+  useEffect(() => {
+    if (!open) {
+      setLineHeightPanelOpen(false);
+    }
+  }, [open]);
+
+  function clearLineHeightCloseTimer() {
+    if (lineHeightCloseTimerRef.current !== null) {
+      window.clearTimeout(lineHeightCloseTimerRef.current);
+      lineHeightCloseTimerRef.current = null;
+    }
+  }
+
+  function handleLineHeightMouseEnter() {
+    clearLineHeightCloseTimer();
+    setLineHeightPanelOpen(true);
+  }
+
+  function handleLineHeightMouseLeave() {
+    clearLineHeightCloseTimer();
+    lineHeightCloseTimerRef.current = window.setTimeout(() => {
+      lineHeightCloseTimerRef.current = null;
+      setLineHeightPanelOpen(false);
+    }, FORMAT_TOOLBAR_DROPDOWN_HOVER_CLOSE_MS);
+  }
 
   return (
     <FormatToolbarDropdownShell
@@ -923,7 +951,10 @@ export function DetailFormatOverflowMenu({
           </span>
           Subscript
         </button>
-        <div>
+        <div
+          onMouseEnter={handleLineHeightMouseEnter}
+          onMouseLeave={handleLineHeightMouseLeave}
+        >
           <button
             type="button"
             role="menuitem"
@@ -934,7 +965,7 @@ export function DetailFormatOverflowMenu({
             }`}
             style={{ fontSize: "13px" }}
             onMouseDown={(event) => event.preventDefault()}
-            onClick={() => setLineHeightPanelOpen((current) => !current)}
+            onClick={() => setLineHeightPanelOpen(true)}
           >
             <span className={FORMAT_TOOLBAR_OVERFLOW_MENU_ICON_CLASS}>
               <AiOutlineLineHeight

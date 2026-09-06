@@ -118,6 +118,7 @@ export type TodoRoute =
     }
   | { kind: "task"; taskId: string }
   | { kind: "today" }
+  | { kind: "inbox" }
   | { kind: "important" }
   | {
       kind: "calendar";
@@ -152,6 +153,8 @@ export function buildTodoPath(route: TodoRoute): string {
       return `/tasks/${encodeURIComponent(route.taskId)}`;
     case "today":
       return "/today";
+    case "inbox":
+      return "/inbox";
     case "important":
       return "/important";
     case "calendar":
@@ -174,6 +177,7 @@ export function parseTodoPath(
 
   if (pathname === "/") return { kind: "home" };
   if (pathname === "/today") return { kind: "today" };
+  if (pathname === "/inbox") return { kind: "inbox" };
   if (pathname === "/important") return { kind: "important" };
 
   const calendarMatch = pathname.match(
@@ -237,7 +241,7 @@ export function findListIdForTask(
 }
 
 export type TodoRouteAppState = {
-  activeView: "today" | "important" | "calendar" | null;
+  activeView: "today" | "inbox" | "important" | "calendar" | null;
   selectedListId: string | null;
   selectedTaskId: string | null;
   selectedLabelId: string | null;
@@ -264,6 +268,10 @@ export function getRouteFromAppState(
 
   if (state.activeView === "today") {
     return { kind: "today" };
+  }
+
+  if (state.activeView === "inbox") {
+    return { kind: "inbox" };
   }
 
   if (state.activeView === "important") {
@@ -322,6 +330,7 @@ export function routesEqual(a: TodoRoute, b: TodoRoute) {
   switch (a.kind) {
     case "home":
     case "today":
+    case "inbox":
     case "important":
       return true;
     case "calendar":

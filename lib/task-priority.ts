@@ -93,9 +93,8 @@ export function getTaskPriorityItemStyle(
 
   return {
     backgroundColor: surface.background,
-    color: surface.text,
     ["--calendar-task-item-background" as string]: surface.background,
-    ["--calendar-task-title-color" as string]: surface.text,
+    ["--calendar-task-title-source-color" as string]: surface.background,
   };
 }
 

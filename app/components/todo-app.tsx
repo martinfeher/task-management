@@ -26,6 +26,7 @@ import {
   toggleTask as toggleTaskInDb,
   updateTaskDueDate as updateTaskDueDateInDb,
   updateTaskDueTime as updateTaskDueTimeInDb,
+  updateTaskDueDateAndTime as updateTaskDueDateAndTimeInDb,
   updateTaskPriority as updateTaskPriorityInDb,
   updateTaskCalendarColor as updateTaskCalendarColorInDb,
   updateTaskPinned as updateTaskPinnedInDb,
@@ -62,6 +63,8 @@ import {
   type ListCalendarView,
   type TodoRoute,
 } from "@/lib/todo-routes";
+import { getInboxListId } from "@/lib/inbox-list";
+import { useImportantEnabled } from "@/lib/important-settings";
 import type { CalendarViewTab } from "@/lib/calendar-view-settings";
 import {
   readCalendarViewSession,
@@ -301,6 +304,7 @@ function getTasksByLabel(
 
 type ActiveView =
   | "today"
+  | "inbox"
   // | "next7days"
   | "important"
   | "calendar"
@@ -329,6 +333,19 @@ function getVisibleTasks(
           listName: list.name,
         })),
     );
+  }
+
+  if (activeView === "inbox") {
+    const inboxListId = getInboxListId(lists);
+    if (!inboxListId) return [];
+
+    return (tasksByList[inboxListId] ?? [])
+      .filter((task) => !task.completed)
+      .map((task) => ({
+        ...task,
+        listId: inboxListId,
+        listName: lists.find((list) => list.id === inboxListId)?.name,
+      }));
   }
 
   /*
@@ -409,6 +426,13 @@ function getFirstVisibleTaskId(
     return buildVisibleTasks(listTasks, false)[0]?.id ?? null;
   }
 
+  if (activeView === "inbox") {
+    const inboxListId = getInboxListId(lists);
+    if (!inboxListId) return null;
+
+    return getFirstVisibleTaskId(null, inboxListId, null, lists, tasksByList);
+  }
+
   return getVisibleTasks(
     activeView,
     listId,
@@ -471,6 +495,20 @@ function resolveStateFromRoute(
         selectedListId: null,
         selectedTaskId: getFirstVisibleTaskId(
           "today",
+          null,
+          null,
+          lists,
+          tasksByList,
+        ),
+        selectedLabelId: null,
+        ...closedCalendar,
+      };
+    case "inbox":
+      return {
+        activeView: "inbox" as ActiveView,
+        selectedListId: null,
+        selectedTaskId: getFirstVisibleTaskId(
+          "inbox",
           null,
           null,
           lists,
@@ -566,12 +604,16 @@ function resolveStateFromRoute(
     case "home":
     default:
       return {
-        activeView: null,
+        activeView: "inbox" as ActiveView,
         selectedLabelId: null,
-        selectedListId: firstListId,
-        selectedTaskId: firstListId
-          ? getFirstVisibleTaskId(null, firstListId, null, lists, tasksByList)
-          : null,
+        selectedListId: null,
+        selectedTaskId: getFirstVisibleTaskId(
+          "inbox",
+          null,
+          null,
+          lists,
+          tasksByList,
+        ),
         ...closedCalendar,
       };
   }
@@ -667,6 +709,7 @@ export function TodoApp({
     suppressDetailsTitleFocusRef.current = false;
   }, []);
   const [activeView, setActiveView] = useState<ActiveView>(bootState.activeView);
+  const { importantEnabled } = useImportantEnabled();
   const [tasksByList, setTasksByList] = useState(() => initialTasks);
   const [pendingUndo, setPendingUndo] = useState<PendingUndo | null>(null);
   const [pendingRecurrenceUndo, setPendingRecurrenceUndo] =
@@ -975,6 +1018,10 @@ export function TodoApp({
   const selectedList = lists.find((list) => list.id === selectedListId) ?? null;
   const selectedLabel =
     labels.find((item) => item.id === selectedLabelId) ?? null;
+  const inboxListId = useMemo(() => getInboxListId(lists), [lists]);
+  const taskListPanelListId =
+    displayedListId ??
+    (displayedActiveView === "inbox" ? inboxListId : null);
 
   const calendarTasks: TaskListItem[] = getVisibleTasks(
     "calendar",
@@ -993,6 +1040,8 @@ export function TodoApp({
           ? selectedLabel.label
           : activeView === "today"
             ? "Today"
+            : activeView === "inbox"
+              ? "Inbox"
             : activeView === "important"
               ? "Important"
               : activeView === "calendar"
@@ -1024,18 +1073,18 @@ export function TodoApp({
   );
 
   const listCompletedTasks: TaskListItem[] = useMemo(() => {
-    if (!displayedListId) return [];
+    if (!taskListPanelListId) return [];
 
-    const list = lists.find((item) => item.id === displayedListId);
+    const list = lists.find((item) => item.id === taskListPanelListId);
 
-    return (tasksByList[displayedListId] ?? [])
+    return (tasksByList[taskListPanelListId] ?? [])
       .filter((task) => task.completed)
       .map((task) => ({
         ...task,
-        listId: displayedListId,
+        listId: taskListPanelListId,
         listName: list?.name,
       }));
-  }, [displayedListId, lists, tasksByList]);
+  }, [taskListPanelListId, lists, tasksByList]);
 
   const completedTasks: CompletedTask[] = useMemo(
     () =>
@@ -1719,6 +1768,15 @@ export function TodoApp({
     );
   }
 
+  function selectInbox() {
+    setActiveView("inbox");
+    setSelectedLabelId(null);
+    setSelectedListId(null);
+    setSelectedTaskId(
+      getFirstVisibleTaskId("inbox", null, null, lists, tasksByList),
+    );
+  }
+
   /*
   function selectNext7Days() {
     setActiveView("next7days");
@@ -1738,6 +1796,17 @@ export function TodoApp({
       getFirstVisibleTaskId("important", null, null, lists, tasksByList),
     );
   }
+
+  useEffect(() => {
+    if (importantEnabled || activeView !== "important") return;
+
+    setActiveView("inbox");
+    setSelectedLabelId(null);
+    setSelectedListId(null);
+    setSelectedTaskId(
+      getFirstVisibleTaskId("inbox", null, null, lists, tasksByList),
+    );
+  }, [importantEnabled, activeView, lists, tasksByList]);
 
   function selectCalendar() {
     openCalendarWithLastView();
@@ -2013,10 +2082,11 @@ export function TodoApp({
     const targetListId =
       options?.listId ??
       displayedListId ??
+      (displayedActiveView === "inbox" ? inboxListId : null) ??
       (displayedLabelId ||
       displayedActiveView === "today" ||
       displayedActiveView === "important"
-        ? (lists[0]?.id ?? null)
+        ? inboxListId
         : null);
     if (!targetListId) return;
 
@@ -2538,6 +2608,43 @@ export function TodoApp({
     });
   }
 
+  // Updates both the due date and due time in a single optimistic update and
+  // a single server round trip. Used when a calendar drag moves a task to a
+  // different day AND a different time slot at once — issuing separate
+  // setTaskDueDate/setTaskDueTime calls in that case can race on the server
+  // (the date-change request resets time fields) and cause the task to
+  // briefly flash back to its old position before settling.
+  async function setTaskDueDateAndTime(
+    taskId: string,
+    dateValue: string | null,
+    dueTime: TaskDueTime,
+  ) {
+    const normalizedDateValue = dateValue ?? null;
+    const optimisticDueDate = normalizedDateValue
+      ? new Date(`${normalizedDateValue}T00:00:00`).toISOString()
+      : null;
+    handleDueDateUpdated(taskId, optimisticDueDate, {
+      dueTimeMinutes: dueTime.dueTimeMinutes,
+      dueDurationMinutes: dueTime.dueDurationMinutes,
+      dueTimeZone: dueTime.dueTimeZone,
+    });
+
+    const updated = await updateTaskDueDateAndTimeInDb(
+      taskId,
+      normalizedDateValue,
+      dueTime,
+    );
+    const dueDate = updated.dueDate
+      ? new Date(updated.dueDate).toISOString()
+      : null;
+
+    handleDueDateUpdated(taskId, dueDate, {
+      dueTimeMinutes: updated.dueTimeMinutes,
+      dueDurationMinutes: updated.dueDurationMinutes,
+      dueTimeZone: updated.dueTimeZone,
+    });
+  }
+
   async function setTaskRecurrence(
     taskId: string,
     rule: TaskRecurrenceRule | null,
@@ -3033,6 +3140,7 @@ export function TodoApp({
     displayedListId !== null ||
     displayedLabelId !== null ||
     displayedActiveView === "today" ||
+    displayedActiveView === "inbox" ||
     displayedActiveView === "important";
   const showListCalendar = isListCalendarOpen || isListCalendarPreview;
   const showListCalendarPanel =
@@ -3104,7 +3212,7 @@ export function TodoApp({
     onTaskRenamed: handleTaskRenamed,
     onDueDateUpdated: handleDueDateUpdated,
     onAddCalendarTask: addCalendarTask,
-    defaultListId: lists[0]?.id ?? null,
+    defaultListId: inboxListId,
   } as const;
 
   return (
@@ -3124,6 +3232,7 @@ export function TodoApp({
           suppressListSelectionHighlightId={suppressListSelectionHighlightId}
           selectedLabelId={selectedLabelId}
           isTodaySelected={activeView === "today"}
+          isInboxSelected={activeView === "inbox"}
           // isNext7DaysSelected={activeView === "next7days"}
           isImportantSelected={activeView === "important"}
           isCalendarSelected={activeView === "calendar"}
@@ -3131,6 +3240,7 @@ export function TodoApp({
           onSelectList={selectList}
           onSelectLabel={selectLabel}
           onSelectToday={selectToday}
+          onSelectInbox={selectInbox}
           // onSelectNext7Days={selectNext7Days}
           onSelectImportant={selectImportant}
           onSelectCalendar={selectCalendar}
@@ -3220,6 +3330,7 @@ export function TodoApp({
                   showAddTask={
                     displayedListId !== null ||
                     displayedLabelId !== null ||
+                    displayedActiveView === "inbox" ||
                     ((displayedActiveView === "today" ||
                       displayedActiveView === "important") &&
                       lists.length > 0)
@@ -3227,7 +3338,7 @@ export function TodoApp({
                   isLabelFilter={displayedLabelId !== null}
                   preselectedLabelId={displayedLabelId}
                   preselectedLabelName={displayedLabel?.label ?? null}
-                  listId={displayedListId}
+                  listId={taskListPanelListId}
                   onAddTask={addTask}
                   onToggleTask={toggleTask}
                   onSelectTask={handleTaskListSelect}
@@ -3243,7 +3354,9 @@ export function TodoApp({
                   onSetTaskRecurrence={setTaskRecurrence}
                   onSetTaskPriority={setTaskPriority}
                   onSetTaskPinned={setTaskPinned}
-                  onSetTaskImportant={setTaskImportant}
+                  onSetTaskImportant={
+                    importantEnabled ? setTaskImportant : undefined
+                  }
                   onConvertTaskToNote={toggleTaskNoteType}
                   onAddSubtask={addSubtask}
                   onDeleteTask={deleteTaskById}
@@ -3291,6 +3404,7 @@ export function TodoApp({
                   onToggleTask={toggleTask}
                   onSetTaskDueDate={setTaskDueDate}
                   onSetTaskDueTime={setTaskDueTime}
+                  onSetTaskDueDateAndTime={setTaskDueDateAndTime}
                   onSetTaskCalendarColor={setTaskCalendarColor}
                   onMoveTaskToList={moveTaskToList}
                   onDetailsSaved={handleDetailsSaved}
@@ -3369,6 +3483,7 @@ export function TodoApp({
                 showAddTask={
                   displayedListId !== null ||
                   displayedLabelId !== null ||
+                  displayedActiveView === "inbox" ||
                   ((displayedActiveView === "today" ||
                     displayedActiveView === "important") &&
                     lists.length > 0)
@@ -3376,7 +3491,7 @@ export function TodoApp({
                 isLabelFilter={displayedLabelId !== null}
                 preselectedLabelId={displayedLabelId}
                 preselectedLabelName={displayedLabel?.label ?? null}
-                listId={displayedListId}
+                listId={taskListPanelListId}
                 onAddTask={addTask}
                 onToggleTask={toggleTask}
                 onSelectTask={handleTaskListSelect}
@@ -3392,7 +3507,9 @@ export function TodoApp({
                 onSetTaskRecurrence={setTaskRecurrence}
                 onSetTaskPriority={setTaskPriority}
                 onSetTaskPinned={setTaskPinned}
-                onSetTaskImportant={setTaskImportant}
+                onSetTaskImportant={
+                  importantEnabled ? setTaskImportant : undefined
+                }
                 onConvertTaskToNote={toggleTaskNoteType}
                 onAddSubtask={addSubtask}
                 onDeleteTask={deleteTaskById}
@@ -3432,6 +3549,7 @@ export function TodoApp({
                   onToggleTask={toggleTask}
                   onSetTaskDueDate={setTaskDueDate}
                   onSetTaskDueTime={setTaskDueTime}
+                  onSetTaskDueDateAndTime={setTaskDueDateAndTime}
                   onSetTaskCalendarColor={setTaskCalendarColor}
                   onMoveTaskToList={moveTaskToList}
                   onDetailsSaved={handleDetailsSaved}

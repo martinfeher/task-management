@@ -159,6 +159,38 @@ export async function updateTaskDueDate(taskId: string, dueDate: string | null) 
   };
 }
 
+export async function updateTaskDueDateAndTime(
+  taskId: string,
+  dueDate: string | null,
+  dueTime: TaskDueTime,
+) {
+  const task = await prisma.task.update({
+    where: { id: taskId },
+    data: {
+      dueDate: dueDate ? new Date(`${dueDate}T12:00:00`) : null,
+      dueTimeMinutes: normalizeDueTimeMinutes(dueTime.dueTimeMinutes),
+      dueDurationMinutes: normalizeDueDurationMinutes(dueTime.dueDurationMinutes),
+      dueTimeZone: normalizeDueTimeZone(dueTime.dueTimeZone),
+    },
+    select: {
+      id: true,
+      dueDate: true,
+      dueTimeMinutes: true,
+      dueDurationMinutes: true,
+      dueTimeZone: true,
+    },
+  });
+
+  revalidatePath("/");
+  return {
+    id: task.id,
+    dueDate: task.dueDate,
+    dueTimeMinutes: task.dueTimeMinutes,
+    dueDurationMinutes: task.dueDurationMinutes,
+    dueTimeZone: normalizeDueTimeZone(task.dueTimeZone),
+  };
+}
+
 export async function updateTaskDueTime(taskId: string, dueTime: TaskDueTime) {
   const task = await prisma.task.update({
     where: { id: taskId },

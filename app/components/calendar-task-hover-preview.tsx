@@ -35,6 +35,7 @@ const PREVIEW_WIDTH = 280;
 const PREVIEW_ESTIMATED_HEIGHT = 168;
 const TASK_GAP = 12;
 const CURSOR_OFFSET_PX = 50;
+const POST_DRAG_HOVER_SUPPRESS_MS = 300;
 
 type PreviewPositionMode = "task-edge" | "cursor";
 
@@ -261,6 +262,16 @@ export function CalendarTaskHoverPreviewProvider({
   const activeElementRef = useRef<HTMLElement | null>(null);
   const cursorRef = useRef({ x: 0, y: 0 });
   const dragPreviewActiveRef = useRef(false);
+  const suppressHoverUntilRef = useRef(0);
+  const suppressHoverTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (suppressHoverTimerRef.current !== null) {
+        window.clearTimeout(suppressHoverTimerRef.current);
+      }
+    };
+  }, []);
 
   const positionOptions = useMemo<PreviewPositionOptions>(
     () =>
@@ -311,6 +322,17 @@ export function CalendarTaskHoverPreviewProvider({
 
   const endTaskDrag = useCallback(() => {
     hide();
+
+    // Releasing pointer capture after a drag can make the browser emit a
+    // synthetic hover event for whatever is now under the cursor, which
+    // would otherwise pop the hover preview open right after the drop.
+    suppressHoverUntilRef.current = Date.now() + POST_DRAG_HOVER_SUPPRESS_MS;
+    if (suppressHoverTimerRef.current !== null) {
+      window.clearTimeout(suppressHoverTimerRef.current);
+    }
+    suppressHoverTimerRef.current = window.setTimeout(() => {
+      suppressHoverTimerRef.current = null;
+    }, POST_DRAG_HOVER_SUPPRESS_MS);
   }, [hide]);
 
   const startDragPreview = useCallback(
@@ -337,6 +359,7 @@ export function CalendarTaskHoverPreviewProvider({
       clientY: number,
     ) => {
       if (dragPreviewActiveRef.current) return;
+      if (Date.now() < suppressHoverUntilRef.current) return;
 
       openPreview(
         task,

@@ -98,6 +98,11 @@ type CalendarPanelProps = {
   onRenameTask: (taskId: string, name: string) => void;
   onSetTaskDueDate?: (taskId: string, dateValue: string | null) => void;
   onSetTaskDueTime?: (taskId: string, dueTime: TaskDueTime) => void;
+  onSetTaskDueDateAndTime?: (
+    taskId: string,
+    dateValue: string | null,
+    dueTime: TaskDueTime,
+  ) => void;
   onSetTaskPriority?: (taskId: string, priority: number | null) => void;
   onSetTaskCalendarColor?: (taskId: string, color: string | null) => void;
   onToggleTaskLabel?: (
@@ -1007,6 +1012,11 @@ type CalendarViewsPanelProps = {
   onToggleTask: (taskId: string) => void;
   onSetTaskDueDate?: (taskId: string, dateValue: string | null) => void;
   onSetTaskDueTime?: (taskId: string, dueTime: TaskDueTime) => void;
+  onSetTaskDueDateAndTime?: (
+    taskId: string,
+    dateValue: string | null,
+    dueTime: TaskDueTime,
+  ) => void;
   onSetTaskCalendarColor?: (taskId: string, color: string | null) => void;
   onMoveTaskToList?: (
     taskId: string,
@@ -1050,6 +1060,7 @@ export function CalendarViewsPanel({
   onToggleTask,
   onSetTaskDueDate,
   onSetTaskDueTime,
+  onSetTaskDueDateAndTime,
   onSetTaskCalendarColor,
   onMoveTaskToList,
   onDetailsSaved,
@@ -1370,6 +1381,7 @@ export function CalendarViewsPanel({
             onToggleTask={onToggleTask}
             onSetTaskDueDate={onSetTaskDueDate}
             onSetTaskDueTime={onSetTaskDueTime}
+            onSetTaskDueDateAndTime={onSetTaskDueDateAndTime}
             onDetailsSaved={onDetailsSaved}
             onTaskHasDetailsKnown={onTaskHasDetailsKnown}
             onTaskRenamed={onTaskRenamed}
@@ -1398,6 +1410,7 @@ export function CalendarViewsPanel({
             onToggleTask={onToggleTask}
             onSetTaskDueDate={onSetTaskDueDate}
             onSetTaskDueTime={onSetTaskDueTime}
+            onSetTaskDueDateAndTime={onSetTaskDueDateAndTime}
             onDetailsSaved={onDetailsSaved}
             onTaskHasDetailsKnown={onTaskHasDetailsKnown}
             onTaskRenamed={onTaskRenamed}
@@ -1425,6 +1438,7 @@ export function CalendarViewsPanel({
             checkAnimatingTaskIds={checkAnimatingTaskIds}
             onSetTaskDueDate={onSetTaskDueDate}
             onSetTaskDueTime={onSetTaskDueTime}
+            onSetTaskDueDateAndTime={onSetTaskDueDateAndTime}
             onDetailsSaved={onDetailsSaved}
             onTaskHasDetailsKnown={onTaskHasDetailsKnown}
             onTaskRenamed={onTaskRenamed}
@@ -1454,6 +1468,7 @@ export function CalendarViewsPanel({
               onToggleTask={onToggleTask}
               onSetTaskDueDate={onSetTaskDueDate}
               onSetTaskDueTime={onSetTaskDueTime}
+              onSetTaskDueDateAndTime={onSetTaskDueDateAndTime}
               onDetailsSaved={onDetailsSaved}
               onTaskHasDetailsKnown={onTaskHasDetailsKnown}
               onTaskRenamed={onTaskRenamed}
@@ -1514,6 +1529,7 @@ export function CalendarPanel({
   onRenameTask,
   onSetTaskDueDate,
   onSetTaskDueTime,
+  onSetTaskDueDateAndTime,
   onSetTaskPriority,
   onSetTaskCalendarColor,
   onToggleTaskLabel,
@@ -1551,6 +1567,7 @@ export function CalendarPanel({
         onToggleTask={onToggleTask}
         onSetTaskDueDate={onSetTaskDueDate}
         onSetTaskDueTime={onSetTaskDueTime}
+        onSetTaskDueDateAndTime={onSetTaskDueDateAndTime}
         onSetTaskCalendarColor={onSetTaskCalendarColor}
         onDetailsSaved={onDetailsSaved}
         onTaskHasDetailsKnown={onTaskHasDetailsKnown}

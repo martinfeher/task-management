@@ -15,6 +15,40 @@ export function reorderListIds(
   return reorderTaskIds(listIds, sourceIndex, dropIndex);
 }
 
+export function getSidebarListIds(
+  listIds: string[],
+  inboxListId: string | null,
+) {
+  if (!inboxListId) return listIds;
+  return listIds.filter((id) => id !== inboxListId);
+}
+
+export function mergeReorderedSidebarListIds(
+  fullListIds: string[],
+  inboxListId: string | null,
+  reorderedSidebarIds: string[],
+) {
+  if (!inboxListId) return reorderedSidebarIds;
+
+  const next: string[] = [];
+  let sidebarIndex = 0;
+
+  for (const id of fullListIds) {
+    if (id === inboxListId) {
+      next.push(inboxListId);
+      continue;
+    }
+
+    const sidebarId = reorderedSidebarIds[sidebarIndex];
+    if (sidebarId) {
+      next.push(sidebarId);
+    }
+    sidebarIndex += 1;
+  }
+
+  return next;
+}
+
 export function getListDropIndex(
   clientY: number,
   rows: HTMLElement[],

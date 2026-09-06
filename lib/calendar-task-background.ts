@@ -38,13 +38,30 @@ const TITLE_COLOR_CHANGE_EVENT = "todolist:calendar-task-title-color-change";
 const TIME_COLOR_CHANGE_EVENT = "todolist:calendar-task-time-color-change";
 export const CALENDAR_TASK_BACKGROUND_CSS_VAR = "--calendar-task-item-background";
 export const CALENDAR_TASK_TITLE_COLOR_CSS_VAR = "--calendar-task-title-color";
+export const CALENDAR_TASK_TITLE_SOURCE_COLOR_CSS_VAR =
+  "--calendar-task-title-source-color";
 export const CALENDAR_TASK_TIME_COLOR_CSS_VAR = "--calendar-task-time-color";
+export const CALENDAR_TASK_TITLE_BRIGHTNESS_CSS_VAR =
+  "--calendar-task-title-brightness";
+
+function applyCalendarTaskTitleSourceColor(baseColor: string) {
+  document.documentElement.style.setProperty(
+    CALENDAR_TASK_TITLE_SOURCE_COLOR_CSS_VAR,
+    baseColor,
+  );
+}
 
 function applyCalendarTaskTextColors(settings: CalendarTaskBackgroundSettings) {
-  document.documentElement.style.setProperty(
-    CALENDAR_TASK_TITLE_COLOR_CSS_VAR,
-    settings.titleColor,
-  );
+  if (settings.titleColor === DEFAULT_CALENDAR_TASK_TITLE_COLOR) {
+    document.documentElement.style.removeProperty(
+      CALENDAR_TASK_TITLE_COLOR_CSS_VAR,
+    );
+  } else {
+    document.documentElement.style.setProperty(
+      CALENDAR_TASK_TITLE_COLOR_CSS_VAR,
+      settings.titleColor,
+    );
+  }
   document.documentElement.style.setProperty(
     CALENDAR_TASK_TIME_COLOR_CSS_VAR,
     settings.timeColor,
@@ -70,6 +87,7 @@ function applyCalendarTaskBackgroundSettings(
     CALENDAR_TASK_BACKGROUND_CSS_VAR,
     presentation.background,
   );
+  applyCalendarTaskTitleSourceColor(normalized.baseColor);
   applyCalendarTaskTextColors(normalized);
   window.dispatchEvent(
     new CustomEvent<CalendarTaskBackgroundId>(BACKGROUND_CHANGE_EVENT, {
@@ -334,6 +352,7 @@ export function useCalendarTaskBackground() {
       CALENDAR_TASK_BACKGROUND_CSS_VAR,
       presentation.background,
     );
+    applyCalendarTaskTitleSourceColor(baseColor);
     applyCalendarTaskTextColors(currentSettings);
   }, [backgroundId, baseColor, endColor, currentSettings]);
 

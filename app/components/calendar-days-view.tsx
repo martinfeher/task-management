@@ -48,6 +48,9 @@ import {
   CALENDAR_ALL_DAY_TO_TIMED_DEFAULT_DURATION_MINUTES,
   getActiveCalendarDropSlot,
   getCalendarTaskDragPreviewDuration,
+  isCalendarTaskAtDragSource,
+  shouldShowCalendarInternalDragSlotMarker,
+  useCalendarTaskDropRevealMask,
   type CalendarTaskDragState,
 } from "@/lib/calendar-task-drag";
 import {
@@ -108,6 +111,11 @@ type CalendarMultiDayViewProps = {
   checkAnimatingTaskIds?: Set<string>;
   onSetTaskDueDate?: (taskId: string, dateValue: string | null) => void;
   onSetTaskDueTime?: (taskId: string, dueTime: TaskDueTime) => void;
+  onSetTaskDueDateAndTime?: (
+    taskId: string,
+    dateValue: string | null,
+    dueTime: TaskDueTime,
+  ) => void;
 } & CalendarTaskEditorCallbacks & {
   onAddCalendarTask?: (payload: {
     name: string;
@@ -228,6 +236,7 @@ export function CalendarMultiDayView({
   onToggleTask,
   completingTaskIds,
   checkAnimatingTaskIds,
+  onSetTaskDueDateAndTime,
   onSetTaskDueDate,
   onSetTaskDueTime,
   onDetailsSaved,
@@ -269,6 +278,8 @@ export function CalendarMultiDayView({
   const [resizePreview, setResizePreview] =
     useState<CalendarTaskResizePreview | null>(null);
   const [resizingTaskId, setResizingTaskId] = useState<string | null>(null);
+  const { markTaskJustDropped, isTaskMaskedForDrop } =
+    useCalendarTaskDropRevealMask();
   const dragStateRef = useRef<CalendarTaskDragState | null>(null);
   const resizingTaskIdRef = useRef<string | null>(null);
   const suppressTaskClickRef = useRef(false);
@@ -522,6 +533,7 @@ export function CalendarMultiDayView({
       hourHeightPx: HOUR_HEIGHT_PX,
       onSetTaskDueDate,
       onSetTaskDueTime,
+      onSetTaskDueDateAndTime,
       dragStateRef,
       suppressTaskClickRef,
       setDropTargetSlot: handleSetDropTargetSlot,
@@ -538,8 +550,11 @@ export function CalendarMultiDayView({
       onDragMove: (point, slot) => {
         updateDragPreview?.(point.clientX, point.clientY, slot);
       },
-      onDragEnd: () => {
+      onDragEnd: (didMove) => {
         endDragPreview?.();
+        if (didMove) {
+          markTaskJustDropped(task.id);
+        }
       },
     });
   }
@@ -631,6 +646,10 @@ export function CalendarMultiDayView({
           draggingTaskPreview.sourceTimeMinutes,
         )
       : null;
+  const internalDragStillAtSource = shouldShowCalendarInternalDragSlotMarker(
+    draggingTask,
+    draggingTaskPreview,
+  );
 
   return (
     <div className={CALENDAR_VIEW_WRAPPER_CLASS}>
@@ -754,7 +773,10 @@ export function CalendarMultiDayView({
                                 task.id === selectedTaskId,
                                 canDragTasks,
                               )} calendar-task-row--single-line gap-1 overflow-hidden`}
-                              style={getCalendarTaskItemStyle(task.priority, task.calendarColor)}
+                              style={{
+                                ...getCalendarTaskItemStyle(task.priority, task.calendarColor),
+                                opacity: isTaskMaskedForDrop(task.id) ? 0 : undefined,
+                              }}
                             >
                               <CalendarTaskTitle
                                 name={task.name}
@@ -827,7 +849,8 @@ export function CalendarMultiDayView({
                 resizePreview === null &&
                 isTimedDropTarget &&
                 !isActiveTimedDay &&
-                (activeDropSlot?.dueTimeMinutes ?? null) !== null;
+                (activeDropSlot?.dueTimeMinutes ?? null) !== null &&
+                internalDragStillAtSource;
               const selectedSlotMinutes = isActiveTimedDay
                 ? (addTaskPopover?.dueTimeMinutes ?? null)
                 : isTimedDropTarget
@@ -886,15 +909,37 @@ export function CalendarMultiDayView({
                       draggingTaskPreview?.taskId === task.id;
                     const isSourceColumn =
                       draggingTaskPreview?.sourceDateKey === dateKey;
-                    const hideDraggedBlock = isDraggingTask;
+                    const hideDraggedBlock =
+                      isDraggingTask &&
+                      draggingTaskPreview !== null &&
+                      isCalendarTaskAtDragSource(task, draggingTaskPreview);
+                    const sourcePlaceholderTop =
+                      draggingTaskPreview?.sourceTimeMinutes == null
+                        ? baseTop
+                        : getTopForMinutes(
+                            draggingTaskPreview.sourceTimeMinutes,
+                          );
+                    const sourcePlaceholderDuration =
+                      draggingTaskPreview?.sourceTimeMinutes == null
+                        ? timing.dueDurationMinutes
+                        : getCalendarTaskDragPreviewDuration(
+                            task,
+                            draggingTaskPreview.sourceTimeMinutes,
+                          );
                     const sourcePlaceholder =
-                      isDraggingTask && isSourceColumn ? (
+                      hideDraggedBlock && isSourceColumn ? (
                         <CalendarTaskDragSourcePlaceholder
-                          top={baseTop}
-                          height={height}
+                          top={sourcePlaceholderTop}
+                          height={Math.max(
+                            24,
+                            (sourcePlaceholderDuration / 60) * HOUR_HEIGHT_PX,
+                          )}
                           taskName={task.name}
-                          startMinutes={timing.dueTimeMinutes}
-                          durationMinutes={timing.dueDurationMinutes}
+                          startMinutes={
+                            draggingTaskPreview?.sourceTimeMinutes ??
+                            timing.dueTimeMinutes
+                          }
+                          durationMinutes={sourcePlaceholderDuration}
                           priority={task.priority}
                           calendarColor={task.calendarColor}
                         />
@@ -942,6 +987,7 @@ export function CalendarMultiDayView({
                           onTaskClick={handleCalendarTaskClick}
                           onSetTaskDueDate={onSetTaskDueDate}
                           onSetTaskDueTime={onSetTaskDueTime}
+                          onSetTaskDueDateAndTime={onSetTaskDueDateAndTime}
                           dragStateRef={dragStateRef}
                           suppressTaskClickRef={suppressTaskClickRef}
                           setDropTargetSlot={handleSetDropTargetSlot}
@@ -952,6 +998,8 @@ export function CalendarMultiDayView({
                           onToggleTask={onToggleTask}
                           isCompleting={completingTaskIds?.has(task.id)}
                           isCheckAnimating={checkAnimatingTaskIds?.has(task.id)}
+                          isMaskedForDrop={isTaskMaskedForDrop(task.id)}
+                          onDropped={markTaskJustDropped}
                           onDragStart={() => {
                             setModalTaskId(null);
                             setDraggingTaskPreview({
