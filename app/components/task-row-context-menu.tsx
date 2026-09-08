@@ -367,15 +367,20 @@ export function TaskRowContextMenu({
           onMouseLeave={scheduleCloseMoveHoverPreview}
         >
           <MainMenuItems {...mainMenuProps} />
-          <TaskMoveToSelector
-            lists={lists}
-            currentListId={currentListId}
-            query={moveQuery}
-            onQueryChange={onMoveQueryChange}
-            onSelectList={onMoveTaskToList}
-            onCancel={onClose}
-            autoFocus={false}
-          />
+          <div
+            className="-ml-0.75"
+            onMouseEnter={openMoveHoverPreview}
+          >
+            <TaskMoveToSelector
+              lists={lists}
+              currentListId={currentListId}
+              query={moveQuery}
+              onQueryChange={onMoveQueryChange}
+              onSelectList={onMoveTaskToList}
+              onCancel={onClose}
+              autoFocus={false}
+            />
+          </div>
         </div>
       )}
 
@@ -386,15 +391,20 @@ export function TaskRowContextMenu({
           onMouseLeave={scheduleCloseMoveHoverPreview}
         >
           <MainMenuItems {...mainMenuProps} />
-          <TaskMoveToSelector
-            lists={lists}
-            currentListId={currentListId}
-            query={moveQuery}
-            onQueryChange={onMoveQueryChange}
-            onSelectList={onMoveTaskToList}
-            onCancel={onClose}
-            autoFocus
-          />
+          <div
+            className="-ml-0.75"
+            onMouseEnter={openMoveHoverPreview}
+          >
+            <TaskMoveToSelector
+              lists={lists}
+              currentListId={currentListId}
+              query={moveQuery}
+              onQueryChange={onMoveQueryChange}
+              onSelectList={onMoveTaskToList}
+              onCancel={onClose}
+              autoFocus
+            />
+          </div>
         </div>
       )}
 

@@ -3,6 +3,7 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { LuX } from "react-icons/lu";
 import { useImportantEnabled } from "@/lib/important-settings";
+import { useSubtasksEnabled } from "@/lib/subtasks-settings";
 
 type SettingsSection = "general" | "tasks" | "labels";
 
@@ -95,21 +96,34 @@ function GeneralSettingsContent() {
   );
 }
 
+function TasksSettingsContent() {
+  const { subtasksEnabled, setSubtasksEnabled } = useSubtasksEnabled();
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-1">
+        <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+          Tasks
+        </h3>
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          Task-related preferences.
+        </p>
+      </div>
+      <SettingsToggle
+        label="Sub-tasks"
+        checked={subtasksEnabled}
+        onChange={setSubtasksEnabled}
+      />
+    </div>
+  );
+}
+
 function SettingsSectionContent({ section }: { section: SettingsSection }) {
   switch (section) {
     case "general":
       return <GeneralSettingsContent />;
     case "tasks":
-      return (
-        <div className="space-y-1">
-          <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
-            Tasks
-          </h3>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            Task-related settings will appear here.
-          </p>
-        </div>
-      );
+      return <TasksSettingsContent />;
     case "labels":
       return (
         <div className="space-y-1">

@@ -65,6 +65,7 @@ import {
 } from "@/lib/todo-routes";
 import { getInboxListId } from "@/lib/inbox-list";
 import { useImportantEnabled } from "@/lib/important-settings";
+import { useSubtasksEnabled } from "@/lib/subtasks-settings";
 import type { CalendarViewTab } from "@/lib/calendar-view-settings";
 import {
   readCalendarViewSession,
@@ -710,6 +711,7 @@ export function TodoApp({
   }, []);
   const [activeView, setActiveView] = useState<ActiveView>(bootState.activeView);
   const { importantEnabled } = useImportantEnabled();
+  const { subtasksEnabled } = useSubtasksEnabled();
   const [tasksByList, setTasksByList] = useState(() => initialTasks);
   const [pendingUndo, setPendingUndo] = useState<PendingUndo | null>(null);
   const [pendingRecurrenceUndo, setPendingRecurrenceUndo] =
@@ -2137,7 +2139,7 @@ export function TodoApp({
     }
 
     const createdSubtasks: Task[] = [];
-    if (options?.subtasks?.length) {
+    if (subtasksEnabled && options?.subtasks?.length) {
       for (const subtaskName of options.subtasks) {
         const subtask = await createSubtask(task.id, subtaskName);
         createdSubtasks.push({
@@ -3189,6 +3191,45 @@ export function TodoApp({
     return null;
   }, [selectedTaskId, tasksByList]);
 
+  const selectedTaskSubtasksContext = useMemo(() => {
+    if (!selectedTaskId) {
+      return { subtasks: [], canManageSubtasks: false };
+    }
+
+    for (const listTasks of Object.values(tasksByList)) {
+      const task = listTasks.find((item) => item.id === selectedTaskId);
+      if (!task) continue;
+
+      return {
+        subtasks: listTasks
+          .filter((item) => item.parentId === selectedTaskId)
+          .map((item) => ({
+            id: item.id,
+            name: item.name,
+            completed: item.completed,
+          })),
+        canManageSubtasks:
+          subtasksEnabled && !task.parentId && !task.isNote,
+      };
+    }
+
+    return { subtasks: [], canManageSubtasks: false };
+  }, [selectedTaskId, tasksByList, subtasksEnabled]);
+
+  const handleAddSubtaskFromDetails = useCallback(
+    async (parentTaskId: string) => {
+      const subtask = await addSubtask(parentTaskId);
+      if (!subtask) return null;
+
+      return {
+        id: subtask.id,
+        name: subtask.name,
+        completed: subtask.completed,
+      };
+    },
+    [addSubtask],
+  );
+
   const calendarPanelSharedProps = {
     tasks: calendarTasks,
     searchTasks,
@@ -3211,7 +3252,11 @@ export function TodoApp({
     onTaskHasDetailsKnown: handleTaskHasDetailsKnown,
     onTaskRenamed: handleTaskRenamed,
     onDueDateUpdated: handleDueDateUpdated,
+    onRecurrenceUpdated: handleRecurrenceUpdated,
+    onSaveTaskRecurrence: setTaskRecurrence,
     onAddCalendarTask: addCalendarTask,
+    labels,
+    onDeleteTask: deleteTaskById,
     defaultListId: inboxListId,
   } as const;
 
@@ -3358,7 +3403,7 @@ export function TodoApp({
                     importantEnabled ? setTaskImportant : undefined
                   }
                   onConvertTaskToNote={toggleTaskNoteType}
-                  onAddSubtask={addSubtask}
+                  onAddSubtask={subtasksEnabled ? addSubtask : undefined}
                   onDeleteTask={deleteTaskById}
                   onToggleTaskLabel={toggleTaskLabel}
                   onLabelsChanged={refreshLabels}
@@ -3377,6 +3422,7 @@ export function TodoApp({
                   isListHovered={sidebarHoverPreview !== null}
                   showSidebarMenu={isCompactLayout}
                   onOpenSidebar={() => setSidebarDrawerOpen(true)}
+                  subtasksEnabled={subtasksEnabled}
                 />
                 {!isCompactLayout ? (
                   <PanelResizeHandle onPointerDown={handleTaskListResizeStart} />
@@ -3406,11 +3452,18 @@ export function TodoApp({
                   onSetTaskDueTime={setTaskDueTime}
                   onSetTaskDueDateAndTime={setTaskDueDateAndTime}
                   onSetTaskCalendarColor={setTaskCalendarColor}
+                  onSetTaskPriority={setTaskPriority}
+                  onToggleTaskLabel={toggleTaskLabel}
+                  onLabelsChanged={refreshLabels}
                   onMoveTaskToList={moveTaskToList}
+                  labels={labels}
+                  onDeleteTask={deleteTaskById}
                   onDetailsSaved={handleDetailsSaved}
                   onTaskHasDetailsKnown={handleTaskHasDetailsKnown}
                   onTaskRenamed={handleTaskRenamed}
                   onDueDateUpdated={handleDueDateUpdated}
+                  onRecurrenceUpdated={handleRecurrenceUpdated}
+                  onSaveTaskRecurrence={setTaskRecurrence}
                   onAddCalendarTask={addCalendarTask}
                   defaultListId={displayedListId}
                   view={listCalendarPanelView}
@@ -3457,6 +3510,9 @@ export function TodoApp({
                     onToggleTask={toggleTask}
                     onRecurrenceUpdated={handleRecurrenceUpdated}
                     onSaveTaskRecurrence={setTaskRecurrence}
+                    subtasks={selectedTaskSubtasksContext.subtasks}
+                    canManageSubtasks={selectedTaskSubtasksContext.canManageSubtasks}
+                    onAddSubtask={handleAddSubtaskFromDetails}
                     onBack={isCompactLayout ? handleCompactBack : undefined}
                   />
                 </div>
@@ -3511,7 +3567,7 @@ export function TodoApp({
                   importantEnabled ? setTaskImportant : undefined
                 }
                 onConvertTaskToNote={toggleTaskNoteType}
-                onAddSubtask={addSubtask}
+                onAddSubtask={subtasksEnabled ? addSubtask : undefined}
                 onDeleteTask={deleteTaskById}
                 onToggleTaskLabel={toggleTaskLabel}
                 onLabelsChanged={refreshLabels}
@@ -3531,6 +3587,7 @@ export function TodoApp({
                 onPanelMouseEnter={commitSidebarHoverSelection}
                 showSidebarMenu={isCompactLayout}
                 onOpenSidebar={() => setSidebarDrawerOpen(true)}
+                subtasksEnabled={subtasksEnabled}
               />
             </div>
             {showListCalendarPanel ? (
@@ -3551,11 +3608,18 @@ export function TodoApp({
                   onSetTaskDueTime={setTaskDueTime}
                   onSetTaskDueDateAndTime={setTaskDueDateAndTime}
                   onSetTaskCalendarColor={setTaskCalendarColor}
+                  onSetTaskPriority={setTaskPriority}
+                  onToggleTaskLabel={toggleTaskLabel}
+                  onLabelsChanged={refreshLabels}
                   onMoveTaskToList={moveTaskToList}
+                  labels={labels}
+                  onDeleteTask={deleteTaskById}
                   onDetailsSaved={handleDetailsSaved}
                   onTaskHasDetailsKnown={handleTaskHasDetailsKnown}
                   onTaskRenamed={handleTaskRenamed}
                   onDueDateUpdated={handleDueDateUpdated}
+                  onRecurrenceUpdated={handleRecurrenceUpdated}
+                  onSaveTaskRecurrence={setTaskRecurrence}
                   onAddCalendarTask={addCalendarTask}
                   defaultListId={displayedListId}
                   view={listCalendarPanelView}
@@ -3597,6 +3661,9 @@ export function TodoApp({
                   onToggleTask={toggleTask}
                   onRecurrenceUpdated={handleRecurrenceUpdated}
                   onSaveTaskRecurrence={setTaskRecurrence}
+                  subtasks={selectedTaskSubtasksContext.subtasks}
+                  canManageSubtasks={selectedTaskSubtasksContext.canManageSubtasks}
+                  onAddSubtask={handleAddSubtaskFromDetails}
                   onBack={isCompactLayout ? handleCompactBack : undefined}
                 />
               </div>

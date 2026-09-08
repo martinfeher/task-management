@@ -232,9 +232,6 @@ export function CalendarAddTaskPopover({
         <div className="border-b border-zinc-100 px-4 py-3 dark:border-zinc-800">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <p className="text-xs font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
-                New task
-              </p>
               <p className="mt-0.5 text-sm font-medium text-zinc-700 dark:text-zinc-200">
                 {dueTimeMinutes === null || dueTimeMinutes === undefined
                   ? formatPopoverDate(date)

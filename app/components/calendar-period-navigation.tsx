@@ -192,7 +192,7 @@ export function CalendarPeriodNavigation({
 
   return (
     <div
-      className={`calendar-period-navigation inline-flex h-9 items-center gap-0.5 overflow-visible rounded-full bg-slate-100/60 px-0.5 py-px dark:bg-zinc-800/70 ${className}`.trim()}
+      className={`calendar-period-navigation inline-flex h-9 items-center gap-0.5 overflow-visible rounded-full z-[10]! bg-slate-100/60 px-0.5 py-px dark:bg-zinc-800/70 ${className}`.trim()}
     >
       <button
         type="button"

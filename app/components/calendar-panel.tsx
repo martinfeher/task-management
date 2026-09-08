@@ -9,6 +9,7 @@ import {
   getCalendarTaskSnapshot,
   type CalendarTaskEditorCallbacks,
 } from "./calendar-task-modal";
+import { CalendarTaskModalActionsProvider } from "./calendar-task-modal-actions";
 import { CalendarDayView } from "./calendar-day-view";
 import { CalendarPeriodNavigation } from "./calendar-period-navigation";
 import { CalendarMultiDayView } from "./calendar-days-view";
@@ -41,7 +42,7 @@ import {
   TaskCompletionCheckbox,
   TASK_COMPLETE_ANIMATION_MS,
 } from "./task-completion-checkbox";
-import type { SearchTask, TaskListItem, TodoList } from "./todo-app";
+import type { SearchTask, TaskLabel, TaskListItem, TodoList } from "./todo-app";
 import type { TaskDueTime } from "@/lib/task-due-time";
 import { resolveCalendarDayFromPoint } from "@/lib/calendar-drag";
 import {
@@ -116,6 +117,8 @@ type CalendarPanelProps = {
     sourceListId: string,
     targetListId: string,
   ) => void;
+  labels?: TaskLabel[];
+  onDeleteTask?: (taskId: string) => void | Promise<void>;
 } & CalendarTaskEditorCallbacks & {
   onAddCalendarTask?: (payload: {
     name: string;
@@ -460,6 +463,8 @@ export function CalendarMonthView({
   onTaskHasDetailsKnown,
   onTaskRenamed,
   onDueDateUpdated,
+  onRecurrenceUpdated,
+  onSaveTaskRecurrence,
   onAddCalendarTask,
   defaultListId = null,
   fullWidth = false,
@@ -993,6 +998,8 @@ export function CalendarMonthView({
           onTaskHasDetailsKnown={onTaskHasDetailsKnown}
           onTaskRenamed={onTaskRenamed}
           onDueDateUpdated={onDueDateUpdated}
+          onRecurrenceUpdated={onRecurrenceUpdated}
+          onSaveTaskRecurrence={onSaveTaskRecurrence}
           onToggleTask={onToggleTask}
         />
       ) : null}
@@ -1023,6 +1030,15 @@ type CalendarViewsPanelProps = {
     sourceListId: string,
     targetListId: string,
   ) => void;
+  onSetTaskPriority?: (taskId: string, priority: number | null) => void;
+  onToggleTaskLabel?: (
+    taskId: string,
+    labelId: string,
+    assigned: boolean,
+  ) => Promise<{ id: string; label: string }[]>;
+  onLabelsChanged?: () => void;
+  labels?: TaskLabel[];
+  onDeleteTask?: (taskId: string) => void | Promise<void>;
 } & CalendarTaskEditorCallbacks & {
   onAddCalendarTask?: (payload: {
     name: string;
@@ -1063,10 +1079,17 @@ export function CalendarViewsPanel({
   onSetTaskDueDateAndTime,
   onSetTaskCalendarColor,
   onMoveTaskToList,
+  onSetTaskPriority,
+  onToggleTaskLabel,
+  onLabelsChanged,
+  labels = [],
+  onDeleteTask,
   onDetailsSaved,
   onTaskHasDetailsKnown,
   onTaskRenamed,
   onDueDateUpdated,
+  onRecurrenceUpdated,
+  onSaveTaskRecurrence,
   onAddCalendarTask,
   defaultListId = null,
   defaultView = "week",
@@ -1156,6 +1179,29 @@ export function CalendarViewsPanel({
   );
   const [sidebarJumpRequestId, setSidebarJumpRequestId] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
+
+  const calendarTaskModalActions = useMemo(
+    () => ({
+      tasks,
+      lists,
+      labels,
+      onSetTaskPriority,
+      onToggleTaskLabel,
+      onLabelsChanged,
+      onMoveTaskToList,
+      onDeleteTask,
+    }),
+    [
+      tasks,
+      lists,
+      labels,
+      onSetTaskPriority,
+      onToggleTaskLabel,
+      onLabelsChanged,
+      onMoveTaskToList,
+      onDeleteTask,
+    ],
+  );
 
   const calendarSearchTasks = useMemo(() => {
     if (searchTasks) return searchTasks;
@@ -1309,6 +1355,8 @@ export function CalendarViewsPanel({
         onTaskHasDetailsKnown={onTaskHasDetailsKnown}
         onTaskRenamed={onTaskRenamed}
         onDueDateUpdated={onDueDateUpdated}
+        onRecurrenceUpdated={onRecurrenceUpdated}
+        onSaveTaskRecurrence={onSaveTaskRecurrence}
         sidebarPosition={sidebarPosition}
         sidebarMinViewportWidth={sidebarMinViewportWidth}
       >
@@ -1325,6 +1373,7 @@ export function CalendarViewsPanel({
       positionFromCursor={activeView === "day"}
       cursorOffsetPx={50}
     >
+    <CalendarTaskModalActionsProvider value={calendarTaskModalActions}>
     <div className="calendar-panel flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden">
       <CalendarViewTabs
         activeView={activeView}
@@ -1360,6 +1409,8 @@ export function CalendarViewsPanel({
           onTaskHasDetailsKnown={onTaskHasDetailsKnown}
           onTaskRenamed={onTaskRenamed}
           onDueDateUpdated={onDueDateUpdated}
+          onRecurrenceUpdated={onRecurrenceUpdated}
+          onSaveTaskRecurrence={onSaveTaskRecurrence}
           onAddCalendarTask={onAddCalendarTask}
           defaultListId={defaultListId}
           fullWidth={fullWidth}
@@ -1386,6 +1437,8 @@ export function CalendarViewsPanel({
             onTaskHasDetailsKnown={onTaskHasDetailsKnown}
             onTaskRenamed={onTaskRenamed}
             onDueDateUpdated={onDueDateUpdated}
+            onRecurrenceUpdated={onRecurrenceUpdated}
+            onSaveTaskRecurrence={onSaveTaskRecurrence}
             onAddCalendarTask={onAddCalendarTask}
             defaultListId={defaultListId}
             fullWidth={fullWidth}
@@ -1415,6 +1468,8 @@ export function CalendarViewsPanel({
             onTaskHasDetailsKnown={onTaskHasDetailsKnown}
             onTaskRenamed={onTaskRenamed}
             onDueDateUpdated={onDueDateUpdated}
+            onRecurrenceUpdated={onRecurrenceUpdated}
+            onSaveTaskRecurrence={onSaveTaskRecurrence}
             onAddCalendarTask={onAddCalendarTask}
             defaultListId={defaultListId}
             externalDropTargetDateKey={externalDropTargetDateKey}
@@ -1443,6 +1498,8 @@ export function CalendarViewsPanel({
             onTaskHasDetailsKnown={onTaskHasDetailsKnown}
             onTaskRenamed={onTaskRenamed}
             onDueDateUpdated={onDueDateUpdated}
+            onRecurrenceUpdated={onRecurrenceUpdated}
+            onSaveTaskRecurrence={onSaveTaskRecurrence}
             onAddCalendarTask={onAddCalendarTask}
             defaultListId={defaultListId}
             fullWidth={fullWidth}
@@ -1473,6 +1530,8 @@ export function CalendarViewsPanel({
               onTaskHasDetailsKnown={onTaskHasDetailsKnown}
               onTaskRenamed={onTaskRenamed}
               onDueDateUpdated={onDueDateUpdated}
+              onRecurrenceUpdated={onRecurrenceUpdated}
+              onSaveTaskRecurrence={onSaveTaskRecurrence}
               onAddCalendarTask={onAddCalendarTask}
               defaultListId={defaultListId}
               fullWidth={fullWidth}
@@ -1497,6 +1556,8 @@ export function CalendarViewsPanel({
               onTaskHasDetailsKnown={onTaskHasDetailsKnown}
               onTaskRenamed={onTaskRenamed}
               onDueDateUpdated={onDueDateUpdated}
+              onRecurrenceUpdated={onRecurrenceUpdated}
+              onSaveTaskRecurrence={onSaveTaskRecurrence}
               onAddCalendarTask={onAddCalendarTask}
               defaultListId={defaultListId}
               fullWidth={fullWidth}
@@ -1511,6 +1572,7 @@ export function CalendarViewsPanel({
       )}
       </div>
     </div>
+    </CalendarTaskModalActionsProvider>
     </CalendarTaskHoverPreviewProvider>
     </CalendarTaskColorMenuProvider>
   );
@@ -1539,6 +1601,8 @@ export function CalendarPanel({
   onTaskHasDetailsKnown,
   onTaskRenamed,
   onDueDateUpdated,
+  onRecurrenceUpdated,
+  onSaveTaskRecurrence,
   onAddCalendarTask,
   defaultListId,
   defaultView = "week",
@@ -1550,6 +1614,8 @@ export function CalendarPanel({
   onMultiWeekCountChange,
   persistViewSession = true,
   periodLabelAction,
+  labels = [],
+  onDeleteTask,
 }: CalendarPanelProps) {
   return (
     <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white dark:bg-zinc-950 calendar-panel">
@@ -1569,10 +1635,18 @@ export function CalendarPanel({
         onSetTaskDueTime={onSetTaskDueTime}
         onSetTaskDueDateAndTime={onSetTaskDueDateAndTime}
         onSetTaskCalendarColor={onSetTaskCalendarColor}
+        onSetTaskPriority={onSetTaskPriority}
+        onToggleTaskLabel={onToggleTaskLabel}
+        onLabelsChanged={onLabelsChanged}
+        onMoveTaskToList={onMoveTaskToList}
+        labels={labels}
+        onDeleteTask={onDeleteTask}
         onDetailsSaved={onDetailsSaved}
         onTaskHasDetailsKnown={onTaskHasDetailsKnown}
         onTaskRenamed={onTaskRenamed}
         onDueDateUpdated={onDueDateUpdated}
+        onRecurrenceUpdated={onRecurrenceUpdated}
+        onSaveTaskRecurrence={onSaveTaskRecurrence}
         onAddCalendarTask={onAddCalendarTask}
         defaultListId={defaultListId}
         defaultView={defaultView}

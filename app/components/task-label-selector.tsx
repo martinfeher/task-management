@@ -23,6 +23,7 @@ type TaskLabelSelectorProps = {
   assignedLabelIds: string[];
   query: string;
   isSubmitting?: boolean;
+  autoFocus?: boolean;
   onQueryChange: (value: string) => void;
   onToggleLabel: (labelId: string) => void;
   onCreateLabel: (label: string, color: string) => void;
@@ -108,6 +109,7 @@ export function TaskLabelSelector({
   assignedLabelIds,
   query,
   isSubmitting = false,
+  autoFocus = true,
   onQueryChange,
   onToggleLabel,
   onCreateLabel,
@@ -122,10 +124,12 @@ export function TaskLabelSelector({
   const [activeIndex, setActiveIndex] = useState(-1);
 
   useEffect(() => {
+    if (!autoFocus) return;
+
     requestAnimationFrame(() => {
       inputRef.current?.focus();
     });
-  }, []);
+  }, [autoFocus]);
 
   const assignedLabels = useMemo(
     () => labels.filter((item) => assignedLabelIds.includes(item.id)),

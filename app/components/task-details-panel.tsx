@@ -1,11 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { createPortal } from "react-dom";
 import { BiLink, BiLeftArrowAlt, BiRedo, BiUndo } from "react-icons/bi";
 import { LuCheck, LuCode, LuHeading1, LuHeading2, LuHeading3, LuHistory, LuPilcrow, LuRemoveFormatting } from "react-icons/lu";
 import { renameTask, updateTaskDueDate, updateTaskDueTime, updateTaskRecurrence } from "@/app/actions/todo";
 import type { TaskRecurrenceRule } from "@/lib/task-recurrence";
 import { serializeRecurrenceRule } from "@/lib/task-recurrence";
+import type { TaskReminderOptionId } from "@/lib/task-reminder";
 import {
   fetchTaskById,
   invalidateTaskDetailsFetchCache,
@@ -134,8 +136,24 @@ import {
 } from "./detail-format-toolbar-menus";
 
 type HeaderFormatDropdown = "family" | "size";
-import { TaskDatePicker } from "./task-date-picker";
+import {
+  TaskDatePicker,
+  computeTaskDatePickerMenuPosition,
+} from "./task-date-picker";
 import { TaskVersionHistoryOffcanvas } from "./task-version-history-offcanvas";
+import {
+  TaskModalFooter,
+  type TaskModalFooterConfig,
+} from "./task-modal-footer";
+import {
+  TaskDetailsSubtasksSection,
+  type TaskDetailsSubtask,
+} from "./task-details-subtasks-section";
+import {
+  getSlashCommandPreviewTopOffset,
+  isSlashCommandPreviewBlockType,
+  SlashCommandBlockPreview,
+} from "./slash-command-block-preview";
 import {
   BulletListIcon,
   ChecklistIcon,
@@ -213,6 +231,11 @@ type TaskDetailsPanelProps = {
     },
   ) => void;
   onToggleTask?: (taskId: string) => void;
+  subtasks?: TaskDetailsSubtask[];
+  canManageSubtasks?: boolean;
+  onAddSubtask?: (
+    taskId: string,
+  ) => Promise<TaskDetailsSubtask | null> | TaskDetailsSubtask | null;
   onRecurrenceUpdated?: (taskId: string, recurrenceRule: string | null) => void;
   onSaveTaskRecurrence?: (
     taskId: string,
@@ -220,6 +243,7 @@ type TaskDetailsPanelProps = {
   ) => Promise<void>;
   onBack?: () => void;
   layout?: "default" | "modal";
+  modalFooterConfig?: TaskModalFooterConfig | null;
 };
 
 type SaveStatus = "idle" | "loading" | "pending" | "saved" | "error";
@@ -269,7 +293,7 @@ function getFormatToolbarPopoverClass(formatMenu: FormatMenuState) {
 }
 
 const TASK_DETAILS_BLOCK_MENU_CLASS =
-  "task-details-block-menu fixed z-50 min-w-[168px] py-0!";
+  "task-details-block-menu min-w-[168px] py-0!";
 
 const TASK_DETAILS_BLOCK_MENU_ITEM_CLASS =
   "flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-900 hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800";
@@ -285,7 +309,7 @@ const FORMAT_TOOLBAR_ICON_BUTTON_CLASS =
 const TASK_DETAILS_DATE_MENU_HOVER_CLOSE_MS = 120;
 
 const FORMAT_TOOLBAR_ACTIVE_BUTTON_CLASS =
-  "bg-zinc-100 text-[#2563eb] dark:bg-zinc-800 dark:text-blue-300";
+  "bg-[#c3eaff] text-[#2563eb] dark:text-blue-300";
 
 type FormatMenuInlineFormats = {
   bold: boolean;
@@ -1161,9 +1185,7 @@ function resolveFormatMenuRange(
     savedRange.toString().trim() &&
     editor.contains(savedRange.commonAncestorContainer)
   ) {
-    const restored = savedRange.cloneRange();
-    restoreEditorSelectionRange(restored);
-    return restored;
+    return savedRange.cloneRange();
   }
 
   return null;
@@ -1630,10 +1652,14 @@ export function TaskDetailsPanel({
   onTaskRenamed,
   onDueDateUpdated,
   onToggleTask,
+  subtasks = [],
+  canManageSubtasks = false,
+  onAddSubtask,
   onRecurrenceUpdated,
   onSaveTaskRecurrence,
   onBack,
   layout = "default",
+  modalFooterConfig = null,
 }: TaskDetailsPanelProps) {
   const isModalLayout = layout === "modal";
   const [task, setTask] = useState<TaskDetails | null>(null);
@@ -1648,6 +1674,15 @@ export function TaskDetailsPanel({
   const [slashCommandMenu, setSlashCommandMenu] =
     useState<SlashCommandMenuState | null>(null);
   const [isDateMenuOpen, setIsDateMenuOpen] = useState(false);
+  const [taskReminderOptionId, setTaskReminderOptionId] =
+    useState<TaskReminderOptionId | null>(null);
+  const taskReminderByIdRef = useRef<Map<string, TaskReminderOptionId>>(
+    new Map(),
+  );
+  const [dateMenuPosition, setDateMenuPosition] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
   const [metadataError, setMetadataError] = useState<string | null>(null);
   const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
   const [canUndo, setCanUndo] = useState(false);
@@ -1714,13 +1749,50 @@ export function TaskDetailsPanel({
   const dateMenuCloseTimerRef = useRef<number | null>(null);
   const dateMenuHoverDismissedRef = useRef(false);
   const isRecurrenceMenuOpenRef = useRef(false);
+  const isReminderMenuOpenRef = useRef(false);
   const dateButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!isDateMenuOpen) {
-      isRecurrenceMenuOpenRef.current = false;
+      setDateMenuPosition(null);
     }
   }, [isDateMenuOpen]);
+
+  useLayoutEffect(() => {
+    if (!isDateMenuOpen || !isModalLayout) return;
+
+    function updateDateMenuPosition() {
+      const anchor = dateButtonRef.current;
+      if (!anchor) return;
+
+      setDateMenuPosition(computeTaskDatePickerMenuPosition(anchor));
+    }
+
+    updateDateMenuPosition();
+    window.addEventListener("resize", updateDateMenuPosition);
+    window.addEventListener("scroll", updateDateMenuPosition, true);
+
+    return () => {
+      window.removeEventListener("resize", updateDateMenuPosition);
+      window.removeEventListener("scroll", updateDateMenuPosition, true);
+    };
+  }, [isDateMenuOpen, isModalLayout]);
+
+  useEffect(() => {
+    if (!isDateMenuOpen) {
+      isRecurrenceMenuOpenRef.current = false;
+      isReminderMenuOpenRef.current = false;
+    }
+  }, [isDateMenuOpen]);
+
+  useEffect(() => {
+    if (!task) {
+      setTaskReminderOptionId(null);
+      return;
+    }
+
+    setTaskReminderOptionId(taskReminderByIdRef.current.get(task.id) ?? null);
+  }, [task?.id]);
 
   const lineControlsRef = useRef<HTMLDivElement>(null);
   const hoveredLineRef = useRef<HTMLElement | null>(null);
@@ -3228,18 +3300,9 @@ export function TaskDetailsPanel({
       }
     }
 
-    const range = resolveFormatMenuRange(
-      editor,
-      savedFormatSelectionRef.current,
-    );
+    const range = resolveFormatMenuRange(editor, null);
     if (!range || !rangeHasFormatableEditorContent(editor, range)) {
-      const hasPendingSelection =
-        editorHasLiveExtendedTextSelection(editor) ||
-        Boolean(
-          savedFormatSelectionRef.current &&
-            !savedFormatSelectionRef.current.collapsed &&
-            savedFormatSelectionRef.current.toString().trim(),
-        );
+      const hasPendingSelection = editorHasLiveExtendedTextSelection(editor);
       syncHeaderClearFormattingState();
       closeFormatMenu({ clearSavedSelection: !hasPendingSelection });
       return;
@@ -3288,10 +3351,7 @@ export function TaskDetailsPanel({
 
       updateFormatMenu();
 
-      const resolvedRange = resolveFormatMenuRange(
-        editor,
-        savedFormatSelectionRef.current,
-      );
+      const resolvedRange = resolveFormatMenuRange(editor, null);
       const shouldHaveMenu = Boolean(
         resolvedRange &&
           rangeHasFormatableEditorContent(editor, resolvedRange),
@@ -5313,6 +5373,28 @@ export function TaskDetailsPanel({
       return;
     }
 
+    if (
+      (event.key === "ArrowUp" ||
+        event.key === "ArrowDown" ||
+        event.key === "ArrowLeft" ||
+        event.key === "ArrowRight") &&
+      !event.metaKey &&
+      !event.ctrlKey &&
+      !event.altKey &&
+      !event.shiftKey
+    ) {
+      const editor = editorRef.current;
+      if (editor && editorHasLiveExtendedTextSelection(editor)) {
+        savedFormatSelectionRef.current = null;
+        savedFormatLineIdsRef.current = [];
+        if (formatMenuTimerRef.current !== null) {
+          window.clearTimeout(formatMenuTimerRef.current);
+          formatMenuTimerRef.current = null;
+        }
+        closeFormatMenu({ clearSavedSelection: true });
+      }
+    }
+
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
       const editor = editorRef.current;
@@ -5535,7 +5617,7 @@ export function TaskDetailsPanel({
   }
 
   function scheduleDateMenuClose() {
-    if (isRecurrenceMenuOpenRef.current) return;
+    if (isRecurrenceMenuOpenRef.current || isReminderMenuOpenRef.current) return;
 
     clearDateMenuCloseTimer();
     dateMenuCloseTimerRef.current = window.setTimeout(() => {
@@ -5698,6 +5780,71 @@ export function TaskDetailsPanel({
   const dueDateLabel = task ? formatDueDateLabel(task.dueDate) : null;
   const dueTimeLabel = task ? formatDueTimeLabel(task.dueTimeMinutes) : null;
 
+  function renderTaskDatePickerMenu() {
+    if (!task || !isDateMenuOpen) return null;
+
+    const datePickerMenu = (
+      <div
+        ref={dateMenuRef}
+        data-task-date-picker-menu
+        className={
+          isModalLayout
+            ? "fixed z-[110]"
+            : "absolute left-0 top-full z-50 pt-1.5"
+        }
+        style={
+          isModalLayout
+            ? {
+                top: dateMenuPosition?.top ?? 0,
+                left: dateMenuPosition?.left ?? 0,
+                visibility: dateMenuPosition ? "visible" : "hidden",
+              }
+            : undefined
+        }
+        onMouseEnter={clearDateMenuCloseTimer}
+        onMouseLeave={handleDatePickerMouseLeave}
+        onPointerDown={(event) => event.stopPropagation()}
+      >
+        <TaskDatePicker
+          dueDate={task.dueDate}
+          dueTimeMinutes={task.dueTimeMinutes}
+          dueDurationMinutes={task.dueDurationMinutes}
+          dueTimeZone={task.dueTimeZone}
+          recurrenceRule={task.recurrenceRule}
+          reminderOptionId={taskReminderOptionId}
+          onSelectDate={(dateValue) => void handleSelectDueDate(dateValue)}
+          onSaveDueTime={(dueTime, options) =>
+            void handleSaveDueTime(dueTime, options)
+          }
+          onSaveRecurrence={(rule) => void handleSaveRecurrence(rule)}
+          onSaveReminder={(optionId) => {
+            if (!task) return;
+            taskReminderByIdRef.current.set(task.id, optionId);
+            setTaskReminderOptionId(optionId);
+          }}
+          onRecurrenceMenuOpenChange={(open) => {
+            isRecurrenceMenuOpenRef.current = open;
+            if (open) {
+              clearDateMenuCloseTimer();
+            }
+          }}
+          onReminderMenuOpenChange={(open) => {
+            isReminderMenuOpenRef.current = open;
+            if (open) {
+              clearDateMenuCloseTimer();
+            }
+          }}
+        />
+      </div>
+    );
+
+    if (isModalLayout && typeof document !== "undefined") {
+      return createPortal(datePickerMenu, document.body);
+    }
+
+    return datePickerMenu;
+  }
+
   return (
     <section
       ref={panelRef}
@@ -5710,7 +5857,11 @@ export function TaskDetailsPanel({
       }`}
       aria-busy={saveStatus === "loading" ? true : undefined}
     >
-      <div className="relative flex items-center justify-between overflow-visible px-4 pt-1 pb-1">
+      <div
+        className={`relative flex items-center justify-between overflow-visible px-4 pt-1 pb-1 ${
+          isModalLayout ? "pr-48" : ""
+        }`}
+      >
         <div className="flex items-center gap-3">
           {onBack ? (
             <button
@@ -5799,7 +5950,7 @@ export function TaskDetailsPanel({
                         <div
                           className={
                             isModalLayout
-                              ? "font-normal text-[#9f9f9f] text-[7px] leading-[7px]"
+                              ? "font-normal text-[#9f9f9f] text-[7px] leading-[7px] pt-[2px]!"
                               : "absolute -bottom-[5.5px] right-[2px] font-normal text-[#9f9f9f] text-[7px] leading-tight"
                           }
                         >
@@ -5812,36 +5963,7 @@ export function TaskDetailsPanel({
                   )}
                 </button>
 
-                {isDateMenuOpen && (
-                  <div
-                    ref={dateMenuRef}
-                    data-task-date-picker-menu
-                    className="absolute left-0 top-full z-50 pt-1.5"
-                    onMouseEnter={clearDateMenuCloseTimer}
-                    onMouseLeave={handleDatePickerMouseLeave}
-                  >
-                    <TaskDatePicker
-                      dueDate={task.dueDate}
-                      dueTimeMinutes={task.dueTimeMinutes}
-                      dueDurationMinutes={task.dueDurationMinutes}
-                      dueTimeZone={task.dueTimeZone}
-                      recurrenceRule={task.recurrenceRule}
-                      onSelectDate={(dateValue) =>
-                        void handleSelectDueDate(dateValue)
-                      }
-                      onSaveDueTime={(dueTime, options) =>
-                        void handleSaveDueTime(dueTime, options)
-                      }
-                      onSaveRecurrence={(rule) => void handleSaveRecurrence(rule)}
-                      onRecurrenceMenuOpenChange={(open) => {
-                        isRecurrenceMenuOpenRef.current = open;
-                        if (open) {
-                          clearDateMenuCloseTimer();
-                        }
-                      }}
-                    />
-                  </div>
-                )}
+                {renderTaskDatePickerMenu()}
               </div>
               <span className="text-[#cfcfcf] ml-2">|</span>
               <div
@@ -5983,7 +6105,7 @@ export function TaskDetailsPanel({
                   </div>
                 </>
               ) : null}
-              {onToggleTask && !task.completed && !task.isNote ? (
+              {onToggleTask && !task.completed && !task.isNote && !isModalLayout ? (
                 <button
                   type="button"
                   onClick={() => onToggleTask(task.id)}
@@ -6130,6 +6252,16 @@ export function TaskDetailsPanel({
                 ))}
               </div>
           </div>
+
+          {canManageSubtasks && onAddSubtask && onToggleTask ? (
+            <TaskDetailsSubtasksSection
+              taskId={task.id}
+              subtasks={subtasks}
+              onAddSubtask={onAddSubtask}
+              onToggleSubtask={onToggleTask}
+              onRenameSubtask={onTaskRenamed}
+            />
+          ) : null}
         </div>
       ) : (
         <p className="px-4 text-sm text-zinc-500 dark:text-zinc-400">
@@ -6141,7 +6273,7 @@ export function TaskDetailsPanel({
         <div
           ref={addBlockMenuRef}
           role="menu"
-          className={TASK_DETAILS_BLOCK_MENU_CLASS}
+          className={`fixed z-50 ${TASK_DETAILS_BLOCK_MENU_CLASS}`}
           style={{ top: addBlockMenu.top, left: addBlockMenu.left }}
         >
           {ADD_BLOCK_OPTIONS.map((option, index) => (
@@ -6176,57 +6308,82 @@ export function TaskDetailsPanel({
         const blockOptionCount = filteredOptions.filter(
           (option) => option.kind === "block",
         ).length;
+        const selectedOption = filteredOptions[selectedIndex];
+        const previewType =
+          selectedOption?.kind === "block" &&
+          isSlashCommandPreviewBlockType(selectedOption.type)
+            ? selectedOption.type
+            : null;
+        const previewTopOffset = previewType
+          ? getSlashCommandPreviewTopOffset(
+              selectedIndex,
+              filteredOptions,
+              !slashCommandMenu.query,
+            )
+          : 0;
 
         return (
           <div
             ref={slashCommandMenuRef}
-            role="menu"
-            aria-label="Block type commands"
-            className={TASK_DETAILS_BLOCK_MENU_CLASS}
+            className="fixed z-50"
             style={{
               top: slashCommandMenu.top,
               left: slashCommandMenu.left,
             }}
           >
-            {filteredOptions.map((option, index) => (
-              <div key={option.kind === "link" ? "link" : option.type}>
-                {!slashCommandMenu.query &&
-                  option.kind === "block" &&
-                  index === TEXT_BLOCK_OPTIONS.length && (
-                    <div
-                      role="separator"
-                      className="my-1 border-t border-zinc-200 dark:border-zinc-700"
-                    />
-                  )}
-                {!slashCommandMenu.query &&
-                  option.kind === "link" &&
-                  blockOptionCount > 0 && (
-                    <div
-                      role="separator"
-                      className="my-1 border-t border-zinc-200 dark:border-zinc-700"
-                    />
-                  )}
-                <button
-                  type="button"
-                  role="menuitem"
-                  className={`${TASK_DETAILS_BLOCK_MENU_ITEM_CLASS} ${
-                    index === selectedIndex
-                      ? "bg-zinc-100 dark:bg-zinc-800"
-                      : ""
-                  }`}
-                  onMouseDown={(event) => event.preventDefault()}
-                  onMouseEnter={() =>
-                    setSlashCommandMenu((current) =>
-                      current ? { ...current, selectedIndex: index } : null,
-                    )
-                  }
-                  onClick={() => handleApplySlashCommandOption(option)}
-                >
-                  <option.Icon className="size-4 shrink-0 text-zinc-500 dark:text-zinc-400" />
-                  {option.label}
-                </button>
+            {previewType ? (
+              <div
+                className="absolute left-full ml-2"
+                style={{ top: previewTopOffset }}
+              >
+                <SlashCommandBlockPreview type={previewType} />
               </div>
-            ))}
+            ) : null}
+            <div
+              role="menu"
+              aria-label="Block type commands"
+              className={TASK_DETAILS_BLOCK_MENU_CLASS}
+            >
+              {filteredOptions.map((option, index) => (
+                <div key={option.kind === "link" ? "link" : option.type}>
+                  {!slashCommandMenu.query &&
+                    option.kind === "block" &&
+                    index === TEXT_BLOCK_OPTIONS.length && (
+                      <div
+                        role="separator"
+                        className="my-1 border-t border-zinc-200 dark:border-zinc-700"
+                      />
+                    )}
+                  {!slashCommandMenu.query &&
+                    option.kind === "link" &&
+                    blockOptionCount > 0 && (
+                      <div
+                        role="separator"
+                        className="my-1 border-t border-zinc-200 dark:border-zinc-700"
+                      />
+                    )}
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={`${TASK_DETAILS_BLOCK_MENU_ITEM_CLASS} ${
+                      index === selectedIndex
+                        ? "bg-zinc-100 dark:bg-zinc-800"
+                        : ""
+                    }`}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onMouseEnter={() =>
+                      setSlashCommandMenu((current) =>
+                        current ? { ...current, selectedIndex: index } : null,
+                      )
+                    }
+                    onClick={() => handleApplySlashCommandOption(option)}
+                  >
+                    <option.Icon className="size-4 shrink-0 text-zinc-500 dark:text-zinc-400" />
+                    {option.label}
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         );
       })()}
@@ -6511,11 +6668,50 @@ export function TaskDetailsPanel({
         onRestore={applyRestoredTaskVersion}
       />
 
-      {taskId &&
-        saveStatus !== "loading" &&
-        (saveStatus !== "idle" ||
-          showClipboardNotice ||
-          lastSavedAt !== null) && (
+      {isModalLayout && task && modalFooterConfig ? (
+        <footer className="flex shrink-0 items-center justify-between gap-4 border-t border-zinc-100 px-4 py-2.5 dark:border-zinc-800">
+          <TaskModalFooter taskId={task.id} {...modalFooterConfig} />
+          {taskId &&
+          saveStatus !== "loading" &&
+          (saveStatus !== "idle" ||
+            showClipboardNotice ||
+            lastSavedAt !== null) ? (
+            <div className="shrink-0">
+              <span className="flex flex-wrap items-center justify-end gap-2 text-xs text-[#82828a] dark:text-[#acacb4]">
+                {showClipboardNotice ? <span>Clipboard</span> : null}
+                {metadataError ? (
+                  <span className="text-red-600 dark:text-red-400">
+                    {metadataError}
+                  </span>
+                ) : null}
+                {saveStatus === "pending" ? <span>Unsaved changes</span> : null}
+                {saveStatus === "error" ? (
+                  <span className="pointer-events-auto flex items-center gap-2 text-red-600 dark:text-red-400">
+                    <span>{saveErrorMessage ?? "Something went wrong"}</span>
+                    <button
+                      type="button"
+                      onClick={() => void saveDetails()}
+                      className="rounded-md border border-red-200 px-2 py-0.5 text-[11px] font-medium text-red-700 transition-colors hover:bg-red-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/40"
+                    >
+                      Retry
+                    </button>
+                  </span>
+                ) : null}
+                {lastSavedAt && saveStatus === "saved" ? (
+                  <span>Saved · {formatSaveTime(lastSavedAt)}</span>
+                ) : null}
+              </span>
+            </div>
+          ) : null}
+        </footer>
+      ) : null}
+
+      {!isModalLayout &&
+      taskId &&
+      saveStatus !== "loading" &&
+      (saveStatus !== "idle" ||
+        showClipboardNotice ||
+        lastSavedAt !== null) ? (
         <div className="pointer-events-none absolute bottom-3 right-4 z-10">
           <span className="flex flex-wrap items-center justify-end gap-2 text-xs text-[#82828a] dark:text-[#acacb4]">
             {showClipboardNotice ? <span>Clipboard</span> : null}
@@ -6540,7 +6736,7 @@ export function TaskDetailsPanel({
             ) : null}
           </span>
         </div>
-      )}
+      ) : null}
     </section>
   );
 }

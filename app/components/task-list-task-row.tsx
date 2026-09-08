@@ -10,7 +10,11 @@ import {
   TASK_COMPLETE_ANIMATION_MS,
   TaskCompletionCheckbox,
 } from "./task-completion-checkbox";
-import { TaskDatePicker, TASK_DATE_PICKER_WIDTH } from "./task-date-picker";
+import {
+  TaskDatePicker,
+  computeTaskDatePickerMenuPosition,
+} from "./task-date-picker";
+import type { TaskReminderOptionId } from "@/lib/task-reminder";
 import {
   TaskRowContextMenu,
   type TaskRowContextMenuView,
@@ -122,7 +126,6 @@ type TaskListTaskRowProps = {
   useWiderRowPadding?: boolean;
 };
 
-const TASK_DATE_PICKER_GAP = 4;
 const TASK_LABEL_SELECTOR_WIDTH = 280;
 const TASK_LABEL_SELECTOR_GAP = 4;
 const TASK_LABEL_SELECTOR_MAX_HEIGHT = 360;
@@ -208,23 +211,9 @@ function computeTaskDatePickerPosition(
   anchor: HTMLElement,
   preferScheduleAlignment: boolean,
 ) {
-  const rect = anchor.getBoundingClientRect();
-  const viewportPadding = 8;
-  let left = preferScheduleAlignment
-    ? rect.left
-    : rect.right - TASK_DATE_PICKER_WIDTH;
-  left = Math.max(
-    viewportPadding,
-    Math.min(
-      left,
-      window.innerWidth - TASK_DATE_PICKER_WIDTH - viewportPadding,
-    ),
-  );
-
-  return {
-    top: rect.bottom + TASK_DATE_PICKER_GAP,
-    left,
-  };
+  return computeTaskDatePickerMenuPosition(anchor, {
+    align: preferScheduleAlignment ? "left" : "right",
+  });
 }
 
 function isTaskDatePickerTrigger(target: Node) {
@@ -311,6 +300,8 @@ export function TaskListTaskRow({
   useWiderRowPadding = false,
 }: TaskListTaskRowProps) {
   const titleInputRef = useRef<HTMLInputElement>(null);
+  const [reminderOptionId, setReminderOptionId] =
+    useState<TaskReminderOptionId | null>(null);
 
   useLayoutEffect(() => {
     if (editingTaskId !== task.id) return;
@@ -339,7 +330,7 @@ export function TaskListTaskRow({
       isPointerMenuOpen ||
       rowMenuView !== null);
 
-  const basePaddingLeft = useWiderRowPadding ? 22 : 0;
+  const basePaddingLeft = useWiderRowPadding ? 1 : 0;
   const rowOuterPaddingLeft = depth * SUBTASK_INDENT_PX;
   const rowContentPaddingLeft = basePaddingLeft;
   const isSelected = task.id === selectedTaskId;
@@ -637,7 +628,7 @@ export function TaskListTaskRow({
             onClick={(event) => event.stopPropagation()}
             onBlur={() => onCommitTitleEdit(task)}
             onKeyDown={(event) => onTitleKeyDown(event, task)}
-            className="min-w-0 w-full border-0 bg-transparent p-0 text-left text-[15px] leading-[20px] text-zinc-900 outline-none dark:text-zinc-50"
+            className="min-w-0 w-full border-0 bg-transparent p-0 text-left text-[15px] leading-[20px] text-zinc-600 outline-none dark:text-zinc-50"
           />
         ) : (
           <span
@@ -804,6 +795,7 @@ export function TaskListTaskRow({
                     dueDurationMinutes={task.dueDurationMinutes}
                     dueTimeZone={task.dueTimeZone}
                     recurrenceRule={task.recurrenceRule}
+                    reminderOptionId={reminderOptionId}
                     onSelectDate={(dateValue) =>
                       onSelectTaskDueDate(task.id, dateValue)
                     }
@@ -813,6 +805,9 @@ export function TaskListTaskRow({
                     onSaveRecurrence={(rule) =>
                       onSaveTaskRecurrence(task.id, rule)
                     }
+                    onSaveReminder={(optionId) => {
+                      setReminderOptionId(optionId);
+                    }}
                   />
                 </div>,
                 document.body,

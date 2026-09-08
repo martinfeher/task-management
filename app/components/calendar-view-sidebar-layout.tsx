@@ -281,6 +281,8 @@ export function CalendarViewSidebarLayout({
   onTaskHasDetailsKnown,
   onTaskRenamed,
   onDueDateUpdated,
+  onRecurrenceUpdated,
+  onSaveTaskRecurrence,
   sidebarPosition = "right",
   sidebarMinViewportWidth = 1800,
   children,
@@ -388,6 +390,8 @@ export function CalendarViewSidebarLayout({
           onTaskHasDetailsKnown={onTaskHasDetailsKnown}
           onTaskRenamed={onTaskRenamed}
           onDueDateUpdated={onDueDateUpdated}
+          onRecurrenceUpdated={onRecurrenceUpdated}
+          onSaveTaskRecurrence={onSaveTaskRecurrence}
           onToggleTask={onToggleTask}
         />
       ) : null}

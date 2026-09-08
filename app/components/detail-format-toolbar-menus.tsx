@@ -76,8 +76,14 @@ export const FORMAT_TOOLBAR_FONT_SIZE_TRIGGER_CLASS =
 const FORMAT_TOOLBAR_OVERFLOW_MENU_ICON_CLASS =
   `inline-flex h-[18px] w-[22px] shrink-0 items-center justify-center leading-none ${FORMAT_TOOLBAR_ICON_COLOR}`;
 
+const FORMAT_TOOLBAR_OVERFLOW_MENU_BASE_CLASS =
+  "rounded-lg border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900 w-[151px] min-w-[151px]";
+
 const FORMAT_TOOLBAR_OVERFLOW_MENU_CLASS =
-  "overflow-hidden rounded-lg border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900 w-[151px] min-w-[151px]";
+  `${FORMAT_TOOLBAR_OVERFLOW_MENU_BASE_CLASS} overflow-hidden`;
+
+const FORMAT_TOOLBAR_OVERFLOW_MENU_SCROLLABLE_CLASS =
+  `${FORMAT_TOOLBAR_OVERFLOW_MENU_BASE_CLASS} max-h-[min(70vh,360px)] overflow-x-hidden overflow-y-auto`;
 
 const FORMAT_TOOLBAR_OVERFLOW_MENU_TRIGGER_CLASS =
   "flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800";
@@ -890,7 +896,11 @@ export function DetailFormatOverflowMenu({
       tooltipLabel="More options"
       align="center"
       triggerClassName={FORMAT_TOOLBAR_OVERFLOW_MENU_TRIGGER_CLASS}
-      menuClassName={FORMAT_TOOLBAR_OVERFLOW_MENU_CLASS}
+      menuClassName={
+        lineHeightOpen
+          ? FORMAT_TOOLBAR_OVERFLOW_MENU_SCROLLABLE_CLASS
+          : FORMAT_TOOLBAR_OVERFLOW_MENU_CLASS
+      }
       trigger={
         <span
           className={`flex ${FORMAT_TOOLBAR_ICON_SIZE_CLASS} items-center justify-center ${FORMAT_TOOLBAR_ICON_TEXT_CLASS} tracking-widest ${FORMAT_TOOLBAR_ICON_COLOR_MUTED}`}
@@ -978,13 +988,14 @@ export function DetailFormatOverflowMenu({
 
           {lineHeightOpen ? (
             <DetailLineHeightControl
+              open={lineHeightOpen}
               value={lineHeight}
               onSelect={(nextLineHeight) => {
                 onSelectLineHeight(nextLineHeight);
                 setLineHeightPanelOpen(false);
                 onOpenChange(false);
               }}
-              className="mx-1 mb-1 max-h-40 border-0 shadow-none"
+              className="mx-1 mb-1 border-0 shadow-none"
             />
           ) : null}
         </div>

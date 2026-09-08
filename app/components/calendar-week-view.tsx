@@ -258,6 +258,8 @@ export function CalendarWeekView({
   onTaskHasDetailsKnown,
   onTaskRenamed,
   onDueDateUpdated,
+  onRecurrenceUpdated,
+  onSaveTaskRecurrence,
   onAddCalendarTask,
   defaultListId = null,
   fullWidth = false,
@@ -703,7 +705,7 @@ export function CalendarWeekView({
     <div className={CALENDAR_VIEW_WRAPPER_CLASS}>
       <div className={getCalendarShellClassName(fullWidth)}>
         <div className={CALENDAR_VIEW_SURFACE_CLASS}>
-          <div className="flex shrink-0 items-center justify-start px-3 pt-1">
+          <div className="flex shrink-0 items-center justify-start px-3 pt-1 mb-2">
             <CalendarPeriodNavigation
               onToday={goToToday}
               onPrevious={goToPreviousWeek}
@@ -747,7 +749,7 @@ export function CalendarWeekView({
                               key={`head-${toDateKey(day)}`}
                               type="button"
                               onClick={() => handleDayHeaderSelect(day)}
-                              className={`pt-2 pb-[5px] py-2 text-center transition-colors cursor-pointer ${getWeekDayColumnDividerClass(dayIndex, weekDays, isSelectedWeekDay)} ${
+                              className={`pt-1 pb-[5px] py-2 text-center transition-colors cursor-pointer ${getWeekDayColumnDividerClass(dayIndex, weekDays, isSelectedWeekDay)} ${
                                 isSelectedDay
                                   ? `${SELECTED_WEEK_DAY_COLUMN_CLASS} rounded-t-[8px] ${SELECTED_WEEK_DAY_ROW_BORDER_CLASS}`
                                   : `${SELECTED_WEEK_DAY_ROW_BORDER_CLASS} bg-white dark:bg-zinc-950`
@@ -1214,6 +1216,8 @@ export function CalendarWeekView({
           onTaskHasDetailsKnown={onTaskHasDetailsKnown}
           onTaskRenamed={onTaskRenamed}
           onDueDateUpdated={onDueDateUpdated}
+          onRecurrenceUpdated={onRecurrenceUpdated}
+          onSaveTaskRecurrence={onSaveTaskRecurrence}
           onToggleTask={onToggleTask}
         />
       ) : null}

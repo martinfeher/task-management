@@ -55,7 +55,7 @@ export function getDropIndicatorIndent(
 
 export function buildVisibleTasks<
   T extends TaskWithParent & { completed: boolean; pinned: boolean },
->(tasks: T[], pinned: boolean): VisibleTask<T>[] {
+>(tasks: T[], pinned: boolean, includeSubtasks = true): VisibleTask<T>[] {
   const active = tasks.filter(
     (task) => !task.completed && Boolean(task.pinned) === pinned,
   );
@@ -77,6 +77,8 @@ export function buildVisibleTasks<
 
   for (const root of roots) {
     visible.push({ ...root, depth: 0 });
+
+    if (!includeSubtasks) continue;
 
     const children = sortByStoredOrder(
       active.filter((task) => task.parentId === root.id),

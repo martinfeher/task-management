@@ -170,6 +170,8 @@ export function CalendarMultiWeekView({
   onTaskHasDetailsKnown,
   onTaskRenamed,
   onDueDateUpdated,
+  onRecurrenceUpdated,
+  onSaveTaskRecurrence,
   onAddCalendarTask,
   defaultListId = null,
   fullWidth = false,
@@ -594,6 +596,8 @@ export function CalendarMultiWeekView({
           onTaskHasDetailsKnown={onTaskHasDetailsKnown}
           onTaskRenamed={onTaskRenamed}
           onDueDateUpdated={onDueDateUpdated}
+          onRecurrenceUpdated={onRecurrenceUpdated}
+          onSaveTaskRecurrence={onSaveTaskRecurrence}
           onToggleTask={onToggleTask}
         />
       ) : null}

@@ -338,7 +338,7 @@ function SearchTaskPreviewPanel({
       <button
         type="button"
         onClick={(event) => handleOpenTask(event)}
-        className="border-b border-zinc-100 px-5 py-4 text-left transition-colors hover:bg-zinc-100/80 dark:border-zinc-800 dark:hover:bg-zinc-800/50 cursor-pointer"
+        className="border-b border-zinc-100 px-3 py-2.5 text-left transition-colors hover:bg-zinc-100/80 dark:border-zinc-800 dark:hover:bg-zinc-800/50 cursor-pointer"
       >
         <h3
           className={`text-lg font-semibold leading-snug ${
@@ -356,21 +356,31 @@ function SearchTaskPreviewPanel({
       <button
         type="button"
         onClick={(event) => handleOpenTask(event)}
-        className="min-h-0 overflow-y-auto px-5 py-4 text-left transition-colors hover:bg-zinc-100/60 dark:hover:bg-zinc-800/30 cursor-pointer"
+        className="min-h-0 flex-1 overflow-y-auto px-3.5 py-1.5 text-left transition-colors hover:bg-zinc-100/60 dark:hover:bg-zinc-800/30 cursor-pointer"
       >
         {isLoading ? (
           <p className="text-sm text-zinc-400 dark:text-zinc-500">
             Loading content...
           </p>
-        ) : hasContent ? (
-          <div
-            className="search-result-content-preview task-details-editor pointer-events-none text-sm leading-relaxed text-zinc-700 dark:text-zinc-300"
-            dangerouslySetInnerHTML={{ __html: previewDetails }}
-          />
         ) : (
-          <p className="text-sm text-zinc-400 dark:text-zinc-500">
-            No content
-          </p>
+          <div
+            className={`min-h-full w-full ${
+              hasContent
+                ? "flex flex-col items-start justify-start"
+                : "flex items-center justify-center"
+            }`}
+          >
+            {hasContent ? (
+              <div
+                className="search-result-content-preview task-details-editor pointer-events-none w-full text-sm leading-relaxed text-zinc-700 dark:text-zinc-300"
+                dangerouslySetInnerHTML={{ __html: previewDetails }}
+              />
+            ) : (
+              <p className="text-sm text-zinc-300 dark:text-zinc-500">
+                No content
+              </p>
+            )}
+          </div>
         )}
       </button>
     </div>

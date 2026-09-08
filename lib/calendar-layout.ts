@@ -110,11 +110,11 @@ export const CALENDAR_WEEK_ALLDAY_STICKY_CLASS =
 /** Sticky offset for all-day rows sitting below day headers in multi-day view. */
 export const CALENDAR_DAYS_HEADER_HEIGHT_PX = 60;
 export const CALENDAR_DAYS_HEADER_STICKY_CLASS =
-  "sticky top-0 z-30 bg-white dark:bg-zinc-950";
+  "sticky top-0 z-30 bg-white dark:bg-zinc-950 mt-4";
 export const CALENDAR_DAYS_ALLDAY_STICKY_CLASS =
   "sticky z-20 bg-white dark:bg-zinc-950";
 export const CALENDAR_GRID_SCROLL_CLASS =
-  "calendar-grid-scroll min-h-0 flex-1 overflow-auto";
+  "calendar-grid-scroll min-h-0 flex-1 overflow-auto mb-[40px]";
 export const CALENDAR_TIMED_GRID_SCROLL_CLASS = CALENDAR_GRID_SCROLL_CLASS;
 
 export const CALENDAR_DAY_COLUMN_DIVIDER_CLASS =

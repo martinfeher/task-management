@@ -425,6 +425,7 @@ type TaskListPanelProps = {
   onPanelMouseEnter?: () => void;
   showSidebarMenu?: boolean;
   onOpenSidebar?: () => void;
+  subtasksEnabled?: boolean;
 };
 
 export function TaskListPanel({
@@ -486,6 +487,7 @@ export function TaskListPanel({
   onPanelMouseEnter,
   showSidebarMenu = false,
   onOpenSidebar,
+  subtasksEnabled = false,
 }: TaskListPanelProps) {
   const isListCalendarToggleActive =
     (isListCalendarOpen && !listCalendarShowingDetails) || isListCalendarPreview;
@@ -633,17 +635,17 @@ export function TaskListPanel({
   const pinnedVisibleTasks = useMemo(
     () =>
       canReorder
-        ? buildVisibleTasks(orderedTasks, true)
+        ? buildVisibleTasks(orderedTasks, true, subtasksEnabled)
         : pinnedTasks.map((task) => ({ ...task, depth: 0 })),
-    [canReorder, orderedTasks, pinnedTasks],
+    [canReorder, orderedTasks, pinnedTasks, subtasksEnabled],
   );
 
   const unpinnedVisibleTasks = useMemo(
     () =>
       canReorder
-        ? buildVisibleTasks(orderedTasks, false)
+        ? buildVisibleTasks(orderedTasks, false, subtasksEnabled)
         : listTasks.map((task) => ({ ...task, depth: 0 })),
-    [canReorder, listTasks, orderedTasks],
+    [canReorder, listTasks, orderedTasks, subtasksEnabled],
   );
 
   const tasksById = useMemo(
@@ -1101,7 +1103,9 @@ export function TaskListPanel({
         : {}),
       ...(parsed.recurrenceRule ? { recurrenceRule: parsed.recurrenceRule } : {}),
       ...(parsed.listId ? { listId: parsed.listId } : {}),
-      ...(parsed.subtasks.length > 0 ? { subtasks: parsed.subtasks } : {}),
+      ...(parsed.subtasks.length > 0 && subtasksEnabled
+        ? { subtasks: parsed.subtasks }
+        : {}),
     };
 
     keepAddTaskOpenRef.current = true;
@@ -1799,7 +1803,7 @@ export function TaskListPanel({
     const listRect = list.getBoundingClientRect();
     const hasChildBlock = dragState.blockIds.length > 1;
     const sourceParentId = dragState.sourceParentId;
-    const hierarchyIntent = hasChildBlock
+    const hierarchyIntent = !subtasksEnabled || hasChildBlock
       ? "root"
       : resolveHierarchyDragIntent(
           event.clientX,
@@ -2063,13 +2067,15 @@ export function TaskListPanel({
       const hierarchyIntentByTaskId = new Map([
         [dragState.sourceTaskId, dragState.hierarchyIntent],
       ]);
-      const parentUpdates = collectParentUpdates(
-        orderedTasks,
-        nextIds,
-        [dragState.sourceTaskId],
-        hierarchyIntentByTaskId,
-        tasksById,
-      );
+      const parentUpdates = subtasksEnabled
+        ? collectParentUpdates(
+            orderedTasks,
+            nextIds,
+            [dragState.sourceTaskId],
+            hierarchyIntentByTaskId,
+            tasksById,
+          )
+        : [];
       const parentChanged = parentUpdates.length > 0;
 
       if (orderChanged || parentChanged) {
@@ -2185,6 +2191,7 @@ export function TaskListPanel({
       const depth = task.depth ?? 0;
       const previousTask = index > 0 ? taskItems[index - 1] : null;
       const showSubtaskConnector =
+        subtasksEnabled &&
         depth === 1 &&
         previousTask &&
         (previousTask.depth ?? 0) === 0 &&
@@ -2272,7 +2279,12 @@ export function TaskListPanel({
           hasImportantActions={Boolean(onSetTaskImportant)}
           hasLabelActions={hasLabelActions}
           hasMoveActions={hasMoveActions}
-          hasSubtaskActions={Boolean(onAddSubtask) && !task.parentId && !task.isNote}
+          hasSubtaskActions={
+            subtasksEnabled &&
+            Boolean(onAddSubtask) &&
+            !task.parentId &&
+            !task.isNote
+          }
           hasDeleteActions={Boolean(onDeleteTask)}
           useWiderRowPadding={useWiderRowPadding}
         />
@@ -2361,6 +2373,7 @@ export function TaskListPanel({
               hasLabelActions={Boolean(onToggleTaskLabel)}
               hasMoveActions={Boolean(onMoveTaskToList) && lists.length > 1}
               hasSubtaskActions={
+                subtasksEnabled &&
                 Boolean(onAddSubtask) &&
                 !pointerMenuTask.parentId &&
                 !pointerMenuTask.isNote

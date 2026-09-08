@@ -243,6 +243,8 @@ export function CalendarMultiDayView({
   onTaskHasDetailsKnown,
   onTaskRenamed,
   onDueDateUpdated,
+  onRecurrenceUpdated,
+  onSaveTaskRecurrence,
   onAddCalendarTask,
   defaultListId = null,
   fullWidth = false,
@@ -688,14 +690,14 @@ export function CalendarMultiDayView({
                             : `${SELECTED_DAY_ROW_BORDER_CLASS} bg-white dark:bg-zinc-950`
                         }`}
                       >
-                        <div className="text-xs font-medium uppercase tracking-wide text-zinc-400">
+                        <div className="text-xs font-medium uppercase tracking-wide text-[#393939]">
                           {getCalendarWeekdayLabel(day)}
                         </div>
                         <div
                           className={`mt-px inline-flex size-7 items-center justify-center rounded-full text-sm ${
                             isToday
                               ? CALENDAR_TODAY_DATE_CIRCLE_CLASS
-                              : "font-medium text-zinc-700 dark:text-zinc-200"
+                              : "font-medium text-[#999999] dark:text-zinc-200"
                           }`}
                         >
                           {day.getDate()}
@@ -1127,6 +1129,8 @@ export function CalendarMultiDayView({
           onTaskHasDetailsKnown={onTaskHasDetailsKnown}
           onTaskRenamed={onTaskRenamed}
           onDueDateUpdated={onDueDateUpdated}
+          onRecurrenceUpdated={onRecurrenceUpdated}
+          onSaveTaskRecurrence={onSaveTaskRecurrence}
           onToggleTask={onToggleTask}
         />
       ) : null}

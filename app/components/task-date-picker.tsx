@@ -8,6 +8,7 @@ import {
   BiSun,
   BiTimeFive,
 } from "react-icons/bi";
+import { MdAlarm } from "react-icons/md";
 import { CalendarOff, Repeat } from "lucide-react";
 import {
   formatDueTimeLabel,
@@ -32,6 +33,11 @@ import {
   RECURRENCE_MENU_OPTIONS,
   type TaskRecurrenceRule,
 } from "@/lib/task-recurrence";
+import {
+  formatReminderLabel,
+  REMINDER_MENU_OPTIONS,
+  type TaskReminderOptionId,
+} from "@/lib/task-reminder";
 
 type TaskDueTimeSaveOptions = {
   keepOpen?: boolean;
@@ -49,12 +55,41 @@ type TaskDatePickerProps = {
     rule: TaskRecurrenceRule | null,
   ) => void | Promise<void>;
   onRecurrenceMenuOpenChange?: (open: boolean) => void;
+  onReminderMenuOpenChange?: (open: boolean) => void;
+  reminderOptionId?: TaskReminderOptionId | null;
+  onSaveReminder?: (optionId: TaskReminderOptionId) => void;
   className?: string;
 };
 
 const TASK_DATE_PICKER_WIDTH = 280;
+const TASK_DATE_PICKER_GAP = 4;
 
-export { TASK_DATE_PICKER_WIDTH };
+export { TASK_DATE_PICKER_WIDTH, TASK_DATE_PICKER_GAP };
+
+export function computeTaskDatePickerMenuPosition(
+  anchor: HTMLElement,
+  options?: { align?: "left" | "right" },
+) {
+  const rect = anchor.getBoundingClientRect();
+  const viewportPadding = 8;
+  let left =
+    options?.align === "right"
+      ? rect.right - TASK_DATE_PICKER_WIDTH
+      : rect.left;
+
+  left = Math.max(
+    viewportPadding,
+    Math.min(
+      left,
+      window.innerWidth - TASK_DATE_PICKER_WIDTH - viewportPadding,
+    ),
+  );
+
+  return {
+    top: rect.bottom + TASK_DATE_PICKER_GAP,
+    left,
+  };
+}
 
 /** Canvas Time Lens–aligned picker tokens (oklch approximations) */
 const PICKER_ACCENT = "#67676";
@@ -452,18 +487,205 @@ function MonthGrid({
   );
 }
 
+function TaskReminderMenu({
+  activeReminder,
+  disabled,
+  isOpen,
+  onSelectReminder,
+  onOpenChange,
+}: {
+  activeReminder: TaskReminderOptionId | null;
+  disabled?: boolean;
+  isOpen: boolean;
+  onSelectReminder: (optionId: TaskReminderOptionId) => void;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const menuRef = useRef<HTMLDivElement>(null);
+  const closeTimerRef = useRef<number | null>(null);
+  const triggerLabel = formatReminderLabel(activeReminder);
+  const hasActiveReminder = activeReminder !== null;
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current !== null) {
+        window.clearTimeout(closeTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    function handlePointerDown(event: MouseEvent) {
+      if (menuRef.current?.contains(event.target as Node)) return;
+      onOpenChange(false);
+    }
+
+    document.addEventListener("mousedown", handlePointerDown, true);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown, true);
+    };
+  }, [isOpen, onOpenChange]);
+
+  function openMenu() {
+    if (disabled || isOpen) return;
+    onOpenChange(true);
+  }
+
+  function closeMenu() {
+    if (!isOpen) return;
+    onOpenChange(false);
+  }
+
+  function scheduleCloseMenu() {
+    if (closeTimerRef.current !== null) {
+      window.clearTimeout(closeTimerRef.current);
+    }
+
+    closeTimerRef.current = window.setTimeout(() => {
+      closeTimerRef.current = null;
+      closeMenu();
+    }, 120);
+  }
+
+  function cancelScheduledClose() {
+    if (closeTimerRef.current !== null) {
+      window.clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+  }
+
+  function handleSelectOption(optionId: TaskReminderOptionId) {
+    if (activeReminder === optionId) {
+      closeMenu();
+      return;
+    }
+
+    onSelectReminder(optionId);
+    closeMenu();
+  }
+
+  return (
+    <div
+      ref={menuRef}
+      className="relative"
+      onMouseEnter={() => {
+        cancelScheduledClose();
+        openMenu();
+      }}
+      onMouseLeave={() => scheduleCloseMenu()}
+    >
+      <button
+        type="button"
+        disabled={disabled}
+        aria-label={
+          hasActiveReminder ? `Reminder: ${triggerLabel}` : "Reminder"
+        }
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        onPointerDown={(event) => {
+          event.stopPropagation();
+        }}
+        onClick={() => {
+          if (disabled) return;
+          if (isOpen) {
+            closeMenu();
+            return;
+          }
+          openMenu();
+        }}
+        className={`flex w-full items-center justify-between gap-2 rounded-full border pl-5 pr-3 py-2 text-[13px] font-medium transition-colors ${
+          disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+        }`}
+        style={{
+          borderColor: PICKER_BORDER,
+          color: PICKER_FOREGROUND,
+        }}
+      >
+        <span className="flex min-w-0 flex-1 items-center gap-4">
+          <MdAlarm
+            className="size-4 shrink-0"
+            style={{ color: PICKER_MUTED_FG }}
+            aria-hidden="true"
+          />
+          <span
+            className="truncate"
+            style={{
+              color: hasActiveReminder ? PICKER_ACCENT : "#6c6d6d",
+            }}
+          >
+            {triggerLabel}
+          </span>
+        </span>
+        <BiChevronDown
+          className={`size-4 shrink-0 transition-transform ${
+            isOpen ? "rotate-180" : ""
+          }`}
+          style={{ color: PICKER_MUTED_FG }}
+          aria-hidden="true"
+        />
+      </button>
+
+      {isOpen ? (
+        <div
+          className="absolute bottom-full left-0 right-0 z-40 pb-1"
+          onPointerDown={(event) => {
+            event.stopPropagation();
+          }}
+        >
+          <div
+            role="listbox"
+            aria-label="Reminder options"
+            className="overflow-hidden rounded-xl border bg-white p-1"
+            style={{
+              borderColor: PICKER_BORDER,
+              boxShadow: PICKER_POPOVER_SHADOW,
+            }}
+          >
+            {REMINDER_MENU_OPTIONS.map((option) => {
+              const isSelected = option.id === activeReminder;
+
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  role="option"
+                  aria-selected={isSelected}
+                  onPointerDown={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    handleSelectOption(option.id);
+                  }}
+                  className={`flex w-full rounded-lg px-3 py-2 text-left text-[13px] transition-colors cursor-pointer ${
+                    isSelected
+                      ? "bg-zinc-100 font-medium text-zinc-700"
+                      : "text-zinc-700 hover:bg-zinc-50"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function TaskRecurrenceMenu({
   activeRecurrence,
   disabled,
+  isOpen,
   onSaveRecurrence,
   onOpenChange,
 }: {
   activeRecurrence: TaskRecurrenceRule | null;
   disabled?: boolean;
+  isOpen: boolean;
   onSaveRecurrence: (rule: TaskRecurrenceRule | null) => void;
-  onOpenChange?: (open: boolean) => void;
+  onOpenChange: (open: boolean) => void;
 }) {
-  const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const menuSelectionId = getRecurrenceMenuSelectionId(activeRecurrence);
   const activeOptionId = menuSelectionId ?? "none";
@@ -478,8 +700,7 @@ function TaskRecurrenceMenu({
 
     function handlePointerDown(event: MouseEvent) {
       if (menuRef.current?.contains(event.target as Node)) return;
-      setIsOpen(false);
-      onOpenChange?.(false);
+      onOpenChange(false);
     }
 
     document.addEventListener("mousedown", handlePointerDown, true);
@@ -488,9 +709,14 @@ function TaskRecurrenceMenu({
     };
   }, [isOpen, onOpenChange]);
 
+  function openMenu() {
+    if (disabled || isOpen) return;
+    onOpenChange(true);
+  }
+
   function closeMenu() {
-    setIsOpen(false);
-    onOpenChange?.(false);
+    if (!isOpen) return;
+    onOpenChange(false);
   }
 
   function handleSelectOption(optionId: string) {
@@ -518,7 +744,12 @@ function TaskRecurrenceMenu({
   }
 
   return (
-    <div ref={menuRef} className="relative">
+    <div
+      ref={menuRef}
+      className="relative"
+      onMouseEnter={() => openMenu()}
+      onMouseLeave={() => closeMenu()}
+    >
       <button
         type="button"
         disabled={disabled}
@@ -530,9 +761,11 @@ function TaskRecurrenceMenu({
         }}
         onClick={() => {
           if (disabled) return;
-          const nextOpen = !isOpen;
-          setIsOpen(nextOpen);
-          onOpenChange?.(nextOpen);
+          if (isOpen) {
+            closeMenu();
+            return;
+          }
+          openMenu();
         }}
         className={`flex w-full items-center justify-between gap-2 rounded-full border pl-5 pr-3 py-2 text-[13px] font-medium transition-colors ${
           disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"
@@ -562,17 +795,20 @@ function TaskRecurrenceMenu({
 
       {isOpen ? (
         <div
-          role="listbox"
-          aria-label="Repeat options"
-          className="absolute bottom-full left-0 right-0 z-40 mb-1 overflow-hidden rounded-xl border bg-white p-1"
+          className="absolute bottom-full left-0 right-0 z-40 pb-1"
           onPointerDown={(event) => {
             event.stopPropagation();
           }}
-          style={{
-            borderColor: PICKER_BORDER,
-            boxShadow: PICKER_POPOVER_SHADOW,
-          }}
         >
+          <div
+            role="listbox"
+            aria-label="Repeat options"
+            className="overflow-hidden rounded-xl border bg-white p-1"
+            style={{
+              borderColor: PICKER_BORDER,
+              boxShadow: PICKER_POPOVER_SHADOW,
+            }}
+          >
           {RECURRENCE_MENU_OPTIONS.map((option) => {
             const isSelected = option.id === activeOptionId;
 
@@ -593,6 +829,7 @@ function TaskRecurrenceMenu({
               </button>
             );
           })}
+          </div>
         </div>
       ) : null}
     </div>
@@ -1066,6 +1303,9 @@ export function TaskDatePicker({
   onSaveDueTime,
   onSaveRecurrence,
   onRecurrenceMenuOpenChange,
+  onReminderMenuOpenChange,
+  reminderOptionId = null,
+  onSaveReminder,
   className,
 }: TaskDatePickerProps) {
   const today = useMemo(() => startOfDay(new Date()), []);
@@ -1082,6 +1322,11 @@ export function TaskDatePicker({
   const activeFormat = getDateFormatConfig(dateInputFormat);
   const [viewMonth, setViewMonth] = useState(todayMonth);
   const [isTimeMenuOpen, setIsTimeMenuOpen] = useState(false);
+  const [displayReminder, setDisplayReminder] =
+    useState<TaskReminderOptionId | null>(reminderOptionId);
+  const [openFooterSubmenu, setOpenFooterSubmenu] = useState<
+    "reminder" | "recurrence" | null
+  >(null);
   const activeRecurrence = parseRecurrenceRule(recurrenceRule);
   const [displayRecurrence, setDisplayRecurrence] =
     useState<TaskRecurrenceRule | null>(activeRecurrence);
@@ -1120,6 +1365,34 @@ export function TaskDatePicker({
   useEffect(() => {
     setDisplayRecurrence(activeRecurrence);
   }, [recurrenceRule]);
+
+  useEffect(() => {
+    setDisplayReminder(reminderOptionId);
+  }, [reminderOptionId]);
+
+  function handleReminderMenuOpenChange(open: boolean) {
+    if (open) {
+      setIsTimeMenuOpen(false);
+      setOpenFooterSubmenu("reminder");
+    } else {
+      setOpenFooterSubmenu((current) =>
+        current === "reminder" ? null : current,
+      );
+    }
+    onReminderMenuOpenChange?.(open);
+  }
+
+  function handleRecurrenceMenuOpenChange(open: boolean) {
+    if (open) {
+      setIsTimeMenuOpen(false);
+      setOpenFooterSubmenu("recurrence");
+    } else {
+      setOpenFooterSubmenu((current) =>
+        current === "recurrence" ? null : current,
+      );
+    }
+    onRecurrenceMenuOpenChange?.(open);
+  }
 
   const tomorrow = addDays(today, 1);
   const nextMonth = useMemo(
@@ -1361,11 +1634,10 @@ export function TaskDatePicker({
           <button
             type="button"
             onClick={() => setIsTimeMenuOpen((open) => !open)}
-            className="flex w-full items-center justify-center gap-2 rounded-full border py-2 text-[13px] border-[#dedede] text-zinc-600 font-medium transition-colors cursor-pointer"
+            className="flex w-full items-center justify-center gap-2 rounded-full border bg-white py-2 text-[13px] border-[#dedede] text-zinc-600 font-medium transition-colors cursor-pointer"
             style={
               isTimeMenuOpen || dueTimeMinutes !== null
                 ? {
-                    backgroundColor: PICKER_ACCENT_SOFT,
                     color: PICKER_ACCENT,
                   }
                 : {
@@ -1397,13 +1669,21 @@ export function TaskDatePicker({
             />
           ) : null}
         </div>
+        <TaskReminderMenu
+          activeReminder={displayReminder}
+          isOpen={openFooterSubmenu === "reminder"}
+          onOpenChange={handleReminderMenuOpenChange}
+          onSelectReminder={(optionId) => {
+            setIsTimeMenuOpen(false);
+            setDisplayReminder(optionId);
+            onSaveReminder?.(optionId);
+          }}
+        />
         <TaskRecurrenceMenu
           activeRecurrence={displayRecurrence}
           disabled={!onSaveRecurrence}
-          onOpenChange={(open) => {
-            if (open) setIsTimeMenuOpen(false);
-            onRecurrenceMenuOpenChange?.(open);
-          }}
+          isOpen={openFooterSubmenu === "recurrence"}
+          onOpenChange={handleRecurrenceMenuOpenChange}
           onSaveRecurrence={(rule) => {
             setIsTimeMenuOpen(false);
             const previousRecurrence = displayRecurrence;

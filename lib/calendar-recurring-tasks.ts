@@ -52,6 +52,12 @@ export function getCalendarRangeFromDays(days: Date[]): CalendarDateRange | null
   };
 }
 
+export function filterCalendarDisplayTasks(
+  tasks: TaskListItem[],
+): TaskListItem[] {
+  return tasks.filter((task) => !task.completed && task.dueDate);
+}
+
 export function expandTaskForCalendarRange(
   task: TaskListItem,
   range: CalendarDateRange,
