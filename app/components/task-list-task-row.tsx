@@ -341,6 +341,8 @@ export function TaskListTaskRow({
   const checkedTextStyle = hideDueDate
     ? "text-zinc-400 dark:text-zinc-500"
     : "text-zinc-700 dark:text-zinc-50";
+  const taskTitleTextClass =
+    depth > 0 ? "text-[14px] leading-[18px]" : "text-[15px] leading-[20px]";
   const completionAnimationMs = getCompletionAnimationMs(
     TASK_COMPLETE_ANIMATION_MS,
     useFastCompletionAnimation,
@@ -564,7 +566,13 @@ export function TaskListTaskRow({
           } ${checkedContentDim}`}
           style={{ transition: dimTransition }}
         >
-          <InteractIcon className="size-3.5 text-[#c3c6cc] group-hover:text-[#6f7174]" />
+          <InteractIcon
+            className={`size-3.5 ${
+              depth > 0
+                ? "text-[#dadce0] group-hover:text-[#919396]"
+                : "text-[#c3c6cc] group-hover:text-[#6f7174]"
+            }`}
+          />
         </span>
       ) : null}
 
@@ -628,12 +636,12 @@ export function TaskListTaskRow({
             onClick={(event) => event.stopPropagation()}
             onBlur={() => onCommitTitleEdit(task)}
             onKeyDown={(event) => onTitleKeyDown(event, task)}
-            className="min-w-0 w-full border-0 bg-transparent p-0 text-left text-[15px] leading-[20px] text-zinc-600 outline-none dark:text-zinc-50"
+            className={`min-w-0 w-full border-0 bg-transparent p-0 text-left ${taskTitleTextClass} text-zinc-600 outline-none dark:text-zinc-50`}
           />
         ) : (
           <span
             data-task-truncate-measure
-            className={`min-w-0 truncate text-left text-[15px] leading-[20px] transition-colors ${checkedTextStyle}`}
+            className={`min-w-0 truncate text-left ${taskTitleTextClass} transition-colors ${checkedTextStyle}`}
             style={{ transitionDuration: `${CHECKED_ROW_DIM_MS}ms` }}
           >
             {task.name}

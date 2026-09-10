@@ -7,6 +7,7 @@ import {
   convertNoteToTask as convertNoteToTaskInDb,
   createTask,
   createSubtask,
+  createLabel as createLabelInDb,
   createTodoList,
   deleteTask as deleteTaskInDb,
   deleteLabel as deleteLabelInDb,
@@ -1141,21 +1142,13 @@ export function TodoApp({
     return counts;
   }, [lists, tasksByList]);
 
-  const visibleLabels = useMemo(() => {
-    const labelIdsWithTasks = new Set<string>();
-
-    for (const list of lists) {
-      for (const task of tasksByList[list.id] ?? []) {
-        if (task.completed) continue;
-
-        for (const label of task.labels) {
-          labelIdsWithTasks.add(label.id);
-        }
-      }
-    }
-
-    return labels.filter((label) => labelIdsWithTasks.has(label.id));
-  }, [labels, lists, tasksByList]);
+  const sidebarLabels = useMemo(
+    () =>
+      [...labels].sort((a, b) =>
+        a.label.localeCompare(b.label, undefined, { sensitivity: "base" }),
+      ),
+    [labels],
+  );
 
   const clearUndoTimer = useCallback(() => {
     if (undoTimerRef.current !== null) {
@@ -2050,6 +2043,15 @@ export function TodoApp({
       label: label.label,
       color: label.color,
     }));
+  }
+
+  async function addLabel(name: string, color: string) {
+    const label = await createLabelInDb(name, color);
+    setLabels((current) =>
+      [...current, label].sort((a, b) =>
+        a.label.localeCompare(b.label, undefined, { sensitivity: "base" }),
+      ),
+    );
   }
 
   async function removeLabel(labelId: string) {
@@ -3265,7 +3267,7 @@ export function TodoApp({
       <div className="flex h-dvh overflow-hidden">
         <Sidebar
           lists={lists}
-          labels={visibleLabels}
+          labels={sidebarLabels}
           taskCountByListId={taskCountByListId}
           taskCountByLabelId={taskCountByLabelId}
           completedTasks={completedTasks}
@@ -3293,6 +3295,7 @@ export function TodoApp({
           onSelectSearchTask={selectSearchTask}
           onToggleTask={toggleTask}
           onAddList={addList}
+          onAddLabel={addLabel}
           onRenameList={renameList}
           onRemoveList={removeList}
           onRenameLabel={renameLabel}

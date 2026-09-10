@@ -14,7 +14,7 @@ import { createPortal } from "react-dom";
 import { BiChevronDown, BiSortAlt2 } from "react-icons/bi";
 import { IoPricetagsOutline } from "react-icons/io5";
 import { LuCalendarCheck2, LuCheck, LuMenu, LuX } from "react-icons/lu";
-import { PiArrowBendDownRight } from "react-icons/pi";
+import { MdOutlineKeyboardDoubleArrowRight } from "react-icons/md";
 import { createLabel, getLabels } from "@/app/actions/todo";
 import { TaskDatePicker } from "./task-date-picker";
 import { TaskSetDateIcon } from "./task-set-date-icon";
@@ -2186,16 +2186,30 @@ export function TaskListPanel({
     const hasLabelActions = Boolean(onToggleTaskLabel);
     const hasMoveActions = Boolean(onMoveTaskToList) && lists.length > 1;
     const useWiderRowPadding = title === "Today" || title === "Important";
+    const subtaskCountByParentId = new Map<string, number>();
+
+    for (const item of taskItems) {
+      if (!item.parentId) continue;
+      subtaskCountByParentId.set(
+        item.parentId,
+        (subtaskCountByParentId.get(item.parentId) ?? 0) + 1,
+      );
+    }
 
     return taskItems.flatMap((task, index) => {
       const depth = task.depth ?? 0;
       const previousTask = index > 0 ? taskItems[index - 1] : null;
+      const parentSubtaskCount =
+        previousTask && task.parentId === previousTask.id
+          ? (subtaskCountByParentId.get(previousTask.id) ?? 0)
+          : 0;
       const showSubtaskConnector =
         subtasksEnabled &&
         depth === 1 &&
         previousTask &&
         (previousTask.depth ?? 0) === 0 &&
-        task.parentId === previousTask.id;
+        task.parentId === previousTask.id &&
+        parentSubtaskCount >= 2;
 
       const row = (
         <TaskListTaskRow
@@ -2298,12 +2312,12 @@ export function TaskListPanel({
         <li
           key={`${task.id}-subtask-connector`}
           aria-hidden="true"
-          className="task-list-item-divider flex h-4 items-center py-0 pr-2"
+          className="task-list-item-divider flex h-[15px] items-center py-0 pr-2"
           style={{
             paddingLeft: SUBTASK_ROOT_LEFT_PX + SUBTASK_INDENT_PX + SUBTASK_ICON_INDENT_PX,
           }}
         >
-          <PiArrowBendDownRight className="size-3.5 text-zinc-400 dark:text-zinc-500" />
+          <MdOutlineKeyboardDoubleArrowRight className="size-3 text-zinc-350 dark:text-zinc-500" />
         </li>,
         row,
       ];

@@ -161,7 +161,7 @@ export function SlashCommandBlockPreview({
   return (
     <div
       aria-hidden="true"
-      className="w-[196px] shrink-0 overflow-hidden rounded-[14px] border-2 border-zinc-800 bg-zinc-900 p-1.5 shadow-[0_10px_28px_rgba(0,0,0,0.22)] dark:border-zinc-600"
+      className="w-[196px] shrink-0 overflow-hidden rounded-[14px] border-1 border-slate-800 bg-slate-700 p-1.5 shadow-[0_10px_28px_rgba(0,0,0,0.22)] dark:border-zinc-600"
     >
       <div className="rounded-[10px] bg-white px-3 py-2.5 dark:bg-zinc-950">
         <div

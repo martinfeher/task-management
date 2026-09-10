@@ -9,7 +9,7 @@ export type VisibleTask<T extends TaskWithParent> = T & {
 
 export const SUBTASK_NEST_THRESHOLD_PX = 20;
 export const SUBTASK_INDENT_PX = 26;
-export const SUBTASK_ICON_INDENT_PX = 10;
+export const SUBTASK_ICON_INDENT_PX = 3;
 export const SUBTASK_ROOT_LEFT_PX = 8;
 export const SUBTASK_UNNEST_THRESHOLD_PX = 20;
 

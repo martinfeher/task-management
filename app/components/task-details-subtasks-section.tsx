@@ -20,6 +20,65 @@ type TaskDetailsSubtasksSectionProps = {
   onRenameSubtask: (subtaskId: string, name: string) => void;
 };
 
+const SUBTASKS_EXPANDED_SESSION_KEY = "todolist.subtasks-expanded-by-task";
+
+function readSubtasksExpandedByTask() {
+  if (typeof window === "undefined") return {} as Record<string, boolean>;
+
+  try {
+    const raw = window.sessionStorage.getItem(SUBTASKS_EXPANDED_SESSION_KEY);
+    if (!raw) return {};
+
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null) return {};
+
+    return Object.fromEntries(
+      Object.entries(parsed).filter(
+        (entry): entry is [string, boolean] => typeof entry[1] === "boolean",
+      ),
+    );
+  } catch {
+    return {};
+  }
+}
+
+function getSavedSubtasksExpanded(taskId: string) {
+  return readSubtasksExpandedByTask()[taskId];
+}
+
+function saveSubtasksExpanded(taskId: string, expanded: boolean) {
+  if (typeof window === "undefined") return;
+
+  const next = {
+    ...readSubtasksExpandedByTask(),
+    [taskId]: expanded,
+  };
+  window.sessionStorage.setItem(
+    SUBTASKS_EXPANDED_SESSION_KEY,
+    JSON.stringify(next),
+  );
+}
+
+function clearSubtasksExpanded(taskId: string) {
+  if (typeof window === "undefined") return;
+
+  const current = readSubtasksExpandedByTask();
+  if (!(taskId in current)) return;
+
+  const next = { ...current };
+  delete next[taskId];
+  window.sessionStorage.setItem(
+    SUBTASKS_EXPANDED_SESSION_KEY,
+    JSON.stringify(next),
+  );
+}
+
+function resolveSubtasksExpandedState(taskId: string, subtaskCount: number) {
+  const saved = getSavedSubtasksExpanded(taskId);
+  if (saved !== undefined) return saved;
+  return subtaskCount > 0;
+}
+
 export function TaskDetailsSubtasksSection({
   taskId,
   subtasks,
@@ -27,13 +86,44 @@ export function TaskDetailsSubtasksSection({
   onToggleSubtask,
   onRenameSubtask,
 }: TaskDetailsSubtasksSectionProps) {
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(() =>
+    resolveSubtasksExpandedState(taskId, subtasks.length),
+  );
   const [editingSubtaskId, setEditingSubtaskId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
   const [isAdding, setIsAdding] = useState(false);
   const editInputRef = useRef<HTMLInputElement>(null);
+  const previousSubtaskCountRef = useRef(subtasks.length);
 
   const completedCount = subtasks.filter((subtask) => subtask.completed).length;
+
+  useEffect(() => {
+    previousSubtaskCountRef.current = subtasks.length;
+    setIsExpanded(resolveSubtasksExpandedState(taskId, subtasks.length));
+  }, [taskId]);
+
+  useEffect(() => {
+    previousSubtaskCountRef.current = subtasks.length;
+
+    if (subtasks.length === 0) {
+      setIsExpanded(false);
+      clearSubtasksExpanded(taskId);
+      return;
+    }
+
+    if (getSavedSubtasksExpanded(taskId) !== undefined) return;
+
+    setIsExpanded(true);
+    saveSubtasksExpanded(taskId, true);
+  }, [subtasks.length, taskId]);
+
+  function handleToggleExpanded() {
+    setIsExpanded((current) => {
+      const next = !current;
+      saveSubtasksExpanded(taskId, next);
+      return next;
+    });
+  }
 
   useEffect(() => {
     if (!editingSubtaskId) return;
@@ -72,6 +162,7 @@ export function TaskDetailsSubtasksSection({
       if (!created) return;
 
       setIsExpanded(true);
+      saveSubtasksExpanded(taskId, true);
       setEditingSubtaskId(created.id);
       setEditingName(created.name);
     } finally {
@@ -80,11 +171,11 @@ export function TaskDetailsSubtasksSection({
   }
 
   return (
-    <section className="mt-4 shrink-0 border-t border-zinc-200 pl-[30px] pr-3 pt-4 dark:border-zinc-700">
+    <section className="mt-4 shrink-0 border-t border-zinc-200 pl-[15px] pr-3 pt-3 dark:border-zinc-700">
       <button
         type="button"
         className="flex w-full items-center gap-1.5 text-left"
-        onClick={() => setIsExpanded((current) => !current)}
+        onClick={handleToggleExpanded}
         aria-expanded={isExpanded}
       >
         {isExpanded ? (
@@ -92,10 +183,10 @@ export function TaskDetailsSubtasksSection({
         ) : (
           <BiChevronRight className="size-4 shrink-0 text-zinc-400" aria-hidden />
         )}
-        <span className="text-[15px] font-semibold text-zinc-500 dark:text-zinc-50">
+        <span className="text-[14px] font-semibold text-zinc-500 dark:text-zinc-50">
           Sub-tasks
         </span>
-        <span className="text-[15px] text-zinc-400 dark:text-zinc-500">
+        <span className="text-[11.5px] text-zinc-400 dark:text-zinc-500">
           {completedCount}/{subtasks.length}
         </span>
       </button>
@@ -107,7 +198,7 @@ export function TaskDetailsSubtasksSection({
               key={subtask.id}
               className="border-b border-zinc-200 dark:border-zinc-700"
             >
-              <div className="flex items-center gap-2.5 py-2.5">
+              <div className="flex items-center gap-2.5 py-2.5 ml-1">
                 <TaskCompletionCheckbox
                   checked={subtask.completed}
                   onChange={() => onToggleSubtask(subtask.id)}
@@ -146,10 +237,10 @@ export function TaskDetailsSubtasksSection({
                       setEditingSubtaskId(subtask.id);
                       setEditingName(subtask.name);
                     }}
-                    className={`min-w-0 flex-1 truncate text-left text-[15px] ${
+                    className={`min-w-0 flex-1 truncate text-left text-[14px] ${
                       subtask.completed
                         ? "text-zinc-400 line-through dark:text-zinc-500"
-                        : "text-zinc-900 dark:text-zinc-50"
+                        : "text-zinc-700 dark:text-zinc-50"
                     }`}
                   >
                     {subtask.name}
@@ -159,17 +250,19 @@ export function TaskDetailsSubtasksSection({
             </div>
           ))}
 
-          <button
-            type="button"
-            disabled={isAdding}
-            onClick={() => void handleAddSubtask()}
-            className="flex w-full items-center gap-2 py-2.5 text-left text-[15px] text-zinc-500 transition-colors hover:text-zinc-700 disabled:cursor-not-allowed disabled:opacity-60 dark:text-zinc-400 dark:hover:text-zinc-200"
-          >
-            <span className="text-[18px] leading-none text-[#e55353]" aria-hidden>
-              +
-            </span>
-            Add sub-task
+          <div className="flex items-center">
+            <button
+              type="button"
+              disabled={isAdding}
+              onClick={() => void handleAddSubtask()}
+              className="ml-[20px] flex w-full items-center gap-2 py-2 text-left text-[13px] text-zinc-400 transition-colors hover:text-zinc-700 disabled:cursor-not-allowed disabled:opacity-60 dark:text-zinc-400 dark:hover:text-zinc-200"
+            >
+              <div className="text-[16px] leading-none text-zinc-400" aria-hidden>
+                +
+              </div>
+              Add sub-task
           </button>
+          </div>
         </div>
       ) : null}
     </section>

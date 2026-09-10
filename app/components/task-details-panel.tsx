@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { BiLink, BiLeftArrowAlt, BiRedo, BiUndo } from "react-icons/bi";
-import { LuCheck, LuCode, LuHeading1, LuHeading2, LuHeading3, LuHistory, LuPilcrow, LuRemoveFormatting } from "react-icons/lu";
+import { CgFormatText } from "react-icons/cg";
+import { LuCheck, LuCode, LuHeading1, LuHeading2, LuHeading3, LuHistory, LuPilcrow, LuRemoveFormatting, LuX } from "react-icons/lu";
 import { renameTask, updateTaskDueDate, updateTaskDueTime, updateTaskRecurrence } from "@/app/actions/todo";
 import type { TaskRecurrenceRule } from "@/lib/task-recurrence";
 import { serializeRecurrenceRule } from "@/lib/task-recurrence";
@@ -244,6 +245,7 @@ type TaskDetailsPanelProps = {
   onBack?: () => void;
   layout?: "default" | "modal";
   modalFooterConfig?: TaskModalFooterConfig | null;
+  onClose?: () => void;
 };
 
 type SaveStatus = "idle" | "loading" | "pending" | "saved" | "error";
@@ -1660,6 +1662,7 @@ export function TaskDetailsPanel({
   onBack,
   layout = "default",
   modalFooterConfig = null,
+  onClose,
 }: TaskDetailsPanelProps) {
   const isModalLayout = layout === "modal";
   const [task, setTask] = useState<TaskDetails | null>(null);
@@ -1690,6 +1693,9 @@ export function TaskDetailsPanel({
   const [openFormatDropdown, setOpenFormatDropdown] =
     useState<FormatToolbarDropdown | null>(null);
   const [openHeaderFormatDropdown, setOpenHeaderFormatDropdown] =
+    useState<HeaderFormatDropdown | null>(null);
+  const [isModalFormatToolbarOpen, setIsModalFormatToolbarOpen] = useState(false);
+  const [openModalFormatDropdown, setOpenModalFormatDropdown] =
     useState<HeaderFormatDropdown | null>(null);
   const [formatMenuFontSize, setFormatMenuFontSize] =
     useState<DetailFontSizeOption>(DEFAULT_DETAIL_FONT_SIZE_PX);
@@ -2918,6 +2924,30 @@ export function TaskDetailsPanel({
     [syncFormatMenuFontState],
   );
 
+  const setModalFormatDropdownOpen = useCallback(
+    (dropdown: HeaderFormatDropdown, open: boolean) => {
+      if (open) {
+        syncFormatMenuFontState();
+        setOpenFormatDropdown(null);
+      }
+      setOpenModalFormatDropdown(open ? dropdown : null);
+    },
+    [syncFormatMenuFontState],
+  );
+
+  const handleModalFormatToggle = useCallback(() => {
+    setIsModalFormatToolbarOpen((current) => {
+      const next = !current;
+      if (next) {
+        syncFormatMenuFontState();
+        syncFormatMenuSelectionState();
+      } else {
+        setOpenModalFormatDropdown(null);
+      }
+      return next;
+    });
+  }, [syncFormatMenuFontState, syncFormatMenuSelectionState]);
+
   const handleDetailFontApplied = useCallback(() => {
     const editor = editorRef.current;
     if (editor) {
@@ -3414,6 +3444,17 @@ export function TaskDetailsPanel({
       closeFormatMenu();
     },
     [closeFormatMenu, recordHistorySnapshot, scheduleAutoSave, syncEditorContent],
+  );
+
+  const handleModalInlineFormatApply = useCallback(
+    (command: "bold" | "italic" | "underline") => {
+      captureFormatSelectionFromEditor();
+      applyFormat(command);
+      requestAnimationFrame(() => {
+        syncFormatMenuSelectionState();
+      });
+    },
+    [applyFormat, captureFormatSelectionFromEditor, syncFormatMenuSelectionState],
   );
 
   const clearFormatting = useCallback(() => {
@@ -5132,16 +5173,6 @@ export function TaskDetailsPanel({
     clickedLineRef.current = line;
     pendingClickLineRef.current = line;
 
-    if (
-      isBodyPlaceholderLine(line) &&
-      !isMultiClick &&
-      !event.shiftKey &&
-      !editorHasLiveExtendedTextSelection(editor)
-    ) {
-      event.preventDefault();
-      focusDetailLine(editor, line);
-    }
-
     updateLineControls();
     requestAnimationFrame(() => {
       updateLineControls();
@@ -5442,7 +5473,8 @@ export function TaskDetailsPanel({
       editor &&
       pendingLine &&
       !isTitleLine(editor, pendingLine) &&
-      shouldPlaceCaretAtLineStart(pendingLine)
+      shouldPlaceCaretAtLineStart(pendingLine) &&
+      !editorHasLiveExtendedTextSelection(editor)
     ) {
       scheduleCaretAtLineStart(editor, pendingLine);
     }
@@ -5779,6 +5811,156 @@ export function TaskDetailsPanel({
 
   const dueDateLabel = task ? formatDueDateLabel(task.dueDate) : null;
   const dueTimeLabel = task ? formatDueTimeLabel(task.dueTimeMinutes) : null;
+  const showModalMarkComplete =
+    isModalLayout &&
+    Boolean(onToggleTask && task && !task.completed && !task.isNote);
+  const showModalFormatToggle =
+    isModalLayout && Boolean(task && !task.isNote);
+
+  function renderModalHeaderActions() {
+    if (!isModalLayout || !task) return null;
+
+    return (
+      <div className="absolute right-2 top-2 z-20 flex items-center gap-2">
+        {showModalMarkComplete ? (
+          <button
+            type="button"
+            onClick={() => onToggleTask?.(task.id)}
+            className="flex cursor-pointer items-center gap-1.5 rounded-full border border-[#e6e9ec] bg-white py-[5px] pl-2 pr-[9px] text-[12px] font-normal text-[#454545] transition-colors hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+          >
+            <LuCheck className="size-3.5 shrink-0" aria-hidden="true" />
+            Mark complete
+          </button>
+        ) : null}
+
+        {showModalFormatToggle ? (
+          <>
+            <button
+              type="button"
+              aria-label={
+                isModalFormatToolbarOpen
+                  ? "Hide formatting options"
+                  : "Show formatting options"
+              }
+              aria-expanded={isModalFormatToolbarOpen}
+              aria-pressed={isModalFormatToolbarOpen}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={handleModalFormatToggle}
+              className={`flex size-8 cursor-pointer items-center justify-center rounded-full transition-colors ${
+                isModalFormatToolbarOpen
+                  ? "bg-zinc-200 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100"
+                  : "text-zinc-500 hover:bg-zinc-200/80 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+              }`}
+            >
+              <CgFormatText className="size-[18px]" aria-hidden="true" />
+            </button>
+
+            {isModalFormatToolbarOpen ? (
+              <div
+                className="flex items-center gap-0.5 rounded-full bg-[#eceef0] px-1 py-0.5 dark:bg-zinc-800"
+                onMouseDown={(event) => {
+                  if (event.button !== 0) return;
+
+                  const editor = editorRef.current;
+                  if (!editor) return;
+
+                  const selection = window.getSelection();
+                  if (
+                    selection?.rangeCount &&
+                    !selection.isCollapsed &&
+                    selection.anchorNode &&
+                    editor.contains(selection.anchorNode)
+                  ) {
+                    rememberFormatSelection(editor, selection.getRangeAt(0));
+                  } else {
+                    captureFormatSelectionFromEditor();
+                  }
+                }}
+              >
+                <button
+                  type="button"
+                  aria-label="Bold"
+                  aria-pressed={formatMenuInlineFormats.bold}
+                  className={`flex size-8 cursor-pointer items-center justify-center rounded-full text-[15px] font-bold transition-colors ${
+                    formatMenuInlineFormats.bold
+                      ? "bg-[#c3eaff] text-[#2563eb] dark:text-blue-300"
+                      : "text-zinc-600 hover:bg-zinc-200 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                  }`}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => handleModalInlineFormatApply("bold")}
+                >
+                  B
+                </button>
+                <button
+                  type="button"
+                  aria-label="Italic"
+                  aria-pressed={formatMenuInlineFormats.italic}
+                  className={`flex size-8 cursor-pointer items-center justify-center rounded-full text-[15px] italic transition-colors ${
+                    formatMenuInlineFormats.italic
+                      ? "bg-[#c3eaff] text-[#2563eb] dark:text-blue-300"
+                      : "text-zinc-600 hover:bg-zinc-200 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                  }`}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => handleModalInlineFormatApply("italic")}
+                >
+                  I
+                </button>
+                <button
+                  type="button"
+                  aria-label="Underline"
+                  aria-pressed={formatMenuInlineFormats.underline}
+                  className={`flex size-8 cursor-pointer items-center justify-center rounded-full text-[15px] underline transition-colors ${
+                    formatMenuInlineFormats.underline
+                      ? "bg-[#c3eaff] text-[#2563eb] dark:text-blue-300"
+                      : "text-zinc-600 hover:bg-zinc-200 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                  }`}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => handleModalInlineFormatApply("underline")}
+                >
+                  U
+                </button>
+
+                <span
+                  className="mx-0.5 h-5 w-px shrink-0 bg-zinc-300 dark:bg-zinc-600"
+                  aria-hidden="true"
+                />
+
+                <DetailFontFamilyControl
+                  formatToolbar
+                  value={formatMenuFontFamily}
+                  open={openModalFormatDropdown === "family"}
+                  onOpenChange={(open) =>
+                    setModalFormatDropdownOpen("family", open)
+                  }
+                  onSelect={applyFormatFontFamily}
+                />
+                <DetailFontSizeControl
+                  formatToolbar
+                  value={formatMenuFontSize}
+                  open={openModalFormatDropdown === "size"}
+                  onOpenChange={(open) =>
+                    setModalFormatDropdownOpen("size", open)
+                  }
+                  onSelect={applyFormatFontSize}
+                />
+              </div>
+            ) : null}
+          </>
+        ) : null}
+
+        {onClose ? (
+          <button
+            type="button"
+            aria-label="Close task editor"
+            onClick={() => void onClose()}
+            className="flex size-8 cursor-pointer items-center justify-center rounded-full text-zinc-500 transition-colors hover:bg-zinc-200/80 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+          >
+            <LuX className="size-4" aria-hidden="true" />
+          </button>
+        ) : null}
+      </div>
+    );
+  }
 
   function renderTaskDatePickerMenu() {
     if (!task || !isDateMenuOpen) return null;
@@ -5857,9 +6039,14 @@ export function TaskDetailsPanel({
       }`}
       aria-busy={saveStatus === "loading" ? true : undefined}
     >
+      {renderModalHeaderActions()}
       <div
         className={`relative flex items-center justify-between overflow-visible px-4 pt-1 pb-1 ${
-          isModalLayout ? "pr-48" : ""
+          isModalLayout
+            ? isModalFormatToolbarOpen
+              ? "pr-[22rem]"
+              : "pr-48"
+            : ""
         }`}
       >
         <div className="flex items-center gap-3">
@@ -6196,7 +6383,7 @@ export function TaskDetailsPanel({
               className={`task-details-editor w-full overflow-auto rounded-xl bg-white py-[2px] pl-[30px] pr-3 text-[17px] text-[#555555] outline-none transition-colors dark:bg-zinc-950 dark:text-zinc-300 [&_.detail-line[data-line-type=bullet]]:pl-1 [&_.detail-line[data-line-type=checklist]]:cursor-pointer [&_.detail-line[data-line-type=checklist]]:pl-1 [&_.detail-line[data-line-type=h1]]:text-[26px] [&_.detail-line[data-line-type=h1]]:font-bold [&_.detail-line[data-line-type=h1]]:leading-[36px] [&_.detail-line[data-line-type=h1]]:text-[#4B4B4B] dark:[&_.detail-line[data-line-type=h1]]:text-[#F5F5F5] [&_.detail-line[data-line-type=h2]]:text-[23px] [&_.detail-line[data-line-type=h2]]:font-semibold [&_.detail-line[data-line-type=h2]]:leading-[30px] [&_.detail-line[data-line-type=h3]]:text-[19px] [&_.detail-line[data-line-type=h3]]:font-semibold [&_.detail-line[data-line-type=h3]]:leading-[26px] [&_.detail-line[data-line-type=numbered]]:pl-1 [&_mark]:bg-yellow-200 dark:[&_mark]:bg-yellow-300/30 [&_s]:line-through [&_strike]:line-through [&_u]:underline ${
                 isModalLayout
                   ? "min-h-0 flex-1 resize-none"
-                  : "min-h-[700px] resize-y"
+                  : "min-h-[380px] resize-y"
               }`}
             />
 

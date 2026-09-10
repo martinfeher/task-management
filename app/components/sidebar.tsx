@@ -2,10 +2,11 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
-import { BiCheckboxChecked } from "react-icons/bi";
+import { BiCheckboxChecked, BiChevronDown } from "react-icons/bi";
 import { IoIosSearch } from "react-icons/io";
 import {
   getLabelColor,
+  LABEL_PRESET_COLORS,
 } from "@/lib/label-colors";
 import { getInboxListId } from "@/lib/inbox-list";
 import { FiSettings } from "react-icons/fi";
@@ -93,6 +94,7 @@ type SidebarProps = {
   onSelectSearchTask: (taskId: string, listId: string) => void;
   onToggleTask: (taskId: string) => void;
   onAddList: (name: string) => void;
+  onAddLabel: (name: string, color: string) => void;
   onRenameList: (listId: string, name: string) => void;
   onRemoveList: (listId: string) => void;
   onRenameLabel: (labelId: string, name: string) => void;
@@ -167,6 +169,7 @@ export function Sidebar({
   onSelectSearchTask,
   onToggleTask,
   onAddList,
+  onAddLabel,
   onRenameList,
   onRemoveList,
   onRenameLabel,
@@ -195,6 +198,8 @@ export function Sidebar({
     number | null
   >(null);
   const [isCompletedOpen, setIsCompletedOpen] = useState(false);
+  const [isLabelsOpen, setIsLabelsOpen] = useState(true);
+  const [isAddLabelOpen, setIsAddLabelOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchRevealOrigin, setSearchRevealOrigin] = useState<{
     x: number;
@@ -336,6 +341,7 @@ export function Sidebar({
         renameList ||
         removeList ||
         isAddListOpen ||
+        isAddLabelOpen ||
         renameLabel ||
         removeLabel
       ) {
@@ -366,6 +372,7 @@ export function Sidebar({
     renameList,
     removeList,
     isAddListOpen,
+    isAddLabelOpen,
     renameLabel,
     removeLabel,
   ]);
@@ -1218,14 +1225,28 @@ export function Sidebar({
             </div>
           </button>
 
-          {orderedLabels.length > 0 ? (
-            <div
-              className="mt-3 flex flex-col"
-              onMouseLeave={() => onSidebarHoverEnd?.()}
+          <div
+            className="mt-3 flex flex-col"
+            onMouseLeave={() => onSidebarHoverEnd?.()}
+          >
+            <button
+              type="button"
+              onClick={() => setIsLabelsOpen((open) => !open)}
+              aria-expanded={isLabelsOpen}
+              className="flex w-full items-center gap-1 px-4 pb-1 text-left"
             >
-              <p className="px-4 pb-1 text-xs font-medium text-zinc-400 dark:text-zinc-500">
+              <BiChevronDown
+                className={`size-3.5 shrink-0 text-zinc-400 transition-transform ${
+                  isLabelsOpen ? "rotate-0" : "-rotate-90"
+                }`}
+                aria-hidden="true"
+              />
+              <span className="text-xs font-medium text-zinc-400 dark:text-zinc-500">
                 Labels
-              </p>
+              </span>
+            </button>
+
+            {isLabelsOpen ? (
               <div
                 ref={labelContainerRef}
                 className="relative flex flex-col overflow-visible"
@@ -1236,74 +1257,98 @@ export function Sidebar({
                     style={{ top: labelDropIndicatorTop }}
                   />
                 )}
-                {orderedLabels.map((item) => {
-                const isSelected = selectedLabelId === item.id;
-                const showLabelAccentBorder =
-                  isSelected && sidebarHoverPreview === null;
-                const labelColor = getLabelColor(item);
+                {orderedLabels.length === 0 ? (
+                  <p className="px-4 pb-1 text-xs text-zinc-400 dark:text-zinc-500">
+                    No labels
+                  </p>
+                ) : (
+                  orderedLabels.map((item) => {
+                    const isSelected = selectedLabelId === item.id;
+                    const showLabelAccentBorder =
+                      isSelected && sidebarHoverPreview === null;
+                    const labelColor = getLabelColor(item);
 
-                return (
-                <div
-                  key={item.id}
-                  data-label-id={item.id}
-                  onPointerDown={(event) => handleLabelPointerDown(event, item.id)}
-                  onClick={() => handleLabelClick(item.id)}
-                  className={`group relative flex items-center ${getItemClassName(isSelected)} text-[#5b5b5b] rounded-r-[4px] ${
-                    isSelected ? "" : "hover:text-[#777777]"
-                  } ${
-                    showLabelAccentBorder
-                      ? "border-l-[2px] border-l-[#dadfdf]"
-                      : "border-l-[2px] border-l-transparent"
-                  } ${onReorderLabels ? "touch-none cursor-pointer" : ""}`}
-                  onContextMenu={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    openLabelMenu(item.id, {
-                      top: event.clientY,
-                      left: event.clientX,
-                    });
-                  }}
-                >
-                  <div className="flex min-w-0 flex-1 items-center pl-5 pr-[40px] text-left">
-                    <span className="min-w-0 flex-1 truncate text-[#777777]">
-                      {item.label}
-                    </span>
-                  </div>
-                  <span className="pointer-events-none absolute right-[22px] top-1/2 flex -translate-y-1/2 items-center gap-1.5">
-                    <span
-                      aria-hidden="true"
-                      className="size-2.5 shrink-0 rounded-[3px]"
-                      style={{ backgroundColor: labelColor.dot }}
-                    />
-                    <span className="min-w-[1ch] text-xs tabular-nums text-[#777777]">
-                      {taskCountByLabelId[item.id] ?? 0}
-                    </span>
-                  </span>
-                  <div className="absolute right-0 top-1/2 -translate-y-1/2">
-                    <button
-                      type="button"
-                      aria-label={`Open menu for ${item.label}`}
-                      aria-expanded={openMenuLabelId === item.id}
-                      className={`flex size-[22px] items-center justify-center rounded-full text-zinc-500 transition-opacity hover:bg-zinc-200/80 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-zinc-50 cursor-pointer ${
-                        openMenuLabelId === item.id
-                          ? "opacity-100"
-                          : "opacity-0 group-hover:opacity-100"
-                      }`}
-                      onPointerDown={(event) => event.stopPropagation()}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        toggleLabelMenuFromButton(item.id, event.currentTarget);
-                      }}
-                    >
-                      <PiDotsThreeBold className="size-[15px] text-[#777777]" />
-                    </button>
-                  </div>
-                </div>
-                );
-              })}
+                    return (
+                      <div
+                        key={item.id}
+                        data-label-id={item.id}
+                        onPointerDown={(event) =>
+                          handleLabelPointerDown(event, item.id)
+                        }
+                        onClick={() => handleLabelClick(item.id)}
+                        className={`group relative flex items-center ${getItemClassName(isSelected)} text-[#5b5b5b] rounded-r-[4px] ${
+                          isSelected ? "" : "hover:text-[#777777]"
+                        } ${
+                          showLabelAccentBorder
+                            ? "border-l-[2px] border-l-[#dadfdf]"
+                            : "border-l-[2px] border-l-transparent"
+                        } ${onReorderLabels ? "touch-none cursor-pointer" : ""}`}
+                        onContextMenu={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          openLabelMenu(item.id, {
+                            top: event.clientY,
+                            left: event.clientX,
+                          });
+                        }}
+                      >
+                        <div className="flex min-w-0 flex-1 items-center pl-5 pr-[40px] text-left">
+                          <span className="min-w-0 flex-1 truncate text-[#777777]">
+                            {item.label}
+                          </span>
+                        </div>
+                        <span className="pointer-events-none absolute right-[22px] top-1/2 flex -translate-y-1/2 items-center gap-1.5">
+                          <span
+                            aria-hidden="true"
+                            className="size-2.5 shrink-0 rounded-[3px]"
+                            style={{ backgroundColor: labelColor.dot }}
+                          />
+                          <span className="min-w-[1ch] text-xs tabular-nums text-[#777777]">
+                            {taskCountByLabelId[item.id] ?? 0}
+                          </span>
+                        </span>
+                        <div className="absolute right-0 top-1/2 -translate-y-1/2">
+                          <button
+                            type="button"
+                            aria-label={`Open menu for ${item.label}`}
+                            aria-expanded={openMenuLabelId === item.id}
+                            className={`flex size-[22px] items-center justify-center rounded-full text-zinc-500 transition-opacity hover:bg-zinc-200/80 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-zinc-50 cursor-pointer ${
+                              openMenuLabelId === item.id
+                                ? "opacity-100"
+                                : "opacity-0 group-hover:opacity-100"
+                            }`}
+                            onPointerDown={(event) => event.stopPropagation()}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              toggleLabelMenuFromButton(item.id, event.currentTarget);
+                            }}
+                          >
+                            <PiDotsThreeBold className="size-[15px] text-[#777777]" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
-            </div>
-          ) : null}
+            ) : null}
+
+            <button
+              type="button"
+              className={`${getItemClassName(false)} gap-2 pr-4 pl-[15px] group hover:bg-[#ececee]`}
+              onClick={() => setIsAddLabelOpen(true)}
+            >
+              <div className="flex items-center gap-1 rounded-lg py-1 pl-3 pr-3 duration-200">
+                <LuPlus
+                  className="size-3.5 shrink-0 text-[#e04545]"
+                  aria-hidden="true"
+                />
+                <span className="text-[#777b7e] group-hover:text-gray-800">
+                  Add label
+                </span>
+              </div>
+            </button>
+          </div>
 
           <div className="mt-3 flex flex-col border-t border-zinc-150">
             <button
@@ -1419,6 +1464,18 @@ export function Sidebar({
           setIsAddListOpen(false);
         }}
         onCancel={() => setIsAddListOpen(false)}
+      />
+
+      <RenameListModal
+        open={isAddLabelOpen}
+        title="New label"
+        initialName=""
+        confirmLabel="Add"
+        onConfirm={(name) => {
+          onAddLabel(name, LABEL_PRESET_COLORS[0]?.dot ?? "#4873c7");
+          setIsAddLabelOpen(false);
+        }}
+        onCancel={() => setIsAddLabelOpen(false)}
       />
 
       <RenameListModal
