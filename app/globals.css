@@ -94,6 +94,22 @@
     color: var(--panel-text-list-search);
   }
 
+  .ptxt-list-nav-today {
+    color: var(--panel-text-list-nav-today);
+  }
+
+  .ptxt-list-nav-inbox {
+    color: var(--panel-text-list-nav-inbox);
+  }
+
+  .ptxt-list-nav-important {
+    color: var(--panel-text-list-nav-important);
+  }
+
+  .ptxt-list-nav-calendar {
+    color: var(--panel-text-list-nav-calendar);
+  }
+
   .ptxt-list-items {
     color: var(--panel-text-list-items);
   }
@@ -108,6 +124,24 @@
 
   .ptxt-task-title {
     color: var(--panel-text-task-title);
+  }
+
+  .ptxt-task-interaction-icon {
+    color: var(--panel-text-task-interaction-icon);
+    transition: color 150ms ease;
+  }
+
+  .group:hover .ptxt-task-interaction-icon {
+    color: var(--panel-text-task-interaction-icon-hover);
+  }
+
+  .ptxt-subtask-interaction-icon {
+    color: var(--panel-text-subtask-interaction-icon);
+    transition: color 150ms ease;
+  }
+
+  .group:hover .ptxt-subtask-interaction-icon {
+    color: var(--panel-text-subtask-interaction-icon-hover);
   }
 
   .ptxt-subtask-title {
@@ -145,10 +179,18 @@
   --panel-text-900: #18181b;
   --panel-text-950: #09090b;
   --panel-text-list-search: #3f3f46;
+  --panel-text-list-nav-today: #3f3f46;
+  --panel-text-list-nav-inbox: #3f3f46;
+  --panel-text-list-nav-important: #3f3f46;
+  --panel-text-list-nav-calendar: #3f3f46;
   --panel-text-list-items: #27272a;
   --panel-text-label-items: #52525c;
   --panel-text-task-list-title: #3f3f46;
   --panel-text-task-title: #3f3f46;
+  --panel-text-task-interaction-icon: #d4d4d8;
+  --panel-text-task-interaction-icon-hover: #52525c;
+  --panel-text-subtask-interaction-icon: #e4e4e7;
+  --panel-text-subtask-interaction-icon-hover: #71717b;
   --panel-text-subtask-title: #3f3f46;
   --panel-text-task-datetime: #9f9fa9;
   --panel-text-completed-tasks: #9f9fa9;
@@ -204,6 +246,7 @@ html[data-app-font="euclid-circular"] {
   --spacing-9px: 9px;
   --spacing-26px: 26px;
   --size-18px: 18px;
+  --size-21px: 21px;
   --size-22px: 22px;
   --size-24px: 24px;
 
@@ -1100,15 +1143,19 @@ body {
 .task-row-dragging {
   position: relative;
   z-index: 30;
-  border-radius: 8px;
+  border-radius: 9px;
   cursor: grabbing;
-  opacity: 0.93;
+  scale: 0.965;
+  opacity: 1;
   background-color: #ffffff !important;
   border-bottom-color: transparent !important;
   box-shadow:
     0 12px 24px -8px rgba(15, 23, 42, 0.28),
     0 4px 10px -4px rgba(15, 23, 42, 0.16) !important;
-  transition: transform 200ms ease;
+  transition:
+    transform 200ms ease,
+    scale 200ms ease,
+    opacity 200ms ease;
 }
 
 .task-row-dragging.task-row-calendar-drag-source,
@@ -1608,6 +1655,10 @@ body {
 
 .checkbox-wrapper-29.task-completion-checkbox-box.calendar-task-checkbox {
   --size: calc((1.075rem - 3px) * 0.83);
+}
+
+.checkbox-wrapper-29.task-completion-checkbox-box.task-list-subtask-checkbox {
+  --size: calc(1.075rem - 2px);
 }
 
 .calendar-panel .checkbox-wrapper-29 {

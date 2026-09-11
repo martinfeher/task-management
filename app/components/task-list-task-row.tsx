@@ -26,6 +26,8 @@ import { TaskPriorityPill } from "./task-priority-pill";
 import { PiDotsThreeBold } from "react-icons/pi";
 import { CiStickyNote } from "react-icons/ci";
 import { BiAlarm, BiCalendar, BiRevision } from "react-icons/bi";
+import { MdKeyboardArrowDown } from "react-icons/md";
+import { RiArrowDropRightLine } from "react-icons/ri";
 import type { TaskListItem, TodoList } from "./todo-app";
 import type { TaskDueTime } from "@/lib/task-due-time";
 import type { TaskRecurrenceRule } from "@/lib/task-recurrence";
@@ -124,6 +126,10 @@ type TaskListTaskRowProps = {
   hasSubtaskActions: boolean;
   hasDeleteActions: boolean;
   useWiderRowPadding?: boolean;
+  subtaskCount?: number;
+  subtasksExpanded?: boolean;
+  onToggleSubtasksExpanded?: () => void;
+  showSubtaskCollapseToggle?: boolean;
 };
 
 const TASK_LABEL_SELECTOR_WIDTH = 280;
@@ -298,6 +304,10 @@ export function TaskListTaskRow({
   hasSubtaskActions,
   hasDeleteActions,
   useWiderRowPadding = false,
+  subtaskCount = 0,
+  subtasksExpanded = true,
+  onToggleSubtasksExpanded,
+  showSubtaskCollapseToggle = false,
 }: TaskListTaskRowProps) {
   const titleInputRef = useRef<HTMLInputElement>(null);
   const [reminderOptionId, setReminderOptionId] =
@@ -392,8 +402,26 @@ export function TaskListTaskRow({
   const showDueSchedule = Boolean(
     !task.isNote && (task.dueDate || dueTimeLabel !== null),
   );
+  const showSubtaskCollapse =
+    showSubtaskCollapseToggle &&
+    depth === 0 &&
+    subtaskCount > 0 &&
+    Boolean(onToggleSubtasksExpanded);
+  const showSublineRow = showDueSchedule || showSubtaskCollapse;
+  const hasSubtasksWithoutSchedule = showSubtaskCollapse && !showDueSchedule;
   const hasRecurrence = Boolean(parseRecurrenceRule(task.recurrenceRule));
-  const rowMinHeightClass = showDueSchedule ? "min-h-[35px]" : "min-h-[37px]";
+  const rowMinHeightClass =
+    depth > 0
+      ? showDueSchedule
+        ? "min-h-[32px]"
+        : "min-h-[34px]"
+      : showSublineRow
+        ? subtaskCount > 0
+          ? "h-[44px]"
+          : "min-h-[35px]"
+        : subtaskCount > 0
+          ? "h-[44px]"
+          : "min-h-[37px]";
 
   function handleDatePickerTrigger(
     event: React.SyntheticEvent<HTMLButtonElement>,
@@ -571,8 +599,8 @@ export function TaskListTaskRow({
           <InteractIcon
             className={`size-3.5 ${
               depth > 0
-                ? "ptxt-200 group-hover:ptxt-500"
-                : "ptxt-300 group-hover:ptxt-600"
+                ? "ptxt-subtask-interaction-icon"
+                : "ptxt-task-interaction-icon"
             }`}
           />
         </span>
@@ -611,7 +639,9 @@ export function TaskListTaskRow({
           checkKey={task.id}
           animateCheck={isCheckAnimating}
           checked={task.completed || isCheckAnimating || isCompleting}
-          className="task-list-checkbox shrink-0"
+          className={`task-list-checkbox shrink-0${
+            depth > 0 ? " task-list-subtask-checkbox" : ""
+          }`}
           onChange={
             isCompleting ? () => {} : () => onToggleTask(task.id)
           }
@@ -638,69 +668,105 @@ export function TaskListTaskRow({
             onClick={(event) => event.stopPropagation()}
             onBlur={() => onCommitTitleEdit(task)}
             onKeyDown={(event) => onTitleKeyDown(event, task)}
-            className={`min-w-0 w-full border-0 bg-transparent p-0 text-left ${taskTitleTextClass} ${titleColorClass} outline-none`}
+            className={`min-w-0 w-full border-0 bg-transparent p-0 text-left ${taskTitleTextClass} ${titleColorClass} outline-none${
+              hasSubtasksWithoutSchedule ? " relative top-[3px]" : ""
+            }`}
           />
         ) : (
           <span
             data-task-truncate-measure
-            className={`min-w-0 truncate text-left ${taskTitleTextClass} transition-colors ${checkedTextStyle}`}
+            className={`min-w-0 truncate text-left ${taskTitleTextClass} transition-colors ${checkedTextStyle}${
+              hasSubtasksWithoutSchedule ? " relative top-[6px]" : ""
+            }`}
             style={{ transitionDuration: `${CHECKED_ROW_DIM_MS}ms` }}
           >
             {task.name}
           </span>
         )}
-        {showDueSchedule && dueScheduleSubline ? (
-          hasDueDateActions ? (
-            <button
-              ref={scheduleAnchorRef}
-              type="button"
-              aria-label={`${dueScheduleSubline}. Change date`}
-              aria-haspopup="dialog"
-              aria-expanded={isDatePickerOpen}
-              title="Change date"
-              className={`group/schedule mt-0.5 inline-flex w-fit max-w-full self-start cursor-pointer appearance-none items-center gap-1 border-0 bg-transparent p-0 text-left text-[11px] leading-none outline-none focus:outline-none focus-visible:outline-none ${TASK_ROW_SCHEDULE_COLOR_CLASS} ${TASK_ROW_SCHEDULE_TRANSITION_CLASS}`}
-              style={{ transition: dimTransition }}
-              onPointerDown={(event) => {
-                if (event.button !== 0) return;
-                event.stopPropagation();
-                handleDatePickerTrigger(event, true);
-              }}
-              onClick={(event) => event.stopPropagation()}
-              data-task-date-picker-trigger
-            >
-              <BiCalendar
-                className="size-3 shrink-0"
-                aria-hidden="true"
-              />
-              {hasRecurrence ? (
-                <BiRevision
-                  className="size-3 shrink-0 opacity-70"
-                  aria-label="Repeats"
-                />
-              ) : null}
-              <span className="truncate">{dueScheduleSubline}</span>
-            </button>
-          ) : (
-            <div
-              className={`group/schedule mt-0.5 flex min-w-0 items-center gap-1 text-[11px] leading-none ${TASK_ROW_SCHEDULE_COLOR_CLASS} ${TASK_ROW_SCHEDULE_TRANSITION_CLASS}`}
-              style={{ transition: dimTransition }}
-            >
-              <BiCalendar
-                className="size-3 shrink-0"
-                aria-hidden="true"
-              />
-              {hasRecurrence ? (
-                <BiRevision
-                  className="size-3 shrink-0 opacity-70"
-                  aria-label="Repeats"
-                />
-              ) : null}
-              <span className="truncate">{dueScheduleSubline}</span>
-              {hasDueTime ? (
-                <BiAlarm className="size-3 shrink-0" aria-hidden="true" />
-              ) : null}
-            </div>
-          )
+        {showSublineRow ? (
+          <div className="mt-0.5 inline-flex w-fit max-w-full self-start items-center gap-0.5">
+            {showSubtaskCollapse ? (
+              <button
+                type="button"
+                aria-label={
+                  subtasksExpanded ? "Hide subtasks" : "Show subtasks"
+                }
+                aria-expanded={subtasksExpanded}
+                title={subtasksExpanded ? "Hide subtasks" : "Show subtasks"}
+                className={`flex size-[18px] shrink-0 cursor-pointer items-center justify-center rounded border-0 bg-transparent p-0 ptxt-400 outline-none transition-colors hover:ptxt-600${
+                  hasSubtasksWithoutSchedule ? " relative top-[2px]" : ""
+                }`}
+                style={{ transition: dimTransition }}
+                onPointerDown={(event) => {
+                  if (event.button !== 0) return;
+                  event.stopPropagation();
+                }}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onToggleSubtasksExpanded?.();
+                }}
+              >
+                {subtasksExpanded ? (
+                  <MdKeyboardArrowDown className="size-[21px] text-[#b6b6b6] hover:text-[#9a9a9e]" aria-hidden="true" />
+                ) : (
+                  <RiArrowDropRightLine className="size-[16px] text-[#b6b6b6] hover:text-[#9a9a9e]" aria-hidden="true" />
+                )}
+              </button>
+            ) : null}
+            {showDueSchedule && dueScheduleSubline ? (
+              hasDueDateActions ? (
+                <button
+                  ref={scheduleAnchorRef}
+                  type="button"
+                  aria-label={`${dueScheduleSubline}. Change date`}
+                  aria-haspopup="dialog"
+                  aria-expanded={isDatePickerOpen}
+                  title="Change date"
+                  className={`group/schedule inline-flex w-fit max-w-full cursor-pointer appearance-none items-center gap-1 border-0 bg-transparent p-0 text-left text-[11px] leading-none outline-none focus:outline-none focus-visible:outline-none ${TASK_ROW_SCHEDULE_COLOR_CLASS} ${TASK_ROW_SCHEDULE_TRANSITION_CLASS}`}
+                  style={{ transition: dimTransition }}
+                  onPointerDown={(event) => {
+                    if (event.button !== 0) return;
+                    event.stopPropagation();
+                    handleDatePickerTrigger(event, true);
+                  }}
+                  onClick={(event) => event.stopPropagation()}
+                  data-task-date-picker-trigger
+                >
+                  <BiCalendar
+                    className="size-3 shrink-0"
+                    aria-hidden="true"
+                  />
+                  {hasRecurrence ? (
+                    <BiRevision
+                      className="size-3 shrink-0 opacity-70"
+                      aria-label="Repeats"
+                    />
+                  ) : null}
+                  <span className="truncate">{dueScheduleSubline}</span>
+                </button>
+              ) : (
+                <div
+                  className={`group/schedule flex min-w-0 items-center gap-1 text-[11px] leading-none ${TASK_ROW_SCHEDULE_COLOR_CLASS} ${TASK_ROW_SCHEDULE_TRANSITION_CLASS}`}
+                  style={{ transition: dimTransition }}
+                >
+                  <BiCalendar
+                    className="size-3 shrink-0"
+                    aria-hidden="true"
+                  />
+                  {hasRecurrence ? (
+                    <BiRevision
+                      className="size-3 shrink-0 opacity-70"
+                      aria-label="Repeats"
+                    />
+                  ) : null}
+                  <span className="truncate">{dueScheduleSubline}</span>
+                  {hasDueTime ? (
+                    <BiAlarm className="size-3 shrink-0" aria-hidden="true" />
+                  ) : null}
+                </div>
+              )
+            ) : null}
+          </div>
         ) : null}
       </div>
 

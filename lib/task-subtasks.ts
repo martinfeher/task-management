@@ -1,3 +1,5 @@
+export const SUBTASKS_EXPANDED_SESSION_KEY = "todolist.subtasks-expanded-by-task";
+
 export type TaskWithParent = {
   id: string;
   parentId: string | null;
@@ -53,9 +55,75 @@ export function getDropIndicatorIndent(
   return 0;
 }
 
+export function readSubtasksExpandedByTask() {
+  if (typeof window === "undefined") return {} as Record<string, boolean>;
+
+  try {
+    const raw = window.sessionStorage.getItem(SUBTASKS_EXPANDED_SESSION_KEY);
+    if (!raw) return {};
+
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null) return {};
+
+    return Object.fromEntries(
+      Object.entries(parsed).filter(
+        (entry): entry is [string, boolean] => typeof entry[1] === "boolean",
+      ),
+    );
+  } catch {
+    return {};
+  }
+}
+
+export function getSavedSubtasksExpanded(taskId: string) {
+  return readSubtasksExpandedByTask()[taskId];
+}
+
+export function saveSubtasksExpanded(taskId: string, expanded: boolean) {
+  if (typeof window === "undefined") return;
+
+  const next = {
+    ...readSubtasksExpandedByTask(),
+    [taskId]: expanded,
+  };
+  window.sessionStorage.setItem(
+    SUBTASKS_EXPANDED_SESSION_KEY,
+    JSON.stringify(next),
+  );
+}
+
+export function clearSubtasksExpanded(taskId: string) {
+  if (typeof window === "undefined") return;
+
+  const current = readSubtasksExpandedByTask();
+  if (!(taskId in current)) return;
+
+  const next = { ...current };
+  delete next[taskId];
+  window.sessionStorage.setItem(
+    SUBTASKS_EXPANDED_SESSION_KEY,
+    JSON.stringify(next),
+  );
+}
+
+export function resolveSubtasksExpandedState(
+  taskId: string,
+  subtaskCount: number,
+  savedByTaskId: Record<string, boolean> = readSubtasksExpandedByTask(),
+) {
+  const saved = savedByTaskId[taskId];
+  if (saved !== undefined) return saved;
+  return subtaskCount > 0;
+}
+
 export function buildVisibleTasks<
   T extends TaskWithParent & { completed: boolean; pinned: boolean },
->(tasks: T[], pinned: boolean, includeSubtasks = true): VisibleTask<T>[] {
+>(
+  tasks: T[],
+  pinned: boolean,
+  includeSubtasks = true,
+  collapsedParentIds: ReadonlySet<string> = new Set(),
+): VisibleTask<T>[] {
   const active = tasks.filter(
     (task) => !task.completed && Boolean(task.pinned) === pinned,
   );
@@ -78,7 +146,7 @@ export function buildVisibleTasks<
   for (const root of roots) {
     visible.push({ ...root, depth: 0 });
 
-    if (!includeSubtasks) continue;
+    if (!includeSubtasks || collapsedParentIds.has(root.id)) continue;
 
     const children = sortByStoredOrder(
       active.filter((task) => task.parentId === root.id),

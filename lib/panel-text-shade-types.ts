@@ -10,10 +10,18 @@ export type { PanelTextShadeId, PanelTextShadeToken } from "@/lib/panel-text-sha
 
 export type PanelTextElementKey =
   | "listSearchText"
+  | "listNavToday"
+  | "listNavInbox"
+  | "listNavImportant"
+  | "listNavCalendar"
   | "listItems"
   | "labelItems"
   | "taskListTitle"
   | "taskTitle"
+  | "taskInteractionIcon"
+  | "taskInteractionIconHover"
+  | "subtaskInteractionIcon"
+  | "subtaskInteractionIconHover"
   | "subtaskTitle"
   | "taskDateTime"
   | "completedTasks";
@@ -30,10 +38,18 @@ export type PanelTextColorsSettings = Record<
 
 export const PANEL_TEXT_ELEMENT_KEYS: PanelTextElementKey[] = [
   "listSearchText",
+  "listNavToday",
+  "listNavInbox",
+  "listNavImportant",
+  "listNavCalendar",
   "listItems",
   "labelItems",
   "taskListTitle",
   "taskTitle",
+  "taskInteractionIcon",
+  "taskInteractionIconHover",
+  "subtaskInteractionIcon",
+  "subtaskInteractionIconHover",
   "subtaskTitle",
   "taskDateTime",
   "completedTasks",
@@ -41,10 +57,18 @@ export const PANEL_TEXT_ELEMENT_KEYS: PanelTextElementKey[] = [
 
 export const PANEL_TEXT_ELEMENT_LABELS: Record<PanelTextElementKey, string> = {
   listSearchText: "Search item text",
+  listNavToday: "Today",
+  listNavInbox: "Inbox",
+  listNavImportant: "Important",
+  listNavCalendar: "Calendar",
   listItems: "List items",
   labelItems: "Label items",
   taskListTitle: "List title",
   taskTitle: "Task title",
+  taskInteractionIcon: "Interaction icon",
+  taskInteractionIconHover: "Interaction icon hover",
+  subtaskInteractionIcon: "Subtask interaction icon",
+  subtaskInteractionIconHover: "Subtask interaction icon hover",
   subtaskTitle: "Subtask title",
   taskDateTime: "Date and time",
   completedTasks: "Completed tasks",
@@ -56,13 +80,25 @@ export const PANEL_TEXT_ELEMENT_GROUPS: Array<{
 }> = [
   {
     title: "List panel",
-    keys: ["listSearchText", "listItems", "labelItems"],
+    keys: [
+      "listSearchText",
+      "listNavToday",
+      "listNavInbox",
+      "listNavImportant",
+      "listNavCalendar",
+      "listItems",
+      "labelItems",
+    ],
   },
   {
     title: "Task list panel",
     keys: [
       "taskListTitle",
       "taskTitle",
+      "taskInteractionIcon",
+      "taskInteractionIconHover",
+      "subtaskInteractionIcon",
+      "subtaskInteractionIconHover",
       "subtaskTitle",
       "taskDateTime",
       "completedTasks",
@@ -73,10 +109,18 @@ export const PANEL_TEXT_ELEMENT_GROUPS: Array<{
 export const PANEL_TEXT_ELEMENT_CSS_VARS: Record<PanelTextElementKey, string> =
   {
     listSearchText: "--panel-text-list-search",
+    listNavToday: "--panel-text-list-nav-today",
+    listNavInbox: "--panel-text-list-nav-inbox",
+    listNavImportant: "--panel-text-list-nav-important",
+    listNavCalendar: "--panel-text-list-nav-calendar",
     listItems: "--panel-text-list-items",
     labelItems: "--panel-text-label-items",
     taskListTitle: "--panel-text-task-list-title",
     taskTitle: "--panel-text-task-title",
+    taskInteractionIcon: "--panel-text-task-interaction-icon",
+    taskInteractionIconHover: "--panel-text-task-interaction-icon-hover",
+    subtaskInteractionIcon: "--panel-text-subtask-interaction-icon",
+    subtaskInteractionIconHover: "--panel-text-subtask-interaction-icon-hover",
     subtaskTitle: "--panel-text-subtask-title",
     taskDateTime: "--panel-text-task-datetime",
     completedTasks: "--panel-text-completed-tasks",
@@ -84,10 +128,18 @@ export const PANEL_TEXT_ELEMENT_CSS_VARS: Record<PanelTextElementKey, string> =
 
 const DEFAULT_SHADES: Record<PanelTextElementKey, PanelTextShadeToken> = {
   listSearchText: "zinc-700",
+  listNavToday: "zinc-700",
+  listNavInbox: "zinc-700",
+  listNavImportant: "zinc-700",
+  listNavCalendar: "zinc-700",
   listItems: "zinc-800",
   labelItems: "zinc-600",
   taskListTitle: "zinc-700",
   taskTitle: "zinc-700",
+  taskInteractionIcon: "zinc-300",
+  taskInteractionIconHover: "zinc-600",
+  subtaskInteractionIcon: "zinc-200",
+  subtaskInteractionIconHover: "zinc-500",
   subtaskTitle: "zinc-700",
   taskDateTime: "zinc-400",
   completedTasks: "zinc-400",

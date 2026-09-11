@@ -6129,7 +6129,7 @@ export function TaskDetailsPanel({
                           isModalLayout
                             ? "text-[12px] leading-[12px]"
                             : "text-[13px] leading-[13px]"
-                        }`}
+                        }${!dueTimeLabel ? " relative top-[3px]" : ""}`}
                       >
                         {dueDateLabel}
                       </span>

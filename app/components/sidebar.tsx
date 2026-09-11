@@ -4,13 +4,11 @@ import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 import { BiCheckboxChecked, BiChevronDown } from "react-icons/bi";
 import { IoIosSearch } from "react-icons/io";
-import {
-  getLabelColor,
-  LABEL_PRESET_COLORS,
-} from "@/lib/label-colors";
+import { LABEL_PRESET_COLORS } from "@/lib/label-colors";
 import { getInboxListId } from "@/lib/inbox-list";
 import { FiSettings } from "react-icons/fi";
-import { LuArrowRight, LuInbox, LuPlus, LuStar } from "react-icons/lu";
+import { MdLabelOutline } from "react-icons/md";
+import { LuInbox, LuList, LuPlus, LuStar } from "react-icons/lu";
 import { PiDotsThreeBold } from "react-icons/pi";
 import { BsCalendar3 } from "react-icons/bs";
 import { useSidebarBackground } from "@/lib/sidebar-background";
@@ -30,7 +28,6 @@ import {
   mergeReorderedSidebarListIds,
   reorderListIds,
 } from "./list-reorder";
-import { InteractIcon } from "./line-control-icons";
 import {
   applyLabelRowShifts,
   getLabelDropIndex,
@@ -54,6 +51,13 @@ const SettingsModal = dynamic(
   () => import("./settings-modal").then((module) => module.SettingsModal),
   { ssr: false },
 );
+
+const NAV_ITEM_TEXT_CLASS = {
+  today: "ptxt-list-nav-today",
+  inbox: "ptxt-list-nav-inbox",
+  important: "ptxt-list-nav-important",
+  calendar: "ptxt-list-nav-calendar",
+} as const;
 
 const NAV_ITEMS = [
   { label: "Search", action: "search" as const },
@@ -123,7 +127,7 @@ function shouldStartListDrag(target: EventTarget | null) {
 }
 
 const itemClassName =
-  "flex mx-[6px] mb-px w-[236px] items-center rounded-[3px]  text-left text-sm transition-colors cursor-pointer";
+  "flex ml-[6px] mb-px w-[236px] items-center rounded-[3px]  text-left text-sm transition-colors cursor-pointer";
 
 const completedItemClassName =
   "flex mx-[4px] mb-px min-h-[44px] w-auto flex-col items-start justify-center gap-0 rounded-[3px] px-4 py-1 text-left text-sm transition-colors";
@@ -256,7 +260,6 @@ export function Sidebar({
   const suppressListClickRef = useRef(false);
   const suppressLabelClickRef = useRef(false);
 
-  const [activeText, setActiveText] = useState(false);
 
   useEffect(() => {
     setOrderedLists(lists);
@@ -397,24 +400,16 @@ export function Sidebar({
     const isTaskDropTarget = taskDropHighlightListId === listId;
     const isSelected =
       isListSelected(listId) && listId !== suppressListSelectionHighlightId;
-    const isHovered =
-      sidebarHoverPreview?.kind === "list" &&
-      sidebarHoverPreview.listId === listId;
 
     if (isTaskDropTarget) {
-      return "border-r border-transparent bg-blue-100 ring-2 ring-inset ring-blue-400 dark:bg-blue-950/70 dark:ring-blue-500";
+      return "bg-blue-100 ring-2 ring-inset ring-blue-400 dark:bg-blue-950/70 dark:ring-blue-500";
     }
 
-    // Keep selected background even while previewing another list name.
     if (isSelected) {
-      return "border-r border-transparent bg-[#e9ebee]/50 dark:bg-zinc-800";
+      return "bg-[#e9ebee] dark:bg-zinc-800/60";
     }
 
-    if (isHovered) {
-      return "bg-[#f0f0f0]";
-    }
-
-    return "border-r-2 border-transparent hover:bg-zinc-200/50 dark:hover:bg-zinc-800/60";
+    return "hover:bg-zinc-100/80 dark:hover:bg-zinc-800/40";
   }
 
   function getNavItemClassName(
@@ -934,9 +929,16 @@ export function Sidebar({
               // (item.action === "next7days" && isNext7DaysSelected) ||
               (item.action === "important" && isImportantSelected) ||
               (item.action === "calendar" && isCalendarSelected);
+            const navTextClass =
+              item.action === "today" ||
+              item.action === "inbox" ||
+              item.action === "important" ||
+              item.action === "calendar"
+                ? NAV_ITEM_TEXT_CLASS[item.action]
+                : null;
             const navIconColor = isNavItemSelected
               ? "ptxt-950"
-              : "ptxt-400";
+              : navTextClass ?? "ptxt-400";
 
             return (
             item.action === "today" ||
@@ -994,7 +996,9 @@ export function Sidebar({
                   aria-hidden="true"
                 />
               )}
-              <span className="inline-block max-w-full truncate rounded-full pl-0 pr-3 py-[3.5px] ptxt-700 transition-all duration-300 cursor-pointer dark:bg-zinc-800/60 dark:hover:bg-zinc-800/80">
+              <span
+                className={`inline-block max-w-full truncate rounded-full pl-0 pr-3 py-[3.5px] ${navTextClass} transition-all duration-300 cursor-pointer dark:bg-zinc-800/60 dark:hover:bg-zinc-800/80`}
+              >
                 {item.label}
               </span>
             </div>
@@ -1015,8 +1019,8 @@ export function Sidebar({
               }
               className={
                 item.action === "search"
-                  ? "mx-[6px] my-2 flex h-[35px] w-auto bg-[#fcfbff] cursor-pointer items-center gap-2 self-stretch rounded-[7px] border border-[#e3e3e9] py-0 pl-3 pr-[3px] text-left text-sm ptxt-list-search transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
-                  : `${getItemClassName(isNavItemSelected)} gap-1 px-4`
+                  ? "ml-[6px] my-2 flex py-[3px] h-[35px]! w-auto bg-[#fcfbff] cursor-pointer items-center gap-2 self-stretch rounded-[7px] border border-[#e3e3e9] py-0 pl-3 pr-[3px] text-left text-sm ptxt-list-search transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
+                  : `${getItemClassName(isNavItemSelected)} gap-1 px-4 h-[35px]!`
               }
             >
               {item.action === "search" ? (
@@ -1044,8 +1048,20 @@ export function Sidebar({
             );
           })}
           
-          <hr className="mt-2 mb-1.5 border-zinc-200 dark:border-zinc-800" />
-          <div className="flex flex-col gap-2 px-4 text-xs font-medium ptxt-400 dark:ptxt-500">Lists</div>
+          <div className="mt-3 flex flex-col">
+            <div className="flex items-center px-4 pb-1.5">
+              <span className="min-w-0 flex-1 text-[11px] font-semibold uppercase tracking-[0.06em] ptxt-400 dark:ptxt-500">
+                Lists
+              </span>
+              <button
+                type="button"
+                aria-label="Add list"
+                className="mr-4 cursor-pointer flex size-6 shrink-0 items-center justify-center rounded-md ptxt-400 transition-colors hover:bg-zinc-200/60 hover:ptxt-600 dark:hover:bg-zinc-800/60 dark:hover:ptxt-300"
+                onClick={() => setIsAddListOpen(true)}
+              >
+                <LuPlus className="size-3.5" aria-hidden="true" />
+              </button>
+            </div>
           <div
             ref={listContainerRef}
             className="relative flex flex-col"
@@ -1075,36 +1091,27 @@ export function Sidebar({
             <div
               key={list.id}
               data-list-id={list.id}
+              onPointerDown={(event) => handleListPointerDown(event, list.id)}
               onClick={() => handleListClick(list.id)}
+              onMouseEnter={() => {
+                onSidebarHoverStart?.({ kind: "list", listId: list.id });
+              }}
               onMouseLeave={() => {
                 if (isNameHovered) {
                   onSidebarHoverEnd?.();
                 }
               }}
-              className={`group relative flex h-[35px] w-[241px] items-center cursor-pointer ml-[6px] mr-[1px] mb-px rounded-[3px] transition-[background-color,filter] ${
-                dimOtherLists ? "duration-400" : "duration-500"
+              className={`group relative ml-[6px] mb-1 flex h-[34px] cursor-pointer items-center gap-2 rounded-md px-3 transition-[background-color,filter] ${
+                dimOtherLists ? "duration-400 blur-[0.5px] brightness-[1.25]" : "duration-200"
               } ${getListRowClassName(list.id)} ${
-                dimOtherLists ? "blur-[0.5px] brightness-[1.25]" : ""
-              } ${
-                isNameHovered || (isSelectedRow && sidebarHoverPreview === null)
-                  ? "border-l-[2px] border-l-[#dadfdf]"
-                  : "border-l-[2px] border-l-transparent"
-              } ${onReorderLists ? "touch-none" : ""}`}
+                onReorderLists ? "touch-none" : ""
+              }`}
             >
-              {onReorderLists ? (
-                <span
-                  aria-hidden="true"
-                  className="flex size-[19px] shrink-0 cursor-grab items-center justify-center active:cursor-grabbing"
-                  onPointerDown={(event) => handleListPointerDown(event, list.id)}
-                >
-                  <InteractIcon className="size-3.5 ptxt-400 opacity-0 transition-opacity group-hover:opacity-100" />
-                </span>
-              ) : null}
-              <div
-                className={`flex min-w-0 flex-1 items-center pr-[40px] text-left text-sm ptxt-list-items ${
-                  onReorderLists ? "pl-0 -ml-[4px]!" : "pl-[11px]"
-                }`}
-              >
+              <LuList
+                className="size-[14px] shrink-0 ptxt-400"
+                aria-hidden="true"
+              />
+              <div className="min-w-0 flex-1 text-left">
                 {editingListId === list.id ? (
                   <input
                     ref={listNameInputRef}
@@ -1117,54 +1124,25 @@ export function Sidebar({
                     onBlur={() => commitListNameEdit(list)}
                     onKeyDown={(event) => handleListNameKeyDown(event, list)}
                     aria-label={`Rename ${list.name}`}
-                    className="min-w-0 flex-1 bg-transparent text-sm ptxt-list-items outline-none cursor-text"
+                    className="min-w-0 w-full bg-transparent text-sm ptxt-list-items outline-none cursor-text"
                   />
                 ) : (
-                  <div className="min-w-0 flex items-center">
-                    <div
-                      className="inline-block ptxt-list-items hover:bg-[#dfdfe6]/80 max-w-full truncate pl-[6px] pr-3 py-[3.5px] rounded-full cursor-pointer dark:bg-zinc-800/60 dark:hover:bg-zinc-800/80 transition-all duration-300"
-                      onMouseEnter={() => {
-                        onSidebarHoverStart?.({ kind: "list", listId: list.id });
-                      }}
-                      onMouseLeave={() => {
-                        onSidebarHoverEnd?.();
-                      }}
-                      onDoubleClick={(event) => {
-                        event.stopPropagation();
-                        startListNameEdit(list);
-                      }}
-                    >
-                      {list.name}
-                    </div>
-                    {isNameHovered && openMenuListId !== list.id ? (
-                      <span
-                        key={`list-arrow-${list.id}`}
-                        aria-hidden="true"
-                        className="list-name-hover-arrow pointer-events-none inline-flex shrink-0"
-                      >
-                        <LuArrowRight
-                          className="size-[13px] ptxt-500 ml-1"
-                          strokeWidth={2.25}
-                        />
-                      </span>
-                    ) : null}
-                  </div>
+                  <span
+                    className="block truncate text-sm ptxt-list-items"
+                    onDoubleClick={(event) => {
+                      event.stopPropagation();
+                      startListNameEdit(list);
+                    }}
+                  >
+                    {list.name}
+                  </span>
                 )}
               </div>
-              <span className="pointer-events-none absolute right-[27px] top-1/2 -translate-y-1/2 text-xs tabular-nums ptxt-400 dark:ptxt-500">
+              <span className="pointer-events-none shrink-0 pr-5 text-xs tabular-nums ptxt-400 dark:ptxt-500">
                 {taskCountByListId[list.id] ?? 0}
               </span>
-
-              {isNameHovered && activeText ? (
-                <div
-                  aria-hidden="true"
-                  className="pointer-events-none absolute top-1/2 right-[41px] -translate-y-1/2 whitespace-nowrap text-[10px] ptxt-350 dark:ptxt-500"
-                >
-                  active
-                </div>
-              ) : null}
               <div
-                className="absolute right-0 top-1/2 -translate-y-1/2"
+                className="absolute right-1 top-1/2 -translate-y-1/2"
                 ref={openMenuListId === list.id ? menuRef : null}
               >
                 <button
@@ -1211,40 +1189,47 @@ export function Sidebar({
               );
             })}
           </div>
-
-          <button
-            type="button"
-            className={`${getItemClassName(false)} gap-2 pr-4 pl-[15px] group hover:ptxt-900 hover:bg-[#ececee]`}
-            onClick={() => setIsAddListOpen(true)}
-          >
-            <div className="pl-3 pr-3 py-1 rounded-lg flex items-center gap-1 duration-200">
-            {/* <div className="hover:bg-[#e1ddda] pl-2 pr-3 py-1 rounded-lg flex items-center gap-1 duration-200"> */}
-              <LuPlus className="size-3.5 ptxt-500 group-hover:ptxt-600 shrink-0" aria-hidden="true" />
-              {/* <LuPlus className="size-3.5 text-[#d0d5dc] group-hover:ptxt-600 shrink-0" aria-hidden="true" /> */}
-              <div className="ptxt-500 group-hover:ptxt-800 ">Create list</div>
-            </div>
-          </button>
+          </div>
 
           <div
             className="mt-3 flex flex-col"
             onMouseLeave={() => onSidebarHoverEnd?.()}
           >
-            <button
-              type="button"
-              onClick={() => setIsLabelsOpen((open) => !open)}
-              aria-expanded={isLabelsOpen}
-              className="flex w-full items-center gap-1 px-4 pb-1 text-left"
-            >
-              <BiChevronDown
-                className={`size-3.5 shrink-0 ptxt-400 transition-transform ${
-                  isLabelsOpen ? "rotate-0" : "-rotate-90"
-                }`}
-                aria-hidden="true"
-              />
-              <span className="text-xs font-medium ptxt-400 dark:ptxt-500">
-                Labels
-              </span>
-            </button>
+            <div className="flex items-center px-4 pb-1.5">
+              <button
+                type="button"
+                onClick={() => setIsLabelsOpen((open) => !open)}
+                aria-expanded={isLabelsOpen}
+                className="min-w-0 flex-1 text-left"
+              >
+                <span className="text-[11px] font-semibold uppercase tracking-[0.06em] ptxt-400 dark:ptxt-500">
+                  Labels
+                </span>
+              </button>
+              <button
+                type="button"
+                aria-label={isLabelsOpen ? "Collapse labels" : "Expand labels"}
+                aria-expanded={isLabelsOpen}
+                className="flex mr-1 size-6 shrink-0 items-center justify-center rounded-md ptxt-400 transition-colors cursor-pointer hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60"
+                onClick={() => setIsLabelsOpen((open) => !open)}
+              >
+                <BiChevronDown
+                  className={`size-4 transition-transform ${
+                    isLabelsOpen ? "rotate-0" : "-rotate-90"
+                  }`}
+                  aria-hidden="true"
+                />
+              </button>
+              <button
+                type="button"
+                aria-label="Add label"
+                className="mr-0.5 mr-[14px] flex size-6 shrink-0 items-center justify-center rounded-md ptxt-400 transition-colors hover:bg-zinc-200/60 cursor-pointer hover:ptxt-600 dark:hover:bg-zinc-800/60 dark:hover:ptxt-300"
+                onClick={() => setIsAddLabelOpen(true)}
+              >
+                <LuPlus className="size-3.5" aria-hidden="true" />
+              </button>
+              
+            </div>
 
             {isLabelsOpen ? (
               <div
@@ -1266,7 +1251,6 @@ export function Sidebar({
                     const isSelected = selectedLabelId === item.id;
                     const showLabelAccentBorder =
                       isSelected && sidebarHoverPreview === null;
-                    const labelColor = getLabelColor(item);
 
                     return (
                       <div
@@ -1276,13 +1260,15 @@ export function Sidebar({
                           handleLabelPointerDown(event, item.id)
                         }
                         onClick={() => handleLabelClick(item.id)}
-                        className={`group relative flex items-center ${getItemClassName(isSelected)} ptxt-label-items rounded-r-[4px] ${
-                          isSelected ? "" : "opacity-90"
+                        className={`group relative ml-[6px] mb-px flex h-[32px] w-[236px] cursor-pointer items-center gap-2 rounded-[3px] px-3 transition-colors ${
+                          isSelected
+                            ? "bg-[#e9ebee]/50 font-medium dark:bg-zinc-800/60"
+                            : "hover:bg-zinc-200/50 dark:hover:bg-zinc-800/60"
                         } ${
                           showLabelAccentBorder
                             ? "border-l-[2px] border-l-[#dadfdf]"
                             : "border-l-[2px] border-l-transparent"
-                        } ${onReorderLabels ? "touch-none cursor-pointer" : ""}`}
+                        } ${onReorderLabels ? "touch-none" : ""}`}
                         onContextMenu={(event) => {
                           event.preventDefault();
                           event.stopPropagation();
@@ -1292,20 +1278,12 @@ export function Sidebar({
                           });
                         }}
                       >
-                        <div className="flex min-w-0 flex-1 items-center pl-5 pr-[40px] text-left">
-                          <span className="min-w-0 flex-1 truncate ptxt-label-items">
-                            {item.label}
-                          </span>
-                        </div>
-                        <span className="pointer-events-none absolute right-[22px] top-1/2 flex -translate-y-1/2 items-center gap-1.5">
-                          <span
-                            aria-hidden="true"
-                            className="size-2.5 shrink-0 rounded-[3px]"
-                            style={{ backgroundColor: labelColor.dot }}
-                          />
-                          <span className="min-w-[1ch] text-xs tabular-nums ptxt-500">
-                            {taskCountByLabelId[item.id] ?? 0}
-                          </span>
+                        <MdLabelOutline
+                          className="size-[15px] shrink-0 ptxt-label-items"
+                          aria-hidden="true"
+                        />
+                        <span className="min-w-0 flex-1 truncate text-sm ptxt-label-items">
+                          {item.label}
                         </span>
                         <div className="absolute right-0 top-1/2 -translate-y-1/2">
                           <button
@@ -1332,22 +1310,6 @@ export function Sidebar({
                 )}
               </div>
             ) : null}
-
-            <button
-              type="button"
-              className={`${getItemClassName(false)} gap-2 pr-4 pl-[15px] group hover:bg-[#ececee]`}
-              onClick={() => setIsAddLabelOpen(true)}
-            >
-              <div className="flex items-center gap-1 rounded-lg py-1 pl-3 pr-3 duration-200">
-                <LuPlus
-                  className="size-3.5 shrink-0 text-[#e04545]"
-                  aria-hidden="true"
-                />
-                <span className="ptxt-550 group-hover:ptxt-800">
-                  Add label
-                </span>
-              </div>
-            </button>
           </div>
 
           <div className="mt-3 flex flex-col border-t border-zinc-150">

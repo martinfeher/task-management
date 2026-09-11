@@ -55,8 +55,11 @@ import {
   collectParentUpdates,
   getDragBlockIds,
   getDropIndicatorIndent,
+  readSubtasksExpandedByTask,
   reorderVisibleTaskIds,
   resolveHierarchyDragIntent,
+  resolveSubtasksExpandedState,
+  saveSubtasksExpanded,
   SUBTASK_INDENT_PX,
   SUBTASK_ICON_INDENT_PX,
   SUBTASK_ROOT_LEFT_PX,
@@ -516,6 +519,9 @@ export function TaskListPanel({
   const [isAddTaskPriorityMenuOpen, setIsAddTaskPriorityMenuOpen] =
     useState(false);
   const [isAddTaskFormResetting, setIsAddTaskFormResetting] = useState(false);
+  const [subtasksExpandedByTaskId, setSubtasksExpandedByTaskId] = useState<
+    Record<string, boolean>
+  >(() => readSubtasksExpandedByTask());
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [selectAllTitleEditTaskId, setSelectAllTitleEditTaskId] = useState<
     string | null
@@ -634,20 +640,97 @@ export function TaskListPanel({
     [orderedTasks, showAddTask],
   );
 
+  const subtaskCountByParentId = useMemo(() => {
+    const counts = new Map<string, number>();
+
+    for (const task of orderedTasks) {
+      if (task.completed || !task.parentId) continue;
+      counts.set(task.parentId, (counts.get(task.parentId) ?? 0) + 1);
+    }
+
+    return counts;
+  }, [orderedTasks]);
+
+  const collapsedSubtasksParentIds = useMemo(() => {
+    const collapsed = new Set<string>();
+    if (!subtasksEnabled) return collapsed;
+
+    for (const [parentId, count] of subtaskCountByParentId) {
+      const expanded = resolveSubtasksExpandedState(
+        parentId,
+        count,
+        subtasksExpandedByTaskId,
+      );
+      if (!expanded) {
+        collapsed.add(parentId);
+      }
+    }
+
+    return collapsed;
+  }, [subtaskCountByParentId, subtasksEnabled, subtasksExpandedByTaskId]);
+
+  const toggleSubtasksExpanded = useCallback(
+    (taskId: string, subtaskCount: number) => {
+      setSubtasksExpandedByTaskId((current) => {
+        const expanded = resolveSubtasksExpandedState(
+          taskId,
+          subtaskCount,
+          current,
+        );
+        const nextExpanded = !expanded;
+        saveSubtasksExpanded(taskId, nextExpanded);
+        return { ...current, [taskId]: nextExpanded };
+      });
+    },
+    [],
+  );
+
   const pinnedVisibleTasks = useMemo(
-    () =>
-      canReorder
-        ? buildVisibleTasks(orderedTasks, true, subtasksEnabled)
-        : pinnedTasks.map((task) => ({ ...task, depth: 0 })),
-    [canReorder, orderedTasks, pinnedTasks, subtasksEnabled],
+    () => {
+      if (subtasksEnabled) {
+        return buildVisibleTasks(
+          orderedTasks,
+          true,
+          true,
+          collapsedSubtasksParentIds,
+        );
+      }
+
+      return canReorder
+        ? buildVisibleTasks(orderedTasks, true, false)
+        : pinnedTasks.map((task) => ({ ...task, depth: 0 }));
+    },
+    [
+      canReorder,
+      collapsedSubtasksParentIds,
+      orderedTasks,
+      pinnedTasks,
+      subtasksEnabled,
+    ],
   );
 
   const unpinnedVisibleTasks = useMemo(
-    () =>
-      canReorder
-        ? buildVisibleTasks(orderedTasks, false, subtasksEnabled)
-        : listTasks.map((task) => ({ ...task, depth: 0 })),
-    [canReorder, listTasks, orderedTasks, subtasksEnabled],
+    () => {
+      if (subtasksEnabled) {
+        return buildVisibleTasks(
+          orderedTasks,
+          false,
+          true,
+          collapsedSubtasksParentIds,
+        );
+      }
+
+      return canReorder
+        ? buildVisibleTasks(orderedTasks, false, false)
+        : listTasks.map((task) => ({ ...task, depth: 0 }));
+    },
+    [
+      canReorder,
+      collapsedSubtasksParentIds,
+      listTasks,
+      orderedTasks,
+      subtasksEnabled,
+    ],
   );
 
   const tasksById = useMemo(
@@ -1584,6 +1667,10 @@ export function TaskListPanel({
     if (!onAddSubtask) return;
 
     closeTaskMenus();
+    setSubtasksExpandedByTaskId((current) => {
+      saveSubtasksExpanded(taskId, true);
+      return { ...current, [taskId]: true };
+    });
     const subtask = await onAddSubtask(taskId);
     if (!subtask) return;
 
@@ -1926,7 +2013,6 @@ export function TaskListPanel({
     }
 
     activeRow.classList.add("task-row-dragging");
-    activeRow.style.scale = "1.02";
     trySetPointerCapture(activeRow, pointerId);
     activeRow.style.cursor = "grabbing";
     document.body.style.cursor = "grabbing";
@@ -2188,13 +2274,13 @@ export function TaskListPanel({
     const hasLabelActions = Boolean(onToggleTaskLabel);
     const hasMoveActions = Boolean(onMoveTaskToList) && lists.length > 1;
     const useWiderRowPadding = title === "Today" || title === "Important";
-    const subtaskCountByParentId = new Map<string, number>();
+    const sectionSubtaskCountByParentId = new Map<string, number>();
 
     for (const item of taskItems) {
       if (!item.parentId) continue;
-      subtaskCountByParentId.set(
+      sectionSubtaskCountByParentId.set(
         item.parentId,
-        (subtaskCountByParentId.get(item.parentId) ?? 0) + 1,
+        (sectionSubtaskCountByParentId.get(item.parentId) ?? 0) + 1,
       );
     }
 
@@ -2203,8 +2289,9 @@ export function TaskListPanel({
       const previousTask = index > 0 ? taskItems[index - 1] : null;
       const parentSubtaskCount =
         previousTask && task.parentId === previousTask.id
-          ? (subtaskCountByParentId.get(previousTask.id) ?? 0)
+          ? (sectionSubtaskCountByParentId.get(previousTask.id) ?? 0)
           : 0;
+      const parentSubtaskCountForTask = subtaskCountByParentId.get(task.id) ?? 0;
       const showSubtaskConnector =
         subtasksEnabled &&
         depth === 1 &&
@@ -2303,6 +2390,23 @@ export function TaskListPanel({
           }
           hasDeleteActions={Boolean(onDeleteTask)}
           useWiderRowPadding={useWiderRowPadding}
+          subtaskCount={depth === 0 ? parentSubtaskCountForTask : 0}
+          subtasksExpanded={
+            depth === 0
+              ? resolveSubtasksExpandedState(
+                  task.id,
+                  parentSubtaskCountForTask,
+                  subtasksExpandedByTaskId,
+                )
+              : undefined
+          }
+          onToggleSubtasksExpanded={
+            depth === 0 && parentSubtaskCountForTask > 0
+              ? () =>
+                  toggleSubtasksExpanded(task.id, parentSubtaskCountForTask)
+              : undefined
+          }
+          showSubtaskCollapseToggle={subtasksEnabled}
         />
       );
 
@@ -2310,19 +2414,7 @@ export function TaskListPanel({
         return [row];
       }
 
-      return [
-        <li
-          key={`${task.id}-subtask-connector`}
-          aria-hidden="true"
-          className="task-list-item-divider flex h-[15px] items-center py-0 pr-2"
-          style={{
-            paddingLeft: SUBTASK_ROOT_LEFT_PX + SUBTASK_INDENT_PX + SUBTASK_ICON_INDENT_PX,
-          }}
-        >
-          <MdOutlineKeyboardDoubleArrowRight className="size-3 ptxt-350 dark:ptxt-500" />
-        </li>,
-        row,
-      ];
+    
     });
   }
 
@@ -2760,7 +2852,7 @@ export function TaskListPanel({
                       <TaskPriorityFlagIcon
                         level={newTaskPriority}
                         outline={newTaskPriority === null}
-                        className="size-[14px] ptxt-400! group-hover/add-priority:ptxt-600"
+                        className="size-[14px] text-[#a3a3b1]!  ptxt-400! group-hover/add-priority:ptxt-600"
                       />
                     </button>
                     <span

@@ -2,6 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BiChevronDown, BiChevronRight } from "react-icons/bi";
+import {
+  clearSubtasksExpanded,
+  getSavedSubtasksExpanded,
+  resolveSubtasksExpandedState,
+  saveSubtasksExpanded,
+} from "@/lib/task-subtasks";
 import { TaskCompletionCheckbox } from "./task-completion-checkbox";
 
 export type TaskDetailsSubtask = {
@@ -19,65 +25,6 @@ type TaskDetailsSubtasksSectionProps = {
   onToggleSubtask: (subtaskId: string) => void;
   onRenameSubtask: (subtaskId: string, name: string) => void;
 };
-
-const SUBTASKS_EXPANDED_SESSION_KEY = "todolist.subtasks-expanded-by-task";
-
-function readSubtasksExpandedByTask() {
-  if (typeof window === "undefined") return {} as Record<string, boolean>;
-
-  try {
-    const raw = window.sessionStorage.getItem(SUBTASKS_EXPANDED_SESSION_KEY);
-    if (!raw) return {};
-
-    const parsed: unknown = JSON.parse(raw);
-    if (typeof parsed !== "object" || parsed === null) return {};
-
-    return Object.fromEntries(
-      Object.entries(parsed).filter(
-        (entry): entry is [string, boolean] => typeof entry[1] === "boolean",
-      ),
-    );
-  } catch {
-    return {};
-  }
-}
-
-function getSavedSubtasksExpanded(taskId: string) {
-  return readSubtasksExpandedByTask()[taskId];
-}
-
-function saveSubtasksExpanded(taskId: string, expanded: boolean) {
-  if (typeof window === "undefined") return;
-
-  const next = {
-    ...readSubtasksExpandedByTask(),
-    [taskId]: expanded,
-  };
-  window.sessionStorage.setItem(
-    SUBTASKS_EXPANDED_SESSION_KEY,
-    JSON.stringify(next),
-  );
-}
-
-function clearSubtasksExpanded(taskId: string) {
-  if (typeof window === "undefined") return;
-
-  const current = readSubtasksExpandedByTask();
-  if (!(taskId in current)) return;
-
-  const next = { ...current };
-  delete next[taskId];
-  window.sessionStorage.setItem(
-    SUBTASKS_EXPANDED_SESSION_KEY,
-    JSON.stringify(next),
-  );
-}
-
-function resolveSubtasksExpandedState(taskId: string, subtaskCount: number) {
-  const saved = getSavedSubtasksExpanded(taskId);
-  if (saved !== undefined) return saved;
-  return subtaskCount > 0;
-}
 
 function orderSubtasksForDisplay(subtasks: TaskDetailsSubtask[]) {
   return subtasks
