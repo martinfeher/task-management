@@ -1,5 +1,9 @@
 import { revalidatePath } from "next/cache";
-import { getTasksApiData, type TasksQuery } from "@/lib/mobile-api-data";
+import {
+  getTasksApiData,
+  type TasksApiResponse,
+  type TasksQuery,
+} from "@/lib/mobile-api-data";
 import { jsonWithCors, optionsWithCors } from "@/lib/api-cors";
 import { prisma } from "@/lib/prisma";
 import {
@@ -40,8 +44,78 @@ function parseTasksQuery(searchParams: URLSearchParams): TasksQuery | null {
   return null;
 }
 
+const LIST_TASKS_RESPONSE_CACHE_MS =
+  process.env.NODE_ENV === "development" ? 10_000 : 2_000;
+const listTasksResponseCache = new Map<
+  string,
+  { body: TasksApiResponse; fetchedAt: number }
+>();
+const listTasksInFlight = new Map<string, Promise<TasksApiResponse>>();
+
+const listTasksLogState = {
+  lastLoggedAt: 0,
+  countSinceLog: 0,
+};
+
+async function getListTasksApiData(listId: string) {
+  const cached = listTasksResponseCache.get(listId);
+  if (cached && Date.now() - cached.fetchedAt < LIST_TASKS_RESPONSE_CACHE_MS) {
+    return cached.body;
+  }
+
+  const inFlight = listTasksInFlight.get(listId);
+  if (inFlight) {
+    return inFlight;
+  }
+
+  const promise = getTasksApiData({ view: "list", listId })
+    .then((body) => {
+      listTasksResponseCache.set(listId, {
+        body,
+        fetchedAt: Date.now(),
+      });
+      return body;
+    })
+    .finally(() => {
+      if (listTasksInFlight.get(listId) === promise) {
+        listTasksInFlight.delete(listId);
+      }
+    });
+
+  listTasksInFlight.set(listId, promise);
+  return promise;
+}
+
+function logAbusiveListTasksRequest(
+  request: Request,
+  listId: string,
+  count: number,
+) {
+  const userAgent = request.headers.get("user-agent") ?? "(none)";
+  const referer = request.headers.get("referer") ?? "(none)";
+  console.warn(
+    `[tasks-api] Repeated GET listId=${listId} x${count} in 2s — likely a client remount loop. UA: ${userAgent} | Referer: ${referer}`,
+  );
+}
+
 export async function GET(request: Request) {
   const query = parseTasksQuery(new URL(request.url).searchParams);
+
+  if (process.env.NODE_ENV === "development" && query?.view === "list") {
+    listTasksLogState.countSinceLog += 1;
+    const now = Date.now();
+    if (now - listTasksLogState.lastLoggedAt >= 2_000) {
+      if (listTasksLogState.countSinceLog > 5) {
+        logAbusiveListTasksRequest(
+          request,
+          query.listId,
+          listTasksLogState.countSinceLog,
+        );
+      }
+      listTasksLogState.lastLoggedAt = now;
+      listTasksLogState.countSinceLog = 0;
+    }
+  }
 
   if (!query) {
     return jsonWithCors(
@@ -51,7 +125,10 @@ export async function GET(request: Request) {
   }
 
   try {
-    const data = await getTasksApiData(query);
+    const data =
+      query.view === "list"
+        ? await getListTasksApiData(query.listId)
+        : await getTasksApiData(query);
     return jsonWithCors(data);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to load tasks";

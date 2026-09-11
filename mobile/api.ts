@@ -1,16 +1,15 @@
+import {
+  clearMobileListSnapshot,
+  dedupeMobileRequest,
+  type MobileTask,
+} from "./mobile-session";
+
+export type { MobileTask };
+
 const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000").replace(
   /\/$/,
   "",
 );
-
-export type MobileTask = {
-  id: string;
-  name: string;
-  completed: boolean;
-  dueDate: string | null;
-  recurrenceRule: string | null;
-  listId: string;
-};
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, {
@@ -30,18 +29,22 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export async function getFirstListId(): Promise<string> {
-  const data = await api<{ lists: { id: string }[] }>("/api/lists");
-  const listId = data.lists[0]?.id;
-  if (!listId) throw new Error("No lists found");
-  return listId;
+  return dedupeMobileRequest("lists:first", async () => {
+    const data = await api<{ lists: { id: string }[] }>("/api/lists");
+    const listId = data.lists[0]?.id;
+    if (!listId) throw new Error("No lists found");
+    return listId;
+  });
 }
 
 export async function getListTasks(listId: string) {
-  return api<{
-    title: string;
-    pinned: MobileTask[];
-    tasks: MobileTask[];
-  }>(`/api/tasks?listId=${listId}`);
+  return dedupeMobileRequest(`tasks:list:${listId}`, () =>
+    api<{
+      title: string;
+      pinned: MobileTask[];
+      tasks: MobileTask[];
+    }>(`/api/tasks?listId=${listId}`),
+  );
 }
 
 export async function getTask(taskId: string) {
@@ -58,17 +61,21 @@ export async function patchTask(
   taskId: string,
   body: Record<string, unknown>,
 ) {
-  return api(`/api/tasks/${taskId}`, {
+  const result = await api(`/api/tasks/${taskId}`, {
     method: "PATCH",
     body: JSON.stringify(body),
   });
+  clearMobileListSnapshot();
+  return result;
 }
 
 export async function putDetails(taskId: string, details: string) {
-  return api(`/api/tasks/${taskId}/details`, {
+  const result = await api(`/api/tasks/${taskId}/details`, {
     method: "PUT",
     body: JSON.stringify({ details }),
   });
+  clearMobileListSnapshot();
+  return result;
 }
 
 export async function uploadTaskImage(taskId: string) {
@@ -88,6 +95,7 @@ export async function uploadTaskImage(taskId: string) {
     throw new Error(`${response.status}: ${text}`);
   }
 
+  clearMobileListSnapshot();
   return response.json() as Promise<{ url: string }>;
 }
 

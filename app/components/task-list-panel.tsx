@@ -2566,7 +2566,9 @@ export function TaskListPanel({
                     type="text"
                     value={newTaskName}
                     onChange={(event) => setNewTaskName(event.target.value)}
-                    placeholder="New task"
+                    placeholder={
+                      title ? `New task in "${title}"` : "New task"
+                    }
                     aria-label="Task name"
                     title="Add task (Ctrl+Enter / Cmd+Enter)"
                     className="add-task-input min-w-0 flex-1 bg-transparent py-1.5 text-sm text-zinc-700 outline-none dark:text-zinc-50"

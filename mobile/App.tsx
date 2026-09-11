@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -19,6 +19,23 @@ import {
   uploadTaskImage,
   type MobileTask,
 } from "./api";
+import {
+  getMobileLoadInFlight,
+  readMobileListSnapshot,
+  setMobileLoadInFlight,
+  writeMobileListSnapshot,
+} from "./mobile-session";
+
+function hydrateFromSnapshot(
+  snapshot: NonNullable<ReturnType<typeof readMobileListSnapshot>>,
+  listIdRef: { current: string | null },
+  setListTitle: (title: string) => void,
+  setTasks: (tasks: MobileTask[]) => void,
+) {
+  listIdRef.current = snapshot.listId;
+  setListTitle(snapshot.listTitle);
+  setTasks(snapshot.tasks);
+}
 
 export default function App() {
   const [loading, setLoading] = useState(true);
@@ -27,19 +44,71 @@ export default function App() {
   const [tasks, setTasks] = useState<MobileTask[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedDetails, setSelectedDetails] = useState("");
+  const listIdRef = useRef<string | null>(null);
+  const initialLoadDoneRef = useRef(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const listId = await getFirstListId();
-      const data = await getListTasks(listId);
-      setListTitle(data.title);
-      setTasks([...data.pinned, ...data.tasks]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load");
-    } finally {
+  const load = useCallback(async (options?: { background?: boolean; force?: boolean }) => {
+    const snapshot = readMobileListSnapshot();
+    if (!options?.force && snapshot) {
+      hydrateFromSnapshot(snapshot, listIdRef, setListTitle, setTasks);
+      initialLoadDoneRef.current = true;
+      setError(null);
       setLoading(false);
+      return;
+    }
+
+    const inFlight = getMobileLoadInFlight();
+    if (inFlight && !options?.force) {
+      await inFlight;
+      const hydratedSnapshot = readMobileListSnapshot();
+      if (hydratedSnapshot) {
+        hydrateFromSnapshot(
+          hydratedSnapshot,
+          listIdRef,
+          setListTitle,
+          setTasks,
+        );
+      }
+      initialLoadDoneRef.current = true;
+      setLoading(false);
+      return;
+    }
+
+    const isInitialLoad = !initialLoadDoneRef.current;
+    if (!options?.background && isInitialLoad) {
+      setLoading(true);
+    }
+    setError(null);
+
+    const promise = (async () => {
+      try {
+        const listId = listIdRef.current ?? (await getFirstListId());
+        listIdRef.current = listId;
+        const data = await getListTasks(listId);
+        const nextTasks = [...data.pinned, ...data.tasks];
+        setListTitle(data.title);
+        setTasks(nextTasks);
+        writeMobileListSnapshot({
+          listId,
+          listTitle: data.title,
+          tasks: nextTasks,
+          fetchedAt: Date.now(),
+        });
+        initialLoadDoneRef.current = true;
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load");
+      } finally {
+        if (!options?.background && isInitialLoad) {
+          setLoading(false);
+        }
+      }
+    })();
+
+    setMobileLoadInFlight(promise);
+    try {
+      await promise;
+    } finally {
+      setMobileLoadInFlight(null);
     }
   }, []);
 
@@ -61,30 +130,22 @@ export default function App() {
 
   async function toggleComplete(task: MobileTask) {
     await patchTask(task.id, { completed: !task.completed });
-    await load();
+    await load({ background: true, force: true });
   }
 
   async function setWeeklyRepeat(task: MobileTask) {
     await patchTask(task.id, {
       recurrenceRule: { frequency: "weekly", interval: 1 },
     });
-    await load();
+    await load({ background: true, force: true });
   }
 
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.center}>
-        <ActivityIndicator size="large" />
-      </SafeAreaView>
-    );
-  }
-
-  if (error) {
+  if (error && !initialLoadDoneRef.current) {
     return (
       <SafeAreaView style={styles.container}>
         <Text style={styles.error}>Error: {error}</Text>
         <Text style={styles.meta}>API: {getApiUrl()}</Text>
-        <Pressable style={styles.button} onPress={() => void load()}>
+        <Pressable style={styles.button} onPress={() => void load({ force: true })}>
           <Text style={styles.buttonText}>Retry</Text>
         </Pressable>
       </SafeAreaView>
@@ -94,6 +155,12 @@ export default function App() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="auto" />
+      {loading ? (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" />
+        </View>
+      ) : null}
+      {error ? <Text style={styles.error}>{error}</Text> : null}
       <Text style={styles.heading}>{listTitle}</Text>
       <Text style={styles.meta}>API: {getApiUrl()}</Text>
 
@@ -161,7 +228,13 @@ export default function App() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: "#fff" },
-  center: { flex: 1, alignItems: "center", justifyContent: "center" },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.72)",
+    zIndex: 2,
+  },
   heading: { fontSize: 22, fontWeight: "700", marginBottom: 4 },
   meta: { fontSize: 12, color: "#666", marginBottom: 12 },
   row: {
