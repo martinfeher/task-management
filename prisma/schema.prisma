@@ -100,6 +100,13 @@ model SidebarTemplateSetting {
   updatedAt    DateTime @updatedAt
 }
 
+model TaskListTemplateSetting {
+  id           String   @id @default("default")
+  backgroundId String   @default("white")
+  baseColor    String   @default("#f1f5ff")
+  updatedAt    DateTime @updatedAt
+}
+
 model CalendarTaskTemplateSetting {
   id           String   @id @default("default")
   backgroundId String   @default("solid")

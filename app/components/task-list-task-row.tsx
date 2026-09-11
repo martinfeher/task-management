@@ -138,14 +138,14 @@ const TASK_ROW_LEFT_BORDER_COLOR_CLASS = "border-l-[#dADFeF]";
 
 // Schedule/time subline: base #98979c, row hover 20% darker → #79787c
 const TASK_ROW_SCHEDULE_COLOR_CLASS =
-  "text-[#afafaf] group-hover:text-[#7696bf]";
-  // "text-[#afafaf] group-hover:text-[#6f90bf]";
-  // "text-[#afafaf] group-hover:text-[#6fa0cf]";
-  // "text-[#afafaf] group-hover:text-[#6a99c6]";
-  // "text-[#afafaf] group-hover:text-[#6793bc]";
-  // "text-[#afafaf] group-hover:text-[#67a3cc]";
-  // "text-[#afafaf] group-hover:text-[#699abd]";
-  // "text-[#afafaf] group-hover:text-[#8f8d93]";
+  "ptxt-task-datetime group-hover:text-[#7696bf]";
+  // "ptxt-400 group-hover:text-[#6f90bf]";
+  // "ptxt-400 group-hover:text-[#6fa0cf]";
+  // "ptxt-400 group-hover:text-[#6a99c6]";
+  // "ptxt-400 group-hover:text-[#6793bc]";
+  // "ptxt-400 group-hover:text-[#67a3cc]";
+  // "ptxt-400 group-hover:text-[#699abd]";
+  // "ptxt-400 group-hover:text-[#8f8d93]";
 const TASK_ROW_SCHEDULE_TRANSITION_CLASS =
   "transition-colors duration-200 ease-in-out";
 
@@ -338,9 +338,11 @@ export function TaskListTaskRow({
   const dividerClass = getTaskListItemDividerClass(task);
   const hideDueDate = isCheckAnimating || isCompleting;
   const checkedContentDim = hideDueDate ? "opacity-50" : "opacity-100";
+  const titleColorClass =
+    depth > 0 ? "ptxt-subtask-title" : "ptxt-task-title";
   const checkedTextStyle = hideDueDate
-    ? "text-zinc-400 dark:text-zinc-500"
-    : "text-zinc-700 dark:text-zinc-50";
+    ? "ptxt-completed-tasks"
+    : titleColorClass;
   const taskTitleTextClass =
     depth > 0 ? "text-[14px] leading-[18px]" : "text-[15px] leading-[20px]";
   const completionAnimationMs = getCompletionAnimationMs(
@@ -569,8 +571,8 @@ export function TaskListTaskRow({
           <InteractIcon
             className={`size-3.5 ${
               depth > 0
-                ? "text-[#dadce0] group-hover:text-[#919396]"
-                : "text-[#c3c6cc] group-hover:text-[#6f7174]"
+                ? "ptxt-200 group-hover:ptxt-500"
+                : "ptxt-300 group-hover:ptxt-600"
             }`}
           />
         </span>
@@ -586,7 +588,7 @@ export function TaskListTaskRow({
       >
       {task.isNote ? (
         <span
-          className="group/note-icon relative task-list-checkbox flex size-[24px] shrink-0 items-center text-[#979797]"
+          className="group/note-icon relative task-list-checkbox flex size-[24px] shrink-0 items-center ptxt-500"
           aria-label="Note"
           aria-describedby={`note-icon-tooltip-${task.id}`}
         >
@@ -636,7 +638,7 @@ export function TaskListTaskRow({
             onClick={(event) => event.stopPropagation()}
             onBlur={() => onCommitTitleEdit(task)}
             onKeyDown={(event) => onTitleKeyDown(event, task)}
-            className={`min-w-0 w-full border-0 bg-transparent p-0 text-left ${taskTitleTextClass} text-zinc-600 outline-none dark:text-zinc-50`}
+            className={`min-w-0 w-full border-0 bg-transparent p-0 text-left ${taskTitleTextClass} ${titleColorClass} outline-none`}
           />
         ) : (
           <span
@@ -757,9 +759,7 @@ export function TaskListTaskRow({
                 aria-haspopup="dialog"
                 aria-expanded={openDatePickerTaskId === task.id}
                 aria-describedby={`set-date-tooltip-${task.id}`}
-                className={`flex h-[19px] w-[19px] shrink-0 mr-1 items-center justify-center rounded-md text-zinc-400 transition-colors cursor-pointer hover:text-zinc-500 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 ${
-                  task.dueDate ? "text-zinc-400 dark:text-zinc-300" : ""
-                }`}
+                className="flex h-[19px] w-[19px] shrink-0 mr-1 items-center justify-center rounded-md ptxt-task-datetime transition-colors cursor-pointer hover:opacity-80 dark:hover:bg-zinc-800"
                 onPointerDown={(event) => {
                   if (event.button !== 0) return;
                   event.stopPropagation();
@@ -834,7 +834,7 @@ export function TaskListTaskRow({
               aria-haspopup="menu"
               aria-expanded={isPointerMenuOpen || rowMenuView !== null}
               title="More options"
-              className="flex size-[23px] shrink-0 items-center justify-center rounded-full text-zinc-400 cursor-pointer transition-colors hover:bg-zinc-200/80 hover:text-zinc-500 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+              className="flex size-[23px] shrink-0 items-center justify-center rounded-full ptxt-400 cursor-pointer transition-colors hover:bg-zinc-200/80 hover:ptxt-500 dark:ptxt-400 dark:hover:bg-zinc-800 dark:hover:ptxt-100"
               onPointerDown={(event) => {
                 if (event.button !== 0) return;
                 event.stopPropagation();

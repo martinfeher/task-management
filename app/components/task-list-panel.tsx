@@ -79,6 +79,7 @@ import {
   useTaskListTitleEditSession,
   type TaskListPointerContextMenuState,
 } from "@/lib/task-list-interaction-store";
+import { useTaskListBackground } from "@/lib/task-list-background";
 
 export const TASK_LIST_PANEL_DEFAULT_WIDTH = 520;
 export const TASK_LIST_PANEL_AUTO_EXPAND_MAX_WIDTH = 620;
@@ -489,6 +490,7 @@ export function TaskListPanel({
   onOpenSidebar,
   subtasksEnabled = false,
 }: TaskListPanelProps) {
+  const { presentation: taskListBackground } = useTaskListBackground();
   const isListCalendarToggleActive =
     (isListCalendarOpen && !listCalendarShowingDetails) || isListCalendarPreview;
   const [newTaskName, setNewTaskName] = useState("");
@@ -2317,7 +2319,7 @@ export function TaskListPanel({
             paddingLeft: SUBTASK_ROOT_LEFT_PX + SUBTASK_INDENT_PX + SUBTASK_ICON_INDENT_PX,
           }}
         >
-          <MdOutlineKeyboardDoubleArrowRight className="size-3 text-zinc-350 dark:text-zinc-500" />
+          <MdOutlineKeyboardDoubleArrowRight className="size-3 ptxt-350 dark:ptxt-500" />
         </li>,
         row,
       ];
@@ -2399,29 +2401,37 @@ export function TaskListPanel({
         )
       : null;
 
+  const panelLayoutStyle =
+    panelWidth != null
+      ? {
+          width: resolvedPanelWidth,
+          minWidth: TASK_LIST_PANEL_MIN_WIDTH,
+          maxWidth: panelMaxWidth,
+          flexShrink: 0,
+        }
+      : title
+        ? {
+            width: resolvedPanelWidth,
+            minWidth: TASK_LIST_PANEL_MIN_WIDTH,
+            maxWidth: autoExpandMaxWidth,
+            flexShrink: 0,
+          }
+        : undefined;
+
   return (
     <section
       style={
-        panelWidth != null
+        panelLayoutStyle || taskListBackground.style
           ? {
-              width: resolvedPanelWidth,
-              minWidth: TASK_LIST_PANEL_MIN_WIDTH,
-              maxWidth: panelMaxWidth,
-              flexShrink: 0,
+              ...panelLayoutStyle,
+              ...taskListBackground.style,
             }
-          : title
-            ? {
-                width: resolvedPanelWidth,
-                minWidth: TASK_LIST_PANEL_MIN_WIDTH,
-                maxWidth: autoExpandMaxWidth,
-                flexShrink: 0,
-              }
-            : undefined
+          : undefined
       }
       onMouseEnter={onPanelMouseEnter}
-      className={`relative shrink-0 bg-white dark:bg-zinc-950 border-l border-l-[#ffffff] ${
-        isListHovered ? "border-l border-l-[#bbbbbb]" : ""
-      } ${
+      className={`panel-text-scope relative shrink-0 dark:bg-zinc-950 border-l border-l-[#ffffff] ${
+        taskListBackground.className
+      } ${isListHovered ? "border-l border-l-[#bbbbbb]" : ""} ${
         panelWidth != null || title
           ? "flex min-h-0 flex-col border-r border-zinc-200 dark:border-zinc-800"
           : embedded
@@ -2442,13 +2452,13 @@ export function TaskListPanel({
                   <button
                     type="button"
                     aria-label="Open menu"
-                    className="-ml-2 flex size-9 shrink-0 items-center justify-center rounded-lg text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800 lg:hidden"
+                    className="-ml-2 flex size-9 shrink-0 items-center justify-center rounded-lg ptxt-600 hover:bg-zinc-100 dark:ptxt-300 dark:hover:bg-zinc-800 lg:hidden"
                     onClick={onOpenSidebar}
                   >
                     <LuMenu className="size-5" aria-hidden="true" />
                   </button>
                 ) : null}
-                <h1 className="min-w-0 truncate text-xl font-semibold text-gray-700 dark:text-zinc-50">
+                <h1 className="min-w-0 truncate text-xl font-semibold ptxt-task-list-title">
                   {title}
                 </h1>
                 {showListCalendarButton && hasScheduledTasks ? (
@@ -2464,7 +2474,7 @@ export function TaskListPanel({
                       className={`group flex w-full items-center overflow-hidden rounded-lg py-[4px] pl-[9px] pr-[9px] transition-[background-color,padding,max-width,opacity] cursor-pointer ${
                         isListCalendarToggleActive
                           ? "bg-[#4873c7] text-white"
-                          : "bg-[#eceef0] text-zinc-700 hover:bg-zinc-250 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+                          : "bg-[#eceef0] ptxt-700 hover:bg-zinc-250 dark:bg-zinc-800 dark:ptxt-200 dark:hover:bg-zinc-700"
                       }`}
                     >
                       <LuCalendarCheck2
@@ -2501,7 +2511,7 @@ export function TaskListPanel({
                     }
                     aria-haspopup="menu"
                     aria-expanded={isSortMenuOpen}
-                    className="flex h-[27px] cursor-pointer items-center rounded-lg pl-1 pr-[6px] text-[14px] text-[#777777] transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+                    className="flex h-[27px] cursor-pointer items-center rounded-lg pl-1 pr-[6px] text-[14px] ptxt-500 transition-colors hover:ptxt-900 dark:ptxt-400 dark:hover:ptxt-100"
                   >
                     <BiSortAlt2
                       className="size-[15px] shrink-0"
@@ -2533,7 +2543,7 @@ export function TaskListPanel({
                             onClick={() =>
                               applySort(option.field, option.direction)
                             }
-                            className="flex h-[32px] w-full cursor-pointer items-center px-3 text-left text-[13px] text-zinc-650  hover:text-zinc-800 transition-colors hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-zinc-800/80"
+                            className="flex h-[32px] w-full cursor-pointer items-center px-3 text-left text-[13px] ptxt-650  hover:ptxt-800 transition-colors hover:bg-zinc-50 dark:ptxt-200 dark:hover:bg-zinc-800/80"
                           >
                             {option.label}
                           </button>
@@ -2571,7 +2581,7 @@ export function TaskListPanel({
                     }
                     aria-label="Task name"
                     title="Add task (Ctrl+Enter / Cmd+Enter)"
-                    className="add-task-input min-w-0 flex-1 bg-transparent py-1.5 text-sm text-zinc-700 outline-none dark:text-zinc-50"
+                    className="add-task-input min-w-0 flex-1 bg-transparent py-1.5 text-sm ptxt-700 outline-none dark:ptxt-50"
                     onKeyDown={(event) => {
                       if (event.key === "Escape") {
                         event.preventDefault();
@@ -2626,7 +2636,7 @@ export function TaskListPanel({
                           : ""
                       }`}
                     >
-                      <TaskSetDateIcon className="size-[19px] text-[#8b8b97] group-hover/date-picker:text-[#54545e]" />
+                      <TaskSetDateIcon className="size-[19px] ptxt-400 group-hover/date-picker:ptxt-600" />
                     </button>
                     <span
                       id="add-task-calendar-tooltip"
@@ -2691,7 +2701,7 @@ export function TaskListPanel({
                           : ""
                       }`}
                     >
-                      <IoPricetagsOutline className="size-[15px] text-[#aeaeae] group-hover/add-label:text-[#54545e]" />
+                      <IoPricetagsOutline className="size-[15px] ptxt-400 group-hover/add-label:ptxt-600" />
                     </button>
                     <span
                       id="add-task-label-tooltip"
@@ -2750,7 +2760,7 @@ export function TaskListPanel({
                       <TaskPriorityFlagIcon
                         level={newTaskPriority}
                         outline={newTaskPriority === null}
-                        className="size-[14px] text-[#aeaeae]! group-hover/add-priority:text-[#54545e]"
+                        className="size-[14px] ptxt-400! group-hover/add-priority:ptxt-600"
                       />
                     </button>
                     <span
@@ -2787,7 +2797,7 @@ export function TaskListPanel({
                   </button>
                 </form>
                 {newTaskParsePreview ? (
-                  <p className="mt-1 px-1 text-[11px] text-zinc-400 dark:text-zinc-500">
+                  <p className="mt-1 px-1 text-[11px] ptxt-400 dark:ptxt-500">
                     {newTaskParsePreview}
                   </p>
                 ) : null}
@@ -2805,7 +2815,7 @@ export function TaskListPanel({
           >
           {showAddTask && pinnedVisibleTasks.length > 0 && (
             <div className="mb-2 border-b border-zinc-200 bg-zinc-50/40 dark:border-zinc-700 dark:bg-zinc-900/40">
-              <p className="px-4 pb-1 pt-2.5 text-[10px] font-semibold uppercase tracking-wide text-slate-300 dark:text-zinc-400">
+              <p className="px-4 pb-1 pt-2.5 text-[10px] font-semibold uppercase tracking-wide ptxt-300 dark:ptxt-400">
                 Pinned
               </p>
               <ul
@@ -2847,7 +2857,7 @@ export function TaskListPanel({
             )}
 
             {listTasks.length === 0 && pinnedVisibleTasks.length === 0 ? (
-              <li className="pl-[33px] pr-4 py-3 text-sm text-zinc-500 dark:text-zinc-400">
+              <li className="pl-[33px] pr-4 py-3 text-sm ptxt-500 dark:ptxt-400">
                 {title === "Today"
                   ? "No tasks for today"
                   // : title === "Next 7 days"
@@ -2874,17 +2884,17 @@ export function TaskListPanel({
                 type="button"
                 onClick={() => setIsCompletedOpen((open) => !open)}
                 aria-expanded={isCompletedOpen}
-                className="flex w-full items-center gap-1.5 pl-1 pr-4 py-2.5 text-left text-sm outline-none text-[#777b7e] transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-900/40"
+                className="flex w-full items-center gap-1.5 pl-1 pr-4 py-2.5 text-left text-sm outline-none ptxt-completed-tasks transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-900/40"
               >
                 <BiChevronDown
-                  className={`size-4 shrink-0 text-zinc-400 transition-transform ${
+                  className={`size-4 shrink-0 ptxt-400 transition-transform ${
                     isCompletedOpen ? "rotate-0" : "-rotate-90"
                   }`}
                   aria-hidden="true"
                 />
                 <span>Completed</span>
                 {completedTasks.length > 0 ? (
-                  <span className="text-xs text-zinc-400 dark:text-zinc-500">
+                  <span className="text-xs ptxt-400 dark:ptxt-500">
                     {completedTasks.length}
                   </span>
                 ) : null}
@@ -2892,7 +2902,7 @@ export function TaskListPanel({
 
               {isCompletedOpen ? (
                 completedTasks.length === 0 ? (
-                  <p className="px-4 pb-3 text-sm text-zinc-500 dark:text-zinc-400">
+                  <p className="px-4 pb-3 text-sm ptxt-completed-tasks">
                     No completed tasks
                   </p>
                 ) : (
@@ -2926,7 +2936,7 @@ export function TaskListPanel({
                         >
                           <span
                             data-task-truncate-measure
-                            className="block truncate text-sm leading-[19px] text-zinc-400 dark:text-zinc-500"
+                            className="block truncate text-sm leading-[19px] ptxt-completed-tasks"
                           >
                             {task.name}
                           </span>
@@ -2943,7 +2953,7 @@ export function TaskListPanel({
         </div>
       ) : (
         <div className="p-4">
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          <p className="text-sm ptxt-500 dark:ptxt-400">
             Select a list, Today, or Calendar to view tasks
           </p>
         </div>

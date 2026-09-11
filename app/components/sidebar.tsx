@@ -134,8 +134,8 @@ function getItemClassName(isSelected: boolean, baseClassName = itemClassName) {
 
   return `${baseClassName} ${heightClass} ${
     isSelected
-      ? "bg-[#e9ebee] font-medium text-[#111111] dark:bg-zinc-800 dark:text-zinc-50"
-      : "text-zinc-900 hover:bg-zinc-200/60 dark:text-zinc-50 dark:hover:bg-zinc-800/60"
+      ? "bg-[#e9ebee] font-medium ptxt-950 dark:bg-zinc-800 dark:ptxt-50"
+      : "ptxt-900 hover:bg-zinc-200/60 dark:ptxt-50 dark:hover:bg-zinc-800/60"
   }`;
 }
 
@@ -421,10 +421,10 @@ export function Sidebar({
     isSelected: boolean,
   ) {
     if (isSelected) {
-      return `${itemClassName} group h-[35px] bg-[#e9ebee]/50 font-medium text-[#111111] dark:bg-zinc-800 dark:text-zinc-50`;
+      return `${itemClassName} group h-[35px] bg-[#e9ebee]/50 font-medium ptxt-950 dark:bg-zinc-800 dark:ptxt-50`;
     }
 
-    return `${itemClassName} group h-[35px] text-zinc-900 hover:bg-zinc-200/50 dark:text-zinc-50 dark:hover:bg-zinc-800/60`;
+    return `${itemClassName} group h-[35px] ptxt-900 hover:bg-zinc-200/50 dark:ptxt-50 dark:hover:bg-zinc-800/60`;
   }
 
   function openRenameModal(list: TodoList) {
@@ -917,7 +917,7 @@ export function Sidebar({
         />
       ) : null}
       <aside
-        className={`flex h-full min-h-0 w-[250px] shrink-0 flex-col border-r border-zinc-200 dark:border-zinc-800 dark:bg-zinc-950 ${sidebarBackground.className} ${
+        className={`panel-text-scope flex h-full min-h-0 w-[250px] shrink-0 flex-col border-r border-zinc-200 dark:border-zinc-800 dark:bg-zinc-950 ${sidebarBackground.className} ${
           compactDrawer
             ? `fixed inset-y-0 left-0 z-50 transition-transform duration-200 ease-out lg:static lg:translate-x-0 ${
                 drawerOpen ? "translate-x-0" : "-translate-x-full"
@@ -935,8 +935,8 @@ export function Sidebar({
               (item.action === "important" && isImportantSelected) ||
               (item.action === "calendar" && isCalendarSelected);
             const navIconColor = isNavItemSelected
-              ? "text-[#111111]"
-              : "text-[#7c92a0]";
+              ? "ptxt-950"
+              : "ptxt-400";
 
             return (
             item.action === "today" ||
@@ -994,7 +994,7 @@ export function Sidebar({
                   aria-hidden="true"
                 />
               )}
-              <span className="inline-block max-w-full truncate rounded-full pl-0 pr-3 py-[3.5px] text-zinc-700 transition-all duration-300 cursor-pointer dark:bg-zinc-800/60 dark:hover:bg-zinc-800/80">
+              <span className="inline-block max-w-full truncate rounded-full pl-0 pr-3 py-[3.5px] ptxt-700 transition-all duration-300 cursor-pointer dark:bg-zinc-800/60 dark:hover:bg-zinc-800/80">
                 {item.label}
               </span>
             </div>
@@ -1015,7 +1015,7 @@ export function Sidebar({
               }
               className={
                 item.action === "search"
-                  ? "mx-[6px] my-2 flex h-[35px] w-auto bg-[#fcfbff] cursor-pointer items-center gap-2 self-stretch rounded-[7px] border border-[#e3e3e9] py-0 pl-3 pr-[3px] text-left text-sm text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800/60"
+                  ? "mx-[6px] my-2 flex h-[35px] w-auto bg-[#fcfbff] cursor-pointer items-center gap-2 self-stretch rounded-[7px] border border-[#e3e3e9] py-0 pl-3 pr-[3px] text-left text-sm ptxt-list-search transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
                   : `${getItemClassName(isNavItemSelected)} gap-1 px-4`
               }
             >
@@ -1031,9 +1031,9 @@ export function Sidebar({
                   className="ml-auto flex h-[25px] w-[37px] shrink-0 items-center justify-center rounded-full bg-[#EcEcEf] mr-[1px] border border-[#eee8ef]"
                   aria-hidden="true"
                 >
-                  <div className="flex items-center gap-px text-[#a1a7be]/80">
+                  <div className="flex items-center gap-px ptxt-400/80">
                     <MacCmdIcon className="size-[9px] shrink-0" />
-                    <span className="text-[10px] font-bold leading-none text-[#a1a7ae]/80">
+                    <span className="text-[10px] font-bold leading-none ptxt-400/80">
                       +K
                     </span>
                   </div>
@@ -1045,7 +1045,7 @@ export function Sidebar({
           })}
           
           <hr className="mt-2 mb-1.5 border-zinc-200 dark:border-zinc-800" />
-          <div className="flex flex-col gap-2 px-4 text-xs font-medium text-zinc-400 dark:text-zinc-500">Lists</div>
+          <div className="flex flex-col gap-2 px-4 text-xs font-medium ptxt-400 dark:ptxt-500">Lists</div>
           <div
             ref={listContainerRef}
             className="relative flex flex-col"
@@ -1097,11 +1097,11 @@ export function Sidebar({
                   className="flex size-[19px] shrink-0 cursor-grab items-center justify-center active:cursor-grabbing"
                   onPointerDown={(event) => handleListPointerDown(event, list.id)}
                 >
-                  <InteractIcon className="size-3.5 text-[#aaabad] opacity-0 transition-opacity group-hover:opacity-100" />
+                  <InteractIcon className="size-3.5 ptxt-400 opacity-0 transition-opacity group-hover:opacity-100" />
                 </span>
               ) : null}
               <div
-                className={`flex min-w-0 flex-1 items-center pr-[40px] text-left text-sm text-zinc-800 dark:text-zinc-50 ${
+                className={`flex min-w-0 flex-1 items-center pr-[40px] text-left text-sm ptxt-list-items ${
                   onReorderLists ? "pl-0 -ml-[4px]!" : "pl-[11px]"
                 }`}
               >
@@ -1117,12 +1117,12 @@ export function Sidebar({
                     onBlur={() => commitListNameEdit(list)}
                     onKeyDown={(event) => handleListNameKeyDown(event, list)}
                     aria-label={`Rename ${list.name}`}
-                    className="min-w-0 flex-1 bg-transparent text-sm text-zinc-800 outline-none cursor-text dark:text-zinc-50"
+                    className="min-w-0 flex-1 bg-transparent text-sm ptxt-list-items outline-none cursor-text"
                   />
                 ) : (
                   <div className="min-w-0 flex items-center">
                     <div
-                      className="inline-block text-zinc-700 hover:text-[#404040] hover:bg-[#dfdfe6]/80 max-w-full truncate pl-[6px] pr-3 py-[3.5px] rounded-full cursor-pointer dark:bg-zinc-800/60 dark:hover:bg-zinc-800/80 transition-all duration-300"
+                      className="inline-block ptxt-list-items hover:bg-[#dfdfe6]/80 max-w-full truncate pl-[6px] pr-3 py-[3.5px] rounded-full cursor-pointer dark:bg-zinc-800/60 dark:hover:bg-zinc-800/80 transition-all duration-300"
                       onMouseEnter={() => {
                         onSidebarHoverStart?.({ kind: "list", listId: list.id });
                       }}
@@ -1143,7 +1143,7 @@ export function Sidebar({
                         className="list-name-hover-arrow pointer-events-none inline-flex shrink-0"
                       >
                         <LuArrowRight
-                          className="size-[13px] text-[#777777] ml-1"
+                          className="size-[13px] ptxt-500 ml-1"
                           strokeWidth={2.25}
                         />
                       </span>
@@ -1151,14 +1151,14 @@ export function Sidebar({
                   </div>
                 )}
               </div>
-              <span className="pointer-events-none absolute right-[27px] top-1/2 -translate-y-1/2 text-xs tabular-nums text-zinc-400 dark:text-zinc-500">
+              <span className="pointer-events-none absolute right-[27px] top-1/2 -translate-y-1/2 text-xs tabular-nums ptxt-400 dark:ptxt-500">
                 {taskCountByListId[list.id] ?? 0}
               </span>
 
               {isNameHovered && activeText ? (
                 <div
                   aria-hidden="true"
-                  className="pointer-events-none absolute top-1/2 right-[41px] -translate-y-1/2 whitespace-nowrap text-[10px] text-zinc-350 dark:text-zinc-500"
+                  className="pointer-events-none absolute top-1/2 right-[41px] -translate-y-1/2 whitespace-nowrap text-[10px] ptxt-350 dark:ptxt-500"
                 >
                   active
                 </div>
@@ -1171,7 +1171,7 @@ export function Sidebar({
                   type="button"
                   aria-label={`Open menu for ${list.name}`}
                   aria-expanded={openMenuListId === list.id}
-                  className={`flex size-[22px] items-center justify-center rounded-full text-zinc-500 transition-opacity hover:bg-zinc-200/80 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-zinc-50 cursor-pointer ${
+                  className={`flex size-[22px] items-center justify-center rounded-full ptxt-500 transition-opacity hover:bg-zinc-200/80 hover:ptxt-900 dark:ptxt-400 dark:hover:bg-zinc-700 dark:hover:ptxt-50 cursor-pointer ${
                     openMenuListId === list.id
                       ? "opacity-100"
                       : "opacity-0 group-hover:opacity-100"
@@ -1184,14 +1184,14 @@ export function Sidebar({
                     );
                   }}
                 >
-                  <PiDotsThreeBold className="size-[15px] text-[#777777]" />
+                  <PiDotsThreeBold className="size-[15px] ptxt-500" />
                 </button>
 
                 {openMenuListId === list.id && (
                   <div className="absolute right-0 top-full z-20 mt-1 w-36 overflow-hidden rounded-md border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
                     <button
                       type="button"
-                      className="flex h-[35px] w-full items-center px-3 text-left text-sm text-zinc-900 hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800"
+                      className="flex h-[35px] w-full items-center px-3 text-left text-sm ptxt-900 hover:bg-zinc-100 dark:ptxt-50 dark:hover:bg-zinc-800"
                       onClick={() => openRenameModal(list)}
                     >
                       Rename
@@ -1214,14 +1214,14 @@ export function Sidebar({
 
           <button
             type="button"
-            className={`${getItemClassName(false)} gap-2 pr-4 pl-[15px] group hover:text-zinc-900 hover:bg-[#ececee]`}
+            className={`${getItemClassName(false)} gap-2 pr-4 pl-[15px] group hover:ptxt-900 hover:bg-[#ececee]`}
             onClick={() => setIsAddListOpen(true)}
           >
             <div className="pl-3 pr-3 py-1 rounded-lg flex items-center gap-1 duration-200">
             {/* <div className="hover:bg-[#e1ddda] pl-2 pr-3 py-1 rounded-lg flex items-center gap-1 duration-200"> */}
-              <LuPlus className="size-3.5 text-gray-500 group-hover:text-zinc-600 shrink-0" aria-hidden="true" />
-              {/* <LuPlus className="size-3.5 text-[#d0d5dc] group-hover:text-zinc-600 shrink-0" aria-hidden="true" /> */}
-              <div className="text-gray-500 group-hover:text-gray-800 ">Create list</div>
+              <LuPlus className="size-3.5 ptxt-500 group-hover:ptxt-600 shrink-0" aria-hidden="true" />
+              {/* <LuPlus className="size-3.5 text-[#d0d5dc] group-hover:ptxt-600 shrink-0" aria-hidden="true" /> */}
+              <div className="ptxt-500 group-hover:ptxt-800 ">Create list</div>
             </div>
           </button>
 
@@ -1236,12 +1236,12 @@ export function Sidebar({
               className="flex w-full items-center gap-1 px-4 pb-1 text-left"
             >
               <BiChevronDown
-                className={`size-3.5 shrink-0 text-zinc-400 transition-transform ${
+                className={`size-3.5 shrink-0 ptxt-400 transition-transform ${
                   isLabelsOpen ? "rotate-0" : "-rotate-90"
                 }`}
                 aria-hidden="true"
               />
-              <span className="text-xs font-medium text-zinc-400 dark:text-zinc-500">
+              <span className="text-xs font-medium ptxt-400 dark:ptxt-500">
                 Labels
               </span>
             </button>
@@ -1258,7 +1258,7 @@ export function Sidebar({
                   />
                 )}
                 {orderedLabels.length === 0 ? (
-                  <p className="px-4 pb-1 text-xs text-zinc-400 dark:text-zinc-500">
+                  <p className="px-4 pb-1 text-xs ptxt-400 dark:ptxt-500">
                     No labels
                   </p>
                 ) : (
@@ -1276,8 +1276,8 @@ export function Sidebar({
                           handleLabelPointerDown(event, item.id)
                         }
                         onClick={() => handleLabelClick(item.id)}
-                        className={`group relative flex items-center ${getItemClassName(isSelected)} text-[#5b5b5b] rounded-r-[4px] ${
-                          isSelected ? "" : "hover:text-[#777777]"
+                        className={`group relative flex items-center ${getItemClassName(isSelected)} ptxt-label-items rounded-r-[4px] ${
+                          isSelected ? "" : "opacity-90"
                         } ${
                           showLabelAccentBorder
                             ? "border-l-[2px] border-l-[#dadfdf]"
@@ -1293,7 +1293,7 @@ export function Sidebar({
                         }}
                       >
                         <div className="flex min-w-0 flex-1 items-center pl-5 pr-[40px] text-left">
-                          <span className="min-w-0 flex-1 truncate text-[#777777]">
+                          <span className="min-w-0 flex-1 truncate ptxt-label-items">
                             {item.label}
                           </span>
                         </div>
@@ -1303,7 +1303,7 @@ export function Sidebar({
                             className="size-2.5 shrink-0 rounded-[3px]"
                             style={{ backgroundColor: labelColor.dot }}
                           />
-                          <span className="min-w-[1ch] text-xs tabular-nums text-[#777777]">
+                          <span className="min-w-[1ch] text-xs tabular-nums ptxt-500">
                             {taskCountByLabelId[item.id] ?? 0}
                           </span>
                         </span>
@@ -1312,7 +1312,7 @@ export function Sidebar({
                             type="button"
                             aria-label={`Open menu for ${item.label}`}
                             aria-expanded={openMenuLabelId === item.id}
-                            className={`flex size-[22px] items-center justify-center rounded-full text-zinc-500 transition-opacity hover:bg-zinc-200/80 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-zinc-50 cursor-pointer ${
+                            className={`flex size-[22px] items-center justify-center rounded-full ptxt-500 transition-opacity hover:bg-zinc-200/80 hover:ptxt-900 dark:ptxt-400 dark:hover:bg-zinc-700 dark:hover:ptxt-50 cursor-pointer ${
                               openMenuLabelId === item.id
                                 ? "opacity-100"
                                 : "opacity-0 group-hover:opacity-100"
@@ -1323,7 +1323,7 @@ export function Sidebar({
                               toggleLabelMenuFromButton(item.id, event.currentTarget);
                             }}
                           >
-                            <PiDotsThreeBold className="size-[15px] text-[#777777]" />
+                            <PiDotsThreeBold className="size-[15px] ptxt-500" />
                           </button>
                         </div>
                       </div>
@@ -1343,7 +1343,7 @@ export function Sidebar({
                   className="size-3.5 shrink-0 text-[#e04545]"
                   aria-hidden="true"
                 />
-                <span className="text-[#777b7e] group-hover:text-gray-800">
+                <span className="ptxt-550 group-hover:ptxt-800">
                   Add label
                 </span>
               </div>
@@ -1358,16 +1358,16 @@ export function Sidebar({
             >
               <BiCheckboxChecked
                 className={`size-[21px] shrink-0 ${
-                  isCompletedOpen ? "text-[#111111]" : "text-[#b5bcc1]"
+                  isCompletedOpen ? "ptxt-950" : "ptxt-400"
                 }`}
                 aria-hidden="true"
               />
-              <span className="text-[#777b7e]">Completed</span>
+              <span className="ptxt-550">Completed</span>
             </button>
 
             {isCompletedOpen &&
               (completedTasks.length === 0 ? (
-                <p className="px-4 pb-3 text-xs text-zinc-400 dark:text-zinc-500">
+                <p className="px-4 pb-3 text-xs ptxt-400 dark:ptxt-500">
                   No completed tasks
                 </p>
               ) : (
@@ -1385,10 +1385,10 @@ export function Sidebar({
                         closeDrawer();
                       }}
                     >
-                      <span className="w-full truncate text-zinc-400 line-through dark:text-zinc-500">
+                      <span className="w-full truncate ptxt-400 line-through dark:ptxt-500">
                         {task.name}
                       </span>
-                      <span className="w-full truncate text-xs text-zinc-400 dark:text-zinc-500">
+                      <span className="w-full truncate text-xs ptxt-400 dark:ptxt-500">
                         {task.listName}
                       </span>
                     </button>
@@ -1409,7 +1409,7 @@ export function Sidebar({
               });
               closeDrawer();
             }}
-            className="flex size-8 items-center justify-center rounded-full text-[#7c92a0] transition-colors hover:bg-zinc-200/60 hover:text-zinc-900 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-50 cursor-pointer"
+            className="flex size-8 items-center justify-center rounded-full ptxt-400 transition-colors hover:bg-zinc-200/60 hover:ptxt-900 dark:hover:bg-zinc-800/60 dark:hover:ptxt-50 cursor-pointer"
           >
             <FiSettings className="size-[18px]" aria-hidden="true" />
           </button>

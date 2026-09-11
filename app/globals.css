@@ -17,9 +17,141 @@
   }
 }
 
+@layer utilities {
+  .ptxt-50 {
+    color: var(--panel-text-50);
+  }
+
+  .ptxt-100 {
+    color: var(--panel-text-100);
+  }
+
+  .ptxt-150 {
+    color: var(--panel-text-150);
+  }
+
+  .ptxt-200 {
+    color: var(--panel-text-200);
+  }
+
+  .ptxt-250 {
+    color: var(--panel-text-250);
+  }
+
+  .ptxt-300 {
+    color: var(--panel-text-300);
+  }
+
+  .ptxt-350 {
+    color: var(--panel-text-350);
+  }
+
+  .ptxt-400 {
+    color: var(--panel-text-400);
+  }
+
+  .ptxt-500 {
+    color: var(--panel-text-500);
+  }
+
+  .ptxt-550 {
+    color: var(--panel-text-550);
+  }
+
+  .ptxt-600 {
+    color: var(--panel-text-600);
+  }
+
+  .ptxt-650 {
+    color: var(--panel-text-650);
+  }
+
+  .ptxt-700 {
+    color: var(--panel-text-700);
+  }
+
+  .ptxt-750 {
+    color: var(--panel-text-750);
+  }
+
+  .ptxt-800 {
+    color: var(--panel-text-800);
+  }
+
+  .ptxt-850 {
+    color: var(--panel-text-850);
+  }
+
+  .ptxt-900 {
+    color: var(--panel-text-900);
+  }
+
+  .ptxt-950 {
+    color: var(--panel-text-950);
+  }
+
+  .ptxt-list-search {
+    color: var(--panel-text-list-search);
+  }
+
+  .ptxt-list-items {
+    color: var(--panel-text-list-items);
+  }
+
+  .ptxt-label-items {
+    color: var(--panel-text-label-items);
+  }
+
+  .ptxt-task-list-title {
+    color: var(--panel-text-task-list-title);
+  }
+
+  .ptxt-task-title {
+    color: var(--panel-text-task-title);
+  }
+
+  .ptxt-subtask-title {
+    color: var(--panel-text-subtask-title);
+  }
+
+  .ptxt-task-datetime {
+    color: var(--panel-text-task-datetime);
+  }
+
+  .ptxt-completed-tasks {
+    color: var(--panel-text-completed-tasks);
+  }
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --panel-text-50: #fafafa;
+  --panel-text-100: #f4f4f5;
+  --panel-text-150: #ececee;
+  --panel-text-200: #e4e4e7;
+  --panel-text-250: #dcdce0;
+  --panel-text-300: #d4d4d8;
+  --panel-text-350: #b9b9c0;
+  --panel-text-400: #9f9fa9;
+  --panel-text-500: #71717b;
+  --panel-text-550: #61616c;
+  --panel-text-600: #52525c;
+  --panel-text-650: #484851;
+  --panel-text-700: #3f3f46;
+  --panel-text-750: #333338;
+  --panel-text-800: #27272a;
+  --panel-text-850: #1f1f23;
+  --panel-text-900: #18181b;
+  --panel-text-950: #09090b;
+  --panel-text-list-search: #3f3f46;
+  --panel-text-list-items: #27272a;
+  --panel-text-label-items: #52525c;
+  --panel-text-task-list-title: #3f3f46;
+  --panel-text-task-title: #3f3f46;
+  --panel-text-subtask-title: #3f3f46;
+  --panel-text-task-datetime: #9f9fa9;
+  --panel-text-completed-tasks: #9f9fa9;
   --font-app: var(--font-inter);
   --calendar-task-surface-shadow:
     0 2px 4px rgba(0, 0, 0, 0.04),

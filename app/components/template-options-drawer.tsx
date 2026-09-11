@@ -12,7 +12,20 @@ import {
   SIDEBAR_BACKGROUND_OPTIONS,
   useSidebarBackground,
 } from "@/lib/sidebar-background";
+import {
+  getTaskListBackgroundPresentation,
+  TASK_LIST_BACKGROUND_OPTIONS,
+  useTaskListBackground,
+} from "@/lib/task-list-background";
 import { normalizeHexColor } from "@/lib/sidebar-background-types";
+import {
+  PANEL_TEXT_ELEMENT_GROUPS,
+  PANEL_TEXT_ELEMENT_LABELS,
+  PANEL_TEXT_SHADE_DROPDOWN_OPTIONS,
+  usePanelTextColors,
+  type PanelTextElementKey,
+  type PanelTextShadeToken,
+} from "@/lib/panel-text-shade";
 import {
   MAX_TOOLTIP_CORNER_RADIUS_PX,
   MIN_TOOLTIP_CORNER_RADIUS_PX,
@@ -166,6 +179,59 @@ type BackgroundOption = {
   usesEndColor?: boolean;
 };
 
+function PanelTextColorControl({
+  label,
+  shade,
+  color,
+  onShadeChange,
+  onColorChange,
+}: {
+  label: string;
+  shade: string;
+  color: string;
+  onShadeChange: (shade: string) => void;
+  onColorChange: (color: string) => void;
+}) {
+  function stopInteraction(event: React.SyntheticEvent) {
+    event.stopPropagation();
+  }
+
+  return (
+    <div
+      className="space-y-1.5 py-2"
+      onClick={stopInteraction}
+      onPointerDown={stopInteraction}
+    >
+      <span className="block text-sm text-zinc-800 dark:text-zinc-100">
+        {label}
+      </span>
+      <div className="flex items-center gap-1.5">
+        <select
+          aria-label={`${label} shade`}
+          value={shade}
+          onChange={(event) => onShadeChange(event.target.value)}
+          className="min-w-0 flex-1 rounded-md border border-zinc-300 bg-white px-1.5 py-1 text-xs text-zinc-800 outline-none focus:border-zinc-400 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:focus:border-zinc-500"
+        >
+          {PANEL_TEXT_SHADE_DROPDOWN_OPTIONS.map((group) => (
+            <optgroup key={group.palette} label={group.label}>
+              {group.tokens.map((token) => (
+                <option key={token} value={token}>
+                  {token}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+        <TemplateHexColorPicker
+          label={`${label} color`}
+          value={color}
+          onChange={onColorChange}
+        />
+      </div>
+    </div>
+  );
+}
+
 function BackgroundOptionList<T extends string>({
   options,
   selectedId,
@@ -280,15 +346,35 @@ export function TemplateOptionsDrawer() {
   const [open, setOpen] = useState(false);
   const drawerId = useId();
   const sidebar = useSidebarBackground();
+  const taskList = useTaskListBackground();
   const calendarTask = useCalendarTaskBackground();
   const tooltip = useTooltipSettings();
+  const panelTextColors = usePanelTextColors();
 
-  const isDirty = sidebar.isDirty || calendarTask.isDirty || tooltip.isDirty;
-  const isSaving = sidebar.isSaving || calendarTask.isSaving || tooltip.isSaving;
+  const isDirty =
+    sidebar.isDirty ||
+    taskList.isDirty ||
+    calendarTask.isDirty ||
+    tooltip.isDirty ||
+    panelTextColors.isDirty;
+  const isSaving =
+    sidebar.isSaving ||
+    taskList.isSaving ||
+    calendarTask.isSaving ||
+    tooltip.isSaving ||
+    panelTextColors.isSaving;
   const saveError =
-    sidebar.saveError ?? calendarTask.saveError ?? tooltip.saveError;
+    sidebar.saveError ??
+    taskList.saveError ??
+    calendarTask.saveError ??
+    tooltip.saveError ??
+    panelTextColors.saveError;
   const saveSuccess =
-    sidebar.saveSuccess || calendarTask.saveSuccess || tooltip.saveSuccess;
+    sidebar.saveSuccess ||
+    taskList.saveSuccess ||
+    calendarTask.saveSuccess ||
+    tooltip.saveSuccess ||
+    panelTextColors.saveSuccess;
 
   useEffect(() => {
     if (!open) return;
@@ -307,11 +393,17 @@ export function TemplateOptionsDrawer() {
     if (sidebar.isDirty) {
       await sidebar.saveSettings();
     }
+    if (taskList.isDirty) {
+      await taskList.saveSettings();
+    }
     if (calendarTask.isDirty) {
       await calendarTask.saveSettings();
     }
     if (tooltip.isDirty) {
       await tooltip.saveSettings();
+    }
+    if (panelTextColors.isDirty) {
+      await panelTextColors.saveSettings();
     }
   }
 
@@ -344,6 +436,47 @@ export function TemplateOptionsDrawer() {
         <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
           <section className="mb-6">
             <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+              Panel text colors
+            </h3>
+            <p className="mb-2 px-1 text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400">
+              Choose a Tailwind zinc, slate, or gray shade (50-step increments)
+              or pick a custom hex color for each text element.
+            </p>
+            <div className="space-y-3 rounded-lg border border-zinc-200 px-3 py-2 dark:border-zinc-700">
+              {PANEL_TEXT_ELEMENT_GROUPS.map((group) => (
+                <div key={group.title}>
+                  <h4 className="mb-1 px-0.5 text-[11px] font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+                    {group.title}
+                  </h4>
+                  <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                    {group.keys.map((key) => (
+                      <PanelTextColorControl
+                        key={key}
+                        label={PANEL_TEXT_ELEMENT_LABELS[key as PanelTextElementKey]}
+                        shade={panelTextColors.settings[key as PanelTextElementKey].shade}
+                        color={panelTextColors.settings[key as PanelTextElementKey].color}
+                        onShadeChange={(shade) =>
+                          panelTextColors.setElementShade(
+                            key as PanelTextElementKey,
+                            shade as PanelTextShadeToken,
+                          )
+                        }
+                        onColorChange={(color) =>
+                          panelTextColors.setElementColor(
+                            key as PanelTextElementKey,
+                            color,
+                          )
+                        }
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="mb-6">
+            <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
               Sidebar background
             </h3>
             <BackgroundOptionList
@@ -353,6 +486,21 @@ export function TemplateOptionsDrawer() {
               getPresentation={getSidebarBackgroundPresentation}
               onSelect={sidebar.setBackgroundId}
               onBaseColorChange={sidebar.setBaseColor}
+              colorPickerLabelPrefix="Base color for"
+            />
+          </section>
+
+          <section className="mb-6">
+            <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+              Task list background
+            </h3>
+            <BackgroundOptionList
+              options={TASK_LIST_BACKGROUND_OPTIONS}
+              selectedId={taskList.backgroundId}
+              baseColor={taskList.baseColor}
+              getPresentation={getTaskListBackgroundPresentation}
+              onSelect={taskList.setBackgroundId}
+              onBaseColorChange={taskList.setBaseColor}
               colorPickerLabelPrefix="Base color for"
             />
           </section>
