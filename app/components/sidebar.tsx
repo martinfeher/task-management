@@ -926,7 +926,7 @@ export function Sidebar({
         }`}
         style={sidebarBackground.style}
       >
-        <nav className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+        <nav className="list-panel-scroll flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto">
           {visibleNavItems.map((item) => {
             const isNavItemSelected =
               (item.action === "today" && isTodaySelected) ||
@@ -1371,7 +1371,7 @@ export function Sidebar({
                   No completed tasks
                 </p>
               ) : (
-                <div className="max-h-[280px] overflow-y-auto">
+                <div className="list-panel-scroll max-h-[280px] overflow-x-hidden overflow-y-auto">
                   {completedTasks.map((task) => (
                     <button
                       key={task.id}

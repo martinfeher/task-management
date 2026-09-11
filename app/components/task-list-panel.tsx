@@ -80,8 +80,8 @@ import {
   type TaskListPointerContextMenuState,
 } from "@/lib/task-list-interaction-store";
 
-export const TASK_LIST_PANEL_DEFAULT_WIDTH = 350;
-export const TASK_LIST_PANEL_AUTO_EXPAND_MAX_WIDTH = 450;
+export const TASK_LIST_PANEL_DEFAULT_WIDTH = 520;
+export const TASK_LIST_PANEL_AUTO_EXPAND_MAX_WIDTH = 620;
 export const TASK_LIST_PANEL_MIN_WIDTH = 350;
 
 function measureTaskListTruncationOverflow(root: HTMLElement | null) {
@@ -2425,8 +2425,8 @@ export function TaskListPanel({
         panelWidth != null || title
           ? "flex min-h-0 flex-col border-r border-zinc-200 dark:border-zinc-800"
           : embedded
-            ? "w-[350px] border-r border-zinc-200 dark:border-zinc-800"
-            : "w-full max-w-[350px] min-w-[350px] border-r border-zinc-200 dark:border-zinc-800"
+            ? "w-[520px] border-r border-zinc-200 dark:border-zinc-800"
+            : "w-full min-w-[350px] border-r border-zinc-200 dark:border-zinc-800"
       }`}
     >
       {title ? (
@@ -2799,7 +2799,7 @@ export function TaskListPanel({
             ref={taskListScrollRef}
             className={
               panelWidth != null || title
-                ? "min-h-0 flex-1 overflow-y-auto"
+                ? "list-panel-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden"
                 : undefined
             }
           >

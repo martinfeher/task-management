@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BiChevronDown, BiChevronRight } from "react-icons/bi";
 import { TaskCompletionCheckbox } from "./task-completion-checkbox";
 
@@ -79,6 +79,19 @@ function resolveSubtasksExpandedState(taskId: string, subtaskCount: number) {
   return subtaskCount > 0;
 }
 
+function orderSubtasksForDisplay(subtasks: TaskDetailsSubtask[]) {
+  return subtasks
+    .map((subtask, index) => ({ subtask, index }))
+    .sort((a, b) => {
+      if (a.subtask.completed !== b.subtask.completed) {
+        return Number(a.subtask.completed) - Number(b.subtask.completed);
+      }
+
+      return a.index - b.index;
+    })
+    .map(({ subtask }) => subtask);
+}
+
 export function TaskDetailsSubtasksSection({
   taskId,
   subtasks,
@@ -95,6 +108,10 @@ export function TaskDetailsSubtasksSection({
   const editInputRef = useRef<HTMLInputElement>(null);
   const previousSubtaskCountRef = useRef(subtasks.length);
 
+  const orderedSubtasks = useMemo(
+    () => orderSubtasksForDisplay(subtasks),
+    [subtasks],
+  );
   const completedCount = subtasks.filter((subtask) => subtask.completed).length;
 
   useEffect(() => {
@@ -170,8 +187,26 @@ export function TaskDetailsSubtasksSection({
     }
   }
 
+  const addSubtaskButton = (
+    <button
+      type="button"
+      disabled={isAdding}
+      onClick={() => void handleAddSubtask()}
+      className="flex w-full items-center gap-2 py-2 text-left text-[13px] text-slate-400 transition-colors hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-60 dark:text-zinc-400 dark:hover:text-zinc-200"
+    >
+      <div className="text-[16px] leading-none text-zinc-400" aria-hidden>
+        +
+      </div>
+      Add sub-task
+    </button>
+  );
+
   return (
     <section className="mt-4 shrink-0 border-t border-zinc-200 pl-[15px] pr-3 pt-3 dark:border-zinc-700">
+      {subtasks.length === 0 ? (
+        <div className="ml-1">{addSubtaskButton}</div>
+      ) : (
+        <>
       <button
         type="button"
         className="flex w-full items-center gap-1.5 text-left"
@@ -183,7 +218,7 @@ export function TaskDetailsSubtasksSection({
         ) : (
           <BiChevronRight className="size-4 shrink-0 text-zinc-400" aria-hidden />
         )}
-        <span className="text-[14px] font-semibold text-zinc-500 dark:text-zinc-50">
+        <span className="text-[14px] font-semibold text-slate-500 dark:text-zinc-50">
           Sub-tasks
         </span>
         <span className="text-[11.5px] text-zinc-400 dark:text-zinc-500">
@@ -193,7 +228,7 @@ export function TaskDetailsSubtasksSection({
 
       {isExpanded ? (
         <div className="mt-3 border-t border-zinc-200 dark:border-zinc-700">
-          {subtasks.map((subtask) => (
+          {orderedSubtasks.map((subtask) => (
             <div
               key={subtask.id}
               className="border-b border-zinc-200 dark:border-zinc-700"
@@ -240,7 +275,7 @@ export function TaskDetailsSubtasksSection({
                     className={`min-w-0 flex-1 truncate text-left text-[14px] ${
                       subtask.completed
                         ? "text-zinc-400 line-through dark:text-zinc-500"
-                        : "text-zinc-700 dark:text-zinc-50"
+                        : "text-slate-500 dark:text-zinc-50"
                     }`}
                   >
                     {subtask.name}
@@ -250,21 +285,11 @@ export function TaskDetailsSubtasksSection({
             </div>
           ))}
 
-          <div className="flex items-center">
-            <button
-              type="button"
-              disabled={isAdding}
-              onClick={() => void handleAddSubtask()}
-              className="ml-[20px] flex w-full items-center gap-2 py-2 text-left text-[13px] text-zinc-400 transition-colors hover:text-zinc-700 disabled:cursor-not-allowed disabled:opacity-60 dark:text-zinc-400 dark:hover:text-zinc-200"
-            >
-              <div className="text-[16px] leading-none text-zinc-400" aria-hidden>
-                +
-              </div>
-              Add sub-task
-          </button>
-          </div>
+          <div className="ml-[20px]">{addSubtaskButton}</div>
         </div>
       ) : null}
+        </>
+      )}
     </section>
   );
 }
