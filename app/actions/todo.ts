@@ -9,6 +9,8 @@ import {
   type TaskDueTime,
 } from "@/lib/task-due-time";
 import {
+  getLabelsFromTaskTags,
+  getPriorityFromTaskTags,
   LABEL_CATEGORY,
   labelSlug,
   normalizePriority,
@@ -814,7 +816,7 @@ export async function moveTaskToList(taskId: string, targetListId: string) {
     ? []
     : (
         await prisma.task.findMany({
-          where: { parentId: taskId },
+          where: { parentId: taskId, deletedAt: null },
           select: { id: true },
         })
       ).map((child) => child.id);
@@ -867,7 +869,7 @@ export async function reorderTasks(
   parentUpdates: TaskParentUpdate[] = [],
 ) {
   const tasks = await prisma.task.findMany({
-    where: { listId },
+    where: { listId, deletedAt: null },
     select: { id: true },
     orderBy: [{ position: "asc" }, { createdAt: "asc" }],
   });
@@ -1052,10 +1054,215 @@ export async function toggleTask(taskId: string, completed: boolean) {
 export async function deleteTask(taskId: string) {
   const childIds = (
     await prisma.task.findMany({
-      where: { parentId: taskId },
+      where: { parentId: taskId, deletedAt: null },
       select: { id: true },
     })
   ).map((child) => child.id);
+  const idsToDelete = [taskId, ...childIds];
+  const deletedAt = new Date();
+
+  await prisma.task.updateMany({
+    where: { id: { in: idsToDelete }, deletedAt: null },
+    data: { deletedAt },
+  });
+
+  revalidatePath("/");
+}
+
+export type ArchivedTaskItem = {
+  id: string;
+  name: string;
+  isNote: boolean;
+  listId: string;
+  listName: string;
+  deletedAt: string;
+};
+
+export type RestoredTaskItem = {
+  id: string;
+  name: string;
+  completed: boolean;
+  details: string;
+  hasDetails: boolean;
+  dueDate: string | null;
+  dueTimeMinutes: number | null;
+  dueDurationMinutes: number | null;
+  dueTimeZone: string;
+  calendarColor: string | null;
+  recurrenceRule: string | null;
+  priority: number | null;
+  pinned: boolean;
+  important: boolean;
+  isNote: boolean;
+  parentId: string | null;
+  labels: { id: string; label: string; color?: string | null }[];
+  listId: string;
+};
+
+async function mapRestoredTaskRecord(task: {
+  id: string;
+  name: string;
+  completed: boolean;
+  details: string;
+  dueDate: Date | null;
+  dueTimeMinutes: number | null;
+  dueDurationMinutes: number | null;
+  dueTimeZone: string;
+  calendarColor: string | null;
+  recurrenceRule: string | null;
+  pinned: boolean;
+  important: boolean;
+  isNote: boolean;
+  parentId: string | null;
+  listId: string;
+  tags: Array<{
+    tag: {
+      id: string;
+      label: string;
+      color: string | null;
+      category: string;
+      level: number | null;
+    };
+  }>;
+}): Promise<RestoredTaskItem> {
+  const hasDetails = taskDetailsHasContent(task.details);
+
+  return {
+    id: task.id,
+    name: task.name,
+    completed: task.completed,
+    details: "",
+    hasDetails,
+    dueDate: task.dueDate ? task.dueDate.toISOString() : null,
+    dueTimeMinutes: task.dueTimeMinutes,
+    dueDurationMinutes: task.dueDurationMinutes,
+    dueTimeZone: normalizeDueTimeZone(task.dueTimeZone),
+    calendarColor: task.calendarColor ?? null,
+    recurrenceRule: task.recurrenceRule ?? null,
+    priority: getPriorityFromTaskTags(task.tags),
+    pinned: Boolean(task.pinned),
+    important: Boolean(task.important),
+    isNote: Boolean(task.isNote),
+    parentId: task.parentId ?? null,
+    labels: getLabelsFromTaskTags(task.tags),
+    listId: task.listId,
+  };
+}
+
+const restoredTaskSelect = {
+  id: true,
+  name: true,
+  completed: true,
+  details: true,
+  dueDate: true,
+  dueTimeMinutes: true,
+  dueDurationMinutes: true,
+  dueTimeZone: true,
+  calendarColor: true,
+  recurrenceRule: true,
+  pinned: true,
+  important: true,
+  isNote: true,
+  parentId: true,
+  listId: true,
+  tags: {
+    include: {
+      tag: {
+        select: {
+          id: true,
+          label: true,
+          color: true,
+          category: true,
+          level: true,
+        },
+      },
+    },
+  },
+} as const;
+
+export async function getArchivedTasks(): Promise<ArchivedTaskItem[]> {
+  const tasks = await prisma.task.findMany({
+    where: { deletedAt: { not: null } },
+    orderBy: [{ deletedAt: "desc" }, { name: "asc" }],
+    select: {
+      id: true,
+      name: true,
+      isNote: true,
+      deletedAt: true,
+      list: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+  });
+
+  return tasks.map((task) => ({
+    id: task.id,
+    name: task.name,
+    isNote: task.isNote,
+    listId: task.list.id,
+    listName: task.list.name,
+    deletedAt: task.deletedAt!.toISOString(),
+  }));
+}
+
+export async function restoreArchivedTask(
+  taskId: string,
+): Promise<RestoredTaskItem[]> {
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+    select: { id: true, parentId: true, deletedAt: true },
+  });
+
+  if (!task?.deletedAt) {
+    throw new Error("Archived task not found");
+  }
+
+  const childIds = task.parentId
+    ? []
+    : (
+        await prisma.task.findMany({
+          where: { parentId: taskId, deletedAt: { not: null } },
+          select: { id: true },
+        })
+      ).map((child) => child.id);
+  const idsToRestore = [taskId, ...childIds];
+
+  await prisma.task.updateMany({
+    where: { id: { in: idsToRestore } },
+    data: { deletedAt: null },
+  });
+
+  const restoredTasks = await prisma.task.findMany({
+    where: { id: { in: idsToRestore } },
+    select: restoredTaskSelect,
+  });
+
+  revalidatePath("/");
+
+  return Promise.all(restoredTasks.map((item) => mapRestoredTaskRecord(item)));
+}
+
+export async function permanentlyDeleteArchivedTask(taskId: string) {
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+    select: { id: true, parentId: true, deletedAt: true },
+  });
+
+  if (!task?.deletedAt) {
+    throw new Error("Archived task not found");
+  }
+
+  const childIds = task.parentId
+    ? []
+    : (
+        await prisma.task.findMany({
+          where: { parentId: taskId, deletedAt: { not: null } },
+          select: { id: true },
+        })
+      ).map((child) => child.id);
   const idsToDelete = [taskId, ...childIds];
 
   await prisma.task.deleteMany({

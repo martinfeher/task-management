@@ -165,6 +165,7 @@ export function TemplateStylesSection({
       <div className="mb-3 space-y-2">
         <input
           type="text"
+          data-template-style-name-input
           value={nameDraft}
           onChange={(event) => setNameDraft(event.target.value)}
           placeholder="Template name"

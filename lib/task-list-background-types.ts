@@ -36,11 +36,6 @@ export const TASK_LIST_BACKGROUND_OPTIONS: TaskListBackgroundOption[] = [
     usesBaseColor: false,
   },
   {
-    id: "zinc-50",
-    label: "Zinc 50",
-    usesBaseColor: false,
-  },
-  {
     id: "solid-blue",
     label: "Light blue",
     usesBaseColor: true,

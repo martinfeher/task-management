@@ -92,6 +92,7 @@ export async function getTodoData() {
   const lists = await prisma.todoList.findMany({
     include: {
       tasks: {
+        where: { deletedAt: null },
         orderBy: [{ position: "asc" }, { createdAt: "asc" }],
         select: {
           id: true,

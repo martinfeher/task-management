@@ -1569,6 +1569,37 @@ const FORMAT_MENU_VIEWPORT_PADDING = 8;
 /** Matches `pl-[30px]` on `.task-details-editor` — line controls live in this gutter. */
 const TASK_DETAILS_LINE_CONTROLS_GUTTER_PX = 30;
 
+const TASK_DETAILS_EDITOR_MIN_HEIGHT_PX = 500;
+const TASK_DETAILS_EDITOR_BOTTOM_INSET_PX = 30;
+
+function getEditorReservedBelowSpacePx(
+  editor: HTMLElement,
+  panel: HTMLElement | null,
+  isModalLayout: boolean,
+) {
+  let reserved = TASK_DETAILS_EDITOR_BOTTOM_INSET_PX;
+
+  const contentRoot = editor.closest("[data-task-details-content]");
+  if (contentRoot instanceof HTMLElement) {
+    const styles = window.getComputedStyle(contentRoot);
+    reserved += parseFloat(styles.paddingBottom) || 0;
+
+    const subtasks = contentRoot.querySelector("[data-task-details-subtasks]");
+    if (subtasks instanceof HTMLElement) {
+      reserved += subtasks.getBoundingClientRect().height;
+    }
+  }
+
+  if (isModalLayout && panel) {
+    const footer = panel.querySelector("footer");
+    if (footer instanceof HTMLElement) {
+      reserved += footer.getBoundingClientRect().height;
+    }
+  }
+
+  return reserved;
+}
+
 function isPointerInLineControlsGutter(clientX: number, editor: HTMLElement) {
   const rect = editor.getBoundingClientRect();
   return clientX - rect.left <= TASK_DETAILS_LINE_CONTROLS_GUTTER_PX;
@@ -1737,6 +1768,7 @@ export function TaskDetailsPanel({
   const panelRef = useRef<HTMLElement>(null);
   const editorWrapperRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
+  const editorHeightFrameRef = useRef<number | null>(null);
   const formatMenuRef = useRef<HTMLDivElement>(null);
   const headerFormatControlsRef = useRef<HTMLDivElement>(null);
   const headerFormatActionsRef = useRef<HTMLDivElement>(null);
@@ -2619,6 +2651,44 @@ export function TaskDetailsPanel({
     }, LINE_CONTROLS_DEBOUNCE_MS);
   }, [updateLineControls]);
 
+  const syncEditorHeight = useCallback(() => {
+    const editor = editorRef.current;
+    const panel = panelRef.current;
+    if (!editor || !task) return;
+
+    editor.style.height = "auto";
+    const contentHeight = editor.scrollHeight;
+    const viewportBottom =
+      window.visualViewport?.height ?? window.innerHeight;
+    const editorTop = editor.getBoundingClientRect().top;
+    const reservedBelow = getEditorReservedBelowSpacePx(
+      editor,
+      panel,
+      isModalLayout,
+    );
+    const maxHeight = Math.max(
+      TASK_DETAILS_EDITOR_MIN_HEIGHT_PX,
+      viewportBottom - editorTop - reservedBelow,
+    );
+    const nextHeight = Math.max(
+      TASK_DETAILS_EDITOR_MIN_HEIGHT_PX,
+      Math.min(contentHeight, maxHeight),
+    );
+
+    editor.style.height = `${nextHeight}px`;
+  }, [isModalLayout, task]);
+
+  const scheduleEditorHeightSync = useCallback(() => {
+    if (editorHeightFrameRef.current !== null) {
+      window.cancelAnimationFrame(editorHeightFrameRef.current);
+    }
+
+    editorHeightFrameRef.current = window.requestAnimationFrame(() => {
+      editorHeightFrameRef.current = null;
+      syncEditorHeight();
+    });
+  }, [syncEditorHeight]);
+
   function beginEditorPointerInteraction() {
     isEditorPointerDownRef.current = true;
     setLineControlsPointerEventsEnabled(false);
@@ -2670,9 +2740,11 @@ export function TaskDetailsPanel({
       scheduleHistorySnapshot();
       scheduleAutoSave();
       scheduleLineControlsUpdate();
+      scheduleEditorHeightSync();
     },
     [
       scheduleAutoSave,
+      scheduleEditorHeightSync,
       scheduleHistorySnapshot,
       scheduleLineControlsUpdate,
       syncEditorContent,
@@ -3810,6 +3882,7 @@ export function TaskDetailsPanel({
       setAddBlockMenu(null);
       setSlashCommandMenu(null);
       scheduleAutoSave();
+      scheduleEditorHeightSync();
 
       requestAnimationFrame(() => {
         isApplyingHistoryRef.current = false;
@@ -3818,6 +3891,7 @@ export function TaskDetailsPanel({
     [
       closeFormatMenu,
       scheduleAutoSave,
+      scheduleEditorHeightSync,
       syncEditorContent,
       syncTitleToTaskList,
       updateHistoryAvailability,
@@ -3884,6 +3958,7 @@ export function TaskDetailsPanel({
         hydratedTaskIdRef.current = currentTaskId;
         resetHistory(readEditorContent());
         updateLineControls();
+        scheduleEditorHeightSync();
       } else {
         hydratedTaskIdRef.current = null;
       }
@@ -3911,6 +3986,7 @@ export function TaskDetailsPanel({
       onTaskRenamed,
       readEditorContent,
       resetHistory,
+      scheduleEditorHeightSync,
       updateLineControls,
     ],
   );
@@ -3947,6 +4023,7 @@ export function TaskDetailsPanel({
 
       requestAnimationFrame(() => {
       updateLineControls();
+      syncEditorHeight();
       if (task.isNote) {
         syncFormatMenuFontState();
       }
@@ -3954,11 +4031,56 @@ export function TaskDetailsPanel({
   }, [
     readEditorContent,
     resetHistory,
+    syncEditorHeight,
     syncFormatMenuFontState,
     task?.details,
     task?.id,
     task?.isNote,
     updateLineControls,
+  ]);
+
+  useLayoutEffect(() => {
+    if (!task) return;
+
+    scheduleEditorHeightSync();
+
+    function handleViewportChange() {
+      scheduleEditorHeightSync();
+    }
+
+    window.addEventListener("resize", handleViewportChange);
+    window.visualViewport?.addEventListener("resize", handleViewportChange);
+
+    const resizeObserver = new ResizeObserver(() => {
+      scheduleEditorHeightSync();
+    });
+    const contentRoot = panelRef.current?.querySelector(
+      "[data-task-details-content]",
+    );
+    if (contentRoot instanceof HTMLElement) {
+      resizeObserver.observe(contentRoot);
+    }
+    const subtasksSection = contentRoot?.querySelector(
+      "[data-task-details-subtasks]",
+    );
+    if (subtasksSection instanceof HTMLElement) {
+      resizeObserver.observe(subtasksSection);
+    }
+    const footer = panelRef.current?.querySelector("footer");
+    if (footer instanceof HTMLElement) {
+      resizeObserver.observe(footer);
+    }
+
+    return () => {
+      window.removeEventListener("resize", handleViewportChange);
+      window.visualViewport?.removeEventListener("resize", handleViewportChange);
+      resizeObserver.disconnect();
+    };
+  }, [
+    isModalLayout,
+    scheduleEditorHeightSync,
+    subtasks.length,
+    task?.id,
   ]);
 
   useEffect(() => {
@@ -4520,6 +4642,21 @@ export function TaskDetailsPanel({
       const target = event.target as Node | null;
       if (!target || !panelRef.current.contains(target)) return;
 
+      if (
+        target instanceof HTMLElement &&
+        target.matches("input[data-subtask-edit-input]")
+      ) {
+        return;
+      }
+
+      if (
+        target instanceof HTMLElement &&
+        (target.closest("[data-template-options-drawer]") ||
+          target.closest("[data-template-color-popover]"))
+      ) {
+        return;
+      }
+
       if (!(event.metaKey || event.ctrlKey)) return;
 
       const key = event.key.toLowerCase();
@@ -4760,6 +4897,7 @@ export function TaskDetailsPanel({
       rememberPendingLocalSave();
     }
 
+    scheduleEditorHeightSync();
     scheduleInputNormalization();
     updateSlashCommandMenu();
   }
@@ -4799,6 +4937,7 @@ export function TaskDetailsPanel({
       }
       requestSave("immediate");
       updateLineControls();
+      scheduleEditorHeightSync();
     } catch (error) {
       rememberPendingLocalSave();
       saveStatusRef.current = "error";
@@ -5525,6 +5664,7 @@ export function TaskDetailsPanel({
         syncEditorContent();
         recordHistorySnapshot();
         requestSave("flush");
+        scheduleEditorHeightSync();
       });
       return;
     }
@@ -5546,6 +5686,7 @@ export function TaskDetailsPanel({
         syncEditorContent();
         recordHistorySnapshot();
         requestSave("flush");
+        scheduleEditorHeightSync();
       },
     );
   }
@@ -6032,16 +6173,12 @@ export function TaskDetailsPanel({
       ref={panelRef}
       data-task-details-panel
       data-task-details-layout={layout}
-      className={`relative min-w-[300px] flex-1 ${
-        isModalLayout
-          ? "flex h-full min-h-0 flex-col bg-white dark:bg-zinc-950"
-          : "bg-[#f8f8f9]"
-      }`}
+      className="task-details-panel-background relative flex min-h-0 min-w-[300px] flex-1 flex-col"
       aria-busy={saveStatus === "loading" ? true : undefined}
     >
       {renderModalHeaderActions()}
       <div
-        className={`relative flex items-center justify-between overflow-visible px-4 pt-1 pb-1 ${
+        className={`relative flex shrink-0 items-center justify-between overflow-visible px-4 pt-1 pb-1 ${
           isModalLayout
             ? isModalFormatToolbarOpen
               ? "pr-[22rem]"
@@ -6101,9 +6238,9 @@ export function TaskDetailsPanel({
                   <div
                     className={
                       dueDateLabel
-                        ? `shrink-0 text-[12px] mb-[6px] ${
-                            isModalLayout ? "leading-none" : "leading-[13px]"
-                          }`
+                        ? `shrink-0 text-[12px] ${
+                            dueTimeLabel ? "mb-[6px]" : ""
+                          } ${isModalLayout ? "leading-none" : "leading-[13px]"}`
                         : undefined
                     }
                   >
@@ -6113,9 +6250,11 @@ export function TaskDetailsPanel({
                   {dueDateLabel ? (
                     <div
                       className={`relative ml-px flex flex-col normal-case tracking-normal ${
-                        isModalLayout
-                          ? "h-[17px] items-end justify-center"
-                          : `h-[17px] ${!dueTimeLabel ? "-mb-[4px]" : "mb-0"} items-end`
+                        dueTimeLabel
+                          ? isModalLayout
+                            ? "h-[17px] items-end justify-center"
+                            : "mb-0 h-[17px] items-end"
+                          : "items-center justify-center"
                       }`}
                       title={
                         dueTimeLabel
@@ -6123,13 +6262,12 @@ export function TaskDetailsPanel({
                           : dueDateLabel || undefined
                       }
                     >
-               
                       <span
                         className={`font-normal text-[#5F5F5F] dark:text-zinc-300 ${
                           isModalLayout
                             ? "text-[12px] leading-[12px]"
                             : "text-[13px] leading-[13px]"
-                        }${!dueTimeLabel ? " relative top-[3px]" : ""}`}
+                        }`}
                       >
                         {dueDateLabel}
                       </span>
@@ -6318,15 +6456,14 @@ export function TaskDetailsPanel({
         </>
       ) : task ? (
         <div
-          className={`flex flex-col px-4 ${
-            isModalLayout ? "min-h-0 flex-1 pb-4" : "pb-4"
+          data-task-details-content
+          className={`flex min-h-0 flex-1 flex-col px-4 ${
+            isModalLayout ? "pb-4" : "pb-[30px]"
           }`}
         >
           <div
             ref={editorWrapperRef}
-            className={`relative overflow-visible text-[#555555] ${
-              isModalLayout ? "flex min-h-0 flex-1 flex-col" : ""
-            }`}
+            className="relative text-[#555555]"
             onMouseEnter={handleEditorWrapperMouseEnter}
             onMouseLeave={handleEditorWrapperMouseLeave}
             onMouseMove={handleEditorWrapperMouseMove}
@@ -6380,11 +6517,7 @@ export function TaskDetailsPanel({
               onKeyDown={handleEditorKeyDown}
               onKeyUp={handleEditorKeyUp}
               onScroll={updateLineControls}
-              className={`task-details-editor w-full overflow-auto rounded-xl bg-white py-[2px] pl-[30px] pr-3 text-[17px] text-[#555555] outline-none transition-colors dark:bg-zinc-950 dark:text-zinc-300 [&_.detail-line[data-line-type=bullet]]:pl-1 [&_.detail-line[data-line-type=checklist]]:cursor-pointer [&_.detail-line[data-line-type=checklist]]:pl-1 [&_.detail-line[data-line-type=h1]]:text-[26px] [&_.detail-line[data-line-type=h1]]:font-bold [&_.detail-line[data-line-type=h1]]:leading-[36px] [&_.detail-line[data-line-type=h1]]:text-[#4B4B4B] dark:[&_.detail-line[data-line-type=h1]]:text-[#F5F5F5] [&_.detail-line[data-line-type=h2]]:text-[23px] [&_.detail-line[data-line-type=h2]]:font-semibold [&_.detail-line[data-line-type=h2]]:leading-[30px] [&_.detail-line[data-line-type=h3]]:text-[19px] [&_.detail-line[data-line-type=h3]]:font-semibold [&_.detail-line[data-line-type=h3]]:leading-[26px] [&_.detail-line[data-line-type=numbered]]:pl-1 [&_mark]:bg-yellow-200 dark:[&_mark]:bg-yellow-300/30 [&_s]:line-through [&_strike]:line-through [&_u]:underline ${
-                isModalLayout
-                  ? "min-h-0 flex-1 resize-none"
-                  : "min-h-[380px] resize-y"
-              }`}
+              className="task-details-editor min-h-[500px] w-full resize-none overflow-auto rounded-xl py-[2px] pl-[30px] pr-3 text-[17px] text-[#555555] outline-none transition-colors dark:text-zinc-300 [&_.detail-line[data-line-type=bullet]]:pl-1 [&_.detail-line[data-line-type=checklist]]:cursor-pointer [&_.detail-line[data-line-type=checklist]]:pl-1 [&_.detail-line[data-line-type=h1]]:text-[26px] [&_.detail-line[data-line-type=h1]]:font-bold [&_.detail-line[data-line-type=h1]]:leading-[36px] [&_.detail-line[data-line-type=h1]]:text-[#4B4B4B] dark:[&_.detail-line[data-line-type=h1]]:text-[#F5F5F5] [&_.detail-line[data-line-type=h2]]:text-[23px] [&_.detail-line[data-line-type=h2]]:font-semibold [&_.detail-line[data-line-type=h2]]:leading-[30px] [&_.detail-line[data-line-type=h3]]:text-[19px] [&_.detail-line[data-line-type=h3]]:font-semibold [&_.detail-line[data-line-type=h3]]:leading-[26px] [&_.detail-line[data-line-type=numbered]]:pl-1 [&_mark]:bg-yellow-200 dark:[&_mark]:bg-yellow-300/30 [&_s]:line-through [&_strike]:line-through [&_u]:underline"
             />
 
             {dropIndicator && (
@@ -6441,13 +6574,15 @@ export function TaskDetailsPanel({
           </div>
 
           {canManageSubtasks && onAddSubtask && onToggleTask ? (
-            <TaskDetailsSubtasksSection
-              taskId={task.id}
-              subtasks={subtasks}
-              onAddSubtask={onAddSubtask}
-              onToggleSubtask={onToggleTask}
-              onRenameSubtask={onTaskRenamed}
-            />
+            <div data-task-details-subtasks>
+              <TaskDetailsSubtasksSection
+                taskId={task.id}
+                subtasks={subtasks}
+                onAddSubtask={onAddSubtask}
+                onToggleSubtask={onToggleTask}
+                onRenameSubtask={onTaskRenamed}
+              />
+            </div>
           ) : null}
         </div>
       ) : (

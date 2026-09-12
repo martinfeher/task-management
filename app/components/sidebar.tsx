@@ -7,6 +7,7 @@ import { IoIosSearch } from "react-icons/io";
 import { LABEL_PRESET_COLORS } from "@/lib/label-colors";
 import { getInboxListId } from "@/lib/inbox-list";
 import { FiSettings } from "react-icons/fi";
+import { getLabelDotColor } from "@/lib/label-colors";
 import { MdLabelOutline } from "react-icons/md";
 import { LuInbox, LuList, LuPlus, LuStar } from "react-icons/lu";
 import { PiDotsThreeBold } from "react-icons/pi";
@@ -52,6 +53,11 @@ const SettingsModal = dynamic(
   { ssr: false },
 );
 
+const ArchiveModal = dynamic(
+  () => import("./archive-modal").then((module) => module.ArchiveModal),
+  { ssr: false },
+);
+
 const NAV_ITEM_TEXT_CLASS = {
   today: "ptxt-list-nav-today",
   inbox: "ptxt-list-nav-inbox",
@@ -73,6 +79,11 @@ type SidebarProps = {
   labels: TaskLabel[];
   taskCountByListId: Record<string, number>;
   taskCountByLabelId: Record<string, number>;
+  navTaskCounts: {
+    today: number;
+    inbox: number;
+    important: number;
+  };
   completedTasks: CompletedTask[];
   searchTasks: SearchTask[];
   completingTaskIds?: Set<string>;
@@ -106,6 +117,9 @@ type SidebarProps = {
   onUpdateLabelColor: (labelId: string, color: string) => void;
   onReorderLists?: (listIds: string[]) => void;
   onReorderLabels?: (labelIds: string[]) => void;
+  onArchivedTasksRestored?: (
+    tasks: import("@/app/actions/todo").RestoredTaskItem[],
+  ) => void;
   onSidebarHoverStart?: (preview: SidebarHoverPreview) => void;
   onSidebarHoverEnd?: () => void;
   sidebarHoverPreview?: SidebarHoverPreview | null;
@@ -118,6 +132,21 @@ type SidebarProps = {
 const LIST_DRAG_THRESHOLD_PX = 5;
 const LABEL_DRAG_THRESHOLD_PX = 5;
 
+const SIDEBAR_ROW_COUNT_CLASS =
+  "pointer-events-none absolute right-[var(--sidebar-row-trailing-inset)] top-1/2 -translate-y-1/2 text-xs tabular-nums ptxt-400 transition-opacity group-hover:opacity-0 dark:ptxt-500";
+
+const SIDEBAR_ROW_COUNT_STATIC_CLASS =
+  "pointer-events-none absolute right-[var(--sidebar-row-trailing-inset)] top-1/2 -translate-y-1/2 text-xs tabular-nums ptxt-400 dark:ptxt-500";
+
+const SIDEBAR_ROW_MENU_WRAPPER_CLASS =
+  "absolute right-[var(--sidebar-row-trailing-inset)] top-1/2 -translate-y-1/2";
+
+function getSidebarRowMenuButtonClass(menuOpen: boolean) {
+  return `flex size-[22px] items-center justify-center rounded-full ptxt-500 text-[12px] transition-opacity hover:bg-zinc-200/80 hover:ptxt-900 dark:ptxt-400 dark:hover:bg-zinc-700 dark:hover:ptxt-50 cursor-pointer ${
+    menuOpen ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+  }`;
+}
+
 function shouldStartListDrag(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) return true;
 
@@ -127,7 +156,7 @@ function shouldStartListDrag(target: EventTarget | null) {
 }
 
 const itemClassName =
-  "flex ml-[6px] mb-px w-[236px] items-center rounded-[3px]  text-left text-sm transition-colors cursor-pointer";
+  "flex ml-[6px] mb-px w-[230px] items-center rounded-[3px]  text-left text-sm transition-colors cursor-pointer";
 
 const completedItemClassName =
   "flex mx-[4px] mb-px min-h-[44px] w-auto flex-col items-start justify-center gap-0 rounded-[3px] px-4 py-1 text-left text-sm transition-colors";
@@ -148,6 +177,7 @@ export function Sidebar({
   labels,
   taskCountByListId,
   taskCountByLabelId,
+  navTaskCounts,
   completedTasks,
   searchTasks,
   completingTaskIds,
@@ -181,6 +211,7 @@ export function Sidebar({
   onUpdateLabelColor,
   onReorderLists,
   onReorderLabels,
+  onArchivedTasksRestored,
   onSidebarHoverStart,
   onSidebarHoverEnd,
   sidebarHoverPreview = null,
@@ -214,6 +245,12 @@ export function Sidebar({
     x: number;
     y: number;
   } | null>(null);
+  const [isArchiveOpen, setIsArchiveOpen] = useState(false);
+  const [archiveRevealOrigin, setArchiveRevealOrigin] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+  const completedFooterRef = useRef<HTMLDivElement>(null);
   const [openMenuListId, setOpenMenuListId] = useState<string | null>(null);
   const [openMenuLabelId, setOpenMenuLabelId] = useState<string | null>(null);
   const [labelMenuPosition, setLabelMenuPosition] = useState<{
@@ -229,6 +266,8 @@ export function Sidebar({
   const [listNameDraft, setListNameDraft] = useState("");
   const menuRef = useRef<HTMLDivElement>(null);
   const labelMenuRef = useRef<HTMLDivElement>(null);
+  const listPanelScrollRef = useRef<HTMLElement>(null);
+  const [hasVerticalScroll, setHasVerticalScroll] = useState(false);
   const listContainerRef = useRef<HTMLDivElement>(null);
   const labelContainerRef = useRef<HTMLDivElement>(null);
   const listNameInputRef = useRef<HTMLInputElement>(null);
@@ -260,6 +299,33 @@ export function Sidebar({
   const suppressListClickRef = useRef(false);
   const suppressLabelClickRef = useRef(false);
 
+
+  useEffect(() => {
+    const element = listPanelScrollRef.current;
+    if (!element) return;
+
+    function updateVerticalScrollState() {
+      const scrollElement = listPanelScrollRef.current;
+      if (!scrollElement) return;
+      setHasVerticalScroll(scrollElement.scrollHeight > scrollElement.clientHeight);
+    }
+
+    updateVerticalScrollState();
+
+    const resizeObserver = new ResizeObserver(updateVerticalScrollState);
+    resizeObserver.observe(element);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [
+    isCompletedOpen,
+    isLabelsOpen,
+    labels.length,
+    lists.length,
+    orderedLabels.length,
+    orderedLists.length,
+  ]);
 
   useEffect(() => {
     setOrderedLists(lists);
@@ -304,6 +370,12 @@ export function Sidebar({
     setIsSettingsOpen(true);
   }
 
+  function openArchiveModal(origin: { x: number; y: number }) {
+    setArchiveRevealOrigin(origin);
+    setIsArchiveOpen(true);
+    setIsCompletedOpen(false);
+  }
+
   useEffect(() => {
     function handleSearchShortcut(event: KeyboardEvent) {
       if (!(event.metaKey || event.ctrlKey)) return;
@@ -320,6 +392,13 @@ export function Sidebar({
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
+      if (
+        isCompletedOpen &&
+        completedFooterRef.current &&
+        !completedFooterRef.current.contains(event.target as Node)
+      ) {
+        setIsCompletedOpen(false);
+      }
       if (!menuRef.current?.contains(event.target as Node)) {
         setOpenMenuListId(null);
       }
@@ -333,7 +412,7 @@ export function Sidebar({
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, []);
+  }, [isCompletedOpen]);
 
   useEffect(() => {
     function handleEscape(event: KeyboardEvent) {
@@ -912,7 +991,7 @@ export function Sidebar({
         />
       ) : null}
       <aside
-        className={`panel-text-scope flex h-full min-h-0 w-[250px] shrink-0 flex-col border-r border-zinc-200 dark:border-zinc-800 dark:bg-zinc-950 ${sidebarBackground.className} ${
+        className={`panel-text-scope flex h-full min-h-0 w-[244px] shrink-0 flex-col border-r border-zinc-200 dark:border-zinc-800 dark:bg-zinc-950 ${sidebarBackground.className} ${
           compactDrawer
             ? `fixed inset-y-0 left-0 z-50 transition-transform duration-200 ease-out lg:static lg:translate-x-0 ${
                 drawerOpen ? "translate-x-0" : "-translate-x-full"
@@ -921,7 +1000,11 @@ export function Sidebar({
         }`}
         style={sidebarBackground.style}
       >
-        <nav className="list-panel-scroll flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto">
+        <nav
+          ref={listPanelScrollRef}
+          data-has-vertical-scroll={hasVerticalScroll ? "true" : undefined}
+          className="list-panel-scroll flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto"
+        >
           {visibleNavItems.map((item) => {
             const isNavItemSelected =
               (item.action === "today" && isTodaySelected) ||
@@ -970,7 +1053,7 @@ export function Sidebar({
                 else onSelectCalendar();
                 closeDrawer();
               }}
-              className={`${getNavItemClassName(isNavItemSelected)} gap-[8px] px-4 rounded-r-[9px] ${
+              className={`${getNavItemClassName(isNavItemSelected)} relative gap-[8px] px-4 rounded-r-[9px] ${
                 showNavAccentBorder
                   ? "border-l-[2px] border-l-[#dadfdf]"
                   : "border-l-[2px] border-l-transparent"
@@ -997,10 +1080,23 @@ export function Sidebar({
                 />
               )}
               <span
-                className={`inline-block max-w-full truncate rounded-full pl-0 pr-3 py-[3.5px] ${navTextClass} transition-all duration-300 cursor-pointer dark:bg-zinc-800/60 dark:hover:bg-zinc-800/80`}
+                className={`inline-block min-w-0 max-w-full flex-1 truncate rounded-full pl-0 pr-8 py-[3.5px] ${navTextClass} transition-all duration-300 cursor-pointer dark:bg-zinc-800/60 dark:hover:bg-zinc-800/80`}
               >
                 {item.label}
               </span>
+              {item.action === "today" ? (
+                <span className={SIDEBAR_ROW_COUNT_STATIC_CLASS}>
+                  {navTaskCounts.today}
+                </span>
+              ) : item.action === "inbox" ? (
+                <span className={SIDEBAR_ROW_COUNT_STATIC_CLASS}>
+                  {navTaskCounts.inbox}
+                </span>
+              ) : item.action === "important" ? (
+                <span className={SIDEBAR_ROW_COUNT_STATIC_CLASS}>
+                  {navTaskCounts.important}
+                </span>
+              ) : null}
             </div>
               );
             })()
@@ -1035,9 +1131,9 @@ export function Sidebar({
                   className="ml-auto flex h-[25px] w-[37px] shrink-0 items-center justify-center rounded-full bg-[#EcEcEf] mr-[1px] border border-[#eee8ef]"
                   aria-hidden="true"
                 >
-                  <div className="flex items-center gap-px ptxt-400/80">
+                  <div className="flex items-center gap-px text-zinc-400/80">
                     <MacCmdIcon className="size-[9px] shrink-0" />
-                    <span className="text-[10px] font-bold leading-none ptxt-400/80">
+                    <span className="text-[10px] font-bold leading-none text-zinc-400/80">
                       +K
                     </span>
                   </div>
@@ -1048,18 +1144,24 @@ export function Sidebar({
             );
           })}
           
-          <div className="mt-3 flex flex-col">
-            <div className="flex items-center px-4 pb-1.5">
+          <div className="flex flex-col overflow-visible">
+            <div className="relative z-[200] flex items-center overflow-visible px-4">
               <span className="min-w-0 flex-1 text-[11px] font-semibold uppercase tracking-[0.06em] ptxt-400 dark:ptxt-500">
                 Lists
               </span>
               <button
                 type="button"
                 aria-label="Add list"
-                className="mr-4 cursor-pointer flex size-6 shrink-0 items-center justify-center rounded-md ptxt-400 transition-colors hover:bg-zinc-200/60 hover:ptxt-600 dark:hover:bg-zinc-800/60 dark:hover:ptxt-300"
+                className="group/add-list relative -mr-[9px] flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md ptxt-400 transition-colors hover:bg-zinc-200/60 hover:ptxt-600 dark:hover:bg-zinc-800/60 dark:hover:ptxt-300"
                 onClick={() => setIsAddListOpen(true)}
               >
-                <LuPlus className="size-3.5" aria-hidden="true" />
+                <LuPlus className="size-3.5 text-[#acadb2]" aria-hidden="true" />
+                <span
+                  aria-hidden="true"
+                  className="task-date-picker-remove-tooltip add-task-date-tooltip pointer-events-none absolute right-0 bottom-[calc(100%+8px)] z-[200] whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity group-hover/add-list:opacity-100"
+                >
+                  Add List
+                </span>
               </button>
             </div>
           <div
@@ -1101,17 +1203,17 @@ export function Sidebar({
                   onSidebarHoverEnd?.();
                 }
               }}
-              className={`group relative ml-[6px] mb-1 flex h-[34px] cursor-pointer items-center gap-2 rounded-md px-3 transition-[background-color,filter] ${
+              className={`group relative ml-[3px] mb-1 flex h-[34px] cursor-pointer items-center gap-2 rounded-md px-3 transition-[background-color,filter] ${
                 dimOtherLists ? "duration-400 blur-[0.5px] brightness-[1.25]" : "duration-200"
               } ${getListRowClassName(list.id)} ${
                 onReorderLists ? "touch-none" : ""
               }`}
             >
               <LuList
-                className="size-[14px] shrink-0 ptxt-400"
+                className="size-[14px] shrink-0 text-[#acadb7]"
                 aria-hidden="true"
               />
-              <div className="min-w-0 flex-1 text-left">
+              <div className="group min-w-0 flex-1 pr-8 text-left">
                 {editingListId === list.id ? (
                   <input
                     ref={listNameInputRef}
@@ -1128,7 +1230,7 @@ export function Sidebar({
                   />
                 ) : (
                   <span
-                    className="block truncate text-sm ptxt-list-items"
+                    className="group-hover:text-[#131313] block truncate text-sm ptxt-list-items"
                     onDoubleClick={(event) => {
                       event.stopPropagation();
                       startListNameEdit(list);
@@ -1138,22 +1240,23 @@ export function Sidebar({
                   </span>
                 )}
               </div>
-              <span className="pointer-events-none shrink-0 pr-5 text-xs tabular-nums ptxt-400 dark:ptxt-500">
+              <span
+                className={`${SIDEBAR_ROW_COUNT_CLASS} ${
+                  openMenuListId === list.id ? "opacity-0" : ""
+                }`}
+              >
                 {taskCountByListId[list.id] ?? 0}
               </span>
               <div
-                className="absolute right-1 top-1/2 -translate-y-1/2"
+                className={SIDEBAR_ROW_MENU_WRAPPER_CLASS}
                 ref={openMenuListId === list.id ? menuRef : null}
               >
                 <button
                   type="button"
                   aria-label={`Open menu for ${list.name}`}
                   aria-expanded={openMenuListId === list.id}
-                  className={`flex size-[22px] items-center justify-center rounded-full ptxt-500 transition-opacity hover:bg-zinc-200/80 hover:ptxt-900 dark:ptxt-400 dark:hover:bg-zinc-700 dark:hover:ptxt-50 cursor-pointer ${
-                    openMenuListId === list.id
-                      ? "opacity-100"
-                      : "opacity-0 group-hover:opacity-100"
-                  }`}
+                  className={`${getSidebarRowMenuButtonClass(openMenuListId === list.id)} -mr-[6px]`}
+             
                   onPointerDown={(event) => event.stopPropagation()}
                   onClick={(event) => {
                     event.stopPropagation();
@@ -1192,15 +1295,15 @@ export function Sidebar({
           </div>
 
           <div
-            className="mt-3 flex flex-col"
+            className="flex flex-col overflow-visible"
             onMouseLeave={() => onSidebarHoverEnd?.()}
           >
-            <div className="flex items-center px-4 pb-1.5">
+            <div className="relative z-[200] flex items-center overflow-visible px-4 pb-1.5">
               <button
                 type="button"
                 onClick={() => setIsLabelsOpen((open) => !open)}
                 aria-expanded={isLabelsOpen}
-                className="min-w-0 flex-1 text-left"
+                className="min-w-0 flex-1 text-left cursor-pointer"
               >
                 <span className="text-[11px] font-semibold uppercase tracking-[0.06em] ptxt-400 dark:ptxt-500">
                   Labels
@@ -1210,11 +1313,11 @@ export function Sidebar({
                 type="button"
                 aria-label={isLabelsOpen ? "Collapse labels" : "Expand labels"}
                 aria-expanded={isLabelsOpen}
-                className="flex mr-1 size-6 shrink-0 items-center justify-center rounded-md ptxt-400 transition-colors cursor-pointer hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60"
+                className="flex -mr-[3px] size-6 shrink-0 items-center justify-center rounded-md ptxt-400 transition-colors cursor-pointer hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60"
                 onClick={() => setIsLabelsOpen((open) => !open)}
               >
                 <BiChevronDown
-                  className={`size-4 transition-transform ${
+                  className={`size-4 transition-transform text-[#c0c5e0] ${
                     isLabelsOpen ? "rotate-0" : "-rotate-90"
                   }`}
                   aria-hidden="true"
@@ -1223,10 +1326,16 @@ export function Sidebar({
               <button
                 type="button"
                 aria-label="Add label"
-                className="mr-0.5 mr-[14px] flex size-6 shrink-0 items-center justify-center rounded-md ptxt-400 transition-colors hover:bg-zinc-200/60 cursor-pointer hover:ptxt-600 dark:hover:bg-zinc-800/60 dark:hover:ptxt-300"
+                className="group/add-label relative -mr-[12px] flex size-6 shrink-0 items-center justify-center rounded-md ptxt-400 transition-colors hover:bg-zinc-200/60 cursor-pointer hover:ptxt-600 dark:hover:bg-zinc-800/60 dark:hover:ptxt-300"
                 onClick={() => setIsAddLabelOpen(true)}
               >
-                <LuPlus className="size-3.5" aria-hidden="true" />
+                <LuPlus className="size-3.5 text-[#acadb2]" aria-hidden="true" />
+                <span
+                  aria-hidden="true"
+                  className="task-date-picker-remove-tooltip add-task-date-tooltip pointer-events-none absolute right-0 bottom-[calc(100%+8px)] z-[200] whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity group-hover/add-label:opacity-100"
+                >
+                  Add Label
+                </span>
               </button>
               
             </div>
@@ -1260,10 +1369,10 @@ export function Sidebar({
                           handleLabelPointerDown(event, item.id)
                         }
                         onClick={() => handleLabelClick(item.id)}
-                        className={`group relative ml-[6px] mb-px flex h-[32px] w-[236px] cursor-pointer items-center gap-2 rounded-[3px] px-3 transition-colors ${
+                        className={`group relative ml-[3px] mb-px flex h-[32px] w-[230px] cursor-pointer items-center gap-2 rounded-[3px] pl-3 pr-1 transition-colors ${
                           isSelected
                             ? "bg-[#e9ebee]/50 font-medium dark:bg-zinc-800/60"
-                            : "hover:bg-zinc-200/50 dark:hover:bg-zinc-800/60"
+                            : "hover:bg-zinc-200/30 dark:hover:bg-zinc-800/60"
                         } ${
                           showLabelAccentBorder
                             ? "border-l-[2px] border-l-[#dadfdf]"
@@ -1278,23 +1387,44 @@ export function Sidebar({
                           });
                         }}
                       >
-                        <MdLabelOutline
-                          className="size-[15px] shrink-0 ptxt-label-items"
-                          aria-hidden="true"
-                        />
-                        <span className="min-w-0 flex-1 truncate text-sm ptxt-label-items">
-                          {item.label}
-                        </span>
-                        <div className="absolute right-0 top-1/2 -translate-y-1/2">
+                        <div className="group flex min-w-0 flex-1 items-center gap-2">
+                          <span className="inline-flex shrink-0 items-center justify-center">
+                            <MdLabelOutline
+                              className="size-[14px] text-[#adadc2]"
+                              aria-hidden="true"
+                            />
+                          </span>
+                          <span className="group-hover:text-[#222222] min-w-0 flex-1 truncate pr-14 text-sm leading-none ptxt-label-items">
+                            {item.label}
+                          </span>
+                        </div>
+                        <div className="absolute right-[var(--sidebar-row-trailing-inset)] top-1/2 flex -translate-y-1/2 items-center gap-2">
+                          <span
+                            aria-hidden="true"
+                            className="inline-flex size-[5px] shrink-0 items-center justify-center rounded-full mr-[6px]"
+                            style={{ backgroundColor: getLabelDotColor(item) }}
+                          />
+                          <span
+                            className={`pointer-events-none inline-flex items-center text-[11px] leading-none tabular-nums transition-opacity ${
+                              openMenuLabelId === item.id
+                                ? "opacity-0"
+                                : "group-hover:opacity-0"
+                            }`}
+                            style={{ color: getLabelDotColor(item) }}
+                          >
+                            {taskCountByLabelId[item.id] ?? 0}
+                          </span>
+                        </div>
+                        <div className={SIDEBAR_ROW_MENU_WRAPPER_CLASS}>
                           <button
                             type="button"
                             aria-label={`Open menu for ${item.label}`}
                             aria-expanded={openMenuLabelId === item.id}
-                            className={`flex size-[22px] items-center justify-center rounded-full ptxt-500 transition-opacity hover:bg-zinc-200/80 hover:ptxt-900 dark:ptxt-400 dark:hover:bg-zinc-700 dark:hover:ptxt-50 cursor-pointer ${
-                              openMenuLabelId === item.id
-                                ? "opacity-100"
-                                : "opacity-0 group-hover:opacity-100"
-                            }`}
+                            className={`${getSidebarRowMenuButtonClass(
+                              openMenuLabelId === item.id,
+                            )} -mr-[7px]`}
+                       
+                            
                             onPointerDown={(event) => event.stopPropagation()}
                             onClick={(event) => {
                               event.stopPropagation();
@@ -1312,28 +1442,20 @@ export function Sidebar({
             ) : null}
           </div>
 
-          <div className="mt-3 flex flex-col border-t border-zinc-150">
-            <button
-              type="button"
-              className={`${getItemClassName(isCompletedOpen)} gap-1 px-4 `}
-              onClick={() => setIsCompletedOpen((open) => !open)}
-            >
-              <BiCheckboxChecked
-                className={`size-[21px] shrink-0 ${
-                  isCompletedOpen ? "ptxt-950" : "ptxt-400"
-                }`}
-                aria-hidden="true"
-              />
-              <span className="ptxt-550">Completed</span>
-            </button>
+        </nav>
 
-            {isCompletedOpen &&
-              (completedTasks.length === 0 ? (
-                <p className="px-4 pb-3 text-xs ptxt-400 dark:ptxt-500">
+        <div
+          ref={completedFooterRef}
+          className="relative shrink-0 border-t border-zinc-200 dark:border-zinc-800"
+        >
+          {isCompletedOpen ? (
+            <div className="absolute bottom-full left-0 right-0 z-10 border-t border-zinc-200 bg-inherit shadow-[0_-8px_24px_rgba(15,23,42,0.08)] dark:border-zinc-800 dark:shadow-[0_-8px_24px_rgba(0,0,0,0.35)]">
+              {completedTasks.length === 0 ? (
+                <p className="px-4 py-3 text-xs ptxt-400 dark:ptxt-500">
                   No completed tasks
                 </p>
               ) : (
-                <div className="list-panel-scroll max-h-[280px] overflow-x-hidden overflow-y-auto">
+                <div className="list-panel-scroll max-h-[280px] overflow-x-hidden overflow-y-auto py-1">
                   {completedTasks.map((task) => (
                     <button
                       key={task.id}
@@ -1356,25 +1478,58 @@ export function Sidebar({
                     </button>
                   ))}
                 </div>
-              ))}
-          </div>
-        </nav>
+              )}
+            </div>
+          ) : null}
 
-        <div className="flex justify-end items-center shrink-0 border-t border-zinc-200 px-4 py-3 dark:border-zinc-800">
-          <button
-            type="button"
-            aria-label="Open settings"
-            onClick={(event) => {
-              openSettingsModal({
-                x: event.clientX,
-                y: event.clientY,
-              });
-              closeDrawer();
-            }}
-            className="flex size-8 items-center justify-center rounded-full ptxt-400 transition-colors hover:bg-zinc-200/60 hover:ptxt-900 dark:hover:bg-zinc-800/60 dark:hover:ptxt-50 cursor-pointer"
-          >
-            <FiSettings className="size-[18px]" aria-hidden="true" />
-          </button>
+          <div className="flex items-center justify-between px-4 py-2">
+            <div className="flex flex-col items-center">
+              <button
+                type="button"
+                aria-expanded={isCompletedOpen}
+                className="group flex items-center gap-1 text-sm ptxt-550 transition-colors hover:ptxt-900 dark:hover:ptxt-50 cursor-pointer"
+                onClick={() => {
+                  setIsCompletedOpen((open) => !open);
+                  setIsArchiveOpen(false);
+                }}
+              >
+                <BiCheckboxChecked
+                  className={`size-[15px] shrink-0 ${
+                    isCompletedOpen ? "ptxt-950" : "ptxt-400"
+                  }`}
+                  aria-hidden="true"
+                />
+                <span className="text-[#9d9da3] group-hover:text-[#747479] text-[14px]">Completed</span>
+              </button>
+              <button
+                type="button"
+                className="group text-sm ptxt-550 transition-colors hover:ptxt-900 dark:hover:ptxt-50 cursor-pointer"
+                onClick={(event) => {
+                  openArchiveModal({
+                    x: event.clientX,
+                    y: event.clientY,
+                  });
+                  closeDrawer();
+                }}
+              >
+              <span className="text-[#9d9da3]group-hover:text-[#747479] text-[14px]">Archive</span>
+              </button>
+            </div>
+            <button
+              type="button"
+              aria-label="Open settings"
+              onClick={(event) => {
+                openSettingsModal({
+                  x: event.clientX,
+                  y: event.clientY,
+                });
+                closeDrawer();
+              }}
+              className="flex size-8 items-center justify-center rounded-full ptxt-400 transition-colors hover:bg-zinc-200/60 hover:ptxt-900 dark:hover:bg-zinc-800/60 dark:hover:ptxt-50 cursor-pointer"
+            >
+              <FiSettings className="size-[18px]" aria-hidden="true" />
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -1396,6 +1551,13 @@ export function Sidebar({
         open={isSettingsOpen}
         revealOrigin={settingsRevealOrigin}
         onClose={() => setIsSettingsOpen(false)}
+      />
+
+      <ArchiveModal
+        open={isArchiveOpen}
+        revealOrigin={archiveRevealOrigin}
+        onClose={() => setIsArchiveOpen(false)}
+        onTasksRestored={onArchivedTasksRestored}
       />
 
       {openLabelMenuItem && labelMenuPosition ? (

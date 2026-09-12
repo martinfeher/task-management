@@ -1142,13 +1142,36 @@ export function TodoApp({
     return counts;
   }, [lists, tasksByList]);
 
-  const sidebarLabels = useMemo(
-    () =>
-      [...labels].sort((a, b) =>
-        a.label.localeCompare(b.label, undefined, { sensitivity: "base" }),
-      ),
-    [labels],
-  );
+  const navTaskCounts = useMemo(() => {
+    const inboxListId = getInboxListId(lists);
+    let todayCount = 0;
+    let inboxCount = 0;
+    let importantCount = 0;
+
+    for (const list of lists) {
+      for (const task of tasksByList[list.id] ?? []) {
+        if (task.completed) continue;
+
+        if (task.important) {
+          importantCount += 1;
+        }
+
+        if (isDueToday(task.dueDate)) {
+          todayCount += 1;
+        }
+
+        if (list.id === inboxListId) {
+          inboxCount += 1;
+        }
+      }
+    }
+
+    return {
+      today: todayCount,
+      inbox: inboxCount,
+      important: importantCount,
+    };
+  }, [lists, tasksByList]);
 
   const clearUndoTimer = useCallback(() => {
     if (undoTimerRef.current !== null) {
@@ -2047,11 +2070,7 @@ export function TodoApp({
 
   async function addLabel(name: string, color: string) {
     const label = await createLabelInDb(name, color);
-    setLabels((current) =>
-      [...current, label].sort((a, b) =>
-        a.label.localeCompare(b.label, undefined, { sensitivity: "base" }),
-      ),
-    );
+    setLabels((current) => [...current, label]);
   }
 
   async function removeLabel(labelId: string) {
@@ -2822,6 +2841,25 @@ export function TodoApp({
     }
   }
 
+  function restoreArchivedTasks(
+    restoredTasks: import("@/app/actions/todo").RestoredTaskItem[],
+  ) {
+    if (restoredTasks.length === 0) return;
+
+    setTasksByList((current) => {
+      const next = { ...current };
+
+      for (const task of restoredTasks) {
+        const listTasks = next[task.listId] ?? [];
+        if (listTasks.some((item) => item.id === task.id)) continue;
+
+        next[task.listId] = [...listTasks, task];
+      }
+
+      return next;
+    });
+  }
+
   async function deleteTaskById(taskId: string) {
     const listId = findTaskListId(taskId);
     if (!listId) return;
@@ -3267,9 +3305,10 @@ export function TodoApp({
       <div className="flex h-dvh overflow-hidden">
         <Sidebar
           lists={lists}
-          labels={sidebarLabels}
+          labels={labels}
           taskCountByListId={taskCountByListId}
           taskCountByLabelId={taskCountByLabelId}
+          navTaskCounts={navTaskCounts}
           completedTasks={completedTasks}
           searchTasks={searchTasks}
           completingTaskIds={completingTaskIds}
@@ -3303,6 +3342,7 @@ export function TodoApp({
           onUpdateLabelColor={updateLabelColor}
           onReorderLists={reorderLists}
           onReorderLabels={reorderLabels}
+          onArchivedTasksRestored={restoreArchivedTasks}
           onSidebarHoverStart={handleSidebarHoverStart}
           onSidebarHoverEnd={handleSidebarHoverEnd}
           sidebarHoverPreview={sidebarHoverPreview}

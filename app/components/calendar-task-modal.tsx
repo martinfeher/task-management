@@ -124,7 +124,7 @@ export function CalendarTaskModal({
   }, [handleClose]);
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+    <div className="fixed inset-0 z-[100] flex flex-col px-6 pt-6 pb-[80px]">
       <button
         type="button"
         aria-label="Close task editor"
@@ -136,7 +136,7 @@ export function CalendarTaskModal({
         role="dialog"
         aria-modal="true"
         aria-label="Edit task"
-        className="calendar-task-modal relative z-10 flex h-[min(85vh,820px)] w-full min-w-[600px] max-w-4xl flex-col overflow-hidden bg-white dark:bg-zinc-950"
+        className="calendar-task-modal relative z-10 mx-auto flex min-h-0 w-full min-w-[600px] max-w-4xl flex-1 flex-col overflow-hidden bg-white dark:bg-zinc-950"
         onMouseDown={(event) => event.stopPropagation()}
       >
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">

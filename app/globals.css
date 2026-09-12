@@ -194,6 +194,10 @@
   --panel-text-subtask-title: #3f3f46;
   --panel-text-task-datetime: #9f9fa9;
   --panel-text-completed-tasks: #9f9fa9;
+  --panel-text-task-item-divider: #f4f4f5;
+  --panel-text-task-detail-background: #f8f8f9;
+  --panel-text-task-detail-textarea-background: #ffffff;
+  --panel-text-task-detail-textarea-border: #e4e4e7;
   --font-app: var(--font-inter);
   --calendar-task-surface-shadow:
     0 2px 4px rgba(0, 0, 0, 0.04),
@@ -293,6 +297,10 @@ body {
   font-family: var(--font-app), ui-sans-serif, system-ui, sans-serif;
 }
 
+.task-details-panel-background {
+  background-color: var(--panel-text-task-detail-background);
+}
+
 .task-details-skeleton-bar {
   background-color: color-mix(in srgb, #e4e4e7 65%, white);
 }
@@ -307,6 +315,8 @@ body {
   caret-color: #171717;
   cursor: text;
   scrollbar-gutter: stable;
+  background-color: var(--panel-text-task-detail-textarea-background);
+  border: 1px solid var(--panel-text-task-detail-textarea-border);
 }
 
 .dark .task-details-editor {
@@ -1396,9 +1406,14 @@ body {
 }
 
 .list-panel-scroll {
+  --sidebar-row-trailing-inset: 12px;
   scrollbar-gutter: stable;
   scrollbar-width: thin;
   scrollbar-color: rgb(212 212 216 / 0.7) transparent;
+}
+
+.list-panel-scroll[data-has-vertical-scroll="true"] {
+  --sidebar-row-trailing-inset: 17px;
 }
 
 .list-panel-scroll::-webkit-scrollbar {
@@ -1738,7 +1753,7 @@ body {
   background-image: linear-gradient(
     to right,
     transparent 4.5%,
-    rgb(244 244 245) 4.5%
+    var(--panel-text-task-item-divider) 4.5%
   );
 }
 
@@ -1746,7 +1761,7 @@ body {
   background-image: linear-gradient(
     to right,
     transparent 3%,
-    rgb(244 244 245) 3%
+    var(--panel-text-task-item-divider) 3%
   );
 }
 
@@ -1756,7 +1771,7 @@ body {
   background-image: linear-gradient(
     to right,
     transparent 4.5%,
-    rgb(244 244 245) 4.5%
+    var(--panel-text-task-item-divider) 4.5%
   );
 }
 
@@ -1764,7 +1779,7 @@ body {
   background-image: linear-gradient(
     to right,
     transparent 4.5%,
-    rgb(24 24 27) 4.5%
+    var(--panel-text-task-item-divider) 4.5%
   );
 }
 
@@ -1772,7 +1787,7 @@ body {
   background-image: linear-gradient(
     to right,
     transparent 3%,
-    rgb(24 24 27) 3%
+    var(--panel-text-task-item-divider) 3%
   );
 }
 
@@ -1783,7 +1798,7 @@ body {
   background-image: linear-gradient(
     to right,
     transparent 15%,
-    rgb(24 24 27) 15%
+    var(--panel-text-task-item-divider) 15%
   );
 }
 

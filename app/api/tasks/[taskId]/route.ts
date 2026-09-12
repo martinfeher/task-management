@@ -42,6 +42,7 @@ export async function GET(_request: Request, context: RouteContext) {
       recurrenceAnchor: true,
       important: true,
       pinned: true,
+      deletedAt: true,
       list: {
         select: {
           id: true,
@@ -61,7 +62,7 @@ export async function GET(_request: Request, context: RouteContext) {
     },
   });
 
-  if (!task) {
+  if (!task || task.deletedAt) {
     return jsonWithCors({ error: "Task not found" }, { status: 404 });
   }
 

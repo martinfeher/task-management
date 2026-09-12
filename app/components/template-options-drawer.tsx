@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { LuLayoutTemplate } from "react-icons/lu";
 import {
   CALENDAR_TASK_BACKGROUND_OPTIONS,
@@ -17,7 +17,6 @@ import {
   TASK_LIST_BACKGROUND_OPTIONS,
   useTaskListBackground,
 } from "@/lib/task-list-background";
-import { normalizeHexColor } from "@/lib/sidebar-background-types";
 import {
   PANEL_TEXT_ELEMENT_GROUPS,
   PANEL_TEXT_ELEMENT_LABELS,
@@ -31,81 +30,70 @@ import {
   MIN_TOOLTIP_CORNER_RADIUS_PX,
   useTooltipSettings,
 } from "@/lib/tooltip-settings";
+import { TemplateHexColorPicker } from "./template-hex-color-picker";
 import { TemplateStylesSection } from "./template-styles-section";
+import {
+  areTemplateSettingsSnapshotsEqual,
+  cloneTemplateSettingsSnapshot,
+  type TemplateSettingsSnapshot,
+} from "@/lib/template-settings-history";
 
 const DRAWER_WIDTH_CLASS = "w-[280px]";
 
-function TemplateHexColorPicker({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (color: string) => void;
-}) {
-  const [draft, setDraft] = useState(value);
+type TemplateSettingsControllers = {
+  panelTextColors: ReturnType<typeof usePanelTextColors>;
+  sidebar: ReturnType<typeof useSidebarBackground>;
+  taskList: ReturnType<typeof useTaskListBackground>;
+  calendarTask: ReturnType<typeof useCalendarTaskBackground>;
+  tooltip: ReturnType<typeof useTooltipSettings>;
+};
 
-  useEffect(() => {
-    setDraft(value);
-  }, [value]);
+function captureTemplateSettingsSnapshot(
+  controllers: TemplateSettingsControllers,
+): TemplateSettingsSnapshot {
+  return {
+    panelTextColors: controllers.panelTextColors.settings,
+    sidebar: controllers.sidebar.currentSettings,
+    taskList: controllers.taskList.currentSettings,
+    calendarTask: controllers.calendarTask.currentSettings,
+    tooltip: controllers.tooltip.currentSettings,
+  };
+}
 
-  function commitDraft() {
-    const normalized = normalizeHexColor(draft);
-    if (normalized) {
-      onChange(normalized);
-      setDraft(normalized);
-      return;
-    }
+function applyTemplateSettingsSnapshot(
+  snapshot: TemplateSettingsSnapshot,
+  controllers: TemplateSettingsControllers,
+) {
+  controllers.panelTextColors.replaceSettings(snapshot.panelTextColors);
+  controllers.sidebar.replaceSettings(snapshot.sidebar);
+  controllers.taskList.replaceSettings(snapshot.taskList);
+  controllers.calendarTask.replaceSettings(snapshot.calendarTask);
+  controllers.tooltip.replaceSettings(snapshot.tooltip);
+}
 
-    setDraft(value);
-  }
+function areTemplateSettingsLoading(controllers: TemplateSettingsControllers) {
+  return (
+    controllers.panelTextColors.isLoading ||
+    controllers.sidebar.isLoading ||
+    controllers.taskList.isLoading ||
+    controllers.calendarTask.isLoading ||
+    controllers.tooltip.isLoading
+  );
+}
 
-  function stopInteraction(event: React.SyntheticEvent) {
-    event.stopPropagation();
-  }
+function isTemplateSettingsShortcutTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false;
 
   return (
-    <div
-      className="flex shrink-0 items-center gap-1.5"
-      onClick={stopInteraction}
-      onPointerDown={stopInteraction}
-    >
-      <label className="relative flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md border border-zinc-300 bg-white p-1 dark:border-zinc-600 dark:bg-zinc-900">
-        <span
-          aria-hidden="true"
-          className="size-full rounded-[4px] border border-zinc-200 dark:border-zinc-700"
-          style={{ backgroundColor: value }}
-        />
-        <input
-          type="color"
-          aria-label={`${label} (visual picker)`}
-          value={value}
-          onChange={(event) => {
-            event.stopPropagation();
-            onChange(event.target.value);
-          }}
-          className="absolute inset-0 size-full cursor-pointer opacity-0"
-        />
-      </label>
-      <input
-        type="text"
-        inputMode="text"
-        autoComplete="off"
-        spellCheck={false}
-        aria-label={label}
-        value={draft}
-        onChange={(event) => setDraft(event.target.value)}
-        onBlur={commitDraft}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            commitDraft();
-          }
-        }}
-        className="w-[4.75rem] rounded-md border border-zinc-300 bg-white px-1.5 py-1 font-mono text-xs text-zinc-800 lowercase outline-none focus:border-zinc-400 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:focus:border-zinc-500"
-      />
-    </div>
+    target.closest("[data-template-options-drawer]") !== null ||
+    target.closest("[data-template-color-popover]") !== null
+  );
+}
+
+function isTemplateStyleNameInput(target: EventTarget | null) {
+  return (
+    target instanceof HTMLElement &&
+    target.matches("[data-template-style-name-input]")
   );
 }
 
@@ -350,6 +338,17 @@ export function TemplateOptionsDrawer() {
   const calendarTask = useCalendarTaskBackground();
   const tooltip = useTooltipSettings();
   const panelTextColors = usePanelTextColors();
+  const settingsControllers = {
+    panelTextColors,
+    sidebar,
+    taskList,
+    calendarTask,
+    tooltip,
+  };
+  const historyRef = useRef<TemplateSettingsSnapshot[]>([]);
+  const historyIndexRef = useRef(0);
+  const isApplyingHistoryRef = useRef(false);
+  const historyInitializedRef = useRef(false);
 
   const isDirty =
     sidebar.isDirty ||
@@ -376,18 +375,142 @@ export function TemplateOptionsDrawer() {
     tooltip.saveSuccess ||
     panelTextColors.saveSuccess;
 
+  const applySnapshot = useCallback(
+    (snapshot: TemplateSettingsSnapshot) => {
+      isApplyingHistoryRef.current = true;
+      panelTextColors.replaceSettings(snapshot.panelTextColors);
+      sidebar.replaceSettings(snapshot.sidebar);
+      taskList.replaceSettings(snapshot.taskList);
+      calendarTask.replaceSettings(snapshot.calendarTask);
+      tooltip.replaceSettings(snapshot.tooltip);
+      requestAnimationFrame(() => {
+        isApplyingHistoryRef.current = false;
+      });
+    },
+    [
+      calendarTask.replaceSettings,
+      panelTextColors.replaceSettings,
+      sidebar.replaceSettings,
+      taskList.replaceSettings,
+      tooltip.replaceSettings,
+    ],
+  );
+
+  const undoTemplateSettings = useCallback(() => {
+    if (historyIndexRef.current <= 0) return;
+
+    historyIndexRef.current -= 1;
+    const snapshot = historyRef.current[historyIndexRef.current];
+    if (!snapshot) return;
+
+    applySnapshot(snapshot);
+  }, [applySnapshot]);
+
+  const redoTemplateSettings = useCallback(() => {
+    if (historyIndexRef.current >= historyRef.current.length - 1) return;
+
+    historyIndexRef.current += 1;
+    const snapshot = historyRef.current[historyIndexRef.current];
+    if (!snapshot) return;
+
+    applySnapshot(snapshot);
+  }, [applySnapshot]);
+
+  useEffect(() => {
+    if (!open) {
+      historyInitializedRef.current = false;
+      return;
+    }
+
+    if (areTemplateSettingsLoading(settingsControllers)) return;
+
+    if (!historyInitializedRef.current) {
+      const initial = cloneTemplateSettingsSnapshot(
+        captureTemplateSettingsSnapshot(settingsControllers),
+      );
+      historyRef.current = [initial];
+      historyIndexRef.current = 0;
+      historyInitializedRef.current = true;
+    }
+  }, [
+    open,
+    panelTextColors.isLoading,
+    sidebar.isLoading,
+    taskList.isLoading,
+    calendarTask.isLoading,
+    tooltip.isLoading,
+  ]);
+
+  useEffect(() => {
+    if (!open || !historyInitializedRef.current || isApplyingHistoryRef.current) {
+      return;
+    }
+
+    if (areTemplateSettingsLoading(settingsControllers)) return;
+
+    const snapshot = cloneTemplateSettingsSnapshot(
+      captureTemplateSettingsSnapshot(settingsControllers),
+    );
+    const history = historyRef.current;
+    const index = historyIndexRef.current;
+    const current = history[index];
+
+    if (current && areTemplateSettingsSnapshotsEqual(current, snapshot)) {
+      return;
+    }
+
+    historyRef.current = [...history.slice(0, index + 1), snapshot];
+    historyIndexRef.current = historyRef.current.length - 1;
+  }, [
+    open,
+    panelTextColors.settings,
+    sidebar.currentSettings,
+    taskList.currentSettings,
+    calendarTask.currentSettings,
+    tooltip.currentSettings,
+    panelTextColors.isLoading,
+    sidebar.isLoading,
+    taskList.isLoading,
+    calendarTask.isLoading,
+    tooltip.isLoading,
+  ]);
+
   useEffect(() => {
     if (!open) return;
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         setOpen(false);
+        return;
+      }
+
+      if (!isTemplateSettingsShortcutTarget(event.target)) return;
+
+      if (isTemplateStyleNameInput(event.target)) return;
+
+      if (!(event.metaKey || event.ctrlKey)) return;
+
+      const key = event.key.toLowerCase();
+
+      if (key === "z" && !event.shiftKey) {
+        if (historyIndexRef.current <= 0) return;
+        event.preventDefault();
+        event.stopPropagation();
+        undoTemplateSettings();
+        return;
+      }
+
+      if (key === "y" || (key === "z" && event.shiftKey)) {
+        if (historyIndexRef.current >= historyRef.current.length - 1) return;
+        event.preventDefault();
+        event.stopPropagation();
+        redoTemplateSettings();
       }
     }
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [open]);
+    document.addEventListener("keydown", handleKeyDown, true);
+    return () => document.removeEventListener("keydown", handleKeyDown, true);
+  }, [open, redoTemplateSettings, undoTemplateSettings]);
 
   async function handleSave() {
     if (sidebar.isDirty) {
@@ -420,6 +543,7 @@ export function TemplateOptionsDrawer() {
 
       <aside
         id={drawerId}
+        data-template-options-drawer
         aria-hidden={!open}
         className={`fixed top-0 right-0 z-50 flex h-dvh ${DRAWER_WIDTH_CLASS} flex-col border-l border-zinc-200 bg-white shadow-xl transition-transform duration-200 ease-out dark:border-zinc-800 dark:bg-zinc-950 ${
           open ? "translate-x-0" : "translate-x-full"
@@ -440,7 +564,8 @@ export function TemplateOptionsDrawer() {
             </h3>
             <p className="mb-2 px-1 text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400">
               Choose a Tailwind zinc, slate, or gray shade (50-step increments)
-              or pick a custom hex color for each text element.
+              or pick a custom hex color for each text, divider, and surface
+              element.
             </p>
             <div className="space-y-3 rounded-lg border border-zinc-200 px-3 py-2 dark:border-zinc-700">
               {PANEL_TEXT_ELEMENT_GROUPS.map((group) => (

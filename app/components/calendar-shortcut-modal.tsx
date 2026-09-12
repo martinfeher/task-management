@@ -82,6 +82,20 @@ export function CalendarShortcutModal({
     };
   }, [open]);
 
+  useEffect(() => {
+    if (!open) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      if (document.querySelector(".calendar-task-modal")) return;
+
+      handleClose();
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleClose, open]);
+
   if (!open) return null;
 
   return createPortal(
@@ -100,17 +114,6 @@ export function CalendarShortcutModal({
         className="absolute inset-10 z-10 flex min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-[#fbfbfc] shadow-2xl dark:border-zinc-700 dark:bg-zinc-950"
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <div className="absolute right-3 top-3 z-20 flex items-center gap-1">
-          <button
-            type="button"
-            aria-label="Close calendar"
-            onClick={handleClose}
-            className="flex size-8 items-center justify-center rounded-full text-zinc-500 transition-colors hover:bg-[#e8e8e8] hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
-          >
-            <LuX className="size-4" />
-          </button>
-        </div>
-
         <div className="min-h-0 flex-1 overflow-hidden">
           <CalendarPanel
             {...calendarPanelProps}
@@ -126,6 +129,16 @@ export function CalendarShortcutModal({
                   <CalendarExpandIcon className="size-[18px]" />
                 </button>
               ) : undefined
+            }
+            headerTrailingAction={
+              <button
+                type="button"
+                aria-label="Close calendar"
+                onClick={handleClose}
+                className="flex size-8 shrink-0 items-center justify-center rounded-full text-zinc-500 transition-colors hover:bg-[#e8e8e8] hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+              >
+                <LuX className="size-4" />
+              </button>
             }
             view={view}
             onViewChange={setView}

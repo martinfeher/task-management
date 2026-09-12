@@ -24,11 +24,7 @@ export const DEFAULT_SIDEBAR_BASE_COLOR = "#f1f5ff";
 export const DEFAULT_SIDEBAR_BACKGROUND_ID: SidebarBackgroundId = "solid-blue";
 
 export const SIDEBAR_BACKGROUND_OPTIONS: SidebarBackgroundOption[] = [
-  {
-    id: "zinc-50",
-    label: "Zinc 50",
-    usesBaseColor: false,
-  },
+
   {
     id: "solid-blue",
     label: "Light blue",

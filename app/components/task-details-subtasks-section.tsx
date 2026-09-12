@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { BiChevronDown, BiChevronRight } from "react-icons/bi";
 import {
   clearSubtasksExpanded,
@@ -54,6 +54,9 @@ export function TaskDetailsSubtasksSection({
   const [isAdding, setIsAdding] = useState(false);
   const editInputRef = useRef<HTMLInputElement>(null);
   const previousSubtaskCountRef = useRef(subtasks.length);
+  const editHistoryRef = useRef<string[]>([]);
+  const editHistoryIndexRef = useRef(0);
+  const skipEditHistoryPushRef = useRef(false);
 
   const orderedSubtasks = useMemo(
     () => orderSubtasksForDisplay(subtasks),
@@ -89,20 +92,82 @@ export function TaskDetailsSubtasksSection({
     });
   }
 
-  useEffect(() => {
+  function beginEditingSubtask(subtaskId: string, name: string) {
+    editHistoryRef.current = [name];
+    editHistoryIndexRef.current = 0;
+    skipEditHistoryPushRef.current = false;
+    setEditingSubtaskId(subtaskId);
+    setEditingName(name);
+  }
+
+  function pushEditHistory(value: string) {
+    if (skipEditHistoryPushRef.current) return;
+
+    const history = editHistoryRef.current;
+    const index = editHistoryIndexRef.current;
+    if (history[index] === value) return;
+
+    editHistoryRef.current = [...history.slice(0, index + 1), value];
+    editHistoryIndexRef.current = editHistoryRef.current.length - 1;
+  }
+
+  function applyEditHistoryValue(value: string) {
+    skipEditHistoryPushRef.current = true;
+    setEditingName(value);
+  }
+
+  function undoSubtaskEdit(): boolean {
+    if (editHistoryIndexRef.current <= 0) return false;
+
+    editHistoryIndexRef.current -= 1;
+    applyEditHistoryValue(editHistoryRef.current[editHistoryIndexRef.current] ?? "");
+    return true;
+  }
+
+  function redoSubtaskEdit(): boolean {
+    if (editHistoryIndexRef.current >= editHistoryRef.current.length - 1) {
+      return false;
+    }
+
+    editHistoryIndexRef.current += 1;
+    applyEditHistoryValue(editHistoryRef.current[editHistoryIndexRef.current] ?? "");
+    return true;
+  }
+
+  useLayoutEffect(() => {
+    skipEditHistoryPushRef.current = false;
+  }, [editingName]);
+
+  useLayoutEffect(() => {
     if (!editingSubtaskId) return;
 
-    const frame = requestAnimationFrame(() => {
+    const hasSubtask = subtasks.some((subtask) => subtask.id === editingSubtaskId);
+    if (!hasSubtask) return;
+
+    let frame1 = 0;
+    let frame2 = 0;
+
+    const focusInput = () => {
       const input = editInputRef.current;
-      if (!input) return;
-      input.focus();
+      if (!input) return false;
+
+      input.focus({ preventScroll: true });
       input.select();
+      return true;
+    };
+
+    if (focusInput()) return;
+
+    frame1 = requestAnimationFrame(() => {
+      if (focusInput()) return;
+      frame2 = requestAnimationFrame(focusInput);
     });
 
     return () => {
-      cancelAnimationFrame(frame);
+      cancelAnimationFrame(frame1);
+      cancelAnimationFrame(frame2);
     };
-  }, [editingSubtaskId]);
+  }, [editingSubtaskId, subtasks]);
 
   function commitSubtaskRename(subtaskId: string) {
     const trimmed = editingName.trim();
@@ -127,8 +192,7 @@ export function TaskDetailsSubtasksSection({
 
       setIsExpanded(true);
       saveSubtasksExpanded(taskId, true);
-      setEditingSubtaskId(created.id);
-      setEditingName(created.name);
+      beginEditingSubtask(created.id, created.name);
     } finally {
       setIsAdding(false);
     }
@@ -139,7 +203,7 @@ export function TaskDetailsSubtasksSection({
       type="button"
       disabled={isAdding}
       onClick={() => void handleAddSubtask()}
-      className="flex w-full items-center gap-2 py-2 text-left text-[13px] text-slate-400 transition-colors hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-60 dark:text-zinc-400 dark:hover:text-zinc-200"
+      className="flex w-full items-center gap-2 py-2 text-left text-[13px] text-slate-400 cursor-pointer transition-colors hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-60 dark:text-zinc-400 dark:hover:text-zinc-200"
     >
       <div className="text-[16px] leading-none text-zinc-400" aria-hidden>
         +
@@ -194,20 +258,44 @@ export function TaskDetailsSubtasksSection({
                 {editingSubtaskId === subtask.id ? (
                   <input
                     ref={editInputRef}
+                    data-subtask-edit-input
                     type="text"
                     value={editingName}
-                    onChange={(event) => setEditingName(event.target.value)}
+                    onChange={(event) => {
+                      const nextValue = event.target.value;
+                      setEditingName(nextValue);
+                      pushEditHistory(nextValue);
+                    }}
                     onBlur={() => commitSubtaskRename(subtask.id)}
                     onKeyDown={(event) => {
                       if (event.key === "Enter") {
                         event.preventDefault();
                         commitSubtaskRename(subtask.id);
+                        return;
                       }
 
                       if (event.key === "Escape") {
                         event.preventDefault();
                         setEditingSubtaskId(null);
                         setEditingName("");
+                        return;
+                      }
+
+                      if (!(event.metaKey || event.ctrlKey)) return;
+
+                      const key = event.key.toLowerCase();
+
+                      if (key === "z" && !event.shiftKey) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        undoSubtaskEdit();
+                        return;
+                      }
+
+                      if (key === "y" || (key === "z" && event.shiftKey)) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        redoSubtaskEdit();
                       }
                     }}
                     className="min-w-0 flex-1 bg-transparent text-[14px] text-zinc-600 outline-none dark:text-zinc-50"
@@ -216,8 +304,7 @@ export function TaskDetailsSubtasksSection({
                   <button
                     type="button"
                     onClick={() => {
-                      setEditingSubtaskId(subtask.id);
-                      setEditingName(subtask.name);
+                      beginEditingSubtask(subtask.id, subtask.name);
                     }}
                     className={`min-w-0 flex-1 truncate text-left text-[14px] ${
                       subtask.completed

@@ -5,7 +5,7 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-const PRISMA_CLIENT_VERSION = "postgresql-v12";
+const PRISMA_CLIENT_VERSION = "postgresql-v13";
 
 function assertGeneratedClientSupportsSchema() {
   if (!("important" in Prisma.TaskScalarFieldEnum)) {
@@ -17,6 +17,12 @@ function assertGeneratedClientSupportsSchema() {
   if (!("isNote" in Prisma.TaskScalarFieldEnum)) {
     throw new Error(
       "Prisma client is out of date (missing Task.isNote). Run: npx prisma migrate deploy && npx prisma generate",
+    );
+  }
+
+  if (!("deletedAt" in Prisma.TaskScalarFieldEnum)) {
+    throw new Error(
+      "Prisma client is out of date (missing Task.deletedAt). Run: npx prisma migrate deploy && npx prisma generate",
     );
   }
 

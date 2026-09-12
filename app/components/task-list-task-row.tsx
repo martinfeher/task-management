@@ -588,7 +588,7 @@ export function TaskListTaskRow({
         ...(isCompleting ? completeDurationStyle : {}),
       }}
     >
-      {showDragHandle ? (
+      {showDragHandle && depth === 0 ? (
         <span
           aria-hidden="true"
           className={`flex size-[19px] shrink-0 cursor-move items-center justify-center ${
@@ -596,13 +596,7 @@ export function TaskListTaskRow({
           } ${checkedContentDim}`}
           style={{ transition: dimTransition }}
         >
-          <InteractIcon
-            className={`size-3.5 ${
-              depth > 0
-                ? "ptxt-subtask-interaction-icon"
-                : "ptxt-task-interaction-icon"
-            }`}
-          />
+          <InteractIcon className="size-3.5 ptxt-task-interaction-icon" />
         </span>
       ) : null}
 

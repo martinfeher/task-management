@@ -136,6 +136,7 @@ type CalendarPanelProps = {
   onMultiWeekCountChange?: (count: number) => void;
   persistViewSession?: boolean;
   periodLabelAction?: ReactNode;
+  headerTrailingAction?: ReactNode;
 };
 
 type CalendarTaskDragState = {
@@ -205,6 +206,7 @@ function CalendarViewTabs({
   searchQuery,
   onSearchQueryChange,
   periodLabelAction,
+  headerTrailingAction,
 }: {
   activeView: CalendarViewTab;
   multiDayCount: number;
@@ -219,6 +221,7 @@ function CalendarViewTabs({
   searchQuery: string;
   onSearchQueryChange: (query: string) => void;
   periodLabelAction?: ReactNode;
+  headerTrailingAction?: ReactNode;
 }) {
   const tabButtonClassName = (isActive: boolean) =>
     `rounded-full px-3.5 py-1.5 text-[14px] transition-colors hover:bg-[#F1F5F9] cursor-pointer ${
@@ -332,26 +335,25 @@ function CalendarViewTabs({
           );
         })}
       </div>
-      {activeView !== "month" ? (
-      <div className="flex w-full justify-end pr-[25px]!">
-        <label className="relative flex h-9 w-full max-w-[220px] items-center rounded-full border border-zinc-200 bg-[#f9f9fa] px-3 dark:border-zinc-700 dark:bg-zinc-900">
-          <IoIosSearch
-            className="size-4 shrink-0 text-zinc-400 dark:text-zinc-500"
-            aria-hidden="true"
-          />
-          <input
-            type="search"
-            value={searchQuery}
-            onChange={(event) => onSearchQueryChange(event.target.value)}
-            placeholder="Search"
-            aria-label="Search calendar tasks"
-            className="h-9 min-w-0 flex-1 appearance-none bg-transparent py-0 pl-2 text-sm leading-9 text-zinc-800 outline-none placeholder:text-zinc-400 dark:text-zinc-100 dark:placeholder:text-zinc-500 [&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-decoration]:appearance-none"
-          />
-        </label>
+      <div className="flex w-full items-center justify-end gap-2 pr-[25px]!">
+        {activeView !== "month" ? (
+          <label className="relative flex h-9 w-full max-w-[220px] items-center rounded-full border border-zinc-200 bg-[#f9f9fa] px-3 dark:border-zinc-700 dark:bg-zinc-900">
+            <IoIosSearch
+              className="size-4 shrink-0 text-zinc-400 dark:text-zinc-500"
+              aria-hidden="true"
+            />
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(event) => onSearchQueryChange(event.target.value)}
+              placeholder="Search"
+              aria-label="Search calendar tasks"
+              className="h-9 min-w-0 flex-1 appearance-none bg-transparent py-0 pl-2 text-sm leading-9 text-zinc-800 outline-none placeholder:text-zinc-400 dark:text-zinc-100 dark:placeholder:text-zinc-500 [&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-decoration]:appearance-none"
+            />
+          </label>
+        ) : null}
+        {headerTrailingAction}
       </div>
-      ) : (
-        <div />
-      )}
     </div>
   );
 }
@@ -1062,6 +1064,7 @@ type CalendarViewsPanelProps = {
   externalDraggingTaskId?: string | null;
   externalDraggingTaskName?: string | null;
   periodLabelAction?: ReactNode;
+  headerTrailingAction?: ReactNode;
 };
 
 export function CalendarViewsPanel({
@@ -1106,6 +1109,7 @@ export function CalendarViewsPanel({
   externalDraggingTaskId = null,
   externalDraggingTaskName = null,
   periodLabelAction,
+  headerTrailingAction,
 }: CalendarViewsPanelProps) {
   const [internalActiveView, setInternalActiveView] =
     useState<CalendarViewTab>(defaultView);
@@ -1389,6 +1393,7 @@ export function CalendarViewsPanel({
         searchQuery={searchQuery}
         onSearchQueryChange={setSearchQuery}
         periodLabelAction={periodLabelAction}
+        headerTrailingAction={headerTrailingAction}
       />
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       {activeView === "month" ? (
@@ -1614,6 +1619,7 @@ export function CalendarPanel({
   onMultiWeekCountChange,
   persistViewSession = true,
   periodLabelAction,
+  headerTrailingAction,
   labels = [],
   onDeleteTask,
 }: CalendarPanelProps) {
@@ -1658,6 +1664,7 @@ export function CalendarPanel({
         onMultiWeekCountChange={onMultiWeekCountChange}
         persistViewSession={persistViewSession}
         periodLabelAction={periodLabelAction}
+        headerTrailingAction={headerTrailingAction}
       />
     </section>
   );

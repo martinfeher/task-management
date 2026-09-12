@@ -24,7 +24,11 @@ export type PanelTextElementKey =
   | "subtaskInteractionIconHover"
   | "subtaskTitle"
   | "taskDateTime"
-  | "completedTasks";
+  | "completedTasks"
+  | "taskItemDivider"
+  | "taskDetailBackground"
+  | "taskDetailTextareaBackground"
+  | "taskDetailTextareaBorder";
 
 export type PanelTextColorValue = {
   shade: PanelTextShadeToken;
@@ -53,6 +57,10 @@ export const PANEL_TEXT_ELEMENT_KEYS: PanelTextElementKey[] = [
   "subtaskTitle",
   "taskDateTime",
   "completedTasks",
+  "taskItemDivider",
+  "taskDetailBackground",
+  "taskDetailTextareaBackground",
+  "taskDetailTextareaBorder",
 ];
 
 export const PANEL_TEXT_ELEMENT_LABELS: Record<PanelTextElementKey, string> = {
@@ -72,6 +80,10 @@ export const PANEL_TEXT_ELEMENT_LABELS: Record<PanelTextElementKey, string> = {
   subtaskTitle: "Subtask title",
   taskDateTime: "Date and time",
   completedTasks: "Completed tasks",
+  taskItemDivider: "Task item divider",
+  taskDetailBackground: "Panel background",
+  taskDetailTextareaBackground: "Textarea background",
+  taskDetailTextareaBorder: "Textarea border",
 };
 
 export const PANEL_TEXT_ELEMENT_GROUPS: Array<{
@@ -102,6 +114,15 @@ export const PANEL_TEXT_ELEMENT_GROUPS: Array<{
       "subtaskTitle",
       "taskDateTime",
       "completedTasks",
+      "taskItemDivider",
+    ],
+  },
+  {
+    title: "Task detail",
+    keys: [
+      "taskDetailBackground",
+      "taskDetailTextareaBackground",
+      "taskDetailTextareaBorder",
     ],
   },
 ];
@@ -124,7 +145,19 @@ export const PANEL_TEXT_ELEMENT_CSS_VARS: Record<PanelTextElementKey, string> =
     subtaskTitle: "--panel-text-subtask-title",
     taskDateTime: "--panel-text-task-datetime",
     completedTasks: "--panel-text-completed-tasks",
+    taskItemDivider: "--panel-text-task-item-divider",
+    taskDetailBackground: "--panel-text-task-detail-background",
+    taskDetailTextareaBackground: "--panel-text-task-detail-textarea-background",
+    taskDetailTextareaBorder: "--panel-text-task-detail-textarea-border",
   };
+
+const DEFAULT_PANEL_TEXT_COLOR_OVERRIDES: Partial<
+  Record<PanelTextElementKey, string>
+> = {
+  taskDetailBackground: "#f8f8f9",
+  taskDetailTextareaBackground: "#ffffff",
+  taskDetailTextareaBorder: "#e4e4e7",
+};
 
 const DEFAULT_SHADES: Record<PanelTextElementKey, PanelTextShadeToken> = {
   listSearchText: "zinc-700",
@@ -143,6 +176,10 @@ const DEFAULT_SHADES: Record<PanelTextElementKey, PanelTextShadeToken> = {
   subtaskTitle: "zinc-700",
   taskDateTime: "zinc-400",
   completedTasks: "zinc-400",
+  taskItemDivider: "zinc-100",
+  taskDetailBackground: "zinc-100",
+  taskDetailTextareaBackground: "zinc-50",
+  taskDetailTextareaBorder: "zinc-200",
 };
 
 export function getDefaultPanelTextColorValue(
@@ -151,7 +188,8 @@ export function getDefaultPanelTextColorValue(
   const shade = DEFAULT_SHADES[key];
   return {
     shade,
-    color: getShadeHex(shade),
+    color:
+      DEFAULT_PANEL_TEXT_COLOR_OVERRIDES[key] ?? getShadeHex(shade),
   };
 }
 

@@ -47,6 +47,7 @@ model Task {
   list      TodoList  @relation(fields: [listId], references: [id], onDelete: Cascade)
   tags      TaskTag[]
   versions  TaskVersion[]
+  deletedAt DateTime?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 }
