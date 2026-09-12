@@ -906,6 +906,12 @@ body {
   box-shadow: var(--app-tooltip-shadow);
 }
 
+.add-task-date-tooltip-sm {
+  padding: 4.5px 9px;
+  font-size: 10px;
+  border-radius: 6px;
+}
+
 .add-task-date-tooltip::after {
   content: "";
   position: absolute;
@@ -1813,14 +1819,14 @@ body {
 }
 
 .task-details-subtasks-section {
-  background-image: linear-gradient(to right, transparent 10%, #e4e4e7 10%);
+  background-image: linear-gradient(to right, transparent 2%, #e4e4e7 2%);
   background-size: 100% 1px;
   background-position: top left;
   background-repeat: no-repeat;
 }
 
 .dark .task-details-subtasks-section {
-  background-image: linear-gradient(to right, transparent 10%, #3f3f46 10%);
+  background-image: linear-gradient(to right, transparent 4%, #3f3f46 4%);
 }
 
 .task-list-item-divider {

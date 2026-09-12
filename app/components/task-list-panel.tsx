@@ -71,9 +71,12 @@ import {
   type HierarchyDragIntent,
 } from "@/lib/task-subtasks";
 import {
+  expandSectionReorderIds,
   getReorderTargetIndex,
   getTaskDropIndex,
   getTaskRowElements,
+  mergeReorderedPinnedTasks,
+  mergeReorderedUnpinnedTasks,
 } from "./task-reorder";
 import {
   clearTaskListTitleEdit,
@@ -2166,21 +2169,27 @@ export function TaskListPanel({
         );
       }
 
-      const nextIds = reorderVisibleTaskIds(
+      const nextVisibleIds = reorderVisibleTaskIds(
         dragState.taskIds,
         dragState.sourceIndex,
         dropIndex,
         dragState.blockIds,
       );
+      const nextIds = expandSectionReorderIds(
+        nextVisibleIds,
+        orderedTasks,
+        dragState.section,
+      );
 
-      const orderChanged = nextIds.join(",") !== dragState.taskIds.join(",");
+      const orderChanged =
+        nextVisibleIds.join(",") !== dragState.taskIds.join(",");
       const hierarchyIntentByTaskId = new Map([
         [dragState.sourceTaskId, dragState.hierarchyIntent],
       ]);
       const parentUpdates = subtasksEnabled
         ? collectParentUpdates(
             orderedTasks,
-            nextIds,
+            nextVisibleIds,
             [dragState.sourceTaskId],
             hierarchyIntentByTaskId,
             tasksById,
@@ -2190,6 +2199,24 @@ export function TaskListPanel({
 
       if (orderChanged || parentChanged) {
         setActiveSort(null);
+
+        let nextOrderedTasks =
+          dragState.section === "pinned"
+            ? mergeReorderedPinnedTasks(orderedTasks, nextIds)
+            : mergeReorderedUnpinnedTasks(orderedTasks, nextIds);
+
+        if (parentUpdates.length > 0) {
+          const parentByTaskId = new Map(
+            parentUpdates.map((update) => [update.taskId, update.parentId]),
+          );
+          nextOrderedTasks = nextOrderedTasks.map((task) =>
+            parentByTaskId.has(task.id)
+              ? { ...task, parentId: parentByTaskId.get(task.id)! }
+              : task,
+          );
+        }
+
+        setOrderedTasks(nextOrderedTasks);
         onReorderTasks(
           listId,
           nextIds,

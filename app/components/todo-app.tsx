@@ -1088,7 +1088,7 @@ export function TodoApp({
     const list = lists.find((item) => item.id === taskListPanelListId);
 
     return (tasksByList[taskListPanelListId] ?? [])
-      .filter((task) => task.completed)
+      .filter((task) => task.completed && !task.parentId)
       .map((task) => ({
         ...task,
         listId: taskListPanelListId,
@@ -1118,7 +1118,7 @@ export function TodoApp({
     const list = lists.find((item) => item.id === listHoverPreview.listId);
 
     return (tasksByList[listHoverPreview.listId] ?? [])
-      .filter((task) => task.completed)
+      .filter((task) => task.completed && !task.parentId)
       .map((task) => ({
         ...task,
         listId: listHoverPreview.listId,

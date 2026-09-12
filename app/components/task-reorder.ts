@@ -6,6 +6,57 @@ export function getTaskRowElements(container: HTMLElement) {
   );
 }
 
+export function getSectionActiveTaskIds<
+  T extends { id: string; completed: boolean; pinned: boolean },
+>(allTasks: T[], section: "pinned" | "unpinned") {
+  return allTasks
+    .filter((task) => {
+      if (task.completed) return false;
+      return section === "pinned" ? task.pinned : !task.pinned;
+    })
+    .map((task) => task.id);
+}
+
+export function expandSectionReorderIds(
+  nextVisibleIds: string[],
+  allTasks: Array<{
+    id: string;
+    completed: boolean;
+    pinned: boolean;
+  }>,
+  section: "pinned" | "unpinned",
+) {
+  const sectionIds = getSectionActiveTaskIds(allTasks, section);
+
+  if (nextVisibleIds.length === sectionIds.length) {
+    return nextVisibleIds;
+  }
+
+  const missingIds = new Set(
+    sectionIds.filter((id) => !nextVisibleIds.includes(id)),
+  );
+  if (missingIds.size === 0) {
+    return nextVisibleIds;
+  }
+
+  const result: string[] = [];
+  const visibleQueue = [...nextVisibleIds];
+
+  for (const id of sectionIds) {
+    if (missingIds.has(id)) {
+      result.push(id);
+      continue;
+    }
+
+    const nextVisibleId = visibleQueue.shift();
+    if (nextVisibleId) {
+      result.push(nextVisibleId);
+    }
+  }
+
+  return result;
+}
+
 export function mergeReorderedPinnedTasks<
   T extends { id: string; completed: boolean; pinned: boolean },
 >(allTasks: T[], reorderedPinnedActiveIds: string[]) {

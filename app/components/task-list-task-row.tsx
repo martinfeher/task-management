@@ -28,6 +28,7 @@ import { CiStickyNote } from "react-icons/ci";
 import { BiAlarm, BiCalendar, BiRevision } from "react-icons/bi";
 import { MdKeyboardArrowDown } from "react-icons/md";
 import { RiArrowDropRightLine } from "react-icons/ri";
+import { TaskListSubtaskIcon } from "./task-list-subtask-icon";
 import type { TaskListItem, TodoList } from "./todo-app";
 import type { TaskDueTime } from "@/lib/task-due-time";
 import type { TaskRecurrenceRule } from "@/lib/task-recurrence";
@@ -680,32 +681,84 @@ export function TaskListTaskRow({
         {showSublineRow ? (
           <div className="mt-0.5 inline-flex w-fit max-w-full self-start items-center gap-0.5">
             {showSubtaskCollapse ? (
-              <button
-                type="button"
-                aria-label={
-                  subtasksExpanded ? "Hide subtasks" : "Show subtasks"
-                }
-                aria-expanded={subtasksExpanded}
-                title={subtasksExpanded ? "Hide subtasks" : "Show subtasks"}
-                className={`flex size-[18px] shrink-0 cursor-pointer items-center justify-center rounded border-0 bg-transparent p-0 ptxt-400 outline-none transition-colors hover:ptxt-600${
-                  hasSubtasksWithoutSchedule ? " relative top-[2px]" : ""
-                }`}
-                style={{ transition: dimTransition }}
-                onPointerDown={(event) => {
-                  if (event.button !== 0) return;
-                  event.stopPropagation();
-                }}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onToggleSubtasksExpanded?.();
-                }}
-              >
-                {subtasksExpanded ? (
-                  <MdKeyboardArrowDown className="size-[21px] text-[#b6b6b6] hover:text-[#9a9a9e]" aria-hidden="true" />
-                ) : (
-                  <RiArrowDropRightLine className="size-[16px] text-[#b6b6b6] hover:text-[#9a9a9e]" aria-hidden="true" />
-                )}
-              </button>
+              <>
+                <button
+                  type="button"
+                  aria-label={
+                    subtasksExpanded ? "Collapse subtasks" : "Show subtasks"
+                  }
+                  aria-expanded={subtasksExpanded}
+                  aria-describedby={
+                    subtasksExpanded
+                      ? `subtask-collapse-tooltip-${task.id}`
+                      : undefined
+                  }
+                  title={
+                    subtasksExpanded ? "Collapse subtasks" : "Show subtasks"
+                  }
+                  className={`group/subtask-collapse relative flex size-[18px] shrink-0 cursor-pointer items-center justify-center rounded border-0 bg-transparent p-0 ptxt-400 outline-none transition-colors hover:ptxt-600${
+                    hasSubtasksWithoutSchedule ? " top-[2px]" : ""
+                  }`}
+                  style={{ transition: dimTransition }}
+                  onPointerDown={(event) => {
+                    if (event.button !== 0) return;
+                    event.stopPropagation();
+                  }}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onToggleSubtasksExpanded?.();
+                  }}
+                >
+                  {subtasksExpanded ? (
+                    <>
+                      <MdKeyboardArrowDown className="size-[15px]! text-[#a4a5a8] group-hover/subtask-collapse:text-[#828285]" aria-hidden="true" />
+                      <span
+                        id={`subtask-collapse-tooltip-${task.id}`}
+                        role="tooltip"
+                        className="add-task-date-tooltip add-task-date-tooltip-sm pointer-events-none absolute bottom-[calc(100%+10px)] left-1/2 z-40 -translate-x-1/2 whitespace-nowrap font-medium opacity-0 transition-opacity group-hover/subtask-collapse:opacity-100"
+                      >
+                        Collapse subtasks
+                      </span>
+                    </>
+                  ) : (
+                    <RiArrowDropRightLine className="size-[21px] shrink-0 text-[#babbbd] group-hover/subtask-collapse:text-[#8c8c8e]" aria-hidden="true" />
+                  )}
+                </button>
+                {!subtasksExpanded ? (
+                  <div
+                    className={`group/subtask-toggle relative${
+                      hasSubtasksWithoutSchedule ? " top-[2px]" : ""
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      aria-label="Show subtasks"
+                      aria-expanded={false}
+                      title="Subtasks"
+                      aria-describedby={`subtask-toggle-tooltip-${task.id}`}
+                      className="flex -ml-[9px]! mr-[2px] size-[18px] shrink-0 cursor-pointer items-center justify-center rounded border-0 bg-transparent p-0 outline-none transition-colors"
+                      style={{ transition: dimTransition }}
+                      onPointerDown={(event) => {
+                        if (event.button !== 0) return;
+                        event.stopPropagation();
+                      }}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onToggleSubtasksExpanded?.();
+                      }}
+                    >
+                      <TaskListSubtaskIcon className="  size-[13px] shrink-0 text-[#afafaf] transition-colors group-hover:text-[#767679]" />
+                    </button>
+                    <span
+                      id={`subtask-toggle-tooltip-${task.id}`}
+                      role="tooltip"
+                      className="add-task-date-tooltip pointer-events-none absolute bottom-[calc(100%+10px)] left-1/2 z-40 -translate-x-1/2 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity group-hover/subtask-toggle:opacity-100"
+                    >
+                      Subtasks
+                    </span>
+                  </div>
+                ) : null}
+              </>
             ) : null}
             {showDueSchedule && dueScheduleSubline ? (
               hasDueDateActions ? (
@@ -730,12 +783,6 @@ export function TaskListTaskRow({
                     className="size-3 shrink-0"
                     aria-hidden="true"
                   />
-                  {hasRecurrence ? (
-                    <BiRevision
-                      className="size-3 shrink-0 opacity-70"
-                      aria-label="Repeats"
-                    />
-                  ) : null}
                   <span className="truncate">{dueScheduleSubline}</span>
                 </button>
               ) : (
