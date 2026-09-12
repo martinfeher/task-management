@@ -3,6 +3,7 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { LuX } from "react-icons/lu";
 import { useImportantEnabled } from "@/lib/important-settings";
+import { useListPreviewEnabled } from "@/lib/list-preview-settings";
 import { useSubtasksEnabled } from "@/lib/subtasks-settings";
 
 type SettingsSection = "general" | "tasks" | "labels";
@@ -76,6 +77,7 @@ function SettingsToggle({
 
 function GeneralSettingsContent() {
   const { importantEnabled, setImportantEnabled } = useImportantEnabled();
+  const { listPreviewEnabled, setListPreviewEnabled } = useListPreviewEnabled();
 
   return (
     <div className="space-y-4">
@@ -91,6 +93,11 @@ function GeneralSettingsContent() {
         label="Enable Important"
         checked={importantEnabled}
         onChange={setImportantEnabled}
+      />
+      <SettingsToggle
+        label="List preview"
+        checked={listPreviewEnabled}
+        onChange={setListPreviewEnabled}
       />
     </div>
   );

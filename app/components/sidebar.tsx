@@ -1185,7 +1185,7 @@ export function Sidebar({
               }
               className={
                 item.action === "search"
-                  ? "ml-[14px] my-2 flex py-[3px] h-[35px]! w-auto bg-[#fcfbff] cursor-pointer items-center gap-2 self-stretch rounded-[7px] border border-[#e3e3e9] py-0 pl-3 pr-[3px] text-left text-sm ptxt-list-search transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
+                  ? "ml-[14px] my-2 flex py-[3px] h-[35px]! w-auto bg-[#fcfbff] cursor-pointer items-center gap-2 self-stretch rounded-[7px] border border-[#e3e3e9] py-0 pl-[8px] pr-[3px] text-left text-sm ptxt-list-search transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
                   : `${getItemClassName(isNavItemSelected)} gap-1 px-4 h-[35px]!`
               }
             >
@@ -1251,13 +1251,6 @@ export function Sidebar({
               const isNameHovered =
                 sidebarHoverPreview?.kind === "list" &&
                 sidebarHoverPreview.listId === list.id;
-              const isSelectedRow =
-                isListSelected(list.id) &&
-                list.id !== suppressListSelectionHighlightId;
-              const dimOtherLists =
-                sidebarHoverPreview?.kind === "list" &&
-                !isNameHovered &&
-                !isSelectedRow;
 
               return (
             <div
@@ -1265,16 +1258,24 @@ export function Sidebar({
               data-list-id={list.id}
               onPointerDown={(event) => handleListPointerDown(event, list.id)}
               onClick={() => handleListClick(list.id)}
-              onMouseEnter={() => {
-                onSidebarHoverStart?.({ kind: "list", listId: list.id });
+              onMouseEnter={(event) => {
+                const rect = event.currentTarget.getBoundingClientRect();
+                onSidebarHoverStart?.({
+                  kind: "list",
+                  listId: list.id,
+                  anchorTop: rect.top,
+                  anchorLeft: rect.left,
+                  anchorWidth: rect.width,
+                  anchorHeight: rect.height,
+                });
               }}
               onMouseLeave={() => {
                 if (isNameHovered) {
                   onSidebarHoverEnd?.();
                 }
               }}
-              className={`group relative ml-[3px] mb-1 flex h-[34px] cursor-pointer items-center gap-2 rounded-md px-3 transition-[background-color,filter] ${
-                dimOtherLists ? "duration-400 blur-[0.5px] brightness-[1.25]" : "duration-200"
+              className={`group relative ml-[3px] mb-1 flex h-[34px] cursor-pointer items-center gap-2 rounded-md px-3 transition-[background-color] duration-200 ${
+                isNameHovered ? "bg-zinc-200/70 dark:bg-zinc-800/70" : ""
               } ${getListRowClassName(list.id)} ${
                 onReorderLists ? "touch-none" : ""
               }`}

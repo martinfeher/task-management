@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
   convertTaskToNote as convertTaskToNoteInDb,
@@ -66,6 +73,7 @@ import {
 } from "@/lib/todo-routes";
 import { getInboxListId } from "@/lib/inbox-list";
 import { useImportantEnabled } from "@/lib/important-settings";
+import { useListPreviewEnabled } from "@/lib/list-preview-settings";
 import { useSubtasksEnabled } from "@/lib/subtasks-settings";
 import type { CalendarViewTab } from "@/lib/calendar-view-settings";
 import {
@@ -80,6 +88,10 @@ import { plainTextToTaskDetails } from "./calendar-add-task-popover";
 import { TaskDetailsPanel, type TaskDetailsSaveController } from "./task-details-panel";
 import { PanelResizeHandle } from "./panel-resize-handle";
 import { TaskListPanel, TASK_LIST_PANEL_AUTO_EXPAND_MAX_WIDTH, TASK_LIST_PANEL_DEFAULT_WIDTH, TASK_LIST_PANEL_MIN_WIDTH } from "./task-list-panel";
+import {
+  SidebarListTaskPreview,
+  type SidebarListPreviewRect,
+} from "./sidebar-list-task-preview";
 import {
   CHECKMARK_HIDE_FADE_MS,
   CHECKMARK_HIDE_MS,
@@ -661,9 +673,14 @@ export type AddTaskOptions = {
   subtasks?: string[];
 };
 
-export type SidebarHoverPreview =
-  | { kind: "list"; listId: string }
-  | { kind: "label"; labelId: string };
+export type SidebarHoverPreview = {
+  kind: "list";
+  listId: string;
+  anchorTop: number;
+  anchorLeft: number;
+  anchorWidth: number;
+  anchorHeight: number;
+};
 
 export function TodoApp({
   initialLists,
@@ -716,6 +733,7 @@ export function TodoApp({
   }, []);
   const [activeView, setActiveView] = useState<ActiveView>(bootState.activeView);
   const { importantEnabled } = useImportantEnabled();
+  const { listPreviewEnabled } = useListPreviewEnabled();
   const { subtasksEnabled } = useSubtasksEnabled();
   const [tasksByList, setTasksByList] = useState(() => initialTasks);
   const [pendingUndo, setPendingUndo] = useState<PendingUndo | null>(null);
@@ -965,35 +983,9 @@ export function TodoApp({
     return () => observer.disconnect();
   }, [clampTaskListWidth]);
 
-  const previewListId =
-    sidebarHoverPreview?.kind === "list" ? sidebarHoverPreview.listId : null;
-  const previewList =
-    previewListId !== null
-      ? (lists.find((list) => list.id === previewListId) ?? null)
-      : null;
-  const previewLabelId =
-    sidebarHoverPreview?.kind === "label"
-      ? sidebarHoverPreview.labelId
-      : null;
-  const previewLabel =
-    previewLabelId !== null
-      ? (labels.find((item) => item.id === previewLabelId) ?? null)
-      : null;
-
-  const displayedListId =
-    sidebarHoverPreview == null
-      ? selectedListId
-      : sidebarHoverPreview.kind === "list"
-        ? sidebarHoverPreview.listId
-        : null;
-  const displayedActiveView: ActiveView =
-    sidebarHoverPreview == null ? activeView : null;
-  const displayedLabelId =
-    sidebarHoverPreview == null
-      ? selectedLabelId
-      : sidebarHoverPreview.kind === "label"
-        ? sidebarHoverPreview.labelId
-        : null;
+  const displayedListId = selectedListId;
+  const displayedActiveView: ActiveView = activeView;
+  const displayedLabelId = selectedLabelId;
   const displayedLabel =
     displayedLabelId !== null
       ? (labels.find((item) => item.id === displayedLabelId) ?? null)
@@ -1009,16 +1001,19 @@ export function TodoApp({
     hasResizedTaskList,
   ]);
 
-  const isSidebarHoverPreview = Boolean(
+  const listHoverPreview =
+    listPreviewEnabled &&
     sidebarHoverPreview &&
-      (sidebarHoverPreview.kind === "list"
-        ? sidebarHoverPreview.listId !== selectedListId ||
-          activeView !== null ||
-          selectedLabelId !== null
-        : sidebarHoverPreview.labelId !== selectedLabelId ||
-          activeView !== null ||
-          selectedListId !== null),
-  );
+    !isCompactLayout &&
+    (sidebarHoverPreview.listId !== selectedListId ||
+      activeView !== null ||
+      selectedLabelId !== null)
+      ? sidebarHoverPreview
+      : null;
+  const listHoverPreviewList =
+    listHoverPreview !== null
+      ? (lists.find((list) => list.id === listHoverPreview.listId) ?? null)
+      : null;
 
   const showingCalendarMonth = displayedActiveView === "calendar";
 
@@ -1038,26 +1033,19 @@ export function TodoApp({
     tasksByList,
   );
 
-  const taskListTitle =
-    previewList
-      ? previewList.name
-      : previewLabel
-        ? previewLabel.label
-        : selectedLabel
-          ? selectedLabel.label
-          : activeView === "today"
-            ? "Today"
-            : activeView === "inbox"
-              ? "Inbox"
-            : activeView === "important"
-              ? "Important"
-              : activeView === "calendar"
-                ? "Calendar"
-                : (selectedList?.name ?? null);
+  const taskListTitle = selectedLabel
+    ? selectedLabel.label
+    : activeView === "today"
+      ? "Today"
+      : activeView === "inbox"
+        ? "Inbox"
+        : activeView === "important"
+          ? "Important"
+          : activeView === "calendar"
+            ? "Calendar"
+            : (selectedList?.name ?? null);
 
   const taskListTitleIconKind = useMemo(() => {
-    if (previewList) return "list" as const;
-    if (previewLabel) return "label" as const;
     if (selectedLabel) return "label" as const;
     if (activeView === "today") return "today" as const;
     if (activeView === "inbox") return "inbox" as const;
@@ -1065,7 +1053,7 @@ export function TodoApp({
     if (activeView === "calendar") return null;
     if (selectedList) return "list" as const;
     return null;
-  }, [previewList, previewLabel, selectedLabel, activeView, selectedList]);
+  }, [selectedLabel, activeView, selectedList]);
 
   const taskListViewResetKey = [
     displayedListId ?? "",
@@ -1107,6 +1095,69 @@ export function TodoApp({
         listName: list?.name,
       }));
   }, [taskListPanelListId, lists, tasksByList]);
+
+  const listHoverPreviewTasks: TaskListItem[] = useMemo(() => {
+    if (!listHoverPreview) return [];
+
+    const visibleTasks = getVisibleTasks(
+      null,
+      listHoverPreview.listId,
+      null,
+      lists,
+      tasksByList,
+    );
+
+    if (!subtasksEnabled) return visibleTasks;
+
+    return appendSubtasksForVisibleParents(visibleTasks, tasksByList);
+  }, [listHoverPreview, lists, subtasksEnabled, tasksByList]);
+
+  const listHoverPreviewCompletedTasks: TaskListItem[] = useMemo(() => {
+    if (!listHoverPreview) return [];
+
+    const list = lists.find((item) => item.id === listHoverPreview.listId);
+
+    return (tasksByList[listHoverPreview.listId] ?? [])
+      .filter((task) => task.completed)
+      .map((task) => ({
+        ...task,
+        listId: listHoverPreview.listId,
+        listName: list?.name,
+      }));
+  }, [listHoverPreview, lists, tasksByList]);
+
+  const taskListPanelRef = useRef<HTMLDivElement>(null);
+  const [listHoverPreviewPanelRect, setListHoverPreviewPanelRect] =
+    useState<SidebarListPreviewRect | null>(null);
+
+  useLayoutEffect(() => {
+    if (!listHoverPreview) {
+      setListHoverPreviewPanelRect(null);
+      return;
+    }
+
+    const updateRect = () => {
+      const node = taskListPanelRef.current;
+      if (!node) return;
+
+      const rect = node.getBoundingClientRect();
+      setListHoverPreviewPanelRect({
+        top: rect.top,
+        left: rect.left,
+        width: rect.width,
+        height: rect.height,
+      });
+    };
+
+    updateRect();
+    window.addEventListener("resize", updateRect);
+    window.addEventListener("scroll", updateRect, true);
+
+    return () => {
+      window.removeEventListener("resize", updateRect);
+      window.removeEventListener("scroll", updateRect, true);
+    };
+  }, [listHoverPreview, taskListWidth]);
 
   const completedTasks: CompletedTask[] = useMemo(
     () =>
@@ -1747,6 +1798,7 @@ export function TodoApp({
   const handleSidebarHoverStart = useCallback(
     (preview: SidebarHoverPreview) => {
       if (
+        !listPreviewEnabled ||
         activeView === "calendar" ||
         isListCalendarOpen ||
         isListCalendarPreview ||
@@ -1764,36 +1816,24 @@ export function TodoApp({
       isCalendarShortcutModalOpen,
       isListCalendarOpen,
       isListCalendarPreview,
+      listPreviewEnabled,
     ],
   );
 
+  useEffect(() => {
+    if (listPreviewEnabled) return;
+    setSidebarHoverPreview(null);
+  }, [listPreviewEnabled]);
+
   const handleSidebarHoverEnd = useCallback(() => {
     cancelSidebarHoverClear();
-
-    if (sidebarHoverPreviewRef.current?.kind === "list") {
-      setSidebarHoverPreview(null);
-      return;
-    }
-
-    clearSidebarHoverTimerRef.current = window.setTimeout(() => {
-      clearSidebarHoverTimerRef.current = null;
-      setSidebarHoverPreview(null);
-    }, 400);
+    setSidebarHoverPreview(null);
   }, [cancelSidebarHoverClear]);
 
   function commitSidebarHoverSelection() {
     cancelSidebarHoverClear();
-    const preview = sidebarHoverPreviewRef.current;
-    if (!preview) return;
-
+    if (!sidebarHoverPreviewRef.current) return;
     setSidebarHoverPreview(null);
-
-    if (preview.kind === "list") {
-      return;
-    }
-
-    if (preview.labelId === selectedLabelId) return;
-    selectLabel(preview.labelId);
   }
 
   function selectToday() {
@@ -3409,10 +3449,12 @@ export function TodoApp({
             className="flex min-h-0 min-w-0 flex-1 overflow-hidden"
           >
             {compactShowTaskList ? (
-              <div
-                className="flex min-h-0 shrink-0"
-                onMouseEnter={commitSidebarHoverSelection}
-              >
+              <div className="flex min-h-0 shrink-0">
+                <div
+                  ref={taskListPanelRef}
+                  className="flex min-h-0 shrink-0 self-stretch"
+                  onMouseEnter={commitSidebarHoverSelection}
+                >
                 <TaskListPanel
                   title={taskListTitle}
                   titleIconKind={taskListTitleIconKind}
@@ -3484,11 +3526,11 @@ export function TodoApp({
                   enableCalendarDragDrop={isListCalendarOpen}
                   onCalendarDropTargetChange={handleCalendarDropTargetChange}
                   onSidebarListDropTargetChange={handleSidebarListDropTargetChange}
-                  isListHovered={sidebarHoverPreview !== null}
                   showSidebarMenu={isCompactLayout}
                   onOpenSidebar={() => setSidebarDrawerOpen(true)}
                   subtasksEnabled={subtasksEnabled}
                 />
+                </div>
                 {!isCompactLayout ? (
                   <PanelResizeHandle onPointerDown={handleTaskListResizeStart} />
                 ) : null}
@@ -3554,13 +3596,7 @@ export function TodoApp({
                 />
               ) : null}
               {showTaskDetails && (
-                <div
-                  className={`flex min-h-0 flex-1 flex-col overflow-hidden transition-[filter] duration-200 ${
-                    isSidebarHoverPreview
-                      ? "pointer-events-none blur-[1.5px] brightness-[0.985]"
-                      : ""
-                  }`}
-                >
+                <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                   <TaskDetailsPanel
                     taskId={selectedTaskId}
                     taskSnapshot={selectedTaskSnapshot}
@@ -3589,7 +3625,11 @@ export function TodoApp({
           </div>
         ) : (
           <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
-            <div onMouseEnter={commitSidebarHoverSelection}>
+            <div
+              ref={taskListPanelRef}
+              className="flex min-h-0 shrink-0 self-stretch"
+              onMouseEnter={commitSidebarHoverSelection}
+            >
               <TaskListPanel
                 title={taskListTitle}
                 titleIconKind={taskListTitleIconKind}
@@ -3651,7 +3691,6 @@ export function TodoApp({
                 enableCalendarDragDrop={isListCalendarOpen}
                 onCalendarDropTargetChange={handleCalendarDropTargetChange}
                 onSidebarListDropTargetChange={handleSidebarListDropTargetChange}
-                isListHovered={sidebarHoverPreview !== null}
                 onPanelMouseEnter={commitSidebarHoverSelection}
                 showSidebarMenu={isCompactLayout}
                 onOpenSidebar={() => setSidebarDrawerOpen(true)}
@@ -3741,6 +3780,19 @@ export function TodoApp({
           </div>
         )}
       </div>
+      {listHoverPreview &&
+      listHoverPreviewList &&
+      listHoverPreviewPanelRect ? (
+        <SidebarListTaskPreview
+          listId={listHoverPreview.listId}
+          listName={listHoverPreviewList.name}
+          tasks={listHoverPreviewTasks}
+          completedTasks={listHoverPreviewCompletedTasks}
+          lists={lists}
+          panelRect={listHoverPreviewPanelRect}
+          subtasksEnabled={subtasksEnabled}
+        />
+      ) : null}
       <AppFontSwitcher />
       <TemplateOptionsDrawer />
       <CalendarShortcutModal

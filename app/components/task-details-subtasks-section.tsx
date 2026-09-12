@@ -303,7 +303,7 @@ export function TaskDetailsSubtasksSection({
   );
 
   return (
-    <section className="mt-4 shrink-0 border-t border-zinc-200 pl-[15px] pr-3 pt-2 dark:border-zinc-700">
+    <section className="task-details-subtasks-section mt-4 shrink-0 pl-[15px] pr-3 pt-2">
       {subtasks.length === 0 ? (
         <div className="ml-1">{addSubtaskButton}</div>
       ) : (

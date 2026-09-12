@@ -1812,6 +1812,17 @@ body {
   border-radius: 50%;
 }
 
+.task-details-subtasks-section {
+  background-image: linear-gradient(to right, transparent 10%, #e4e4e7 10%);
+  background-size: 100% 1px;
+  background-position: top left;
+  background-repeat: no-repeat;
+}
+
+.dark .task-details-subtasks-section {
+  background-image: linear-gradient(to right, transparent 10%, #3f3f46 10%);
+}
+
 .task-list-item-divider {
   background-size: 100% 1px;
   background-position: bottom left;
@@ -1873,6 +1884,10 @@ body {
 
 .task-list-checkbox .checkbox__label::after {
   border-color: color-mix(in srgb, #8e8e93 78%, white);
+}
+
+.sidebar-list-task-preview .task-list-checkbox {
+  margin-left: 6px;
 }
 
 .task-list-completed-checkbox.checkbox-wrapper-29 {

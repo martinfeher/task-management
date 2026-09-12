@@ -391,6 +391,7 @@ type TaskListPanelProps = {
   onAutoExpandWidth?: (width: number) => void;
   embedded?: boolean;
   showHeader?: boolean;
+  showSortButton?: boolean;
   showAddTask?: boolean;
   isLabelFilter?: boolean;
   preselectedLabelId?: string | null;
@@ -470,6 +471,7 @@ export function TaskListPanel({
   onAutoExpandWidth,
   embedded = false,
   showHeader = true,
+  showSortButton = true,
   showAddTask = false,
   isLabelFilter = false,
   preselectedLabelId = null,
@@ -2294,33 +2296,11 @@ export function TaskListPanel({
     const hasLabelActions = Boolean(onToggleTaskLabel);
     const hasMoveActions = Boolean(onMoveTaskToList) && lists.length > 1;
     const useWiderRowPadding = title === "Today" || title === "Important";
-    const sectionSubtaskCountByParentId = new Map<string, number>();
-
-    for (const item of taskItems) {
-      if (!item.parentId) continue;
-      sectionSubtaskCountByParentId.set(
-        item.parentId,
-        (sectionSubtaskCountByParentId.get(item.parentId) ?? 0) + 1,
-      );
-    }
-
-    return taskItems.flatMap((task, index) => {
+    return taskItems.map((task) => {
       const depth = task.depth ?? 0;
-      const previousTask = index > 0 ? taskItems[index - 1] : null;
-      const parentSubtaskCount =
-        previousTask && task.parentId === previousTask.id
-          ? (sectionSubtaskCountByParentId.get(previousTask.id) ?? 0)
-          : 0;
       const parentSubtaskCountForTask = subtaskCountByParentId.get(task.id) ?? 0;
-      const showSubtaskConnector =
-        subtasksEnabled &&
-        depth === 1 &&
-        previousTask &&
-        (previousTask.depth ?? 0) === 0 &&
-        task.parentId === previousTask.id &&
-        parentSubtaskCount >= 2;
 
-      const row = (
+      return (
         <TaskListTaskRow
           key={task.id}
           task={task}
@@ -2429,12 +2409,6 @@ export function TaskListPanel({
           showSubtaskCollapseToggle={subtasksEnabled}
         />
       );
-
-      if (!showSubtaskConnector) {
-        return [row];
-      }
-
-    
     });
   }
 
@@ -2625,7 +2599,7 @@ export function TaskListPanel({
                 ) : null}
               </div>
               <div className="flex shrink-0 items-center gap-1">
-              {orderedTasks.length >= 2 ? (
+              {showSortButton && orderedTasks.length >= 2 ? (
                 <div
                   className="relative flex shrink-0 items-center rounded-[5px] bg-[#f5f6f7]"
                   ref={sortMenuRef}
