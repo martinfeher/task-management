@@ -14,6 +14,10 @@ export type PanelTextElementKey =
   | "listNavInbox"
   | "listNavImportant"
   | "listNavCalendar"
+  | "listNavTodayIcon"
+  | "listNavInboxIcon"
+  | "listNavImportantIcon"
+  | "listNavCalendarIcon"
   | "listItems"
   | "labelItems"
   | "listNavHoverBackground"
@@ -52,6 +56,10 @@ export const PANEL_TEXT_ELEMENT_KEYS: PanelTextElementKey[] = [
   "listNavInbox",
   "listNavImportant",
   "listNavCalendar",
+  "listNavTodayIcon",
+  "listNavInboxIcon",
+  "listNavImportantIcon",
+  "listNavCalendarIcon",
   "listItems",
   "labelItems",
   "listNavHoverBackground",
@@ -81,6 +89,10 @@ export const PANEL_TEXT_ELEMENT_LABELS: Record<PanelTextElementKey, string> = {
   listNavInbox: "Inbox",
   listNavImportant: "Important",
   listNavCalendar: "Calendar",
+  listNavTodayIcon: "Today icon",
+  listNavInboxIcon: "Inbox icon",
+  listNavImportantIcon: "Important icon",
+  listNavCalendarIcon: "Calendar icon",
   listItems: "List item text",
   labelItems: "Label item text",
   listNavHoverBackground: "Nav hover background (Today, Inbox, Important, Calendar)",
@@ -117,6 +129,10 @@ export const PANEL_TEXT_ELEMENT_GROUPS: Array<{
       "listNavInbox",
       "listNavImportant",
       "listNavCalendar",
+      "listNavTodayIcon",
+      "listNavInboxIcon",
+      "listNavImportantIcon",
+      "listNavCalendarIcon",
       "listItems",
       "labelItems",
       "listNavHoverBackground",
@@ -159,6 +175,10 @@ export const PANEL_TEXT_ELEMENT_CSS_VARS: Record<PanelTextElementKey, string> =
     listNavInbox: "--panel-text-list-nav-inbox",
     listNavImportant: "--panel-text-list-nav-important",
     listNavCalendar: "--panel-text-list-nav-calendar",
+    listNavTodayIcon: "--panel-text-list-nav-today-icon",
+    listNavInboxIcon: "--panel-text-list-nav-inbox-icon",
+    listNavImportantIcon: "--panel-text-list-nav-important-icon",
+    listNavCalendarIcon: "--panel-text-list-nav-calendar-icon",
     listItems: "--panel-text-list-items",
     labelItems: "--panel-text-label-items",
     listNavHoverBackground: "--panel-list-nav-hover-background",
@@ -202,6 +222,10 @@ const DEFAULT_SHADES: Record<PanelTextElementKey, PanelTextShadeToken> = {
   listNavInbox: "zinc-700",
   listNavImportant: "zinc-700",
   listNavCalendar: "zinc-700",
+  listNavTodayIcon: "zinc-700",
+  listNavInboxIcon: "zinc-700",
+  listNavImportantIcon: "zinc-700",
+  listNavCalendarIcon: "zinc-700",
   listItems: "zinc-800",
   labelItems: "zinc-600",
   listNavHoverBackground: "zinc-200",

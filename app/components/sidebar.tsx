@@ -3,15 +3,22 @@
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 import { BiCheckboxChecked, BiChevronDown } from "react-icons/bi";
+import { BiSolidCheckboxChecked } from "react-icons/bi";
+
+import { BsArchiveFill } from "react-icons/bs";
 import { IoIosSearch } from "react-icons/io";
 import { LABEL_PRESET_COLORS } from "@/lib/label-colors";
 import { getInboxListId } from "@/lib/inbox-list";
 import { FiSettings } from "react-icons/fi";
 import { getLabelDotColor } from "@/lib/label-colors";
-import { MdLabelOutline } from "react-icons/md";
+import { IoPricetag } from "react-icons/io5";
+import { IoMdPricetag } from "react-icons/io";
+
+import { AiFillTag } from "react-icons/ai";
+
 import { LuInbox, LuList, LuPlus, LuStar } from "react-icons/lu";
-import { PiDotsThreeBold } from "react-icons/pi";
-import { BsCalendar3 } from "react-icons/bs";
+import { PiCalendarDots, PiDotsThreeBold } from "react-icons/pi";
+import { LuCalendarDays } from "react-icons/lu";
 import { useSidebarBackground } from "@/lib/sidebar-background";
 import { useImportantEnabled } from "@/lib/important-settings";
 
@@ -40,6 +47,10 @@ import { ConfirmModal } from "./confirm-modal";
 import { MacCmdIcon } from "./mac-cmd-icon";
 import { RenameListModal } from "./rename-list-modal";
 import { LabelContextMenu, clampLabelContextMenuPosition } from "./label-context-menu";
+import {
+  ListContextMenu,
+  clampListContextMenuPosition,
+} from "./list-context-menu";
 import { TodayCalendarIcon } from "./today-calendar-icon";
 
 
@@ -63,6 +74,13 @@ const NAV_ITEM_TEXT_CLASS = {
   inbox: "ptxt-list-nav-inbox",
   important: "ptxt-list-nav-important",
   calendar: "ptxt-list-nav-calendar",
+} as const;
+
+const NAV_ITEM_ICON_CLASS = {
+  today: "ptxt-list-nav-today-icon",
+  inbox: "ptxt-list-nav-inbox-icon",
+  important: "ptxt-list-nav-important-icon",
+  calendar: "ptxt-list-nav-calendar-icon",
 } as const;
 
 const NAV_ITEMS = [
@@ -156,7 +174,7 @@ function shouldStartListDrag(target: EventTarget | null) {
 }
 
 const itemClassName =
-  "flex ml-[2px] mb-px w-[230px] pl-[14px]! items-center rounded-[3px] rounded-l-[7px] text-left text-sm transition-colors cursor-pointer";
+  "flex ml-[2px] gap-[6px]! mb-px w-[230px] pl-[14px]! items-center rounded-r-[6px]! rounded-l-[7px] text-left text-sm transition-colors cursor-pointer";
 
 const completedItemClassName =
   "flex mx-[4px] mb-px min-h-[44px] w-auto flex-col items-start justify-center gap-0 rounded-[3px] px-4 py-1 text-left text-sm transition-colors";
@@ -252,6 +270,10 @@ export function Sidebar({
   } | null>(null);
   const completedFooterRef = useRef<HTMLDivElement>(null);
   const [openMenuListId, setOpenMenuListId] = useState<string | null>(null);
+  const [listMenuPosition, setListMenuPosition] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
   const [openMenuLabelId, setOpenMenuLabelId] = useState<string | null>(null);
   const [labelMenuPosition, setLabelMenuPosition] = useState<{
     top: number;
@@ -400,7 +422,7 @@ export function Sidebar({
         setIsCompletedOpen(false);
       }
       if (!menuRef.current?.contains(event.target as Node)) {
-        setOpenMenuListId(null);
+        closeListMenu();
       }
       if (!labelMenuRef.current?.contains(event.target as Node)) {
         setOpenMenuLabelId(null);
@@ -439,7 +461,7 @@ export function Sidebar({
 
       if (openMenuListId) {
         event.preventDefault();
-        setOpenMenuListId(null);
+        closeListMenu();
       }
     }
 
@@ -495,24 +517,55 @@ export function Sidebar({
     isSelected: boolean,
   ) {
     if (isSelected) {
-      return `${itemClassName} sidebar-list-nav-item sidebar-list-nav-item-selected group h-[35px] font-medium ptxt-950 dark:bg-zinc-800 dark:ptxt-50`;
+      return `${itemClassName} sidebar-list-nav-item sidebar-list-nav-item-selected group h-[35px] font-normal ptxt-950 dark:bg-zinc-800 dark:ptxt-50`;
     }
 
     return `${itemClassName} sidebar-list-nav-item group h-[35px] ptxt-900 dark:ptxt-50`;
   }
 
-  function openRenameModal(list: TodoList) {
+  function closeListMenu() {
     setOpenMenuListId(null);
+    setListMenuPosition(null);
+  }
+
+  function openListMenu(
+    listId: string,
+    position: { top: number; left: number },
+  ) {
+    setOpenMenuListId(listId);
+    setListMenuPosition(
+      clampListContextMenuPosition(position.top, position.left),
+    );
+  }
+
+  function toggleListMenuFromButton(
+    listId: string,
+    button: HTMLButtonElement,
+  ) {
+    if (openMenuListId === listId) {
+      closeListMenu();
+      return;
+    }
+
+    const rect = button.getBoundingClientRect();
+    openListMenu(listId, {
+      top: rect.bottom + 4,
+      left: rect.right - 144,
+    });
+  }
+
+  function openRenameModal(list: TodoList) {
+    closeListMenu();
     setRenameList(list);
   }
 
   function openRemoveModal(list: TodoList) {
-    setOpenMenuListId(null);
+    closeListMenu();
     setRemoveList(list);
   }
 
   function startListNameEdit(list: TodoList) {
-    setOpenMenuListId(null);
+    closeListMenu();
     setEditingListId(list.id);
     setListNameDraft(list.name);
   }
@@ -964,9 +1017,14 @@ export function Sidebar({
     openLabelMenu(labelId, { top: rect.top, left: rect.right + 4 });
   }
 
+  const openListMenuItem =
+    openMenuListId !== null
+      ? (orderedLists.find((item) => item.id === openMenuListId) ?? null)
+      : null;
+
   const openLabelMenuItem =
     openMenuLabelId !== null
-      ? (labels.find((item) => item.id === openMenuLabelId) ?? null)
+      ? (orderedLabels.find((item) => item.id === openMenuLabelId) ?? null)
       : null;
 
   function handleListClick(listId: string) {
@@ -1019,9 +1077,16 @@ export function Sidebar({
               item.action === "calendar"
                 ? NAV_ITEM_TEXT_CLASS[item.action]
                 : null;
+            const navIconClass =
+              item.action === "today" ||
+              item.action === "inbox" ||
+              item.action === "important" ||
+              item.action === "calendar"
+                ? NAV_ITEM_ICON_CLASS[item.action]
+                : null;
             const navIconColor = isNavItemSelected
-              ? "ptxt-950"
-              : navTextClass ?? "ptxt-400";
+              ? "text-[#7474bb]"
+              : navIconClass ?? "ptxt-400";
 
             return (
             item.action === "today" ||
@@ -1062,21 +1127,26 @@ export function Sidebar({
               {item.action === "today" ? (
                 <TodayCalendarIcon
                   className={`size-[19px] -ml-[2px] shrink-0 ${navIconColor}`}
+                  strokeWidth={1}
+                  // strokeWidth={0.875}
                 />
               ) : item.action === "inbox" ? (
                 <LuInbox
                   className={`size-[15px] shrink-0 ${navIconColor}`}
                   aria-hidden="true"
+                  strokeWidth={1}
                 />
               ) : item.action === "important" ? (
                 <LuStar
                   className={`size-[15px] shrink-0 ${navIconColor}`}
                   aria-hidden="true"
+                  strokeWidth={1}
                 />
               ) : (
-                <BsCalendar3
-                  className={`size-[14px] shrink-0 ${navIconColor}`}
+                <LuCalendarDays
+                  className={`size-[16px] shrink-0 ${navIconColor}`}
                   aria-hidden="true"
+                  strokeWidth={1.2}
                 />
               )}
               <span
@@ -1247,45 +1317,21 @@ export function Sidebar({
               >
                 {taskCountByListId[list.id] ?? 0}
               </span>
-              <div
-                className={SIDEBAR_ROW_MENU_WRAPPER_CLASS}
-                ref={openMenuListId === list.id ? menuRef : null}
-              >
+              <div className={SIDEBAR_ROW_MENU_WRAPPER_CLASS}>
                 <button
                   type="button"
                   aria-label={`Open menu for ${list.name}`}
                   aria-expanded={openMenuListId === list.id}
+                  aria-haspopup="menu"
                   className={`${getSidebarRowMenuButtonClass(openMenuListId === list.id)} -mr-[6px]`}
-             
                   onPointerDown={(event) => event.stopPropagation()}
                   onClick={(event) => {
                     event.stopPropagation();
-                    setOpenMenuListId((current) =>
-                      current === list.id ? null : list.id,
-                    );
+                    toggleListMenuFromButton(list.id, event.currentTarget);
                   }}
                 >
                   <PiDotsThreeBold className="size-[15px] ptxt-500" />
                 </button>
-
-                {openMenuListId === list.id && (
-                  <div className="absolute right-0 top-full z-20 mt-1 w-36 overflow-hidden rounded-md border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
-                    <button
-                      type="button"
-                      className="flex h-[35px] w-full items-center px-3 text-left text-sm ptxt-900 hover:bg-zinc-100 dark:ptxt-50 dark:hover:bg-zinc-800"
-                      onClick={() => openRenameModal(list)}
-                    >
-                      Rename
-                    </button>
-                    <button
-                      type="button"
-                      className="flex h-[35px] w-full items-center px-3 text-left text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40"
-                      onClick={() => openRemoveModal(list)}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                )}
               </div>
 
             </div>
@@ -1387,10 +1433,10 @@ export function Sidebar({
                           });
                         }}
                       >
-                        <div className="group flex min-w-0 flex-1 items-center gap-2">
+                        <div className="group flex min-w-0 flex-1 items-center gap-1.5">
                           <span className="inline-flex shrink-0 items-center justify-center">
-                            <MdLabelOutline
-                              className="size-[14px] text-[#adadc2]"
+                            <IoMdPricetag
+                              className="size-[12.5px] mb-[1px] text-[#d4d4ea]"
                               aria-hidden="true"
                             />
                           </span>
@@ -1431,7 +1477,7 @@ export function Sidebar({
                               toggleLabelMenuFromButton(item.id, event.currentTarget);
                             }}
                           >
-                            <PiDotsThreeBold className="size-[15px] ptxt-500" />
+                            <PiDotsThreeBold className="size-[16px] text-[#a1a1af]" />
                           </button>
                         </div>
                       </div>
@@ -1493,7 +1539,7 @@ export function Sidebar({
                   setIsArchiveOpen(false);
                 }}
               >
-                <BiCheckboxChecked
+                <BiSolidCheckboxChecked
                   className={`size-[15px] shrink-0 ${
                     isCompletedOpen ? "ptxt-950" : "ptxt-400"
                   }`}
@@ -1503,7 +1549,7 @@ export function Sidebar({
               </button>
               <button
                 type="button"
-                className="group text-sm ptxt-550 transition-colors hover:ptxt-900 dark:hover:ptxt-50 cursor-pointer"
+                className="group -ml-[26px]! flex items-center gap-1 text-sm ptxt-550 transition-colors hover:ptxt-900 dark:hover:ptxt-50 cursor-pointer"
                 onClick={(event) => {
                   openArchiveModal({
                     x: event.clientX,
@@ -1512,7 +1558,13 @@ export function Sidebar({
                   closeDrawer();
                 }}
               >
-              <span className="text-[#9d9da3]group-hover:text-[#747479] text-[14px]">Archive</span>
+                <BsArchiveFill
+                  className="size-[11px] shrink-0 text-[#b5b5bb] "
+                  aria-hidden="true"
+                />
+                <span className="text-[#9d9da3] group-hover:text-[#747479] text-[13px]">
+                  Archive
+                </span>
               </button>
             </div>
             <button
@@ -1559,6 +1611,16 @@ export function Sidebar({
         onClose={() => setIsArchiveOpen(false)}
         onTasksRestored={onArchivedTasksRestored}
       />
+
+      {openListMenuItem && listMenuPosition ? (
+        <ListContextMenu
+          listName={openListMenuItem.name}
+          fixedPosition={listMenuPosition}
+          menuRef={menuRef}
+          onRename={() => openRenameModal(openListMenuItem)}
+          onRemove={() => openRemoveModal(openListMenuItem)}
+        />
+      ) : null}
 
       {openLabelMenuItem && labelMenuPosition ? (
         <LabelContextMenu
@@ -1608,6 +1670,11 @@ export function Sidebar({
         onConfirm={(name) => {
           if (renameList) {
             onRenameList(renameList.id, name);
+            setOrderedLists((current) =>
+              current.map((item) =>
+                item.id === renameList.id ? { ...item, name } : item,
+              ),
+            );
           }
           setRenameList(null);
         }}
@@ -1632,9 +1699,15 @@ export function Sidebar({
         open={renameLabel !== null}
         title="Edit label title"
         initialName={renameLabel?.label ?? ""}
+        placeholder="Label name"
         onConfirm={(name) => {
           if (renameLabel) {
             onRenameLabel(renameLabel.id, name);
+            setOrderedLabels((current) =>
+              current.map((item) =>
+                item.id === renameLabel.id ? { ...item, label: name } : item,
+              ),
+            );
           }
           setRenameLabel(null);
         }}

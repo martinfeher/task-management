@@ -116,6 +116,54 @@ export function resolveSubtasksExpandedState(
   return subtaskCount > 0;
 }
 
+export function appendSubtasksForVisibleParents<
+  T extends TaskWithParent & { completed: boolean; listId?: string; listName?: string },
+>(
+  visibleTasks: T[],
+  tasksByList: Record<string, T[]>,
+): T[] {
+  if (visibleTasks.length === 0) return visibleTasks;
+
+  const visibleIds = new Set(visibleTasks.map((task) => task.id));
+  const appended: T[] = [];
+
+  for (const parent of visibleTasks) {
+    if (parent.parentId || !parent.listId) continue;
+
+    const listTasks = tasksByList[parent.listId] ?? [];
+    for (const task of listTasks) {
+      if (
+        task.parentId === parent.id &&
+        !task.completed &&
+        !visibleIds.has(task.id)
+      ) {
+        appended.push({
+          ...task,
+          listId: parent.listId,
+          listName: parent.listName,
+        });
+        visibleIds.add(task.id);
+      }
+    }
+  }
+
+  if (appended.length === 0) return visibleTasks;
+  return [...visibleTasks, ...appended];
+}
+
+export function countIncompleteSubtasksByParentId<
+  T extends TaskWithParent & { completed: boolean },
+>(tasks: T[]) {
+  const counts = new Map<string, number>();
+
+  for (const task of tasks) {
+    if (task.completed || !task.parentId) continue;
+    counts.set(task.parentId, (counts.get(task.parentId) ?? 0) + 1);
+  }
+
+  return counts;
+}
+
 export function buildVisibleTasks<
   T extends TaskWithParent & { completed: boolean; pinned: boolean },
 >(
@@ -127,7 +175,9 @@ export function buildVisibleTasks<
   const active = tasks.filter(
     (task) => !task.completed && Boolean(task.pinned) === pinned,
   );
-  const activeIds = new Set(active.map((task) => task.id));
+  const incompleteParentIds = new Set(
+    tasks.filter((task) => !task.completed).map((task) => task.id),
+  );
   const order = new Map(tasks.map((task, index) => [task.id, index]));
 
   const sortByStoredOrder = (items: T[]) =>
@@ -137,7 +187,7 @@ export function buildVisibleTasks<
 
   const roots = sortByStoredOrder(
     active.filter(
-      (task) => !task.parentId || !activeIds.has(task.parentId),
+      (task) => !task.parentId || !incompleteParentIds.has(task.parentId),
     ),
   );
 
@@ -149,7 +199,9 @@ export function buildVisibleTasks<
     if (!includeSubtasks || collapsedParentIds.has(root.id)) continue;
 
     const children = sortByStoredOrder(
-      active.filter((task) => task.parentId === root.id),
+      tasks.filter(
+        (task) => task.parentId === root.id && !task.completed,
+      ),
     );
 
     for (const child of children) {

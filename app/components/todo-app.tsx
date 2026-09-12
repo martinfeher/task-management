@@ -88,7 +88,11 @@ import {
   clearCheckboxCheckStart,
 } from "./task-completion-checkbox";
 import { mergeReorderedPinnedTasks, mergeReorderedUnpinnedTasks } from "./task-reorder";
-import { buildVisibleTasks } from "@/lib/task-subtasks";
+import {
+  appendSubtasksForVisibleParents,
+  buildVisibleTasks,
+  saveSubtasksExpanded,
+} from "@/lib/task-subtasks";
 import { AppFontSwitcher } from "./app-font-switcher";
 import { TemplateOptionsDrawer } from "./template-options-drawer";
 import { UndoButton } from "./undo-button";
@@ -1051,29 +1055,44 @@ export function TodoApp({
                 ? "Calendar"
                 : (selectedList?.name ?? null);
 
+  const taskListTitleIconKind = useMemo(() => {
+    if (previewList) return "list" as const;
+    if (previewLabel) return "label" as const;
+    if (selectedLabel) return "label" as const;
+    if (activeView === "today") return "today" as const;
+    if (activeView === "inbox") return "inbox" as const;
+    if (activeView === "important") return "important" as const;
+    if (activeView === "calendar") return null;
+    if (selectedList) return "list" as const;
+    return null;
+  }, [previewList, previewLabel, selectedLabel, activeView, selectedList]);
+
   const taskListViewResetKey = [
     displayedListId ?? "",
     displayedLabelId ?? "",
     displayedActiveView ?? "",
   ].join(":");
 
-  const taskListItems: TaskListItem[] = useMemo(
-    () =>
-      getVisibleTasks(
-        displayedActiveView,
-        displayedListId,
-        displayedLabelId,
-        lists,
-        tasksByList,
-      ),
-    [
+  const taskListItems: TaskListItem[] = useMemo(() => {
+    const visibleTasks = getVisibleTasks(
       displayedActiveView,
       displayedListId,
       displayedLabelId,
       lists,
       tasksByList,
-    ],
-  );
+    );
+
+    if (!subtasksEnabled) return visibleTasks;
+
+    return appendSubtasksForVisibleParents(visibleTasks, tasksByList);
+  }, [
+    displayedActiveView,
+    displayedListId,
+    displayedLabelId,
+    lists,
+    subtasksEnabled,
+    tasksByList,
+  ]);
 
   const listCompletedTasks: TaskListItem[] = useMemo(() => {
     if (!taskListPanelListId) return [];
@@ -2835,6 +2854,8 @@ export function TodoApp({
         };
       });
 
+      saveSubtasksExpanded(parentId, true);
+
       return newTask;
     } catch {
       return null;
@@ -3394,6 +3415,7 @@ export function TodoApp({
               >
                 <TaskListPanel
                   title={taskListTitle}
+                  titleIconKind={taskListTitleIconKind}
                   viewResetKey={taskListViewResetKey}
                   tasks={taskListItems}
                   completedTasks={listCompletedTasks}
@@ -3556,6 +3578,8 @@ export function TodoApp({
                     subtasks={selectedTaskSubtasksContext.subtasks}
                     canManageSubtasks={selectedTaskSubtasksContext.canManageSubtasks}
                     onAddSubtask={handleAddSubtaskFromDetails}
+                    onRenameSubtask={renameTask}
+                    onDeleteSubtask={deleteTaskById}
                     onBack={isCompactLayout ? handleCompactBack : undefined}
                   />
                 </div>
@@ -3568,6 +3592,7 @@ export function TodoApp({
             <div onMouseEnter={commitSidebarHoverSelection}>
               <TaskListPanel
                 title={taskListTitle}
+                titleIconKind={taskListTitleIconKind}
                 viewResetKey={taskListViewResetKey}
                 tasks={taskListItems}
                 completedTasks={listCompletedTasks}
@@ -3707,6 +3732,8 @@ export function TodoApp({
                   subtasks={selectedTaskSubtasksContext.subtasks}
                   canManageSubtasks={selectedTaskSubtasksContext.canManageSubtasks}
                   onAddSubtask={handleAddSubtaskFromDetails}
+                  onRenameSubtask={renameTask}
+                  onDeleteSubtask={deleteTaskById}
                   onBack={isCompactLayout ? handleCompactBack : undefined}
                 />
               </div>

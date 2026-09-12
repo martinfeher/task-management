@@ -16,6 +16,10 @@ import { IoPricetagsOutline } from "react-icons/io5";
 import { LuCalendarCheck2, LuCheck, LuMenu, LuX } from "react-icons/lu";
 import { MdOutlineKeyboardDoubleArrowRight } from "react-icons/md";
 import { createLabel, getLabels } from "@/app/actions/todo";
+import {
+  TaskListTitleIcon,
+  type TaskListTitleIconKind,
+} from "./list-panel-title-icon";
 import { TaskDatePicker } from "./task-date-picker";
 import { TaskSetDateIcon } from "./task-set-date-icon";
 import { TaskCompletionCheckbox } from "./task-completion-checkbox";
@@ -51,6 +55,7 @@ import { buildTodoPath } from "@/lib/todo-routes";
 import type { TaskPriorityLevel } from "@/lib/task-priority";
 import {
   buildVisibleTasks,
+  countIncompleteSubtasksByParentId,
   clampSubtaskKeepDropIndex,
   collectParentUpdates,
   getDragBlockIds,
@@ -87,6 +92,20 @@ import { useTaskListBackground } from "@/lib/task-list-background";
 export const TASK_LIST_PANEL_DEFAULT_WIDTH = 520;
 export const TASK_LIST_PANEL_AUTO_EXPAND_MAX_WIDTH = 620;
 export const TASK_LIST_PANEL_MIN_WIDTH = 350;
+
+const TASK_LIST_TITLE_ICON_BASE_CLASS = "mt-[1px] shrink-0";
+
+function getTaskListTitleIconClassName(kind: TaskListTitleIconKind) {
+  if (kind === "label") {
+    return `${TASK_LIST_TITLE_ICON_BASE_CLASS} size-[16px] text-[#d4d4ea]`;
+  }
+
+  if (kind === "today") {
+    return `${TASK_LIST_TITLE_ICON_BASE_CLASS} size-[20px] text-[#9f9fa6]!`;
+  }
+
+  return `${TASK_LIST_TITLE_ICON_BASE_CLASS} size-[16px] text-[#9f9fa6]!`;
+}
 
 function measureTaskListTruncationOverflow(root: HTMLElement | null) {
   if (!root) return 0;
@@ -356,6 +375,7 @@ function computeTaskRowMenuAnchorPosition(anchor: HTMLElement) {
 
 type TaskListPanelProps = {
   title: string | null;
+  titleIconKind?: TaskListTitleIconKind | null;
   viewResetKey: string;
   tasks: TaskListItem[];
   completedTasks?: TaskListItem[];
@@ -434,6 +454,7 @@ type TaskListPanelProps = {
 
 export function TaskListPanel({
   title,
+  titleIconKind = null,
   viewResetKey,
   tasks,
   completedTasks = [],
@@ -640,16 +661,10 @@ export function TaskListPanel({
     [orderedTasks, showAddTask],
   );
 
-  const subtaskCountByParentId = useMemo(() => {
-    const counts = new Map<string, number>();
-
-    for (const task of orderedTasks) {
-      if (task.completed || !task.parentId) continue;
-      counts.set(task.parentId, (counts.get(task.parentId) ?? 0) + 1);
-    }
-
-    return counts;
-  }, [orderedTasks]);
+  const subtaskCountByParentId = useMemo(
+    () => countIncompleteSubtasksByParentId(orderedTasks),
+    [orderedTasks],
+  );
 
   const collapsedSubtasksParentIds = useMemo(() => {
     const collapsed = new Set<string>();
@@ -745,11 +760,16 @@ export function TaskListPanel({
 
   useEffect(() => {
     setOrderedTasks((current) => {
-      if (
-        current.length === tasks.length &&
-        current.every((task, index) => task === tasks[index])
-      ) {
-        return current;
+      const nextIds = tasks.map((task) => task.id);
+      const currentIds = current.map((task) => task.id);
+
+      if (nextIds.join(",") === currentIds.join(",")) {
+        const tasksById = new Map(tasks.map((task) => [task.id, task]));
+        const merged = nextIds.map((id) => tasksById.get(id)!);
+        if (merged.every((task, index) => task === current[index])) {
+          return current;
+        }
+        return merged;
       }
 
       return tasks;
@@ -2538,7 +2558,7 @@ export function TaskListPanel({
           }`}
         >
           {showHeader && (
-            <header className="flex items-center justify-between gap-2 border-b border-zinc-200 py-[9px] pl-[26px] pr-4 dark:border-zinc-800">
+            <header className="flex items-center justify-between gap-2 border-b border-zinc-200 py-[7px] pl-[16px]! pr-4 dark:border-zinc-800">
               <div className="flex min-w-0 items-center gap-1.5">
                 {showSidebarMenu && onOpenSidebar ? (
                   <button
@@ -2550,7 +2570,25 @@ export function TaskListPanel({
                     <LuMenu className="size-5" aria-hidden="true" />
                   </button>
                 ) : null}
-                <h1 className="min-w-0 truncate text-xl font-semibold ptxt-task-list-title">
+                {titleIconKind ? (
+                  titleIconKind === "label" ? (
+                    <div className="flex shrink-0 flex-col items-center gap-px">
+                      <TaskListTitleIcon
+                        kind={titleIconKind}
+                        className={getTaskListTitleIconClassName(titleIconKind)}
+                      />
+                      <div className=" -mb-[5px] text-[6.5px] leading-none text-[#afafaf]">
+                        label
+                      </div>
+                    </div>
+                  ) : (
+                    <TaskListTitleIcon
+                      kind={titleIconKind}
+                      className={getTaskListTitleIconClassName(titleIconKind)}
+                    />
+                  )
+                ) : null}
+                <h1 className="min-w-0 ml-[2px] mr-1 truncate text-[22px] font-semibold ptxt-task-list-title">
                   {title}
                 </h1>
                 {showListCalendarButton && hasScheduledTasks ? (

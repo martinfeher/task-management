@@ -5,6 +5,10 @@
 @source inline("gap-[8px]");
 @source inline("text-[13.5px]");
 @source inline("text-[14px]");
+@source inline("text-[7px]");
+@source inline("text-[#7474bb]");
+@source inline("text-[#afafaf]");
+@source inline("text-[#b2b2b2]");
 @source inline("size-[16px]");
 @source inline("size-[20px]");
 @source inline("size-[18px]");
@@ -108,6 +112,22 @@
 
   .ptxt-list-nav-calendar {
     color: var(--panel-text-list-nav-calendar);
+  }
+
+  .ptxt-list-nav-today-icon {
+    color: var(--panel-text-list-nav-today-icon);
+  }
+
+  .ptxt-list-nav-inbox-icon {
+    color: var(--panel-text-list-nav-inbox-icon);
+  }
+
+  .ptxt-list-nav-important-icon {
+    color: var(--panel-text-list-nav-important-icon);
+  }
+
+  .ptxt-list-nav-calendar-icon {
+    color: var(--panel-text-list-nav-calendar-icon);
   }
 
   .ptxt-list-items {
@@ -217,6 +237,10 @@
   --panel-text-list-nav-inbox: #3f3f46;
   --panel-text-list-nav-important: #3f3f46;
   --panel-text-list-nav-calendar: #3f3f46;
+  --panel-text-list-nav-today-icon: #3f3f46;
+  --panel-text-list-nav-inbox-icon: #3f3f46;
+  --panel-text-list-nav-important-icon: #3f3f46;
+  --panel-text-list-nav-calendar-icon: #3f3f46;
   --panel-text-list-items: #27272a;
   --panel-text-label-items: #52525c;
   --panel-list-nav-hover-background: #efeff1;
@@ -1714,6 +1738,11 @@ body {
 
 .checkbox-wrapper-29.task-completion-checkbox-box.task-list-subtask-checkbox {
   --size: calc(1.075rem - 2px);
+}
+
+.checkbox-wrapper-29.task-completion-checkbox-box.task-list-subtask-checkbox
+  .checkbox__label::after {
+  border-color: #bcbcbc;
 }
 
 .calendar-panel .checkbox-wrapper-29 {

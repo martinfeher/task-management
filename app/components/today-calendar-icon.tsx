@@ -1,11 +1,13 @@
 type TodayCalendarIconProps = {
   className?: string;
   day?: number;
+  strokeWidth?: number;
 };
 
 export function TodayCalendarIcon({
   className,
   day = new Date().getDate(),
+  strokeWidth = 1.75,
 }: TodayCalendarIconProps) {
   const dayLabel = String(day);
   const fontSize = dayLabel.length > 1 ? 7.5 : 8.5;
@@ -24,18 +26,18 @@ export function TodayCalendarIcon({
         height="16"
         rx="2"
         stroke="currentColor"
-        strokeWidth="1.75"
+        strokeWidth={strokeWidth}
       />
       <path
         d="M4 9.5h16"
         stroke="currentColor"
-        strokeWidth="1.75"
+        strokeWidth={strokeWidth}
         strokeLinecap="round"
       />
       <path
         d="M8 3.5v3M16 3.5v3"
         stroke="currentColor"
-        strokeWidth="1.75"
+        strokeWidth={strokeWidth}
         strokeLinecap="round"
       />
       <text

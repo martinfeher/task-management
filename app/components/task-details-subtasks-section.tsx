@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { BiChevronDown, BiChevronRight } from "react-icons/bi";
 import {
   clearSubtasksExpanded,
@@ -23,8 +24,32 @@ type TaskDetailsSubtasksSectionProps = {
     taskId: string,
   ) => Promise<TaskDetailsSubtask | null> | TaskDetailsSubtask | null;
   onToggleSubtask: (subtaskId: string) => void;
-  onRenameSubtask: (subtaskId: string, name: string) => void;
+  onRenameSubtask: (subtaskId: string, name: string) => void | Promise<void>;
+  onDeleteSubtask: (subtaskId: string) => void | Promise<void>;
 };
+
+type SubtaskContextMenuState = {
+  subtaskId: string;
+  top: number;
+  left: number;
+};
+
+const SUBTASK_CONTEXT_MENU_WIDTH = 160;
+const SUBTASK_CONTEXT_MENU_HEIGHT = 88;
+
+function clampSubtaskContextMenuPosition(top: number, left: number) {
+  if (typeof window === "undefined") {
+    return { top, left };
+  }
+
+  const maxLeft = window.innerWidth - SUBTASK_CONTEXT_MENU_WIDTH - 8;
+  const maxTop = window.innerHeight - SUBTASK_CONTEXT_MENU_HEIGHT - 8;
+
+  return {
+    top: Math.min(Math.max(8, top), maxTop),
+    left: Math.min(Math.max(8, left), maxLeft),
+  };
+}
 
 function orderSubtasksForDisplay(subtasks: TaskDetailsSubtask[]) {
   return subtasks
@@ -45,6 +70,7 @@ export function TaskDetailsSubtasksSection({
   onAddSubtask,
   onToggleSubtask,
   onRenameSubtask,
+  onDeleteSubtask,
 }: TaskDetailsSubtasksSectionProps) {
   const [isExpanded, setIsExpanded] = useState(() =>
     resolveSubtasksExpandedState(taskId, subtasks.length),
@@ -52,7 +78,11 @@ export function TaskDetailsSubtasksSection({
   const [editingSubtaskId, setEditingSubtaskId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
   const [isAdding, setIsAdding] = useState(false);
+  const [contextMenu, setContextMenu] = useState<SubtaskContextMenuState | null>(
+    null,
+  );
   const editInputRef = useRef<HTMLInputElement>(null);
+  const contextMenuRef = useRef<HTMLDivElement>(null);
   const previousSubtaskCountRef = useRef(subtasks.length);
   const editHistoryRef = useRef<string[]>([]);
   const editHistoryIndexRef = useRef(0);
@@ -68,6 +98,33 @@ export function TaskDetailsSubtasksSection({
     previousSubtaskCountRef.current = subtasks.length;
     setIsExpanded(resolveSubtasksExpandedState(taskId, subtasks.length));
   }, [taskId]);
+
+  useEffect(() => {
+    setContextMenu(null);
+  }, [taskId]);
+
+  useEffect(() => {
+    if (!contextMenu) return;
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target as Node;
+      if (contextMenuRef.current?.contains(target)) return;
+      setContextMenu(null);
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setContextMenu(null);
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [contextMenu]);
 
   useEffect(() => {
     previousSubtaskCountRef.current = subtasks.length;
@@ -179,7 +236,40 @@ export function TaskDetailsSubtasksSection({
     const current = subtasks.find((subtask) => subtask.id === subtaskId);
     if (!current || current.name === trimmed) return;
 
-    onRenameSubtask(subtaskId, trimmed);
+    void onRenameSubtask(subtaskId, trimmed);
+  }
+
+  function openSubtaskContextMenu(
+    event: React.MouseEvent<HTMLElement>,
+    subtaskId: string,
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    const position = clampSubtaskContextMenuPosition(event.clientY, event.clientX);
+    setContextMenu({
+      subtaskId,
+      top: position.top,
+      left: position.left,
+    });
+  }
+
+  function handleRenameFromContextMenu(subtaskId: string) {
+    const subtask = subtasks.find((item) => item.id === subtaskId);
+    if (!subtask) return;
+
+    setContextMenu(null);
+    beginEditingSubtask(subtask.id, subtask.name);
+  }
+
+  async function handleDeleteFromContextMenu(subtaskId: string) {
+    setContextMenu(null);
+
+    if (editingSubtaskId === subtaskId) {
+      setEditingSubtaskId(null);
+      setEditingName("");
+    }
+
+    await onDeleteSubtask(subtaskId);
   }
 
   async function handleAddSubtask() {
@@ -203,7 +293,7 @@ export function TaskDetailsSubtasksSection({
       type="button"
       disabled={isAdding}
       onClick={() => void handleAddSubtask()}
-      className="flex w-full items-center gap-2 py-2 text-left text-[13px] text-slate-400 cursor-pointer transition-colors hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-60 dark:text-zinc-400 dark:hover:text-zinc-200"
+      className="flex w-full items-center gap-2 py-2 text-left text-[13px] text-slate-400 cursor-pointer transition-colors hover:text-slate-500 disabled:cursor-not-allowed disabled:opacity-60 dark:text-zinc-400 dark:hover:text-zinc-200"
     >
       <div className="text-[16px] leading-none text-zinc-400" aria-hidden>
         +
@@ -213,7 +303,7 @@ export function TaskDetailsSubtasksSection({
   );
 
   return (
-    <section className="mt-4 shrink-0 border-t border-zinc-200 pl-[15px] pr-3 pt-3 dark:border-zinc-700">
+    <section className="mt-4 shrink-0 border-t border-zinc-200 pl-[15px] pr-3 pt-2 dark:border-zinc-700">
       {subtasks.length === 0 ? (
         <div className="ml-1">{addSubtaskButton}</div>
       ) : (
@@ -238,16 +328,18 @@ export function TaskDetailsSubtasksSection({
       </button>
 
       {isExpanded ? (
-        <div className="mt-3 border-t border-zinc-200 dark:border-zinc-700">
+        <div className="mt-2 border-t border-zinc-200 dark:border-zinc-700">
           {orderedSubtasks.map((subtask) => (
             <div
               key={subtask.id}
               className="border-b border-zinc-200 dark:border-zinc-700"
+              onContextMenu={(event) => openSubtaskContextMenu(event, subtask.id)}
             >
               <div className="flex items-center gap-2.5 py-2.5 ml-1">
                 <TaskCompletionCheckbox
                   checked={subtask.completed}
                   onChange={() => onToggleSubtask(subtask.id)}
+                  outlineClassName="cursor-pointer text-[#b2b2b2] hover:text-[#b2b2b2] dark:text-[#b2b2b2] dark:hover:text-[#b2b2b2]"
                   aria-label={
                     subtask.completed
                       ? `Mark ${subtask.name} incomplete`
@@ -324,6 +416,40 @@ export function TaskDetailsSubtasksSection({
       ) : null}
         </>
       )}
+
+      {contextMenu && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              ref={contextMenuRef}
+              role="menu"
+              className="fixed z-[120] w-40 overflow-hidden rounded-[23px] bg-white py-1 shadow-[0_12px_32px_rgba(0,0,0,0.12)] dark:bg-zinc-900 dark:shadow-[0_12px_32px_rgba(0,0,0,0.32)]"
+              style={{
+                top: contextMenu.top,
+                left: contextMenu.left,
+              }}
+            >
+              <button
+                type="button"
+                role="menuitem"
+                className="flex h-[35px] w-full items-center px-3 text-left text-sm text-zinc-900 hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800"
+                onClick={() => handleRenameFromContextMenu(contextMenu.subtaskId)}
+              >
+                Rename
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="flex h-[35px] w-full items-center px-3 text-left text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40"
+                onClick={() =>
+                  void handleDeleteFromContextMenu(contextMenu.subtaskId)
+                }
+              >
+                Delete
+              </button>
+            </div>,
+            document.body,
+          )
+        : null}
     </section>
   );
 }
