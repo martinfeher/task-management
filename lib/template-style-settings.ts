@@ -1,9 +1,11 @@
+import { Prisma } from "@/app/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
   ACTIVE_TEMPLATE_STYLE_KEY,
   getCopyTemplateName,
   normalizeTemplateStyleInput,
   serializeTemplateStyleRecord,
+  templateStyleLegacyColumns,
   type TemplateStyleInput,
   type TemplateStyleRecord,
 } from "@/lib/template-style-types";
@@ -62,8 +64,14 @@ export async function createTemplateStyle(input: TemplateStyleInput) {
     throw new Error("Invalid template style input");
   }
 
+  const legacy = templateStyleLegacyColumns(normalized.settings);
+
   const record = await prisma.templateStyle.create({
-    data: normalized,
+    data: {
+      name: normalized.name,
+      settingsJson: normalized.settings as Prisma.InputJsonValue,
+      ...legacy,
+    },
   });
 
   const style = serializeTemplateStyleRecord(record);
@@ -80,9 +88,15 @@ export async function updateTemplateStyle(id: string, input: TemplateStyleInput)
     throw new Error("Invalid template style input");
   }
 
+  const legacy = templateStyleLegacyColumns(normalized.settings);
+
   const record = await prisma.templateStyle.update({
     where: { id },
-    data: normalized,
+    data: {
+      name: normalized.name,
+      settingsJson: normalized.settings as Prisma.InputJsonValue,
+      ...legacy,
+    },
   });
 
   const style = serializeTemplateStyleRecord(record);
@@ -110,12 +124,6 @@ export async function copyTemplateStyle(id: string, name?: string) {
 
   return createTemplateStyle({
     name: name?.trim() ? name : getCopyTemplateName(source.name),
-    sidebarBackgroundId: source.sidebarBackgroundId,
-    sidebarBaseColor: source.sidebarBaseColor,
-    calendarBackgroundId: source.calendarBackgroundId,
-    calendarBaseColor: source.calendarBaseColor,
-    calendarEndColor: source.calendarEndColor,
-    calendarTitleColor: source.calendarTitleColor,
-    calendarTimeColor: source.calendarTimeColor,
+    settings: source.settings,
   });
 }

@@ -17,6 +17,7 @@
     "db:setup": "prisma migrate deploy && prisma generate && tsx scripts/check-db-connection.ts",
     "db:migrate-data": "tsx scripts/migrate-sqlite-to-postgres.ts",
     "verify:api": "tsx scripts/verify-mobile-api.ts",
+    "verify:template-styles-db": "tsx scripts/verify-template-styles-db.ts",
     "qa:gate": "tsx scripts/qa-gate-web.ts",
     "qa:gate:mobile": "tsx scripts/qa-gate-mobile.ts",
     "mobile:start": "npm run start --prefix mobile",

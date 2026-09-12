@@ -34,7 +34,9 @@ export async function POST(request: Request) {
     return jsonWithCors({ ok: true, style }, { status: 201 });
   } catch (error) {
     console.error("Failed to create template style:", error);
-    return jsonWithCors({ error: "Failed to create template style" }, { status: 500 });
+    const message =
+      error instanceof Error ? error.message : "Failed to create template style";
+    return jsonWithCors({ error: message }, { status: 500 });
   }
 }
 

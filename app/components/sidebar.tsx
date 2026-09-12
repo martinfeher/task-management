@@ -156,7 +156,7 @@ function shouldStartListDrag(target: EventTarget | null) {
 }
 
 const itemClassName =
-  "flex ml-[6px] mb-px w-[230px] items-center rounded-[3px]  text-left text-sm transition-colors cursor-pointer";
+  "flex ml-[2px] mb-px w-[230px] pl-[14px]! items-center rounded-[3px] rounded-l-[7px] text-left text-sm transition-colors cursor-pointer";
 
 const completedItemClassName =
   "flex mx-[4px] mb-px min-h-[44px] w-auto flex-col items-start justify-center gap-0 rounded-[3px] px-4 py-1 text-left text-sm transition-colors";
@@ -481,24 +481,24 @@ export function Sidebar({
       isListSelected(listId) && listId !== suppressListSelectionHighlightId;
 
     if (isTaskDropTarget) {
-      return "bg-blue-100 ring-2 ring-inset ring-blue-400 dark:bg-blue-950/70 dark:ring-blue-500";
+      return "sidebar-list-item-drop-target bg-blue-100 ring-2 ring-inset ring-blue-400 dark:bg-blue-950/70 dark:ring-blue-500";
     }
 
     if (isSelected) {
-      return "bg-[#e9ebee] dark:bg-zinc-800/60";
+      return "sidebar-list-item-selected dark:bg-zinc-800/60";
     }
 
-    return "hover:bg-zinc-100/80 dark:hover:bg-zinc-800/40";
+    return "sidebar-list-item";
   }
 
   function getNavItemClassName(
     isSelected: boolean,
   ) {
     if (isSelected) {
-      return `${itemClassName} group h-[35px] bg-[#e9ebee]/50 font-medium ptxt-950 dark:bg-zinc-800 dark:ptxt-50`;
+      return `${itemClassName} sidebar-list-nav-item sidebar-list-nav-item-selected group h-[35px] font-medium ptxt-950 dark:bg-zinc-800 dark:ptxt-50`;
     }
 
-    return `${itemClassName} group h-[35px] ptxt-900 hover:bg-zinc-200/50 dark:ptxt-50 dark:hover:bg-zinc-800/60`;
+    return `${itemClassName} sidebar-list-nav-item group h-[35px] ptxt-900 dark:ptxt-50`;
   }
 
   function openRenameModal(list: TodoList) {
@@ -1080,7 +1080,7 @@ export function Sidebar({
                 />
               )}
               <span
-                className={`inline-block min-w-0 max-w-full flex-1 truncate rounded-full pl-0 pr-8 py-[3.5px] ${navTextClass} transition-all duration-300 cursor-pointer dark:bg-zinc-800/60 dark:hover:bg-zinc-800/80`}
+                className={`inline-block min-w-0 max-w-full flex-1 truncate rounded-full pl-0 pr-8 py-[3.5px] ${navTextClass} transition-all duration-300 cursor-pointer`}
               >
                 {item.label}
               </span>
@@ -1115,7 +1115,7 @@ export function Sidebar({
               }
               className={
                 item.action === "search"
-                  ? "ml-[6px] my-2 flex py-[3px] h-[35px]! w-auto bg-[#fcfbff] cursor-pointer items-center gap-2 self-stretch rounded-[7px] border border-[#e3e3e9] py-0 pl-3 pr-[3px] text-left text-sm ptxt-list-search transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
+                  ? "ml-[14px] my-2 flex py-[3px] h-[35px]! w-auto bg-[#fcfbff] cursor-pointer items-center gap-2 self-stretch rounded-[7px] border border-[#e3e3e9] py-0 pl-3 pr-[3px] text-left text-sm ptxt-list-search transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
                   : `${getItemClassName(isNavItemSelected)} gap-1 px-4 h-[35px]!`
               }
             >
@@ -1230,7 +1230,7 @@ export function Sidebar({
                   />
                 ) : (
                   <span
-                    className="group-hover:text-[#131313] block truncate text-sm ptxt-list-items"
+                    className="block truncate text-sm ptxt-list-items"
                     onDoubleClick={(event) => {
                       event.stopPropagation();
                       startListNameEdit(list);
@@ -1369,10 +1369,10 @@ export function Sidebar({
                           handleLabelPointerDown(event, item.id)
                         }
                         onClick={() => handleLabelClick(item.id)}
-                        className={`group relative ml-[3px] mb-px flex h-[32px] w-[230px] cursor-pointer items-center gap-2 rounded-[3px] pl-3 pr-1 transition-colors ${
+                        className={`group relative ml-[3px] mb-px flex h-[31px] w-[230px] cursor-pointer items-center gap-2 rounded-[3px] pl-3 pr-1 transition-colors ${
                           isSelected
-                            ? "bg-[#e9ebee]/50 font-medium dark:bg-zinc-800/60"
-                            : "hover:bg-zinc-200/30 dark:hover:bg-zinc-800/60"
+                            ? "sidebar-label-item-selected font-medium dark:bg-zinc-800/60"
+                            : "sidebar-label-item"
                         } ${
                           showLabelAccentBorder
                             ? "border-l-[2px] border-l-[#dadfdf]"
@@ -1394,7 +1394,7 @@ export function Sidebar({
                               aria-hidden="true"
                             />
                           </span>
-                          <span className="group-hover:text-[#222222] min-w-0 flex-1 truncate pr-14 text-sm leading-none ptxt-label-items">
+                          <span className="min-w-0 flex-1 truncate pr-14 text-[14px] leading-none ptxt-label-items">
                             {item.label}
                           </span>
                         </div>

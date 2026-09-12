@@ -5,7 +5,7 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-const PRISMA_CLIENT_VERSION = "postgresql-v13";
+const PRISMA_CLIENT_VERSION = "postgresql-v14";
 
 function assertGeneratedClientSupportsSchema() {
   if (!("important" in Prisma.TaskScalarFieldEnum)) {
@@ -35,6 +35,12 @@ function assertGeneratedClientSupportsSchema() {
   if (!("calendarTitleColor" in Prisma.TemplateStyleScalarFieldEnum)) {
     throw new Error(
       "Prisma client is out of date. Run: npx prisma generate",
+    );
+  }
+
+  if (!("settingsJson" in Prisma.TemplateStyleScalarFieldEnum)) {
+    throw new Error(
+      "Prisma client is out of date (missing TemplateStyle.settingsJson). Run: npx prisma migrate deploy && npx prisma generate",
     );
   }
 

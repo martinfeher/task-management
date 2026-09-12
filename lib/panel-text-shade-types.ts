@@ -16,6 +16,12 @@ export type PanelTextElementKey =
   | "listNavCalendar"
   | "listItems"
   | "labelItems"
+  | "listNavHoverBackground"
+  | "listItemsHoverBackground"
+  | "labelItemsHoverBackground"
+  | "listNavSelectedBackground"
+  | "listItemsSelectedBackground"
+  | "labelItemsSelectedBackground"
   | "taskListTitle"
   | "taskTitle"
   | "taskInteractionIcon"
@@ -48,6 +54,12 @@ export const PANEL_TEXT_ELEMENT_KEYS: PanelTextElementKey[] = [
   "listNavCalendar",
   "listItems",
   "labelItems",
+  "listNavHoverBackground",
+  "listItemsHoverBackground",
+  "labelItemsHoverBackground",
+  "listNavSelectedBackground",
+  "listItemsSelectedBackground",
+  "labelItemsSelectedBackground",
   "taskListTitle",
   "taskTitle",
   "taskInteractionIcon",
@@ -69,8 +81,15 @@ export const PANEL_TEXT_ELEMENT_LABELS: Record<PanelTextElementKey, string> = {
   listNavInbox: "Inbox",
   listNavImportant: "Important",
   listNavCalendar: "Calendar",
-  listItems: "List items",
-  labelItems: "Label items",
+  listItems: "List item text",
+  labelItems: "Label item text",
+  listNavHoverBackground: "Nav hover background (Today, Inbox, Important, Calendar)",
+  listItemsHoverBackground: "List item hover background",
+  labelItemsHoverBackground: "Label item hover background",
+  listNavSelectedBackground:
+    "Nav selected background (Today, Inbox, Important, Calendar)",
+  listItemsSelectedBackground: "List item selected background",
+  labelItemsSelectedBackground: "Label item selected background",
   taskListTitle: "List title",
   taskTitle: "Task title",
   taskInteractionIcon: "Interaction icon",
@@ -100,6 +119,12 @@ export const PANEL_TEXT_ELEMENT_GROUPS: Array<{
       "listNavCalendar",
       "listItems",
       "labelItems",
+      "listNavHoverBackground",
+      "listItemsHoverBackground",
+      "labelItemsHoverBackground",
+      "listNavSelectedBackground",
+      "listItemsSelectedBackground",
+      "labelItemsSelectedBackground",
     ],
   },
   {
@@ -136,6 +161,12 @@ export const PANEL_TEXT_ELEMENT_CSS_VARS: Record<PanelTextElementKey, string> =
     listNavCalendar: "--panel-text-list-nav-calendar",
     listItems: "--panel-text-list-items",
     labelItems: "--panel-text-label-items",
+    listNavHoverBackground: "--panel-list-nav-hover-background",
+    listItemsHoverBackground: "--panel-list-items-hover-background",
+    labelItemsHoverBackground: "--panel-label-items-hover-background",
+    listNavSelectedBackground: "--panel-list-nav-selected-background",
+    listItemsSelectedBackground: "--panel-list-items-selected-background",
+    labelItemsSelectedBackground: "--panel-label-items-selected-background",
     taskListTitle: "--panel-text-task-list-title",
     taskTitle: "--panel-text-task-title",
     taskInteractionIcon: "--panel-text-task-interaction-icon",
@@ -157,6 +188,12 @@ const DEFAULT_PANEL_TEXT_COLOR_OVERRIDES: Partial<
   taskDetailBackground: "#f8f8f9",
   taskDetailTextareaBackground: "#ffffff",
   taskDetailTextareaBorder: "#e4e4e7",
+  listNavHoverBackground: "#efeff1",
+  listItemsHoverBackground: "#f4f4f5",
+  labelItemsHoverBackground: "#ededf0",
+  listNavSelectedBackground: "#e9ebee",
+  listItemsSelectedBackground: "#e9ebee",
+  labelItemsSelectedBackground: "#e9ebee",
 };
 
 const DEFAULT_SHADES: Record<PanelTextElementKey, PanelTextShadeToken> = {
@@ -167,6 +204,12 @@ const DEFAULT_SHADES: Record<PanelTextElementKey, PanelTextShadeToken> = {
   listNavCalendar: "zinc-700",
   listItems: "zinc-800",
   labelItems: "zinc-600",
+  listNavHoverBackground: "zinc-200",
+  listItemsHoverBackground: "zinc-100",
+  labelItemsHoverBackground: "zinc-200",
+  listNavSelectedBackground: "zinc-200",
+  listItemsSelectedBackground: "zinc-200",
+  labelItemsSelectedBackground: "zinc-200",
   taskListTitle: "zinc-700",
   taskTitle: "zinc-700",
   taskInteractionIcon: "zinc-300",

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { LuLayoutTemplate } from "react-icons/lu";
+import { GiSettingsKnobs } from "react-icons/gi";
 import {
   CALENDAR_TASK_BACKGROUND_OPTIONS,
   getCalendarTaskBackgroundPresentation,
@@ -512,22 +513,44 @@ export function TemplateOptionsDrawer() {
     return () => document.removeEventListener("keydown", handleKeyDown, true);
   }, [open, redoTemplateSettings, undoTemplateSettings]);
 
+  const getCurrentSnapshot = useCallback(
+    (): TemplateSettingsSnapshot => ({
+      panelTextColors: panelTextColors.settings,
+      sidebar: sidebar.currentSettings,
+      taskList: taskList.currentSettings,
+      calendarTask: calendarTask.currentSettings,
+      tooltip: tooltip.currentSettings,
+    }),
+    [
+      panelTextColors.settings,
+      sidebar.currentSettings,
+      taskList.currentSettings,
+      calendarTask.currentSettings,
+      tooltip.currentSettings,
+    ],
+  );
+
+  const saveAllSettings = useCallback(
+    async (snapshot: TemplateSettingsSnapshot) => {
+      await Promise.all([
+        panelTextColors.saveSettings(snapshot.panelTextColors),
+        sidebar.saveSettings(snapshot.sidebar),
+        taskList.saveSettings(snapshot.taskList),
+        calendarTask.saveSettings(snapshot.calendarTask),
+        tooltip.saveSettings(snapshot.tooltip),
+      ]);
+    },
+    [
+      panelTextColors.saveSettings,
+      sidebar.saveSettings,
+      taskList.saveSettings,
+      calendarTask.saveSettings,
+      tooltip.saveSettings,
+    ],
+  );
+
   async function handleSave() {
-    if (sidebar.isDirty) {
-      await sidebar.saveSettings();
-    }
-    if (taskList.isDirty) {
-      await taskList.saveSettings();
-    }
-    if (calendarTask.isDirty) {
-      await calendarTask.saveSettings();
-    }
-    if (tooltip.isDirty) {
-      await tooltip.saveSettings();
-    }
-    if (panelTextColors.isDirty) {
-      await panelTextColors.saveSettings();
-    }
+    await saveAllSettings(getCurrentSnapshot());
   }
 
   return (
@@ -751,28 +774,34 @@ export function TemplateOptionsDrawer() {
             </div>
           </section>
 
-          <TemplateStylesSection sidebar={sidebar} calendarTask={calendarTask} />
         </div>
 
-        <div className="border-t border-zinc-200 px-3 py-3 dark:border-zinc-800">
-          {saveError ? (
-            <p className="mb-2 text-xs text-red-600 dark:text-red-400">
-              {saveError}
-            </p>
-          ) : null}
-          {saveSuccess ? (
-            <p className="mb-2 text-xs text-emerald-600 dark:text-emerald-400">
-              Settings saved.
-            </p>
-          ) : null}
-          <button
-            type="button"
-            onClick={() => void handleSave()}
-            disabled={!isDirty || isSaving}
-            className="w-full rounded-lg bg-[#4873c7] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#3f68bd] disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {isSaving ? "Saving..." : "Save settings"}
-          </button>
+        <div className="shrink-0 border-t border-zinc-200 px-3 py-3 dark:border-zinc-800">
+          <TemplateStylesSection
+            getCurrentSnapshot={getCurrentSnapshot}
+            applySnapshot={applySnapshot}
+            saveAllSettings={saveAllSettings}
+          />
+          <div className="mt-3">
+            {saveError ? (
+              <p className="mb-2 text-xs text-red-600 dark:text-red-400">
+                {saveError}
+              </p>
+            ) : null}
+            {saveSuccess ? (
+              <p className="mb-2 text-xs text-emerald-600 dark:text-emerald-400">
+                Settings saved.
+              </p>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => void handleSave()}
+              disabled={!isDirty || isSaving}
+              className="w-full rounded-lg bg-[#4873c7] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#3f68bd] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isSaving ? "Saving..." : "Save settings"}
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -782,13 +811,13 @@ export function TemplateOptionsDrawer() {
         aria-controls={drawerId}
         aria-label={open ? "Close template settings" : "Open template settings"}
         onClick={() => setOpen((previous) => !previous)}
-        className={`fixed top-0 right-0 z-[60] flex size-8 items-center justify-center rounded-md transition-colors ${
+        className={`fixed top-0 right-0 z-[60] flex size-8 items-center justify-center rounded-md transition-colors cursor-pointer ${
           open
             ? "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
             : "text-zinc-400/80 hover:bg-zinc-100/80 hover:text-zinc-600 dark:text-zinc-500/80 dark:hover:bg-zinc-800/80 dark:hover:text-zinc-300"
         }`}
       >
-        <LuLayoutTemplate className="size-4" aria-hidden="true" />
+        <GiSettingsKnobs className="size-4" aria-hidden="true" />
       </button>
     </>
   );

@@ -129,6 +129,7 @@ model TooltipTemplateSetting {
 model TemplateStyle {
   id                   String   @id @default(cuid())
   name                 String
+  settingsJson         Json?
   sidebarBackgroundId  String   @default("solid-blue")
   sidebarBaseColor     String   @default("#f1f5ff")
   calendarBackgroundId String   @default("solid")

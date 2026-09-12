@@ -1,42 +1,30 @@
 import {
-  getDefaultCalendarTaskBackgroundSettings,
-  isCalendarTaskBackgroundId,
   normalizeCalendarTaskBackgroundSettings,
-  type CalendarTaskBackgroundId,
   type CalendarTaskBackgroundSettings,
 } from "@/lib/calendar-task-background-types";
 import {
-  getDefaultSidebarBackgroundSettings,
-  isSidebarBackgroundId,
-  normalizeHexColor,
   normalizeSidebarBackgroundSettings,
-  type SidebarBackgroundId,
   type SidebarBackgroundSettings,
 } from "@/lib/sidebar-background-types";
+import {
+  getDefaultTemplateSettingsSnapshot,
+  normalizeTemplateSettingsSnapshot,
+  type TemplateSettingsSnapshot,
+} from "@/lib/template-settings-history";
+
+export type { TemplateSettingsSnapshot } from "@/lib/template-settings-history";
 
 export type TemplateStyleRecord = {
   id: string;
   name: string;
-  sidebarBackgroundId: SidebarBackgroundId;
-  sidebarBaseColor: string;
-  calendarBackgroundId: CalendarTaskBackgroundId;
-  calendarBaseColor: string;
-  calendarEndColor: string;
-  calendarTitleColor: string;
-  calendarTimeColor: string;
+  settings: TemplateSettingsSnapshot;
   createdAt: string;
   updatedAt: string;
 };
 
 export type TemplateStyleInput = {
   name: string;
-  sidebarBackgroundId: SidebarBackgroundId;
-  sidebarBaseColor: string;
-  calendarBackgroundId: CalendarTaskBackgroundId;
-  calendarBaseColor: string;
-  calendarEndColor: string;
-  calendarTitleColor: string;
-  calendarTimeColor: string;
+  settings: TemplateSettingsSnapshot;
 };
 
 export type TemplateStylesResponse = {
@@ -50,10 +38,38 @@ export function normalizeTemplateStyleName(value: string) {
   return value.trim().replace(/\s+/g, " ");
 }
 
+function buildSettingsFromLegacyColumns(value: {
+  sidebarBackgroundId: string;
+  sidebarBaseColor: string;
+  calendarBackgroundId: string;
+  calendarBaseColor: string;
+  calendarEndColor: string;
+  calendarTitleColor?: string;
+  calendarTimeColor?: string;
+}): TemplateSettingsSnapshot {
+  const defaults = getDefaultTemplateSettingsSnapshot();
+
+  return normalizeTemplateSettingsSnapshot({
+    ...defaults,
+    sidebar: normalizeSidebarBackgroundSettings({
+      backgroundId: value.sidebarBackgroundId,
+      baseColor: value.sidebarBaseColor,
+    }),
+    calendarTask: normalizeCalendarTaskBackgroundSettings({
+      backgroundId: value.calendarBackgroundId,
+      baseColor: value.calendarBaseColor,
+      endColor: value.calendarEndColor,
+      titleColor: value.calendarTitleColor,
+      timeColor: value.calendarTimeColor,
+    }),
+  });
+}
+
 export function normalizeTemplateStyleInput(
   value:
     | Partial<{
         name: string;
+        settings: unknown;
         sidebarBackgroundId: string;
         sidebarBaseColor: string;
         calendarBackgroundId: string;
@@ -70,57 +86,46 @@ export function normalizeTemplateStyleInput(
   const name = normalizeTemplateStyleName(value.name);
   if (!name) return null;
 
-  const sidebar = normalizeSidebarBackgroundSettings({
-    backgroundId: value.sidebarBackgroundId,
-    baseColor: value.sidebarBaseColor,
-  });
-  const calendar = normalizeCalendarTaskBackgroundSettings({
-    backgroundId: value.calendarBackgroundId,
-    baseColor: value.calendarBaseColor,
-    endColor: value.calendarEndColor,
-    titleColor: value.calendarTitleColor,
-    timeColor: value.calendarTimeColor,
-  });
+  if (value.settings && typeof value.settings === "object") {
+    return {
+      name,
+      settings: normalizeTemplateSettingsSnapshot(value.settings),
+    };
+  }
 
-  return {
-    name,
-    sidebarBackgroundId: sidebar.backgroundId,
-    sidebarBaseColor: sidebar.baseColor,
-    calendarBackgroundId: calendar.backgroundId,
-    calendarBaseColor: calendar.baseColor,
-    calendarEndColor: calendar.endColor,
-    calendarTitleColor: calendar.titleColor,
-    calendarTimeColor: calendar.timeColor,
-  };
+  if (
+    typeof value.sidebarBackgroundId === "string" &&
+    typeof value.sidebarBaseColor === "string" &&
+    typeof value.calendarBackgroundId === "string" &&
+    typeof value.calendarBaseColor === "string" &&
+    typeof value.calendarEndColor === "string"
+  ) {
+    return {
+      name,
+      settings: buildSettingsFromLegacyColumns({
+        sidebarBackgroundId: value.sidebarBackgroundId,
+        sidebarBaseColor: value.sidebarBaseColor,
+        calendarBackgroundId: value.calendarBackgroundId,
+        calendarBaseColor: value.calendarBaseColor,
+        calendarEndColor: value.calendarEndColor,
+        calendarTitleColor: value.calendarTitleColor,
+        calendarTimeColor: value.calendarTimeColor,
+      }),
+    };
+  }
+
+  return null;
 }
 
 export function parseTemplateStyleInput(value: unknown): TemplateStyleInput | null {
   if (typeof value !== "object" || value === null) return null;
-
-  const candidate = value as Partial<TemplateStyleInput>;
-  if (
-    typeof candidate.sidebarBackgroundId !== "string" ||
-    typeof candidate.sidebarBaseColor !== "string" ||
-    typeof candidate.calendarBackgroundId !== "string" ||
-    typeof candidate.calendarBaseColor !== "string" ||
-    typeof candidate.calendarEndColor !== "string"
-  ) {
-    return null;
-  }
-
-  if (
-    !isSidebarBackgroundId(candidate.sidebarBackgroundId) ||
-    !isCalendarTaskBackgroundId(candidate.calendarBackgroundId)
-  ) {
-    return null;
-  }
-
-  return normalizeTemplateStyleInput(candidate);
+  return normalizeTemplateStyleInput(value as Partial<TemplateStyleInput>);
 }
 
 export function serializeTemplateStyleRecord(value: {
   id: string;
   name: string;
+  settingsJson?: unknown;
   sidebarBackgroundId: string;
   sidebarBaseColor: string;
   calendarBackgroundId: string;
@@ -131,57 +136,51 @@ export function serializeTemplateStyleRecord(value: {
   createdAt: Date;
   updatedAt: Date;
 }): TemplateStyleRecord | null {
-  const normalized = normalizeTemplateStyleInput({
-    name: value.name,
-    sidebarBackgroundId: value.sidebarBackgroundId,
-    sidebarBaseColor: value.sidebarBaseColor,
-    calendarBackgroundId: value.calendarBackgroundId,
-    calendarBaseColor: value.calendarBaseColor,
-    calendarEndColor: value.calendarEndColor,
-    calendarTitleColor: value.calendarTitleColor,
-    calendarTimeColor: value.calendarTimeColor,
-  });
+  const name = normalizeTemplateStyleName(value.name);
+  if (!name) return null;
 
-  if (!normalized) return null;
+  const settings =
+    value.settingsJson && typeof value.settingsJson === "object"
+      ? normalizeTemplateSettingsSnapshot(value.settingsJson)
+      : buildSettingsFromLegacyColumns(value);
 
   return {
     id: value.id,
-    ...normalized,
+    name,
+    settings,
     createdAt: value.createdAt.toISOString(),
     updatedAt: value.updatedAt.toISOString(),
   };
 }
 
+export function buildTemplateStyleInputFromSnapshot(
+  name: string,
+  settings: TemplateSettingsSnapshot,
+): TemplateStyleInput | null {
+  return normalizeTemplateStyleInput({ name, settings });
+}
+
+/** @deprecated Use buildTemplateStyleInputFromSnapshot */
 export function buildTemplateStyleInputFromSettings(
   name: string,
   sidebar: SidebarBackgroundSettings,
   calendar: CalendarTaskBackgroundSettings,
 ): TemplateStyleInput | null {
-  return normalizeTemplateStyleInput({
-    name,
-    sidebarBackgroundId: sidebar.backgroundId,
-    sidebarBaseColor: sidebar.baseColor,
-    calendarBackgroundId: calendar.backgroundId,
-    calendarBaseColor: calendar.baseColor,
-    calendarEndColor: calendar.endColor,
-    calendarTitleColor: calendar.titleColor,
-    calendarTimeColor: calendar.timeColor,
+  const defaults = getDefaultTemplateSettingsSnapshot();
+
+  return buildTemplateStyleInputFromSnapshot(name, {
+    ...defaults,
+    sidebar: normalizeSidebarBackgroundSettings(sidebar),
+    calendarTask: normalizeCalendarTaskBackgroundSettings(calendar),
   });
 }
 
 export function getDefaultTemplateStyleInput(name = "Default"): TemplateStyleInput {
-  const sidebar = getDefaultSidebarBackgroundSettings();
-  const calendar = getDefaultCalendarTaskBackgroundSettings();
+  const normalizedName = normalizeTemplateStyleName(name) || "Default";
 
   return {
-    name: normalizeTemplateStyleName(name) || "Default",
-    sidebarBackgroundId: sidebar.backgroundId,
-    sidebarBaseColor: sidebar.baseColor,
-    calendarBackgroundId: calendar.backgroundId,
-    calendarBaseColor: calendar.baseColor,
-    calendarEndColor: calendar.endColor,
-    calendarTitleColor: calendar.titleColor,
-    calendarTimeColor: calendar.timeColor,
+    name: normalizedName,
+    settings: getDefaultTemplateSettingsSnapshot(),
   };
 }
 
@@ -191,20 +190,34 @@ export function getCopyTemplateName(name: string) {
 }
 
 export function templateStyleToCalendarSettings(
-  style: Pick<
-    TemplateStyleRecord,
-    | "calendarBackgroundId"
-    | "calendarBaseColor"
-    | "calendarEndColor"
-    | "calendarTitleColor"
-    | "calendarTimeColor"
-  >,
+  style: Pick<TemplateStyleRecord, "settings">,
 ): CalendarTaskBackgroundSettings {
-  return normalizeCalendarTaskBackgroundSettings({
-    backgroundId: style.calendarBackgroundId,
-    baseColor: style.calendarBaseColor,
-    endColor: style.calendarEndColor,
-    titleColor: style.calendarTitleColor,
-    timeColor: style.calendarTimeColor,
-  });
+  return normalizeCalendarTaskBackgroundSettings(style.settings.calendarTask);
+}
+
+export function templateStyleToSidebarSettings(
+  style: Pick<TemplateStyleRecord, "settings">,
+): SidebarBackgroundSettings {
+  return normalizeSidebarBackgroundSettings(style.settings.sidebar);
+}
+
+export function templateStyleLegacyColumns(settings: TemplateSettingsSnapshot) {
+  const sidebar = normalizeSidebarBackgroundSettings(settings.sidebar);
+  const calendar = normalizeCalendarTaskBackgroundSettings(settings.calendarTask);
+
+  return {
+    sidebarBackgroundId: sidebar.backgroundId,
+    sidebarBaseColor: sidebar.baseColor,
+    calendarBackgroundId: calendar.backgroundId,
+    calendarBaseColor: calendar.baseColor,
+    calendarEndColor: calendar.endColor,
+    calendarTitleColor: calendar.titleColor,
+    calendarTimeColor: calendar.timeColor,
+  };
+}
+
+export function isLegacyTemplateStylePayload(value: unknown) {
+  if (typeof value !== "object" || value === null) return false;
+  const candidate = value as { settings?: unknown };
+  return !candidate.settings;
 }

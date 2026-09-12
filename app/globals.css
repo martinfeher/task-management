@@ -118,6 +118,40 @@
     color: var(--panel-text-label-items);
   }
 
+  .sidebar-list-nav-item:hover:not(.sidebar-list-nav-item-selected) {
+    background-color: var(--panel-list-nav-hover-background);
+  }
+
+  .sidebar-list-item:hover:not(.sidebar-list-item-selected):not(
+      .sidebar-list-item-drop-target
+    ) {
+    background-color: var(--panel-list-items-hover-background);
+  }
+
+  .sidebar-label-item:hover:not(.sidebar-label-item-selected) {
+    background-color: var(--panel-label-items-hover-background);
+  }
+
+  .sidebar-list-nav-item-selected {
+    background-color: color-mix(
+      in srgb,
+      var(--panel-list-nav-selected-background) 50%,
+      transparent
+    );
+  }
+
+  .sidebar-list-item-selected {
+    background-color: var(--panel-list-items-selected-background);
+  }
+
+  .sidebar-label-item-selected {
+    background-color: color-mix(
+      in srgb,
+      var(--panel-label-items-selected-background) 50%,
+      transparent
+    );
+  }
+
   .ptxt-task-list-title {
     color: var(--panel-text-task-list-title);
   }
@@ -185,6 +219,12 @@
   --panel-text-list-nav-calendar: #3f3f46;
   --panel-text-list-items: #27272a;
   --panel-text-label-items: #52525c;
+  --panel-list-nav-hover-background: #efeff1;
+  --panel-list-items-hover-background: #f4f4f5;
+  --panel-label-items-hover-background: #ededf0;
+  --panel-list-nav-selected-background: #e9ebee;
+  --panel-list-items-selected-background: #e9ebee;
+  --panel-label-items-selected-background: #e9ebee;
   --panel-text-task-list-title: #3f3f46;
   --panel-text-task-title: #3f3f46;
   --panel-text-task-interaction-icon: #d4d4d8;

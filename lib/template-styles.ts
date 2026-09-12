@@ -1,10 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { CalendarTaskBackgroundSettings } from "@/lib/calendar-task-background-types";
-import type { SidebarBackgroundSettings } from "@/lib/sidebar-background-types";
+import type { TemplateSettingsSnapshot } from "@/lib/template-settings-history";
 import {
-  buildTemplateStyleInputFromSettings,
+  buildTemplateStyleInputFromSnapshot,
   getDefaultTemplateStyleInput,
   type TemplateStyleRecord,
   type TemplateStylesResponse,
@@ -101,12 +100,8 @@ export function useTemplateStyles() {
   }, []);
 
   const createStyle = useCallback(
-    async (
-      name: string,
-      sidebar: SidebarBackgroundSettings,
-      calendar: CalendarTaskBackgroundSettings,
-    ) => {
-      const input = buildTemplateStyleInputFromSettings(name, sidebar, calendar);
+    async (name: string, settings: TemplateSettingsSnapshot) => {
+      const input = buildTemplateStyleInputFromSnapshot(name, settings);
       if (!input) {
         throw new Error("Invalid template style settings");
       }
@@ -145,13 +140,8 @@ export function useTemplateStyles() {
   );
 
   const updateStyle = useCallback(
-    async (
-      id: string,
-      name: string,
-      sidebar: SidebarBackgroundSettings,
-      calendar: CalendarTaskBackgroundSettings,
-    ) => {
-      const input = buildTemplateStyleInputFromSettings(name, sidebar, calendar);
+    async (id: string, name: string, settings: TemplateSettingsSnapshot) => {
+      const input = buildTemplateStyleInputFromSnapshot(name, settings);
       if (!input) {
         throw new Error("Invalid template style settings");
       }
