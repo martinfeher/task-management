@@ -15,6 +15,7 @@ import {
 import {
   resetDetailLineHeightOnLines,
 } from "./detail-line-height";
+import { sanitizePastedHtml as sanitizePastedHtmlCore } from "./detail-paste";
 
 export const PASTE_BATCH_ATTR = "data-paste-batch";
 export const DEFAULT_DETAIL_FONT_SIZE = `${INITIAL_TASK_EDITOR_FONT_SIZE_PX}px`;
@@ -1041,11 +1042,10 @@ function normalizePastedElement(element: HTMLElement) {
 }
 
 export function sanitizePastedHtml(html: string) {
-  const doc = new DOMParser().parseFromString(html, "text/html");
-
-  doc
-    .querySelectorAll("script, style, meta, link, head, title")
-    .forEach((element) => element.remove());
+  const doc = new DOMParser().parseFromString(
+    sanitizePastedHtmlCore(html),
+    "text/html",
+  );
 
   for (const line of [
     ...doc.body.querySelectorAll(`.${DETAIL_LINE_CLASS}`),

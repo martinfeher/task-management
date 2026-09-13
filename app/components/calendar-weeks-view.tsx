@@ -28,6 +28,7 @@ import {
   CALENDAR_TODAY_DATE_CIRCLE_CLASS,
   CALENDAR_GRID_SCROLL_CLASS,
 } from "@/lib/calendar-layout";
+import { useCalendarTaskDefaultColor } from "@/lib/calendar-task-default-color-settings";
 import type { CalendarSidebarSyncProps } from "./calendar-view-sidebar-layout";
 import {
   CalendarTaskHoverButton,
@@ -197,6 +198,8 @@ export function CalendarMultiWeekView({
   const dragStateRef = useRef<CalendarTaskDragState | null>(null);
   const suppressTaskClickRef = useRef(false);
   const { beginTaskDrag, endDragPreview } = useCalendarTaskDragPreview();
+  const { defaultColor: calendarTaskDefaultColor } =
+    useCalendarTaskDefaultColor();
 
   useEffect(() => {
     const current = startOfDay(new Date());
@@ -554,7 +557,11 @@ export function CalendarMultiWeekView({
                             ? "cursor-move"
                             : ""
                         } ${calendarTaskItemClassName(task.id === selectedTaskId)}`}
-                        style={getCalendarTaskItemStyle(task.priority, task.calendarColor)}
+                        style={getCalendarTaskItemStyle(
+                          task.priority,
+                          task.calendarColor,
+                          calendarTaskDefaultColor,
+                        )}
                       >
                         {task.name}
                       </CalendarTaskHoverButton>

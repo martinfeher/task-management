@@ -71,6 +71,7 @@ import {
   getCalendarSingleDayGridTemplateColumns,
   CALENDAR_TIMED_GRID_SCROLL_CLASS,
 } from "@/lib/calendar-layout";
+import { useCalendarTaskDefaultColor } from "@/lib/calendar-task-default-color-settings";
 import type { CalendarSidebarSyncProps } from "./calendar-view-sidebar-layout";
 
 const HOUR_START = CALENDAR_HOUR_START;
@@ -179,6 +180,8 @@ export function CalendarDayView({
   const lastSidebarJumpRequestIdRef = useRef(0);
   const lastSyncedSidebarDateKeyRef = useRef<string | null>(null);
   const [modalTaskId, setModalTaskId] = useState<string | null>(null);
+  const { defaultColor: calendarTaskDefaultColor } =
+    useCalendarTaskDefaultColor();
   const [addTaskPopover, setAddTaskPopover] = useState<{
     date: Date;
     x: number;
@@ -647,7 +650,11 @@ export function CalendarDayView({
                   canDragTasks,
                 )} calendar-task-row--single-line gap-1 overflow-hidden`}
                 style={{
-                  ...getCalendarTaskItemStyle(task.priority, task.calendarColor),
+                  ...getCalendarTaskItemStyle(
+                    task.priority,
+                    task.calendarColor,
+                    calendarTaskDefaultColor,
+                  ),
                   opacity: isTaskMaskedForDrop(task.id) ? 0 : undefined,
                 }}
               >

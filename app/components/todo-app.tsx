@@ -106,6 +106,7 @@ import {
   saveSubtasksExpanded,
 } from "@/lib/task-subtasks";
 import { AppFontSwitcher } from "./app-font-switcher";
+import { CalendarTaskDefaultColorBootstrap } from "./calendar-task-default-color-bootstrap";
 import { TaskEditorDefaultsBootstrap } from "./task-editor-defaults-bootstrap";
 import { TemplateOptionsDrawer } from "./template-options-drawer";
 import { UndoButton } from "./undo-button";
@@ -3804,6 +3805,7 @@ export function TodoApp({
         />
       ) : null}
       <TaskEditorDefaultsBootstrap />
+      <CalendarTaskDefaultColorBootstrap />
       <AppFontSwitcher />
       <TemplateOptionsDrawer />
       <CalendarShortcutModal

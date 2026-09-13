@@ -43,6 +43,7 @@ import {
   CALENDAR_WEEK_HEADER_STICKY_CLASS,
   CALENDAR_WEEK_ALLDAY_STICKY_CLASS,
 } from "@/lib/calendar-layout";
+import { useCalendarTaskDefaultColor } from "@/lib/calendar-task-default-color-settings";
 import type { CalendarSidebarSyncProps } from "./calendar-view-sidebar-layout";
 import {
   CALENDAR_HOUR_START,
@@ -277,6 +278,8 @@ export function CalendarWeekView({
   const [now, setNow] = useState<Date | null>(null);
   const lastSidebarJumpRequestIdRef = useRef(0);
   const [modalTaskId, setModalTaskId] = useState<string | null>(null);
+  const { defaultColor: calendarTaskDefaultColor } =
+    useCalendarTaskDefaultColor();
   const [addTaskPopover, setAddTaskPopover] = useState<{
     date: Date;
     x: number;
@@ -842,7 +845,11 @@ export function CalendarWeekView({
                                     canDragTasks,
                                   )} calendar-task-row--single-line gap-1 overflow-hidden`}
                                   style={{
-                                    ...getCalendarTaskItemStyle(task.priority, task.calendarColor),
+                                    ...getCalendarTaskItemStyle(
+                                      task.priority,
+                                      task.calendarColor,
+                                      calendarTaskDefaultColor,
+                                    ),
                                     opacity: isTaskMaskedForDrop(task.id) ? 0 : undefined,
                                   }}
                                 >

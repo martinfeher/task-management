@@ -23,6 +23,7 @@ import {
   type TaskDueTime,
 } from "@/lib/task-due-time";
 import { calendarTaskItemClassName, calendarTaskSecondaryTextClassName, CALENDAR_TASK_FONT_CLASS, CALENDAR_TASK_TIMED_COLUMN_INSET_CLASS, getCalendarTaskItemStyle } from "@/lib/calendar-layout";
+import { useCalendarTaskDefaultColor } from "@/lib/calendar-task-default-color-settings";
 import { useCalendarTaskDragPreview, useCalendarTaskHoverPreview } from "./calendar-task-hover-preview";
 import { useCalendarTaskColorMenu } from "./calendar-task-color-menu";
 import { TaskCompletionCheckbox } from "./task-completion-checkbox";
@@ -152,6 +153,8 @@ export function CalendarTaskDropPreview({
   calendarColor?: string | null;
   variant?: "drop" | "source";
 }) {
+  const { defaultColor: calendarTaskDefaultColor } =
+    useCalendarTaskDefaultColor();
   const availableHeight =
     height - CALENDAR_TASK_CONTENT_PADDING_PX * 2;
   const { showTime, titleMaxLines } =
@@ -172,7 +175,11 @@ export function CalendarTaskDropPreview({
       style={{
         top,
         height,
-        ...getCalendarTaskItemStyle(priority, calendarColor),
+        ...getCalendarTaskItemStyle(
+          priority,
+          calendarColor,
+          calendarTaskDefaultColor,
+        ),
       }}
       className={`${previewClassName} pointer-events-none absolute ${horizontalInsetClass} overflow-hidden rounded-[5px] select-none ${calendarTaskItemClassName()}`}
     >
@@ -700,6 +707,8 @@ export function CalendarTimedTaskBlock({
   const canResize = canInteract && Boolean(onSetTaskDueTime);
   const contentPaddingTop = canResize ? RESIZE_HANDLE_PX : CALENDAR_TASK_CONTENT_PADDING_PX;
   const contentPaddingBottom = canResize ? RESIZE_HANDLE_PX : CALENDAR_TASK_CONTENT_PADDING_PX;
+  const { defaultColor: calendarTaskDefaultColor } =
+    useCalendarTaskDefaultColor();
   const hoverHandlers = useCalendarTaskHoverPreview(task);
   const colorMenuHandlers = useCalendarTaskColorMenu(task);
   const {
@@ -716,7 +725,11 @@ export function CalendarTimedTaskBlock({
       style={{
         top,
         height,
-        ...getCalendarTaskItemStyle(task.priority, task.calendarColor),
+        ...getCalendarTaskItemStyle(
+          task.priority,
+          task.calendarColor,
+          calendarTaskDefaultColor,
+        ),
         opacity: isMaskedForDrop ? 0 : undefined,
       }}
       onContextMenu={(event) => {

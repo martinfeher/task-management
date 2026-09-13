@@ -3,6 +3,12 @@ import {
   ensureImageResizeHandles,
   waitForInitialImageDisplaySize,
 } from "./detail-image-resize";
+import {
+  htmlToPasteLineParts,
+  normalizeTitlePasteText,
+  plainTextToPasteLineParts,
+  type PasteLinePart,
+} from "./detail-paste";
 
 export const DETAIL_LINE_CLASS = "detail-line";
 
@@ -1095,11 +1101,6 @@ function mergeLineHtml(existingHtml: string, appendedHtml: string) {
   return left + right;
 }
 
-function plainTextToLineHtml(text: string) {
-  if (!text) return "<br>";
-  return escapeHtml(text);
-}
-
 function inheritLineBlockTypeFromSource(
   newLine: HTMLElement,
   sourceLine: HTMLElement,
@@ -1119,9 +1120,23 @@ function inheritLineBlockTypeFromSource(
   }
 }
 
-function createLineFromPaste(html: string, sourceLine: HTMLElement, editor: HTMLElement) {
-  const line = createLineElement(html);
-  inheritLineBlockTypeFromSource(line, sourceLine, editor);
+function createLineFromPastePart(
+  part: PasteLinePart,
+  sourceLine: HTMLElement,
+  editor: HTMLElement,
+) {
+  const line = createLineElement(part.html);
+
+  if (part.lineType && part.lineType !== "text") {
+    applyBlockTypeToLine(line, part.lineType, getLineElements(editor));
+
+    if (part.lineType === "checklist") {
+      line.dataset.checked = part.checked ? "true" : "false";
+    }
+  } else {
+    inheritLineBlockTypeFromSource(line, sourceLine, editor);
+  }
+
   return line;
 }
 
@@ -1206,9 +1221,32 @@ function insertHtmlFragmentAtRange(range: Range, html: string) {
   range.collapse(false);
 }
 
+export function insertTitleLinePaste(editor: HTMLElement, plainText: string) {
+  ensureTitleLine(editor);
+
+  const titleLine = getLineElements(editor)[0];
+  if (!titleLine) return false;
+
+  const normalized = normalizeTitlePasteText(plainText);
+  if (!normalized) return false;
+
+  const selection = window.getSelection();
+  if (selection?.rangeCount) {
+    const range = selection.getRangeAt(0);
+    if (titleLine.contains(range.commonAncestorContainer)) {
+      range.deleteContents();
+    }
+  }
+
+  titleLine.textContent = normalized;
+  editor.focus();
+  placeCaretAtEndOfLine(titleLine);
+  return true;
+}
+
 function insertLinePartsAtSelection(
   editor: HTMLElement,
-  parts: string[],
+  parts: PasteLinePart[],
   pasteId?: string,
 ) {
   if (parts.length === 0) return false;
@@ -1231,9 +1269,15 @@ function insertLinePartsAtSelection(
 
   if (selectedLines.length <= 1) {
     if (parts.length === 1) {
-      insertHtmlFragmentAtRange(range, parts[0]);
+      insertHtmlFragmentAtRange(range, parts[0].html);
       selection.removeAllRanges();
       selection.addRange(range);
+      if (parts[0].lineType && parts[0].lineType !== "text") {
+        applyBlockTypeToLine(activeLine, parts[0].lineType, getLineElements(editor));
+        if (parts[0].lineType === "checklist") {
+          activeLine.dataset.checked = parts[0].checked ? "true" : "false";
+        }
+      }
       if (pasteId) {
         markPasteBatchSubtree(activeLine, pasteId);
       }
@@ -1258,7 +1302,13 @@ function insertLinePartsAtSelection(
 
     range.deleteContents();
 
-    activeLine.innerHTML = mergeLineHtml(beforeHtml, parts[0]);
+    activeLine.innerHTML = mergeLineHtml(beforeHtml, parts[0].html);
+    if (parts[0].lineType && parts[0].lineType !== "text") {
+      applyBlockTypeToLine(activeLine, parts[0].lineType, getLineElements(editor));
+      if (parts[0].lineType === "checklist") {
+        activeLine.dataset.checked = parts[0].checked ? "true" : "false";
+      }
+    }
     if (pasteId) {
       markPasteBatchSubtree(activeLine, pasteId);
     }
@@ -1266,7 +1316,7 @@ function insertLinePartsAtSelection(
     let previousLine = activeLine;
 
     for (let index = 1; index < parts.length - 1; index += 1) {
-      const newLine = createLineFromPaste(parts[index], sourceLine, editor);
+      const newLine = createLineFromPastePart(parts[index], sourceLine, editor);
       if (pasteId) {
         markPasteBatchSubtree(newLine, pasteId);
       }
@@ -1274,8 +1324,11 @@ function insertLinePartsAtSelection(
       previousLine = newLine;
     }
 
-    const lastLine = createLineFromPaste(
-      mergeLineHtml(parts[parts.length - 1], afterHtml),
+    const lastLine = createLineFromPastePart(
+      {
+        ...parts[parts.length - 1],
+        html: mergeLineHtml(parts[parts.length - 1].html, afterHtml),
+      },
       sourceLine,
       editor,
     );
@@ -1316,9 +1369,15 @@ function insertLinePartsAtSelection(
 
   if (parts.length === 1) {
     firstLine.innerHTML = mergeLineHtml(
-      mergeLineHtml(beforeHtml, parts[0]),
+      mergeLineHtml(beforeHtml, parts[0].html),
       afterHtml,
     );
+    if (parts[0].lineType && parts[0].lineType !== "text") {
+      applyBlockTypeToLine(firstLine, parts[0].lineType, getLineElements(editor));
+      if (parts[0].lineType === "checklist") {
+        firstLine.dataset.checked = parts[0].checked ? "true" : "false";
+      }
+    }
     if (pasteId) {
       markPasteBatchSubtree(firstLine, pasteId);
     }
@@ -1326,7 +1385,13 @@ function insertLinePartsAtSelection(
     return true;
   }
 
-  firstLine.innerHTML = mergeLineHtml(beforeHtml, parts[0]);
+  firstLine.innerHTML = mergeLineHtml(beforeHtml, parts[0].html);
+  if (parts[0].lineType && parts[0].lineType !== "text") {
+    applyBlockTypeToLine(firstLine, parts[0].lineType, getLineElements(editor));
+    if (parts[0].lineType === "checklist") {
+      firstLine.dataset.checked = parts[0].checked ? "true" : "false";
+    }
+  }
   if (pasteId) {
     markPasteBatchSubtree(firstLine, pasteId);
   }
@@ -1334,7 +1399,7 @@ function insertLinePartsAtSelection(
   let previousLine = firstLine;
 
   for (let index = 1; index < parts.length - 1; index += 1) {
-    const newLine = createLineFromPaste(parts[index], sourceLine, editor);
+    const newLine = createLineFromPastePart(parts[index], sourceLine, editor);
     if (pasteId) {
       markPasteBatchSubtree(newLine, pasteId);
     }
@@ -1342,8 +1407,11 @@ function insertLinePartsAtSelection(
     previousLine = newLine;
   }
 
-  const trailingLine = createLineFromPaste(
-    mergeLineHtml(parts[parts.length - 1], afterHtml),
+  const trailingLine = createLineFromPastePart(
+    {
+      ...parts[parts.length - 1],
+      html: mergeLineHtml(parts[parts.length - 1].html, afterHtml),
+    },
     sourceLine,
     editor,
   );
@@ -1359,8 +1427,10 @@ export function insertPlainTextAtSelection(
   editor: HTMLElement,
   plainText: string,
 ) {
-  const parts = splitClipboardPlainTextIntoLines(plainText).map(plainTextToLineHtml);
-  return insertLinePartsAtSelection(editor, parts);
+  return insertLinePartsAtSelection(
+    editor,
+    plainTextToPasteLineParts(plainText),
+  );
 }
 
 export function insertHtmlAtSelection(
@@ -1368,7 +1438,7 @@ export function insertHtmlAtSelection(
   html: string,
   pasteId?: string,
 ) {
-  return insertLinePartsAtSelection(editor, htmlToLineParts(html), pasteId);
+  return insertLinePartsAtSelection(editor, htmlToPasteLineParts(html), pasteId);
 }
 
 function escapeHtml(text: string) {
@@ -1729,10 +1799,6 @@ export function placeCaretInLine(line: HTMLElement) {
     selection.removeAllRanges();
     selection.addRange(range);
     return;
-  }
-
-  if (!line.querySelector("br")) {
-    line.innerHTML = "<br>";
   }
 
   const range = document.createRange();

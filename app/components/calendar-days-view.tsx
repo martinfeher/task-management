@@ -43,6 +43,7 @@ import {
   CALENDAR_DAYS_HEADER_STICKY_CLASS,
   CALENDAR_DAYS_ALLDAY_STICKY_CLASS,
 } from "@/lib/calendar-layout";
+import { useCalendarTaskDefaultColor } from "@/lib/calendar-task-default-color-settings";
 import {
   bindCalendarTaskDrag,
   CALENDAR_ALL_DAY_TO_TIMED_DEFAULT_DURATION_MINUTES,
@@ -257,6 +258,8 @@ export function CalendarMultiDayView({
   sidebarJumpRequestId,
   onSidebarFocusDateChange,
 }: CalendarMultiDayViewProps) {
+  const { defaultColor: calendarTaskDefaultColor } =
+    useCalendarTaskDefaultColor();
   const [today, setToday] = useState<Date | null>(null);
   const [rangeStart, setRangeStart] = useState<Date | null>(null);
   const [now, setNow] = useState<Date | null>(null);
@@ -776,7 +779,11 @@ export function CalendarMultiDayView({
                                 canDragTasks,
                               )} calendar-task-row--single-line gap-1 overflow-hidden`}
                               style={{
-                                ...getCalendarTaskItemStyle(task.priority, task.calendarColor),
+                                ...getCalendarTaskItemStyle(
+                                  task.priority,
+                                  task.calendarColor,
+                                  calendarTaskDefaultColor,
+                                ),
                                 opacity: isTaskMaskedForDrop(task.id) ? 0 : undefined,
                               }}
                             >

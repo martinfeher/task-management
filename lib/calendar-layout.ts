@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
-import { getTaskPriorityItemStyle } from "@/lib/task-priority";
 import { getCalendarTaskColorItemStyle } from "@/lib/calendar-task-colors";
+import { getCalendarTaskDefaultColor } from "@/lib/calendar-task-default-color";
 
 export const CALENDAR_TASK_FONT_CLASS = "text-[12.5px]";
 export const CALENDAR_TASK_ITEM_CLASS = "calendar-task-item";
@@ -79,12 +79,15 @@ export function calendarTaskItemClassName(selected = false) {
 }
 
 export function getCalendarTaskItemStyle(
-  priority: number | null | undefined,
+  _priority: number | null | undefined,
   calendarColor?: string | null,
+  defaultCalendarColor?: string | null,
 ): CSSProperties | undefined {
   return (
     getCalendarTaskColorItemStyle(calendarColor) ??
-    getTaskPriorityItemStyle(priority)
+    getCalendarTaskColorItemStyle(
+      defaultCalendarColor ?? getCalendarTaskDefaultColor(),
+    )
   );
 }
 

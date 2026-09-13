@@ -16,6 +16,7 @@ import {
   CALENDAR_TASK_COLOR_OPTIONS,
   normalizeCalendarTaskColor,
 } from "@/lib/calendar-task-colors";
+import { useCalendarTaskDefaultColor } from "@/lib/calendar-task-default-color-settings";
 import type { TaskListItem } from "./todo-app";
 
 const MENU_WIDTH = 148;
@@ -62,6 +63,7 @@ export function CalendarTaskColorMenuProvider({
 }) {
   const [menu, setMenu] = useState<ColorMenuState | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const { defaultColor } = useCalendarTaskDefaultColor();
 
   const close = useCallback(() => {
     setMenu(null);
@@ -106,7 +108,7 @@ export function CalendarTaskColorMenuProvider({
   );
 
   const selectedColor = menu
-    ? normalizeCalendarTaskColor(menu.task.calendarColor)
+    ? normalizeCalendarTaskColor(menu.task.calendarColor) ?? defaultColor
     : null;
 
   return (

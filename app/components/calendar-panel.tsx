@@ -52,6 +52,7 @@ import {
   getCalendarTaskDragSurface,
 } from "@/lib/calendar-task-drag";
 import { getCalendarShellClassName, calendarAllDayTaskClassName, getCalendarTaskItemStyle, CALENDAR_WEEKDAY_LABELS, getCalendarDayColumnDividerClass, CALENDAR_TODAY_DATE_CIRCLE_CLASS, CALENDAR_GRID_SCROLL_CLASS } from "@/lib/calendar-layout";
+import { useCalendarTaskDefaultColor } from "@/lib/calendar-task-default-color-settings";
 import {
   readCalendarViewSession,
   saveCalendarViewSession,
@@ -523,6 +524,8 @@ export function CalendarMonthView({
   const suppressTaskClickRef = useRef(false);
   const lastSidebarJumpRequestIdRef = useRef<number | undefined>(undefined);
   const { beginTaskDrag, endDragPreview } = useCalendarTaskDragPreview();
+  const { defaultColor: calendarTaskDefaultColor } =
+    useCalendarTaskDefaultColor();
 
   useEffect(() => {
     const now = startOfDay(new Date());
@@ -934,7 +937,11 @@ export function CalendarMonthView({
                           task.id === selectedTaskId,
                           Boolean(onSetTaskDueDate),
                         )} calendar-task-row--single-line gap-1 overflow-hidden`}
-                        style={getCalendarTaskItemStyle(task.priority, task.calendarColor)}
+                        style={getCalendarTaskItemStyle(
+                          task.priority,
+                          task.calendarColor,
+                          calendarTaskDefaultColor,
+                        )}
                       >
                         <CalendarTaskTitle
                           name={task.name}

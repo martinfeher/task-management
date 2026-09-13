@@ -51,6 +51,8 @@ import {
   repairPastedEditorStructure,
   insertHtmlAtSelection,
   insertPlainTextAtSelection,
+  insertTitleLinePaste,
+  renumberNumberedLines,
   shouldPreferPlainTextPaste,
   isChecklistLine,
   isChecklistToggleClick,
@@ -128,6 +130,7 @@ import {
   type DetailFontFamilyId,
   type DetailFontSizeOption,
 } from "./detail-fonts";
+import { clampPastePlainText } from "./detail-paste";
 import { DetailFontFamilyControl } from "./detail-font-family-control";
 import { DetailFontSizeControl } from "./detail-font-size-control";
 import {
@@ -1107,6 +1110,32 @@ function editorHasLiveExtendedTextSelection(editor: HTMLElement): boolean {
   );
 }
 
+function rangeIsWithinTitleLine(editor: HTMLElement, range: Range) {
+  if (range.collapsed || !range.toString().trim()) return false;
+
+  const startLine = getDetailLineFromNode(range.startContainer, editor);
+  const endLine = getDetailLineFromNode(range.endContainer, editor);
+
+  if (!startLine || !endLine) return false;
+
+  return (
+    isTitleLine(editor, startLine) && isTitleLine(editor, endLine)
+  );
+}
+
+function editorSelectionIsWithinTitleLine(editor: HTMLElement) {
+  const selection = window.getSelection();
+  if (
+    !selection?.rangeCount ||
+    !selection.anchorNode ||
+    !editor.contains(selection.anchorNode)
+  ) {
+    return false;
+  }
+
+  return rangeIsWithinTitleLine(editor, selection.getRangeAt(0));
+}
+
 function isMultiClickMouseEvent(event: Pick<MouseEvent, "detail">) {
   return event.detail >= 2;
 }
@@ -1210,6 +1239,10 @@ function rangeHasFormatableEditorContent(
   range: Range,
 ) {
   if (range.collapsed || !range.toString().trim()) {
+    return false;
+  }
+
+  if (rangeIsWithinTitleLine(editor, range)) {
     return false;
   }
 
@@ -1715,6 +1748,7 @@ export function TaskDetailsPanel({
   const [task, setTask] = useState<TaskDetails | null>(null);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [showClipboardNotice, setShowClipboardNotice] = useState(false);
+  const [clipboardNoticeMessage, setClipboardNoticeMessage] = useState("Clipboard");
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [formatMenu, setFormatMenu] = useState<FormatMenuState | null>(null);
   const [lineControls, setLineControls] = useState<LineControlItem[]>([]);
@@ -2169,15 +2203,17 @@ export function TaskDetailsPanel({
     setSaveStatus("pending");
   }, []);
 
-  const showClipboardSaveNotice = useCallback(() => {
+  const showClipboardSaveNotice = useCallback((message = "Clipboard") => {
     if (clipboardNoticeTimerRef.current !== null) {
       window.clearTimeout(clipboardNoticeTimerRef.current);
     }
 
+    setClipboardNoticeMessage(message);
     setShowClipboardNotice(true);
     clipboardNoticeTimerRef.current = window.setTimeout(() => {
       clipboardNoticeTimerRef.current = null;
       setShowClipboardNotice(false);
+      setClipboardNoticeMessage("Clipboard");
     }, CLIPBOARD_SAVE_NOTICE_MS);
   }, []);
 
@@ -3328,6 +3364,7 @@ export function TaskDetailsPanel({
     splitBlockLinesOnBreaks(editor);
     ensureTitleLine(editor);
     repairPastedEditorStructure(editor);
+    renumberNumberedLines(editor);
     clearAllPasteBatchMarkers(editor);
     normalizeLinks(editor);
     syncEditorLineEmptyState(editor);
@@ -3416,6 +3453,18 @@ export function TaskDetailsPanel({
       selection?.rangeCount &&
       selection.anchorNode &&
       editor.contains(selection.anchorNode) &&
+      !selection.isCollapsed &&
+      rangeIsWithinTitleLine(editor, selection.getRangeAt(0))
+    ) {
+      closeFormatMenu({ clearSavedSelection: true });
+      syncHeaderClearFormattingState();
+      return;
+    }
+
+    if (
+      selection?.rangeCount &&
+      selection.anchorNode &&
+      editor.contains(selection.anchorNode) &&
       selection.isCollapsed
     ) {
       const link = getLinkFromSelection(selection, editor);
@@ -3466,10 +3515,14 @@ export function TaskDetailsPanel({
     const range = resolveFormatMenuRange(editor, null);
     if (!range || !rangeHasFormatableEditorContent(editor, range)) {
       const hasPendingSelection = editorHasLiveExtendedTextSelection(editor);
+      const titleSelection =
+        hasPendingSelection && editorSelectionIsWithinTitleLine(editor);
       syncHeaderClearFormattingState();
-      closeFormatMenu({ clearSavedSelection: !hasPendingSelection });
-        return;
-      }
+      closeFormatMenu({
+        clearSavedSelection: !hasPendingSelection || titleSelection,
+      });
+      return;
+    }
 
     rememberFormatSelection(editor, range);
     setShowLinkMenu(false);
@@ -3507,6 +3560,11 @@ export function TaskDetailsPanel({
       const editor = editorRef.current;
       if (!editor) return;
 
+      if (editorSelectionIsWithinTitleLine(editor)) {
+        closeFormatMenu({ clearSavedSelection: true });
+        return;
+      }
+
       const liveRange = captureLiveEditorFormatSelection(editor);
       if (liveRange) {
         rememberFormatSelection(editor, liveRange);
@@ -3532,7 +3590,7 @@ export function TaskDetailsPanel({
       formatMenuRevealFrameRef.current = null;
       runAttempt();
     });
-  }, [rememberFormatSelection, updateFormatMenu]);
+  }, [closeFormatMenu, rememberFormatSelection, updateFormatMenu]);
 
   useEffect(() => {
     function handleDocumentMouseUp() {
@@ -4628,6 +4686,12 @@ export function TaskDetailsPanel({
           return current;
         });
 
+        if (editorSelectionIsWithinTitleLine(editor)) {
+          closeFormatMenu({ clearSavedSelection: true });
+          scheduleLineControlsUpdate();
+          return;
+        }
+
         const liveRange = captureLiveEditorFormatSelection(editor);
         if (liveRange) {
           rememberFormatSelection(editor, liveRange);
@@ -5024,17 +5088,42 @@ export function TaskDetailsPanel({
     if (!editor) return;
 
     const activeLine = getActiveLineElement(editor);
+    let plainText = event.clipboardData.getData("text/plain");
+    const html = event.clipboardData.getData("text/html");
+
+    if (plainText) {
+      const clamped = clampPastePlainText(plainText);
+      plainText = clamped.text;
+      if (clamped.truncated) {
+        showClipboardSaveNotice("Paste truncated to 512 KB");
+      }
+    }
+
+    if (isTitleLine(editor, activeLine)) {
+      event.preventDefault();
+      if (!plainText && html) {
+        const temp = document.createElement("div");
+        temp.innerHTML = sanitizePastedHtml(html);
+        plainText = temp.textContent ?? "";
+      }
+      if (!plainText) return;
+
+      insertTitleLinePaste(editor, plainText);
+      requestAnimationFrame(() => {
+        finalizePasteEditorState();
+      });
+      return;
+    }
+
     if (isCodeLine(activeLine)) {
       event.preventDefault();
-      const text = event.clipboardData.getData("text/plain");
-      if (!text) return;
+      if (!plainText) return;
 
       editor.focus();
-      document.execCommand("insertText", false, text);
-      syncEditorContent();
-      recordHistorySnapshot();
-      scheduleAutoSave();
-      updateLineControls();
+      document.execCommand("insertText", false, plainText);
+      requestAnimationFrame(() => {
+        finalizePasteEditorState();
+      });
       return;
     }
 
@@ -5045,10 +5134,15 @@ export function TaskDetailsPanel({
       return;
     }
 
-    const html = event.clipboardData.getData("text/html");
-    const plainText = event.clipboardData.getData("text/plain");
+    const htmlHasListStructure = /<(ul|ol)\b/i.test(html);
+    const htmlHasFormatting = Boolean(html) && pastedHtmlHasFormatting(html);
 
-    if (plainText && shouldPreferPlainTextPaste(plainText, html)) {
+    if (
+      plainText &&
+      shouldPreferPlainTextPaste(plainText, html) &&
+      !htmlHasListStructure &&
+      !htmlHasFormatting
+    ) {
       event.preventDefault();
       editor.focus();
       if (!insertPlainTextAtSelection(editor, plainText)) {
@@ -7080,7 +7174,7 @@ export function TaskDetailsPanel({
             lastSavedAt !== null) ? (
             <div className="shrink-0">
               <span className="flex flex-wrap items-center justify-end gap-2 text-xs text-[#82828a] dark:text-[#acacb4]">
-                {showClipboardNotice ? <span>Clipboard</span> : null}
+                {showClipboardNotice ? <span>{clipboardNoticeMessage}</span> : null}
                 {metadataError ? (
                   <span className="text-red-600 dark:text-red-400">
                     {metadataError}
@@ -7116,7 +7210,7 @@ export function TaskDetailsPanel({
         lastSavedAt !== null) ? (
         <div className="pointer-events-none absolute bottom-3 right-4 z-10">
           <span className="flex flex-wrap items-center justify-end gap-2 text-xs text-[#82828a] dark:text-[#acacb4]">
-            {showClipboardNotice ? <span>Clipboard</span> : null}
+            {showClipboardNotice ? <span>{clipboardNoticeMessage}</span> : null}
             {metadataError ? (
               <span className="text-red-600 dark:text-red-400">{metadataError}</span>
             ) : null}

@@ -13,8 +13,9 @@ import {
   TASK_EDITOR_LINE_HEIGHT_STEP,
   useTaskEditorDefaults,
 } from "@/lib/task-editor-defaults-settings";
+import { useCalendarTaskDefaultColor } from "@/lib/calendar-task-default-color-settings";
 
-type SettingsSection = "general" | "tasks" | "labels";
+type SettingsSection = "general" | "tasks" | "labels" | "calendar";
 
 type SettingsModalProps = {
   open: boolean;
@@ -26,6 +27,7 @@ const SETTINGS_SECTIONS: { id: SettingsSection; label: string }[] = [
   { id: "general", label: "General" },
   { id: "tasks", label: "Tasks" },
   { id: "labels", label: "Labels" },
+  { id: "calendar", label: "Calendar" },
 ];
 
 function getDefaultSettingsRevealOrigin() {
@@ -187,6 +189,68 @@ function SettingsNumberField({
   );
 }
 
+function SettingsColorOptions({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: readonly string[];
+  onChange: (color: string) => void;
+}) {
+  return (
+    <div className="space-y-2.5">
+      <p className="text-sm text-zinc-900 dark:text-zinc-50">{label}</p>
+      <div className="grid max-w-[11.5rem] grid-cols-4 gap-2">
+        {options.map((color) => {
+          const isSelected = value === color;
+          return (
+            <button
+              key={color}
+              type="button"
+              aria-label={`Set calendar task default color ${color}`}
+              aria-pressed={isSelected}
+              className={`size-6 rounded-full border border-black/10 transition-transform hover:scale-110 dark:border-white/15 ${
+                isSelected
+                  ? "ring-2 ring-zinc-800 ring-offset-2 dark:ring-zinc-100 dark:ring-offset-zinc-900"
+                  : ""
+              }`}
+              style={{ backgroundColor: color }}
+              onClick={() => onChange(color)}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function CalendarSettingsContent() {
+  const { defaultColor, setDefaultColor, colorOptions } =
+    useCalendarTaskDefaultColor();
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-1">
+        <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+          Calendar
+        </h3>
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          Calendar view preferences.
+        </p>
+      </div>
+      <SettingsColorOptions
+        label="Calendar task default color"
+        value={defaultColor}
+        options={colorOptions}
+        onChange={setDefaultColor}
+      />
+    </div>
+  );
+}
+
 function TasksSettingsContent() {
   const { subtasksEnabled, setSubtasksEnabled } = useSubtasksEnabled();
   const {
@@ -251,6 +315,8 @@ function SettingsSectionContent({ section }: { section: SettingsSection }) {
           </p>
         </div>
       );
+    case "calendar":
+      return <CalendarSettingsContent />;
   }
 }
 
