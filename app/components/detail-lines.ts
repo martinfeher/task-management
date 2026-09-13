@@ -4,6 +4,7 @@ import {
   waitForInitialImageDisplaySize,
 } from "./detail-image-resize";
 import {
+  choosePasteLineParts,
   DETAIL_CLIPBOARD_ROOT_ATTR,
   htmlToPasteLineParts,
   normalizeTitlePasteText,
@@ -1405,14 +1406,42 @@ export function insertTitleLinePaste(editor: HTMLElement, plainText: string) {
   return true;
 }
 
+export function captureEditorSelectionRange(editor: HTMLElement) {
+  const selection = window.getSelection();
+  if (!selection?.rangeCount) return null;
+
+  const range = selection.getRangeAt(0);
+  if (!editor.contains(range.commonAncestorContainer)) {
+    return null;
+  }
+
+  return range.cloneRange();
+}
+
 function insertLinePartsAtSelection(
   editor: HTMLElement,
   parts: PasteLinePart[],
   pasteId?: string,
+  savedRange?: Range | null,
 ) {
   if (parts.length === 0) return false;
 
-  const target = resolveBodyPasteTarget(editor);
+  let target: { line: HTMLElement; range: Range } | null = null;
+
+  if (savedRange && editor.contains(savedRange.commonAncestorContainer)) {
+    const line =
+      getDetailLineFromNode(savedRange.startContainer, editor) ??
+      getDetailLineFromNode(savedRange.endContainer, editor);
+
+    if (line && !isTitleLine(editor, line) && !isCodeLine(line)) {
+      target = { line, range: savedRange.cloneRange() };
+    }
+  }
+
+  if (!target) {
+    target = resolveBodyPasteTarget(editor);
+  }
+
   if (!target) return false;
 
   const selection = window.getSelection();
@@ -1587,10 +1616,13 @@ function insertLinePartsAtSelection(
 export function insertPlainTextAtSelection(
   editor: HTMLElement,
   plainText: string,
+  savedRange?: Range | null,
 ) {
   return insertLinePartsAtSelection(
     editor,
     plainTextToPasteLineParts(plainText),
+    undefined,
+    savedRange,
   );
 }
 
@@ -1598,8 +1630,15 @@ export function insertHtmlAtSelection(
   editor: HTMLElement,
   html: string,
   pasteId?: string,
+  savedRange?: Range | null,
+  plainText?: string | null,
 ) {
-  return insertLinePartsAtSelection(editor, htmlToPasteLineParts(html), pasteId);
+  return insertLinePartsAtSelection(
+    editor,
+    choosePasteLineParts(html, plainText),
+    pasteId,
+    savedRange,
+  );
 }
 
 function escapeHtml(text: string) {
@@ -1896,6 +1935,16 @@ export function isBodyPlaceholderLine(line: HTMLElement) {
   if (!isBodyPlaceholderCandidateLine(line)) return false;
 
   return index === lines.length - 1;
+}
+
+export function isEmptyEditableBodyLine(
+  editor: HTMLElement,
+  line: HTMLElement | null | undefined,
+) {
+  if (!line || !editor.contains(line)) return false;
+  if (isTitleLine(editor, line)) return false;
+  if (!isBodyPlaceholderCandidateLine(line)) return false;
+  return isLineEmpty(line);
 }
 
 export function getDetailLineFromNode(node: Node | null, editor: HTMLElement) {
@@ -2452,10 +2501,15 @@ export function syncLineEmptyState(editor: HTMLElement) {
     }
 
     delete line.dataset.bodyPlaceholder;
+    delete line.dataset.showBodyPlaceholder;
   });
 }
 
 export function syncEditorBodyPlaceholderVisibility(editor: HTMLElement) {
+  for (const line of getLineElements(editor)) {
+    delete line.dataset.showBodyPlaceholder;
+  }
+
   const selection = window.getSelection();
   const editorHasFocus =
     document.activeElement === editor ||
@@ -2472,6 +2526,12 @@ export function syncEditorBodyPlaceholderVisibility(editor: HTMLElement) {
   }
 
   const activeLine = getActiveLineElement(editor);
+  if (activeLine && isEmptyEditableBodyLine(editor, activeLine)) {
+    activeLine.dataset.showBodyPlaceholder = "true";
+    delete editor.dataset.hideBodyPlaceholder;
+    return;
+  }
+
   if (activeLine && !isLineEmpty(activeLine)) {
     editor.dataset.hideBodyPlaceholder = "true";
   } else {

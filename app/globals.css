@@ -375,7 +375,7 @@ body {
 }
 
 .task-details-editor {
-  color: #555555;
+  color: #2e2e2e;
   color-scheme: light;
   caret-color: #171717;
   cursor: text;
@@ -599,7 +599,7 @@ body {
 
 .detail-line[data-line-type="h1"] {
   margin-bottom: 3px;
-  color: #4B4B4B;
+  color: #3c3c3c;
 }
 
 .task-details-editor .detail-line[data-line-type="h1"] + .detail-line {
@@ -615,6 +615,12 @@ body {
 
 .task-details-editor
   .detail-line[data-empty="true"]:last-child:not([data-line-type="h1"]):not([data-line-type="code"]):not(
+    :has(.detail-image-wrapper)
+  ):not([data-line-type="bullet"]):not([data-line-type="numbered"]):not(
+    [data-line-type="checklist"]
+  )::before,
+.task-details-editor
+  .detail-line[data-show-body-placeholder="true"]:not([data-line-type="h1"]):not([data-line-type="code"]):not(
     :has(.detail-image-wrapper)
   ):not([data-line-type="bullet"]):not([data-line-type="numbered"]):not(
     [data-line-type="checklist"]
@@ -635,7 +641,13 @@ body {
 .task-details-editor
   .detail-line[data-empty="true"]:last-child[data-line-type="numbered"]::after,
 .task-details-editor
-  .detail-line[data-empty="true"]:last-child[data-line-type="checklist"]::after {
+  .detail-line[data-empty="true"]:last-child[data-line-type="checklist"]::after,
+.task-details-editor
+  .detail-line[data-show-body-placeholder="true"][data-line-type="bullet"]::after,
+.task-details-editor
+  .detail-line[data-show-body-placeholder="true"][data-line-type="numbered"]::after,
+.task-details-editor
+  .detail-line[data-show-body-placeholder="true"][data-line-type="checklist"]::after {
   content: "start writing or press / to access commands";
   color: #d4d4d8;
   pointer-events: none;
@@ -655,6 +667,21 @@ body {
 .task-details-editor[data-hide-body-placeholder="true"]
   .detail-line[data-empty="true"]:last-child[data-line-type="numbered"]::after,
 .task-details-editor[data-hide-body-placeholder="true"]
+  .detail-line[data-empty="true"]:last-child[data-line-type="checklist"]::after {
+  content: none;
+}
+
+.task-details-editor:has(.detail-line[data-show-body-placeholder="true"]:not(:last-child))
+  .detail-line[data-empty="true"]:last-child:not([data-line-type="h1"]):not([data-line-type="code"]):not(
+    :has(.detail-image-wrapper)
+  ):not([data-line-type="bullet"]):not([data-line-type="numbered"]):not(
+    [data-line-type="checklist"]
+  )::before,
+.task-details-editor:has(.detail-line[data-show-body-placeholder="true"]:not(:last-child))
+  .detail-line[data-empty="true"]:last-child[data-line-type="bullet"]::after,
+.task-details-editor:has(.detail-line[data-show-body-placeholder="true"]:not(:last-child))
+  .detail-line[data-empty="true"]:last-child[data-line-type="numbered"]::after,
+.task-details-editor:has(.detail-line[data-show-body-placeholder="true"]:not(:last-child))
   .detail-line[data-empty="true"]:last-child[data-line-type="checklist"]::after {
   content: none;
 }
@@ -1762,10 +1789,12 @@ body {
   }
 }
 
+.format-text-color-trigger[aria-expanded="true"],
 .format-highlight-trigger[aria-expanded="true"] {
   background-color: #f6f7f8 !important;
 }
 
+.format-text-color-trigger:hover,
 .format-highlight-trigger:hover {
   background-color: #f6f7f8 !important;
 }

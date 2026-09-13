@@ -110,11 +110,13 @@ type TaskListTaskRowProps = {
   onToggleLabel: (labelId: string) => void;
   onCreateLabel: (label: string, color: string) => void;
   onSetTaskDueDateFromMenu: (taskId: string, dateValue: string) => void;
+  onClearTaskDueDateFromMenu: (taskId: string) => void;
   onOpenCustomDatePicker: (taskId: string) => void;
   onSelectTaskPriority: (taskId: string, priority: number) => void;
   onClearTaskPriority: (taskId: string) => void;
   onConvertTaskToNote: (taskId: string) => void;
   onAddSubtask: (taskId: string) => void;
+  onDuplicateTask: (taskId: string) => void;
   onDeleteTask: (taskId: string) => void;
   onCloseTaskMenu: () => void;
   hasDueDateActions: boolean;
@@ -125,6 +127,7 @@ type TaskListTaskRowProps = {
   hasLabelActions: boolean;
   hasMoveActions: boolean;
   hasSubtaskActions: boolean;
+  hasDuplicateActions: boolean;
   hasDeleteActions: boolean;
   useWiderRowPadding?: boolean;
   subtaskCount?: number;
@@ -288,11 +291,13 @@ export function TaskListTaskRow({
   onToggleLabel,
   onCreateLabel,
   onSetTaskDueDateFromMenu,
+  onClearTaskDueDateFromMenu,
   onOpenCustomDatePicker,
   onSelectTaskPriority,
   onClearTaskPriority,
   onConvertTaskToNote,
   onAddSubtask,
+  onDuplicateTask,
   onDeleteTask,
   onCloseTaskMenu,
   hasDueDateActions,
@@ -303,6 +308,7 @@ export function TaskListTaskRow({
   hasLabelActions,
   hasMoveActions,
   hasSubtaskActions,
+  hasDuplicateActions,
   hasDeleteActions,
   useWiderRowPadding = false,
   subtaskCount = 0,
@@ -617,8 +623,9 @@ export function TaskListTaskRow({
         >
           <CiStickyNote
             aria-hidden="true"
-            className="shrink-0 size-[19px]"
+            className="shrink-0 size-[20px] -ml-[1.5px] text-[#8d8d9c]"
             style={{ transform: "scaleX(0.785)" }}
+            // strokeWidth={0.01}
           />
           <span
             id={`note-icon-tooltip-${task.id}`}
@@ -981,6 +988,9 @@ export function TaskListTaskRow({
                   onSetTaskDueDate={(dateValue) =>
                     onSetTaskDueDateFromMenu(task.id, dateValue)
                   }
+                  onClearTaskDueDate={() =>
+                    onClearTaskDueDateFromMenu(task.id)
+                  }
                   onOpenCustomDatePicker={() => onOpenCustomDatePicker(task.id)}
                   onSelectTaskPriority={(priority) =>
                     onSelectTaskPriority(task.id, priority)
@@ -992,6 +1002,10 @@ export function TaskListTaskRow({
                   }}
                   onAddSubtask={() => {
                     onAddSubtask(task.id);
+                    onCloseTaskMenu();
+                  }}
+                  onDuplicateTask={() => {
+                    onDuplicateTask(task.id);
                     onCloseTaskMenu();
                   }}
                   onDeleteTask={() => {
@@ -1006,6 +1020,7 @@ export function TaskListTaskRow({
                   hasLabelActions={hasLabelActions}
                   hasMoveActions={hasMoveActions}
                   hasSubtaskActions={hasSubtaskActions}
+                  hasDuplicateActions={hasDuplicateActions}
                   hasDeleteActions={hasDeleteActions}
                 />
               </div>

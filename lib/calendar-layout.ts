@@ -104,7 +104,7 @@ export function getCalendarShellClassName(
 
 export const CALENDAR_VIEW_WRAPPER_CLASS = "flex min-h-0 flex-1 flex-col";
 export const CALENDAR_VIEW_SURFACE_CLASS =
-  "flex min-h-0 flex-1 flex-col overflow-hidden bg-white dark:bg-zinc-950";
+  "flex min-h-0 flex-1 flex-col overflow-hidden bg-white dark:bg-zinc-950 ml-1";
 /** Sticky offset for all-day rows sitting below day headers in week view. */
 export const CALENDAR_WEEK_HEADER_HEIGHT_PX = 62;
 export const CALENDAR_WEEK_HEADER_STICKY_CLASS = "sticky top-0 z-30 bg-white dark:bg-zinc-950";

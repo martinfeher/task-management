@@ -102,6 +102,15 @@ export function isDetailLinesClipboardHtml(html: string) {
   return html.includes(DETAIL_CLIPBOARD_ROOT_ATTR);
 }
 
+function getDetailLinePasteHtml(element: HTMLElement) {
+  const clone = element.cloneNode(true) as HTMLElement;
+  clone
+    .querySelectorAll(`.${DETAIL_LINE_CLASS}`)
+    .forEach((nestedLine) => nestedLine.remove());
+
+  return clone.innerHTML.trim() || "<br>";
+}
+
 function detailLineElementToPastePart(element: HTMLElement): PasteLinePart {
   const rawType = element.dataset.lineType;
   const lineType =
@@ -111,7 +120,7 @@ function detailLineElementToPastePart(element: HTMLElement): PasteLinePart {
   const listIndent = Number.parseInt(element.dataset.listIndent ?? "0", 10);
 
   return {
-    html: element.innerHTML.trim() || "<br>",
+    html: getDetailLinePasteHtml(element),
     lineType,
     checked:
       lineType === "checklist"
@@ -124,19 +133,36 @@ function detailLineElementToPastePart(element: HTMLElement): PasteLinePart {
 function detailLinesHtmlToPasteLineParts(html: string): PasteLinePart[] {
   const doc = new DOMParser().parseFromString(html, "text/html");
   const root = doc.body.querySelector(`[${DETAIL_CLIPBOARD_ROOT_ATTR}]`);
+  const scope = root ?? doc.body;
 
-  const lineElements = root
-    ? root.querySelectorAll(`:scope > .${DETAIL_LINE_CLASS}`)
-    : doc.body.querySelectorAll(`.${DETAIL_LINE_CLASS}`);
+  // Browsers often re-nest sibling `.detail-line` elements when reading
+  // clipboard HTML back, so collect every line under the root in document
+  // order — not just direct children.
+  const lineElements = [...scope.querySelectorAll(`.${DETAIL_LINE_CLASS}`)].filter(
+    (element): element is HTMLElement => element instanceof HTMLElement,
+  );
 
-  const parts: PasteLinePart[] = [];
+  return lineElements.map(detailLineElementToPastePart);
+}
 
-  for (const element of lineElements) {
-    if (!(element instanceof HTMLElement)) continue;
-    parts.push(detailLineElementToPastePart(element));
+export function choosePasteLineParts(html: string, plainText?: string | null) {
+  const hasHtml = Boolean(html?.trim());
+  const htmlParts = hasHtml ? htmlToPasteLineParts(html) : [];
+
+  if (!plainText?.trim()) {
+    return htmlParts.length > 0 ? htmlParts : [{ html: "<br>" }];
   }
 
-  return parts;
+  const plainParts = plainTextToPasteLineParts(plainText);
+  if (!hasHtml) {
+    return plainParts;
+  }
+
+  if (htmlParts.length >= plainParts.length) {
+    return htmlParts;
+  }
+
+  return plainParts;
 }
 
 function normalizeClipboardPlainText(plainText: string) {

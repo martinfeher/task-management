@@ -55,6 +55,7 @@ import {
   insertLineBeforeBodyPlaceholder,
   insertPlainTextAtSelection,
   insertTitleLinePaste,
+  captureEditorSelectionRange,
   renumberNumberedLines,
   serializeEditorSelectionForClipboard,
   shouldPreferPlainTextPaste,
@@ -63,6 +64,7 @@ import {
   isCodeLine,
   isDetailLineEmpty,
   isBodyPlaceholderLine,
+  isEmptyEditableBodyLine,
   isCaretAtStartOfLine,
   getDetailLineFromNode,
   isTitleLine,
@@ -137,7 +139,8 @@ import { DetailFontFamilyControl } from "./detail-font-family-control";
 import { DetailFontSizeControl } from "./detail-font-size-control";
 import {
   DetailFormatBlockTypeDropdown,
-  DetailFormatTextHighlightColorDropdown,
+  DetailFormatHighlightColorDropdown,
+  DetailFormatTextColorDropdown,
   DetailFormatFontFamilyDropdown,
   DetailFormatFontSizeDropdown,
   DetailFormatListDropdown,
@@ -1142,15 +1145,18 @@ function isMultiClickMouseEvent(event: Pick<MouseEvent, "detail">) {
   return event.detail >= 2;
 }
 
-function shouldPlaceCaretAtLineStart(line: HTMLElement) {
-  return isDetailLineEmpty(line) || isBodyPlaceholderLine(line);
+function shouldPlaceCaretAtLineStart(
+  editor: HTMLElement,
+  line: HTMLElement,
+) {
+  return isEmptyEditableBodyLine(editor, line);
 }
 
 function scheduleCaretAtLineStart(editor: HTMLElement, line: HTMLElement) {
   const place = () => {
     const selection = window.getSelection();
     if (!selection?.isCollapsed || !editor.contains(line)) return;
-    if (!shouldPlaceCaretAtLineStart(line)) return;
+    if (!shouldPlaceCaretAtLineStart(editor, line)) return;
     if (isCaretAtStartOfLine(line)) return;
 
     focusDetailLine(editor, line);
@@ -1172,7 +1178,7 @@ function collapseEditorSelectionAtPoint(
   const probe = getCaretRangeFromPoint(clientX, clientY);
   if (probe && editor.contains(probe.startContainer)) {
     const probeLine = getDetailLineFromNode(probe.startContainer, editor);
-    if (probeLine && shouldPlaceCaretAtLineStart(probeLine)) {
+    if (probeLine && shouldPlaceCaretAtLineStart(editor, probeLine)) {
       placeCaretInLine(probeLine);
     return;
   }
@@ -1188,7 +1194,7 @@ function collapseEditorSelectionAtPoint(
 
   const line = getLineElementAtPoint(editor, clientY);
   if (line && editor.contains(line)) {
-    if (shouldPlaceCaretAtLineStart(line)) {
+    if (shouldPlaceCaretAtLineStart(editor, line)) {
       placeCaretInLine(line);
       return;
     }
@@ -2658,10 +2664,8 @@ export function TaskDetailsPanel({
       (document.activeElement instanceof Node &&
         editor.contains(document.activeElement));
     const activeLine = editorHasFocus ? getActiveLineElement(editor) : null;
-    const focusedBodyPlaceholderLine =
-      activeLine &&
-      editor.contains(activeLine) &&
-      isBodyPlaceholderLine(activeLine)
+    const focusedEmptyBodyLine =
+      activeLine && isEmptyEditableBodyLine(editor, activeLine)
         ? activeLine
         : null;
 
@@ -2669,8 +2673,8 @@ export function TaskDetailsPanel({
       line = activeLineControlsRef.current;
     } else if (addBlockMenu && activeLineControlsRef.current) {
       line = activeLineControlsRef.current;
-    } else if (focusedBodyPlaceholderLine) {
-      line = focusedBodyPlaceholderLine;
+    } else if (focusedEmptyBodyLine) {
+      line = focusedEmptyBodyLine;
     } else if (
       isMouseOverEditorRef.current &&
       hoveredLine &&
@@ -2720,7 +2724,7 @@ export function TaskDetailsPanel({
     const showControls =
       keepAddBlockMenuOpen ||
       keepSlashCommandMenuOpen ||
-      focusedBodyPlaceholderLine === line ||
+      focusedEmptyBodyLine === line ||
       (isMouseOverEditorRef.current && hoveredLine === line);
 
     setLineControls([
@@ -3012,7 +3016,10 @@ export function TaskDetailsPanel({
         setOpenFormatDropdown(dropdown);
 
         const editor = editorRef.current;
-        if (editor && dropdown === "highlight") {
+        if (
+          editor &&
+          (dropdown === "textColor" || dropdown === "highlight")
+        ) {
           setFormatMenuInlineFormats(getDetailSelectionInlineFormatState(editor));
         }
 
@@ -4570,7 +4577,7 @@ export function TaskDetailsPanel({
         if (
           editor &&
           pendingLine &&
-          isBodyPlaceholderLine(pendingLine) &&
+          isEmptyEditableBodyLine(editor, pendingLine) &&
           editor.contains(pendingLine)
         ) {
           const selection = window.getSelection();
@@ -5054,6 +5061,7 @@ export function TaskDetailsPanel({
     const editor = editorRef.current;
     if (!editor) return;
 
+    const savedPasteRange = captureEditorSelectionRange(editor);
     const activeLine = getActiveLineElement(editor);
     let plainText = event.clipboardData.getData("text/plain");
     const html = event.clipboardData.getData("text/html");
@@ -5087,6 +5095,9 @@ export function TaskDetailsPanel({
       if (!plainText) return;
 
       editor.focus();
+      if (savedPasteRange) {
+        restoreEditorSelectionRange(savedPasteRange);
+      }
       document.execCommand("insertText", false, plainText);
       requestAnimationFrame(() => {
         finalizePasteEditorState();
@@ -5113,8 +5124,11 @@ export function TaskDetailsPanel({
       !htmlIsDetailLinesClipboard
     ) {
       event.preventDefault();
-      editor.focus();
-      if (!insertPlainTextAtSelection(editor, plainText)) {
+      if (!insertPlainTextAtSelection(editor, plainText, savedPasteRange)) {
+        editor.focus();
+        if (savedPasteRange) {
+          restoreEditorSelectionRange(savedPasteRange);
+        }
         document.execCommand("insertText", false, plainText);
       }
       requestAnimationFrame(() => {
@@ -5127,11 +5141,6 @@ export function TaskDetailsPanel({
       event.preventDefault();
 
       const currentTaskId = taskIdRef.current;
-      const selection = window.getSelection();
-      const savedPasteRange =
-        selection?.rangeCount && editor.contains(selection.anchorNode)
-          ? selection.getRangeAt(0).cloneRange()
-          : null;
 
       void (async () => {
         let htmlToPaste = html;
@@ -5157,7 +5166,18 @@ export function TaskDetailsPanel({
           restoreEditorSelectionRange(savedPasteRange);
         }
 
-        if (!insertHtmlAtSelection(currentEditor, htmlToPaste)) {
+        if (
+          !insertHtmlAtSelection(
+            currentEditor,
+            htmlToPaste,
+            undefined,
+            savedPasteRange,
+            plainText,
+          )
+        ) {
+          if (savedPasteRange) {
+            restoreEditorSelectionRange(savedPasteRange);
+          }
           document.execCommand("insertText", false, plainText);
         }
 
@@ -5170,8 +5190,19 @@ export function TaskDetailsPanel({
 
     if (html && plainText) {
       event.preventDefault();
-      editor.focus();
-      if (!insertHtmlAtSelection(editor, html)) {
+      if (
+        !insertHtmlAtSelection(
+          editor,
+          html,
+          undefined,
+          savedPasteRange,
+          plainText,
+        )
+      ) {
+        editor.focus();
+        if (savedPasteRange) {
+          restoreEditorSelectionRange(savedPasteRange);
+        }
         document.execCommand("insertText", false, plainText);
       }
 
@@ -5183,8 +5214,11 @@ export function TaskDetailsPanel({
 
     if (plainText) {
       event.preventDefault();
-      editor.focus();
-      if (!insertPlainTextAtSelection(editor, plainText)) {
+      if (!insertPlainTextAtSelection(editor, plainText, savedPasteRange)) {
+        editor.focus();
+        if (savedPasteRange) {
+          restoreEditorSelectionRange(savedPasteRange);
+        }
         document.execCommand("insertText", false, plainText);
       }
       requestAnimationFrame(() => {
@@ -5350,7 +5384,7 @@ export function TaskDetailsPanel({
     if (
       editor &&
       activeLine &&
-      shouldPlaceCaretAtLineStart(activeLine) &&
+      shouldPlaceCaretAtLineStart(editor, activeLine) &&
       !isEditorPointerDownRef.current
     ) {
       focusDetailLine(editor, activeLine);
@@ -5783,7 +5817,7 @@ export function TaskDetailsPanel({
       editor &&
       pendingLine &&
       !isTitleLine(editor, pendingLine) &&
-      shouldPlaceCaretAtLineStart(pendingLine) &&
+      shouldPlaceCaretAtLineStart(editor, pendingLine) &&
       !editorHasLiveExtendedTextSelection(editor)
     ) {
       scheduleCaretAtLineStart(editor, pendingLine);
@@ -5936,7 +5970,7 @@ export function TaskDetailsPanel({
     if (
       clickedLine instanceof HTMLElement &&
       !isTitleLine(editor, clickedLine) &&
-      shouldPlaceCaretAtLineStart(clickedLine)
+      shouldPlaceCaretAtLineStart(editor, clickedLine)
     ) {
       scheduleCaretAtLineStart(editor, clickedLine);
     }
@@ -6349,7 +6383,7 @@ export function TaskDetailsPanel({
     >
       {renderModalHeaderActions()}
       <div
-        className={`relative flex shrink-0 items-center justify-between overflow-visible px-4 pt-1 pb-1 ${
+        className={`relative flex shrink-0 items-center justify-between overflow-visible px-4 pt-[2.5px] pb-[2.5px] ${
           isModalLayout
             ? isModalFormatToolbarOpen
               ? "pr-[22rem]"
@@ -6667,7 +6701,7 @@ export function TaskDetailsPanel({
               onKeyDown={handleEditorKeyDown}
               onKeyUp={handleEditorKeyUp}
               onScroll={updateLineControls}
-              className="task-details-editor min-h-[500px] w-full resize-none overflow-auto rounded-xl py-[2px] pl-[30px] pr-3 pb-3! text-[#555555] outline-none transition-colors dark:text-zinc-300 [&_.detail-line[data-line-type=bullet]]:pl-1 [&_.detail-line[data-line-type=checklist]]:cursor-pointer [&_.detail-line[data-line-type=checklist]]:pl-1 [&_.detail-line[data-line-type=h1]]:text-[26px] [&_.detail-line[data-line-type=h1]]:font-bold [&_.detail-line[data-line-type=h1]]:leading-[36px] [&_.detail-line[data-line-type=h1]]:text-[#4B4B4B] dark:[&_.detail-line[data-line-type=h1]]:text-[#F5F5F5] [&_.detail-line[data-line-type=h2]]:text-[23px] [&_.detail-line[data-line-type=h2]]:font-semibold [&_.detail-line[data-line-type=h2]]:leading-[30px] [&_.detail-line[data-line-type=h3]]:text-[19px] [&_.detail-line[data-line-type=h3]]:font-semibold [&_.detail-line[data-line-type=h3]]:leading-[26px] [&_.detail-line[data-line-type=numbered]]:pl-1 [&_mark]:bg-yellow-200 dark:[&_mark]:bg-yellow-300/30 [&_s]:line-through [&_strike]:line-through [&_u]:underline"
+              className="task-details-editor min-h-[500px] w-full resize-none overflow-auto rounded-xl pt-[13px] pl-[30px] pr-3 pb-4! text-[#555555] outline-none transition-colors dark:text-zinc-300 [&_.detail-line[data-line-type=bullet]]:pl-1 [&_.detail-line[data-line-type=checklist]]:cursor-pointer [&_.detail-line[data-line-type=checklist]]:pl-1 [&_.detail-line[data-line-type=h1]]:text-[26px] [&_.detail-line[data-line-type=h1]]:font-bold [&_.detail-line[data-line-type=h1]]:leading-[36px] [&_.detail-line[data-line-type=h1]]:text-[#4B4B4B] dark:[&_.detail-line[data-line-type=h1]]:text-[#F5F5F5] [&_.detail-line[data-line-type=h2]]:text-[23px] [&_.detail-line[data-line-type=h2]]:font-semibold [&_.detail-line[data-line-type=h2]]:leading-[30px] [&_.detail-line[data-line-type=h3]]:text-[19px] [&_.detail-line[data-line-type=h3]]:font-semibold [&_.detail-line[data-line-type=h3]]:leading-[26px] [&_.detail-line[data-line-type=numbered]]:pl-1 [&_mark]:bg-yellow-200 dark:[&_mark]:bg-yellow-300/30 [&_s]:line-through [&_strike]:line-through [&_u]:underline"
             />
 
             {dropIndicator && (
@@ -6988,41 +7022,27 @@ export function TaskDetailsPanel({
                   I
                 </button>
                 </FormatToolbarTooltipWrap>
-                <FormatToolbarTooltipWrap
-                  label="Underline"
-                  shortcut={getFormatToolbarShortcut("u")}
-                  tooltipId="format-toolbar-underline-tooltip"
-                >
-                <button
-                  type="button"
-                    aria-label="Underline"
-                    aria-pressed={formatMenuInlineFormats.underline}
-                    aria-describedby="format-toolbar-underline-tooltip"
-                    className={`${FORMAT_TOOLBAR_TEXT_BUTTON_CLASS} underline ${
-                      formatMenuInlineFormats.underline
-                        ? FORMAT_TOOLBAR_ACTIVE_BUTTON_CLASS
-                        : ""
-                    }`}
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => applyFormat("underline")}
-                >
-                  U
-                </button>
-                </FormatToolbarTooltipWrap>
-
                 <div aria-hidden="true" className={FORMAT_TOOLBAR_DIVIDER_CLASS} />
 
-                <DetailFormatTextHighlightColorDropdown
+                <DetailFormatTextColorDropdown
+                  open={openFormatDropdown === "textColor"}
+                  onOpenChange={(open) =>
+                    setFormatDropdownOpen("textColor", open)
+                  }
+                  selectedTextColor={formatMenuInlineFormats.textColor}
+                  textColorOptions={TEXT_COLOR_OPTIONS}
+                  onSelectTextColor={applyTextColor}
+                  recentColors={recentFormatColors}
+                />
+
+                <DetailFormatHighlightColorDropdown
                   open={openFormatDropdown === "highlight"}
                   onOpenChange={(open) =>
                     setFormatDropdownOpen("highlight", open)
                   }
-                  selectedTextColor={formatMenuInlineFormats.textColor}
                   selectedHighlightColor={formatMenuInlineFormats.highlightColor}
-                  textColorOptions={TEXT_COLOR_OPTIONS}
                   highlightColorOptions={HIGHLIGHT_COLOR_OPTIONS}
                   isHighlightActive={formatMenuInlineFormats.highlight}
-                  onSelectTextColor={applyTextColor}
                   onSelectHighlightColor={applyHighlightColor}
                   recentColors={recentFormatColors}
                 />
@@ -7124,6 +7144,7 @@ export function TaskDetailsPanel({
                   menuRef={formatOverflowMenuRef}
                   lineHeight={formatMenuLineHeight}
                   onSelectLineHeight={applyFormatLineHeight}
+                  onUnderline={() => applyFormat("underline")}
                   onStrikethrough={() => applyFormat("strikeThrough")}
                   onSuperscript={() => applyFormat("superscript")}
                   onSubscript={() => applyFormat("subscript")}

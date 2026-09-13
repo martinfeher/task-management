@@ -27,6 +27,7 @@ import { DetailLineHeightControl } from "./detail-line-height-control";
 import type { DetailLineHeightOption } from "./detail-line-height";
 
 export type FormatToolbarDropdown =
+  | "textColor"
   | "highlight"
   | "list"
   | "block"
@@ -462,68 +463,49 @@ function HighlightColorSwatchButton({
   );
 }
 
-type DetailFormatTextHighlightColorDropdownProps = {
+type DetailFormatTextColorDropdownProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   selectedTextColor: string;
-  selectedHighlightColor: string;
   textColorOptions: readonly DetailTextColorOption[];
-  highlightColorOptions: readonly { label: string; value: string }[];
-  isHighlightActive?: boolean;
   onSelectTextColor: (color: string) => void;
-  onSelectHighlightColor: (color: string) => void;
   recentColors?: RecentFormatColor[];
 };
 
-export function DetailFormatTextHighlightColorDropdown({
+export function DetailFormatTextColorDropdown({
   open,
   onOpenChange,
   selectedTextColor,
-  selectedHighlightColor,
   textColorOptions,
-  highlightColorOptions,
-  isHighlightActive = false,
   onSelectTextColor,
-  onSelectHighlightColor,
   recentColors = [],
-}: DetailFormatTextHighlightColorDropdownProps) {
-  const menuSelectedHighlightColor = isHighlightActive
-    ? selectedHighlightColor
-    : "#ffffff";
+}: DetailFormatTextColorDropdownProps) {
   const matchedTextColorOption = textColorOptions.find((option) =>
     colorsEquivalent(option.value, selectedTextColor),
   );
-  const defaultTextColor = textColorOptions[0]?.value ?? selectedTextColor;
-  const hasCustomTextColor = !colorsEquivalent(selectedTextColor, defaultTextColor);
+  const recentTextColors = recentColors.filter((entry) => entry.kind === "text");
 
   return (
     <FormatToolbarDropdownShell
       open={open}
       onOpenChange={onOpenChange}
-      ariaLabel="Text and highlight color"
-      tooltipId="format-toolbar-highlight-tooltip"
-      tooltipLabel="Text & highlight color"
+      ariaLabel="Text color"
+      tooltipId="format-toolbar-text-color-tooltip"
+      tooltipLabel="Text color"
       openClassName=""
       menuClassName={`${FORMAT_TOOLBAR_DROPDOWN_MENU_CLASS} min-w-[220px]`}
-      triggerClassName={`format-highlight-trigger flex h-8 cursor-pointer items-center gap-0.5 rounded-lg px-2 text-sm ${FORMAT_TOOLBAR_ICON_COLOR} transition-[background-color] duration-150`}
+      triggerClassName={`format-text-color-trigger flex h-8 cursor-pointer items-center gap-0.5 rounded-lg px-2 text-sm ${FORMAT_TOOLBAR_ICON_COLOR} transition-[background-color] duration-150`}
       trigger={
         <>
           <span
-            className="flex size-[22px] shrink-0 items-center justify-center rounded-[7px] border bg-white dark:bg-zinc-900"
+            className="size-[16px] shrink-0 rounded-full border bg-white p-[2px] dark:bg-zinc-900"
             style={{
-              color: hasCustomTextColor ? selectedTextColor : undefined,
-              borderColor: matchedTextColorOption?.borderColor ?? "#e9e9e7",
-              backgroundColor: isHighlightActive
-                ? selectedHighlightColor
-                : undefined,
+              borderColor: matchedTextColorOption?.borderColor ?? "#454454",
             }}
           >
-            <FormatHighlightIcon
-              className={`${FORMAT_TOOLBAR_TEXT_COLOR_ICON_SIZE_CLASS} ${
-                hasCustomTextColor
-                  ? "text-current"
-                  : FORMAT_TOOLBAR_TEXT_COLOR_ICON_COLOR
-              }`}
+            <span
+              className="block size-full rounded-full"
+              style={{ backgroundColor: selectedTextColor }}
             />
           </span>
           <LuChevronDown className={`size-3.5 shrink-0 ${FORMAT_TOOLBAR_CHEVRON_COLOR}`} />
@@ -531,42 +513,27 @@ export function DetailFormatTextHighlightColorDropdown({
       }
     >
       <div className="space-y-3 px-3 py-2">
-        {recentColors.length > 0 ? (
+        {recentTextColors.length > 0 ? (
           <section>
             <p className={FORMAT_COLOR_MENU_SECTION_TITLE_CLASS}>Recently Used</p>
             <div className="flex flex-wrap gap-1.5">
-              {recentColors.map((entry) =>
-                entry.kind === "text" ? (
-                  <TextColorSwatchButton
-                    key={`recent-text-${entry.color}`}
-                    option={{
-                      label: entry.label,
-                      value: entry.color,
-                      borderColor: textColorOptions.find((option) =>
-                        colorsEquivalent(option.value, entry.color),
-                      )?.borderColor,
-                    }}
-                    selected={colorsEquivalent(entry.color, selectedTextColor)}
-                    onSelect={() => {
-                      onSelectTextColor(entry.color);
-                      onOpenChange(false);
-                    }}
-                  />
-                ) : (
-                  <HighlightColorSwatchButton
-                    key={`recent-highlight-${entry.color}`}
-                    option={{ label: entry.label, value: entry.color }}
-                    selected={colorsEquivalent(
-                      entry.color,
-                      menuSelectedHighlightColor,
-                    )}
-                    onSelect={() => {
-                      onSelectHighlightColor(entry.color);
-                      onOpenChange(false);
-                    }}
-                  />
-                ),
-              )}
+              {recentTextColors.map((entry) => (
+                <TextColorSwatchButton
+                  key={`recent-text-${entry.color}`}
+                  option={{
+                    label: entry.label,
+                    value: entry.color,
+                    borderColor: textColorOptions.find((option) =>
+                      colorsEquivalent(option.value, entry.color),
+                    )?.borderColor,
+                  }}
+                  selected={colorsEquivalent(entry.color, selectedTextColor)}
+                  onSelect={() => {
+                    onSelectTextColor(entry.color);
+                    onOpenChange(false);
+                  }}
+                />
+              ))}
             </div>
           </section>
         ) : null}
@@ -587,6 +554,88 @@ export function DetailFormatTextHighlightColorDropdown({
             ))}
           </div>
         </section>
+      </div>
+    </FormatToolbarDropdownShell>
+  );
+}
+
+type DetailFormatHighlightColorDropdownProps = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  selectedHighlightColor: string;
+  highlightColorOptions: readonly { label: string; value: string }[];
+  isHighlightActive?: boolean;
+  onSelectHighlightColor: (color: string) => void;
+  recentColors?: RecentFormatColor[];
+};
+
+export function DetailFormatHighlightColorDropdown({
+  open,
+  onOpenChange,
+  selectedHighlightColor,
+  highlightColorOptions,
+  isHighlightActive = false,
+  onSelectHighlightColor,
+  recentColors = [],
+}: DetailFormatHighlightColorDropdownProps) {
+  const menuSelectedHighlightColor = isHighlightActive
+    ? selectedHighlightColor
+    : "#ffffff";
+  const recentHighlightColors = recentColors.filter(
+    (entry) => entry.kind === "highlight",
+  );
+
+  return (
+    <FormatToolbarDropdownShell
+      open={open}
+      onOpenChange={onOpenChange}
+      ariaLabel="Highlight color"
+      tooltipId="format-toolbar-highlight-tooltip"
+      tooltipLabel="Highlight color"
+      openClassName=""
+      menuClassName={`${FORMAT_TOOLBAR_DROPDOWN_MENU_CLASS} min-w-[220px]`}
+      triggerClassName={`format-highlight-trigger flex h-8 cursor-pointer items-center gap-0.5 rounded-lg px-2 text-sm ${FORMAT_TOOLBAR_ICON_COLOR} transition-[background-color] duration-150`}
+      trigger={
+        <>
+          <span
+            className="flex size-[22px] shrink-0 items-center justify-center rounded-[7px] border bg-white dark:bg-zinc-900"
+            style={{
+              borderColor: "#e9e9e7",
+              backgroundColor: isHighlightActive
+                ? selectedHighlightColor
+                : undefined,
+            }}
+          >
+            <FormatHighlightIcon
+              className={`${FORMAT_TOOLBAR_TEXT_COLOR_ICON_SIZE_CLASS} ${FORMAT_TOOLBAR_TEXT_COLOR_ICON_COLOR}`}
+            />
+          </span>
+          <LuChevronDown className={`size-3.5 shrink-0 ${FORMAT_TOOLBAR_CHEVRON_COLOR}`} />
+        </>
+      }
+    >
+      <div className="space-y-3 px-3 py-2">
+        {recentHighlightColors.length > 0 ? (
+          <section>
+            <p className={FORMAT_COLOR_MENU_SECTION_TITLE_CLASS}>Recently Used</p>
+            <div className="flex flex-wrap gap-1.5">
+              {recentHighlightColors.map((entry) => (
+                <HighlightColorSwatchButton
+                  key={`recent-highlight-${entry.color}`}
+                  option={{ label: entry.label, value: entry.color }}
+                  selected={colorsEquivalent(
+                    entry.color,
+                    menuSelectedHighlightColor,
+                  )}
+                  onSelect={() => {
+                    onSelectHighlightColor(entry.color);
+                    onOpenChange(false);
+                  }}
+                />
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         <section>
           <p className={FORMAT_COLOR_MENU_SECTION_TITLE_CLASS}>Highlight Color</p>
@@ -609,8 +658,8 @@ export function DetailFormatTextHighlightColorDropdown({
   );
 }
 
-/** @deprecated Use DetailFormatTextHighlightColorDropdown */
-export const DetailFormatHighlightColorDropdown = DetailFormatTextHighlightColorDropdown;
+/** @deprecated Use DetailFormatTextColorDropdown and DetailFormatHighlightColorDropdown */
+export const DetailFormatTextHighlightColorDropdown = DetailFormatHighlightColorDropdown;
 
 type DetailFormatListDropdownProps = {
   open: boolean;
@@ -842,6 +891,7 @@ type DetailFormatOverflowMenuProps = {
   menuRef?: RefObject<HTMLDivElement | null>;
   lineHeight: DetailLineHeightOption;
   onSelectLineHeight: (lineHeight: DetailLineHeightOption) => void;
+  onUnderline: () => void;
   onStrikethrough: () => void;
   onSuperscript: () => void;
   onSubscript: () => void;
@@ -853,6 +903,7 @@ export function DetailFormatOverflowMenu({
   menuRef,
   lineHeight,
   onSelectLineHeight,
+  onUnderline,
   onStrikethrough,
   onSuperscript,
   onSubscript,
@@ -910,6 +961,23 @@ export function DetailFormatOverflowMenu({
       }
     >
       <div ref={menuRef}>
+        <button
+          type="button"
+          role="menuitem"
+          className={FORMAT_TOOLBAR_OVERFLOW_MENU_ITEM_CLASS}
+          style={{ fontSize: "13px" }}
+          onClick={() => {
+            onUnderline();
+            onOpenChange(false);
+          }}
+        >
+          <span
+            className={`${FORMAT_TOOLBAR_OVERFLOW_MENU_ICON_CLASS} ${FORMAT_TOOLBAR_ICON_TEXT_CLASS} -translate-x-[3px] underline`}
+          >
+            U
+          </span>
+          Underline
+        </button>
         <button
           type="button"
           role="menuitem"

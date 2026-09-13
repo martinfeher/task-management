@@ -33,11 +33,13 @@ type TaskRowContextMenuProps = {
   onOpenMoveMenu: () => void;
   onMoveTaskToList: (listId: string) => void;
   onSetTaskDueDate: (dateValue: string) => void;
+  onClearTaskDueDate: () => void;
   onOpenCustomDatePicker: () => void;
   onSelectTaskPriority: (priority: number) => void;
   onClearTaskPriority: () => void;
   onConvertTaskToNote: () => void;
   onAddSubtask: () => void;
+  onDuplicateTask: () => void;
   onDeleteTask: () => void;
   hasDueDateActions: boolean;
   hasPriorityActions: boolean;
@@ -47,6 +49,7 @@ type TaskRowContextMenuProps = {
   hasLabelActions: boolean;
   hasMoveActions: boolean;
   hasSubtaskActions: boolean;
+  hasDuplicateActions: boolean;
   hasDeleteActions: boolean;
 };
 
@@ -70,6 +73,7 @@ function MainMenuItems({
   hasLabelActions,
   hasMoveActions,
   hasSubtaskActions,
+  hasDuplicateActions,
   hasDeleteActions,
   onClose,
   onToggleTaskPinned,
@@ -79,11 +83,13 @@ function MainMenuItems({
   onMoveMouseEnter,
   onMoveMouseLeave,
   onSetTaskDueDate,
+  onClearTaskDueDate,
   onOpenCustomDatePicker,
   onSelectTaskPriority,
   onClearTaskPriority,
   onConvertTaskToNote,
   onAddSubtask,
+  onDuplicateTask,
   onDeleteTask,
 }: Pick<
   TaskRowContextMenuProps,
@@ -97,6 +103,7 @@ function MainMenuItems({
   | "hasLabelActions"
   | "hasMoveActions"
   | "hasSubtaskActions"
+  | "hasDuplicateActions"
   | "hasDeleteActions"
   | "onClose"
   | "onToggleTaskPinned"
@@ -104,11 +111,13 @@ function MainMenuItems({
   | "onOpenLabelMenu"
   | "onOpenMoveMenu"
   | "onSetTaskDueDate"
+  | "onClearTaskDueDate"
   | "onOpenCustomDatePicker"
   | "onSelectTaskPriority"
   | "onClearTaskPriority"
   | "onConvertTaskToNote"
   | "onAddSubtask"
+  | "onDuplicateTask"
   | "onDeleteTask"
 > & {
   onMoveMouseEnter?: () => void;
@@ -132,10 +141,33 @@ function MainMenuItems({
 
   return (
     <div role="menu" className={`${menuWidthClass} ${menuClassName}`}>
+      {hasMoveActions ? (
+        <button
+          type="button"
+          role="menuitem"
+          className={`${menuItemClassName} justify-between ${
+            view === "moveTo" ? "bg-zinc-100 dark:bg-zinc-800" : ""
+          }`}
+          onMouseEnter={onMoveMouseEnter}
+          onMouseLeave={onMoveMouseLeave}
+          onClick={(event) => {
+            event.stopPropagation();
+            onOpenMoveMenu();
+          }}
+        >
+          Move to
+          <BiChevronRight className="size-4 shrink-0 text-zinc-400" aria-hidden />
+        </button>
+      ) : null}
       {hasDueDateActions ? (
         <TaskContextMenuDateShortcuts
+          hasDueDate={Boolean(task.dueDate)}
           onSelectDate={(dateValue) => {
             onSetTaskDueDate(dateValue);
+            onClose();
+          }}
+          onClearDate={() => {
+            onClearTaskDueDate();
             onClose();
           }}
           onOpenCustomDatePicker={() => {
@@ -170,24 +202,6 @@ function MainMenuItems({
           }}
         >
           {task.labels.length > 0 ? "Labels" : "Add label"}
-        </button>
-      ) : null}
-      {hasMoveActions ? (
-        <button
-          type="button"
-          role="menuitem"
-          className={`${menuItemClassName} justify-between ${
-            view === "moveTo" ? "bg-zinc-100 dark:bg-zinc-800" : ""
-          }`}
-          onMouseEnter={onMoveMouseEnter}
-          onMouseLeave={onMoveMouseLeave}
-          onClick={(event) => {
-            event.stopPropagation();
-            onOpenMoveMenu();
-          }}
-        >
-          Move to
-          <BiChevronRight className="size-4 shrink-0 text-zinc-400" aria-hidden />
         </button>
       ) : null}
       {hasPinActions ? (
@@ -229,6 +243,19 @@ function MainMenuItems({
           {task.isNote ? "turn into Task" : "convert to Note"}
         </button>
       ) : null}
+      {hasDuplicateActions ? (
+        <button
+          type="button"
+          role="menuitem"
+          className={menuItemClassName}
+          onClick={(event) => {
+            event.stopPropagation();
+            onDuplicateTask();
+          }}
+        >
+          Duplicate
+        </button>
+      ) : null}
       {hasDeleteActions ? (
         <button
           type="button"
@@ -268,11 +295,13 @@ export function TaskRowContextMenu({
   onOpenMoveMenu,
   onMoveTaskToList,
   onSetTaskDueDate,
+  onClearTaskDueDate,
   onOpenCustomDatePicker,
   onSelectTaskPriority,
   onClearTaskPriority,
   onConvertTaskToNote,
   onAddSubtask,
+  onDuplicateTask,
   onDeleteTask,
   hasDueDateActions,
   hasPriorityActions,
@@ -282,6 +311,7 @@ export function TaskRowContextMenu({
   hasLabelActions,
   hasMoveActions,
   hasSubtaskActions,
+  hasDuplicateActions,
   hasDeleteActions,
 }: TaskRowContextMenuProps) {
   const [isMoveHoverPreviewOpen, setIsMoveHoverPreviewOpen] = useState(false);
@@ -339,6 +369,7 @@ export function TaskRowContextMenu({
     hasLabelActions,
     hasMoveActions,
     hasSubtaskActions,
+    hasDuplicateActions,
     hasDeleteActions,
     onClose,
     onToggleTaskPinned,
@@ -348,11 +379,13 @@ export function TaskRowContextMenu({
     onMoveMouseEnter: openMoveHoverPreview,
     onMoveMouseLeave: scheduleCloseMoveHoverPreview,
     onSetTaskDueDate,
+    onClearTaskDueDate,
     onOpenCustomDatePicker,
     onSelectTaskPriority,
     onClearTaskPriority,
     onConvertTaskToNote,
     onAddSubtask,
+    onDuplicateTask,
     onDeleteTask,
   };
 

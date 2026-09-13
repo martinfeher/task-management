@@ -13,6 +13,7 @@ import {
   convertTaskToNote as convertTaskToNoteInDb,
   convertNoteToTask as convertNoteToTaskInDb,
   createTask,
+  duplicateTask as duplicateTaskInDb,
   createSubtask,
   createLabel as createLabelInDb,
   createTodoList,
@@ -2923,6 +2924,60 @@ export function TodoApp({
     });
   }
 
+  async function duplicateTaskById(
+    taskId: string,
+    options?: { insertAfterTaskId?: string | null },
+  ) {
+    const sourceListId = findTaskListId(taskId);
+    if (!sourceListId) return;
+
+    const duplicated = await duplicateTaskInDb(taskId);
+    const newTask: Task = {
+      id: duplicated.id,
+      name: duplicated.name,
+      completed: duplicated.completed,
+      details: duplicated.details,
+      hasDetails: taskDetailsHasContent(duplicated.details),
+      dueDate: duplicated.dueDate,
+      dueTimeMinutes: duplicated.dueTimeMinutes,
+      dueDurationMinutes: duplicated.dueDurationMinutes,
+      dueTimeZone: duplicated.dueTimeZone,
+      calendarColor: duplicated.calendarColor,
+      recurrenceRule: duplicated.recurrenceRule,
+      priority: duplicated.priority,
+      pinned: duplicated.pinned,
+      important: duplicated.important,
+      isNote: duplicated.isNote,
+      parentId: duplicated.parentId,
+      labels: duplicated.labels,
+    };
+
+    const listId = duplicated.listId;
+    let nextTaskIds: string[] | null = null;
+
+    setTasksByList((current) => {
+      const tasks = [...(current[listId] ?? [])];
+      const afterId = options?.insertAfterTaskId;
+
+      if (afterId) {
+        const index = tasks.findIndex((task) => task.id === afterId);
+        if (index >= 0) {
+          tasks.splice(index + 1, 0, newTask);
+          nextTaskIds = tasks.map((task) => task.id);
+          return { ...current, [listId]: tasks };
+        }
+      }
+
+      return { ...current, [listId]: [newTask, ...tasks] };
+    });
+
+    if (nextTaskIds) {
+      await reorderTasksInDb(listId, nextTaskIds);
+    }
+
+    await selectNewTaskAndFocusDetails(newTask.id);
+  }
+
   async function deleteTaskById(taskId: string) {
     const listId = findTaskListId(taskId);
     if (!listId) return;
@@ -3520,6 +3575,7 @@ export function TodoApp({
                   }
                   onConvertTaskToNote={toggleTaskNoteType}
                   onAddSubtask={subtasksEnabled ? addSubtask : undefined}
+                  onDuplicateTask={duplicateTaskById}
                   onDeleteTask={deleteTaskById}
                   onToggleTaskLabel={toggleTaskLabel}
                   onLabelsChanged={refreshLabels}
@@ -3686,6 +3742,7 @@ export function TodoApp({
                 }
                 onConvertTaskToNote={toggleTaskNoteType}
                 onAddSubtask={subtasksEnabled ? addSubtask : undefined}
+                onDuplicateTask={duplicateTaskById}
                 onDeleteTask={deleteTaskById}
                 onToggleTaskLabel={toggleTaskLabel}
                 onLabelsChanged={refreshLabels}

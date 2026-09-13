@@ -1180,6 +1180,129 @@ const restoredTaskSelect = {
   },
 } as const;
 
+export type DuplicateTaskResult = {
+  id: string;
+  name: string;
+  completed: boolean;
+  details: string;
+  dueDate: string | null;
+  dueTimeMinutes: number | null;
+  dueDurationMinutes: number | null;
+  dueTimeZone: string;
+  calendarColor: string | null;
+  recurrenceRule: string | null;
+  priority: number | null;
+  pinned: boolean;
+  important: boolean;
+  isNote: boolean;
+  parentId: string | null;
+  listId: string;
+  labels: { id: string; label: string; color?: string | null }[];
+};
+
+export async function duplicateTask(
+  taskId: string,
+): Promise<DuplicateTaskResult> {
+  const existing = await prisma.task.findFirst({
+    where: { id: taskId, deletedAt: null },
+    select: {
+      name: true,
+      details: true,
+      detailsDoc: true,
+      detailsText: true,
+      schemaVersion: true,
+      dueDate: true,
+      dueTimeMinutes: true,
+      dueDurationMinutes: true,
+      dueTimeZone: true,
+      calendarColor: true,
+      recurrenceRule: true,
+      recurrenceAnchor: true,
+      pinned: true,
+      important: true,
+      isNote: true,
+      parentId: true,
+      listId: true,
+      tags: { select: { tagId: true } },
+    },
+  });
+
+  if (!existing) {
+    throw new Error("Task not found");
+  }
+
+  const duplicatedId = await prisma.$transaction(async (tx) => {
+    await tx.task.updateMany({
+      where: { listId: existing.listId, deletedAt: null },
+      data: { position: { increment: 1 } },
+    });
+
+    const created = await tx.task.create({
+      data: {
+        listId: existing.listId,
+        name: existing.name,
+        details: existing.details,
+        detailsDoc: existing.detailsDoc ?? undefined,
+        detailsText: existing.detailsText,
+        schemaVersion: existing.schemaVersion,
+        dueDate: existing.dueDate,
+        dueTimeMinutes: existing.dueTimeMinutes,
+        dueDurationMinutes: existing.dueDurationMinutes,
+        dueTimeZone: existing.dueTimeZone,
+        calendarColor: existing.calendarColor,
+        recurrenceRule: existing.recurrenceRule,
+        recurrenceAnchor: existing.recurrenceAnchor,
+        pinned: existing.pinned,
+        important: existing.important,
+        isNote: existing.isNote,
+        parentId: existing.parentId,
+        position: 0,
+        completed: false,
+      },
+      select: restoredTaskSelect,
+    });
+
+    if (existing.tags.length > 0) {
+      await tx.taskTag.createMany({
+        data: existing.tags.map((entry) => ({
+          taskId: created.id,
+          tagId: entry.tagId,
+        })),
+        skipDuplicates: true,
+      });
+    }
+
+    return created.id;
+  });
+
+  const duplicated = await prisma.task.findUniqueOrThrow({
+    where: { id: duplicatedId },
+    select: restoredTaskSelect,
+  });
+
+  revalidatePath("/");
+
+  return {
+    id: duplicated.id,
+    name: duplicated.name,
+    completed: duplicated.completed,
+    details: duplicated.details,
+    dueDate: duplicated.dueDate ? duplicated.dueDate.toISOString() : null,
+    dueTimeMinutes: duplicated.dueTimeMinutes,
+    dueDurationMinutes: duplicated.dueDurationMinutes,
+    dueTimeZone: normalizeDueTimeZone(duplicated.dueTimeZone),
+    calendarColor: duplicated.calendarColor ?? null,
+    recurrenceRule: duplicated.recurrenceRule ?? null,
+    priority: getPriorityFromTaskTags(duplicated.tags),
+    pinned: Boolean(duplicated.pinned),
+    important: Boolean(duplicated.important),
+    isNote: Boolean(duplicated.isNote),
+    parentId: duplicated.parentId ?? null,
+    listId: duplicated.listId,
+    labels: getLabelsFromTaskTags(duplicated.tags),
+  };
+}
+
 export async function getArchivedTasks(): Promise<ArchivedTaskItem[]> {
   const tasks = await prisma.task.findMany({
     where: { deletedAt: { not: null } },

@@ -457,6 +457,10 @@ type TaskListPanelProps = {
   onSetTaskImportant?: (taskId: string, important: boolean) => void;
   onConvertTaskToNote?: (taskId: string) => void | Promise<void>;
   onAddSubtask?: (taskId: string) => TaskListItem | null | Promise<TaskListItem | null>;
+  onDuplicateTask?: (
+    taskId: string,
+    options?: { insertAfterTaskId?: string | null },
+  ) => void | Promise<void>;
   onDeleteTask?: (taskId: string) => void | Promise<void>;
   onToggleTaskLabel?: (
     taskId: string,
@@ -529,6 +533,7 @@ export function TaskListPanel({
   onSetTaskImportant,
   onConvertTaskToNote,
   onAddSubtask,
+  onDuplicateTask,
   onDeleteTask,
   onToggleTaskLabel,
   onLabelsChanged,
@@ -1692,6 +1697,11 @@ export function TaskListPanel({
     closeTaskMenus();
   }
 
+  function handleClearTaskDueDateFromMenu(taskId: string) {
+    handleSelectTaskDueDate(taskId, null);
+    closeTaskMenus();
+  }
+
   function handleOpenCustomDatePicker(taskId: string) {
     openDatePicker(taskId);
   }
@@ -1731,6 +1741,13 @@ export function TaskListPanel({
     if (!subtask) return;
 
     startTitleEdit(subtask, { selectAll: true });
+  }
+
+  function handleDuplicateTask(taskId: string) {
+    closeTaskMenus();
+    void onDuplicateTask?.(taskId, {
+      insertAfterTaskId: activeSort === null ? taskId : null,
+    });
   }
 
   function handleDeleteTask(taskId: string) {
@@ -2408,11 +2425,13 @@ export function TaskListPanel({
             handleCreateLabel(task.id, label, color)
           }
           onSetTaskDueDateFromMenu={handleSetTaskDueDateFromMenu}
+          onClearTaskDueDateFromMenu={handleClearTaskDueDateFromMenu}
           onOpenCustomDatePicker={handleOpenCustomDatePicker}
           onSelectTaskPriority={handleSelectTaskPriority}
           onClearTaskPriority={handleClearTaskPriority}
           onConvertTaskToNote={() => handleConvertTaskToNote(task.id)}
           onAddSubtask={handleAddSubtask}
+          onDuplicateTask={handleDuplicateTask}
           onDeleteTask={handleDeleteTask}
           onCloseTaskMenu={closeTaskMenus}
           hasDueDateActions={Boolean(onSetTaskDueDate)}
@@ -2428,6 +2447,7 @@ export function TaskListPanel({
             !task.parentId &&
             !task.isNote
           }
+          hasDuplicateActions={Boolean(onDuplicateTask)}
           hasDeleteActions={Boolean(onDeleteTask)}
           useWiderRowPadding={useWiderRowPadding}
           subtaskCount={depth === 0 ? parentSubtaskCountForTask : 0}
@@ -2493,6 +2513,9 @@ export function TaskListPanel({
               onSetTaskDueDate={(dateValue) =>
                 handleSetTaskDueDateFromMenu(pointerMenuTask.id, dateValue)
               }
+              onClearTaskDueDate={() =>
+                handleClearTaskDueDateFromMenu(pointerMenuTask.id)
+              }
               onOpenCustomDatePicker={() =>
                 handleOpenCustomDatePicker(pointerMenuTask.id)
               }
@@ -2506,6 +2529,7 @@ export function TaskListPanel({
                 handleConvertTaskToNote(pointerMenuTask.id)
               }
               onAddSubtask={() => handleAddSubtask(pointerMenuTask.id)}
+              onDuplicateTask={() => handleDuplicateTask(pointerMenuTask.id)}
               onDeleteTask={() => handleDeleteTask(pointerMenuTask.id)}
               hasDueDateActions={Boolean(onSetTaskDueDate)}
               hasPriorityActions={Boolean(onSetTaskPriority)}
@@ -2520,6 +2544,7 @@ export function TaskListPanel({
                 !pointerMenuTask.parentId &&
                 !pointerMenuTask.isNote
               }
+              hasDuplicateActions={Boolean(onDuplicateTask)}
               hasDeleteActions={Boolean(onDeleteTask)}
             />
           </div>,
