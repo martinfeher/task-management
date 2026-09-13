@@ -79,10 +79,65 @@ const DANGEROUS_PASTE_TAGS = new Set([
 
 export type PasteLinePart = {
   html: string;
-  lineType?: "text" | "h2" | "h3" | "bullet" | "numbered" | "checklist";
+  lineType?:
+    | "text"
+    | "h1"
+    | "h2"
+    | "h3"
+    | "bullet"
+    | "numbered"
+    | "checklist"
+    | "image"
+    | "code";
   checked?: boolean;
   listIndent?: number;
 };
+
+/** Marks clipboard HTML produced by our editor copy handler. */
+export const DETAIL_CLIPBOARD_ROOT_ATTR = "data-todolist-detail-lines";
+
+const DETAIL_LINE_CLASS = "detail-line";
+
+export function isDetailLinesClipboardHtml(html: string) {
+  return html.includes(DETAIL_CLIPBOARD_ROOT_ATTR);
+}
+
+function detailLineElementToPastePart(element: HTMLElement): PasteLinePart {
+  const rawType = element.dataset.lineType;
+  const lineType =
+    rawType && rawType !== "text"
+      ? (rawType as PasteLinePart["lineType"])
+      : undefined;
+  const listIndent = Number.parseInt(element.dataset.listIndent ?? "0", 10);
+
+  return {
+    html: element.innerHTML.trim() || "<br>",
+    lineType,
+    checked:
+      lineType === "checklist"
+        ? element.dataset.checked === "true"
+        : undefined,
+    listIndent: listIndent > 0 ? listIndent : undefined,
+  };
+}
+
+function detailLinesHtmlToPasteLineParts(html: string): PasteLinePart[] {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const root = doc.body.querySelector(`[${DETAIL_CLIPBOARD_ROOT_ATTR}]`);
+
+  const lineElements = root
+    ? root.querySelectorAll(`:scope > .${DETAIL_LINE_CLASS}`)
+    : doc.body.querySelectorAll(`.${DETAIL_LINE_CLASS}`);
+
+  const parts: PasteLinePart[] = [];
+
+  for (const element of lineElements) {
+    if (!(element instanceof HTMLElement)) continue;
+    parts.push(detailLineElementToPastePart(element));
+  }
+
+  return parts;
+}
 
 function normalizeClipboardPlainText(plainText: string) {
   return plainText.replace(/\r\n?|\n/g, "\n");
@@ -581,6 +636,124 @@ function headingLineType(tagName: string): PasteLinePart["lineType"] | undefined
   return undefined;
 }
 
+/**
+ * Converts a CSS length (e.g. "36pt", "0.5in", "48px") to an approximate
+ * pixel value so indentation from different sources can be compared on a
+ * common scale.
+ */
+function parseCssLengthToPx(value: string | null | undefined): number | null {
+  if (!value) return null;
+
+  const match = value.trim().match(/^(-?[\d.]+)\s*(px|pt|in|cm|mm|pc|q)?$/i);
+  if (!match) return null;
+
+  const num = Number.parseFloat(match[1]);
+  if (!Number.isFinite(num)) return null;
+
+  const unit = (match[2] ?? "px").toLowerCase();
+  switch (unit) {
+    case "pt":
+      return num * (96 / 72);
+    case "in":
+      return num * 96;
+    case "cm":
+      return num * (96 / 2.54);
+    case "mm":
+      return num * (96 / 25.4);
+    case "pc":
+      return num * 16;
+    case "q":
+      return num * (96 / 101.6);
+    default:
+      return num;
+  }
+}
+
+/**
+ * Reads a CSS length directly from an element's raw `style` attribute
+ * string. Using the raw attribute (rather than the parsed CSSStyleDeclaration)
+ * avoids cross-browser inconsistencies in how logical properties like
+ * `padding-inline-start` get normalized, and lets us inspect indentation
+ * *before* sanitization strips the style attribute.
+ */
+function readCssLengthFromStyleAttr(
+  styleAttr: string | null,
+  property: string,
+): number | null {
+  if (!styleAttr) return null;
+
+  const pattern = new RegExp(`(?:^|;)\\s*${property}\\s*:\\s*([^;]+)`, "i");
+  const match = styleAttr.match(pattern);
+  if (!match) return null;
+
+  return parseCssLengthToPx(match[1].trim());
+}
+
+/**
+ * Many word processors (Google Docs in particular) represent multi-level
+ * bullet/numbered lists as a *flat* sequence of sibling `<ul>`/`<ol>`
+ * elements — each wrapping a single `<li>` — rather than real nested
+ * `<ul><li><ul>...` structure. The indentation level lives only in an
+ * inline `padding-inline-start`/`padding-left`/`margin-left` style on the
+ * list (or its `<li>`), which increases with each nesting level. This reads
+ * that indentation, falling back to the first `<li>` child when the list
+ * itself has no indent styling.
+ */
+function getListElementIndentPx(listElement: HTMLElement): number | null {
+  const candidates = [listElement, listElement.querySelector(":scope > li")];
+
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+
+    const styleAttr = candidate.getAttribute("style");
+    const px =
+      readCssLengthFromStyleAttr(styleAttr, "padding-inline-start") ??
+      readCssLengthFromStyleAttr(styleAttr, "padding-left") ??
+      readCssLengthFromStyleAttr(styleAttr, "margin-left");
+
+    if (px !== null && px > 0) {
+      return px;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Tracks measured list indentation (in px) across an entire pasted
+ * document and maps each measured value to a stable zero-based nesting
+ * level, treating close values (within `TOLERANCE_PX`) as the same level.
+ * This lets flat sibling lists with only CSS-based indentation (see
+ * `getListElementIndentPx`) be reconstructed into proper nesting levels.
+ */
+function createListIndentTracker() {
+  const TOLERANCE_PX = 6;
+  const stack: number[] = [];
+
+  return {
+    levelFor(indentPx: number) {
+      while (
+        stack.length > 0 &&
+        indentPx < stack[stack.length - 1] - TOLERANCE_PX
+      ) {
+        stack.pop();
+      }
+
+      if (
+        stack.length > 0 &&
+        Math.abs(indentPx - stack[stack.length - 1]) <= TOLERANCE_PX
+      ) {
+        return stack.length - 1;
+      }
+
+      stack.push(indentPx);
+      return stack.length - 1;
+    },
+  };
+}
+
+type ListIndentTracker = ReturnType<typeof createListIndentTracker>;
+
 function pushPasteLine(
   lines: PasteLinePart[],
   html: string,
@@ -610,9 +783,14 @@ function processPasteListItems(
   listElement: HTMLElement,
   lines: PasteLinePart[],
   depth: number,
+  indentTracker: ListIndentTracker,
 ) {
   const checklist = isChecklistList(listElement);
   const lineType = checklist ? "checklist" : listElement.tagName === "OL" ? "numbered" : "bullet";
+
+  const measuredIndentPx = getListElementIndentPx(listElement);
+  const level =
+    measuredIndentPx !== null ? indentTracker.levelFor(measuredIndentPx) : depth;
 
   for (const item of listElement.querySelectorAll(":scope > li")) {
     if (!(item instanceof HTMLElement)) continue;
@@ -622,18 +800,22 @@ function processPasteListItems(
       getListItemInlineHtml(item),
       lineType,
       checklist ? isListItemChecked(item) : undefined,
-      depth > 0 ? depth : undefined,
+      level > 0 ? level : undefined,
     );
 
     for (const nestedList of item.querySelectorAll(":scope > ul, :scope > ol")) {
       if (nestedList instanceof HTMLElement) {
-        processPasteListItems(nestedList, lines, depth + 1);
+        processPasteListItems(nestedList, lines, level + 1, indentTracker);
       }
     }
   }
 }
 
-function processPasteBlockNode(node: Node, lines: PasteLinePart[]) {
+function processPasteBlockNode(
+  node: Node,
+  lines: PasteLinePart[],
+  indentTracker: ListIndentTracker,
+) {
   if (node.nodeType === Node.TEXT_NODE) {
     const text = (node.textContent ?? "").replace(/\s+/g, " ").trim();
     if (text) {
@@ -645,7 +827,7 @@ function processPasteBlockNode(node: Node, lines: PasteLinePart[]) {
   if (!(node instanceof HTMLElement)) return;
 
   if (node.tagName === "UL" || node.tagName === "OL") {
-    processPasteListItems(node, lines, 0);
+    processPasteListItems(node, lines, 0, indentTracker);
     return;
   }
 
@@ -658,7 +840,7 @@ function processPasteBlockNode(node: Node, lines: PasteLinePart[]) {
   // collapsing everything into one flattened line.
   if (elementHasDirectBlockChild(node)) {
     for (const child of [...node.childNodes]) {
-      processPasteBlockNode(child, lines);
+      processPasteBlockNode(child, lines, indentTracker);
     }
     return;
   }
@@ -738,24 +920,49 @@ function pastedHtmlHasBlockStructure(html: string) {
 }
 
 export function htmlToPasteLineParts(html: string): PasteLinePart[] {
-  const sanitized = sanitizePastedHtml(html);
-  if (!sanitized.trim()) {
+  // Structure (list nesting, indentation) is extracted from the lightly
+  // cleaned — but not yet attribute-stripped — HTML, since full
+  // sanitization (via `sanitizePastedHtml`) removes the inline
+  // `padding-inline-start`/`margin-left` styles that encode indentation
+  // for sources like Google Docs. Each line's own content is sanitized
+  // individually afterward, so this is not a security trade-off.
+  const cleaned = stripOfficeHtmlCruft(html);
+  if (!cleaned.trim()) {
     return [{ html: "<br>" }];
   }
 
-  if (!pastedHtmlHasBlockStructure(sanitized)) {
-    return [{ html: sanitized.trim() }];
+  if (isDetailLinesClipboardHtml(cleaned)) {
+    const parts = detailLinesHtmlToPasteLineParts(cleaned);
+    for (const line of parts) {
+      line.html = sanitizePastedHtml(line.html).trim() || "<br>";
+    }
+    return parts.length > 0 ? parts : [{ html: "<br>" }];
   }
 
-  const doc = new DOMParser().parseFromString(sanitized, "text/html");
+  if (!pastedHtmlHasBlockStructure(cleaned)) {
+    const sanitized = sanitizePastedHtml(cleaned);
+    return [{ html: sanitized.trim() || "<br>" }];
+  }
+
+  const doc = new DOMParser().parseFromString(cleaned, "text/html");
+  doc
+    .querySelectorAll("script, style, meta, link, head, title, iframe, object, embed")
+    .forEach((element) => element.remove());
+
   const lines: PasteLinePart[] = [];
+  const indentTracker = createListIndentTracker();
 
   for (const child of [...doc.body.childNodes]) {
-    processPasteBlockNode(child, lines);
+    processPasteBlockNode(child, lines, indentTracker);
   }
 
   if (lines.length === 0) {
+    const sanitized = sanitizePastedHtml(cleaned);
     return [{ html: sanitized.trim() || "<br>" }];
+  }
+
+  for (const line of lines) {
+    line.html = sanitizePastedHtml(line.html).trim() || "<br>";
   }
 
   return lines;

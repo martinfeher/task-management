@@ -4,6 +4,7 @@ import {
   waitForInitialImageDisplaySize,
 } from "./detail-image-resize";
 import {
+  DETAIL_CLIPBOARD_ROOT_ATTR,
   htmlToPasteLineParts,
   normalizeTitlePasteText,
   plainTextToPasteLineParts,
@@ -2100,6 +2101,154 @@ export function selectAllDetailEditorContent(editor: HTMLElement) {
   }
 
   return selectAllEditorBodyContent(editor);
+}
+
+function getLinesIntersectingRange(editor: HTMLElement, range: Range) {
+  ensureBlockLines(editor);
+
+  const intersectingLines = getLineElements(editor).filter((line) => {
+    try {
+      return range.intersectsNode(line);
+    } catch {
+      return false;
+    }
+  });
+
+  if (intersectingLines.length > 0) {
+    return intersectingLines;
+  }
+
+  const startLine = getLineElementForRangeBoundary(editor, range, "start");
+  const endLine = getLineElementForRangeBoundary(editor, range, "end");
+  if (!startLine || !endLine) {
+    return [];
+  }
+
+  const lines = getLineElements(editor);
+  const startIndex = lines.indexOf(startLine);
+  const endIndex = lines.indexOf(endLine);
+  if (startIndex === -1 || endIndex === -1) {
+    return [];
+  }
+
+  const from = Math.min(startIndex, endIndex);
+  const to = Math.max(startIndex, endIndex);
+
+  return lines.slice(from, to + 1);
+}
+
+function cloneLineMetadataForClipboard(source: HTMLElement, target: HTMLElement) {
+  if (source.dataset.lineType) {
+    target.dataset.lineType = source.dataset.lineType;
+  }
+
+  if (source.dataset.listIndent) {
+    target.dataset.listIndent = source.dataset.listIndent;
+  }
+
+  if (source.dataset.listNumber) {
+    target.dataset.listNumber = source.dataset.listNumber;
+  }
+
+  if (source.dataset.checked) {
+    target.dataset.checked = source.dataset.checked;
+  }
+}
+
+function detailLineSelectionHtml(
+  line: HTMLElement,
+  range: Range,
+  isFirstLine: boolean,
+  isLastLine: boolean,
+) {
+  if (
+    (isFirstLine || isLastLine) &&
+    !isWholeLineSelected(line, range)
+  ) {
+    return rangeToInnerHtml(getLineSelectionRange(line, range));
+  }
+
+  return line.innerHTML;
+}
+
+function detailLineToPlainText(line: HTMLElement, html: string) {
+  const wrapper = document.createElement("div");
+  wrapper.innerHTML = html;
+  const text = (wrapper.textContent ?? "").replace(/\u00a0/g, " ");
+
+  const lineType = line.dataset.lineType ?? "text";
+  const indentPrefix = " ".repeat(getListIndentLevel(line) * 2);
+
+  if (lineType === "bullet") {
+    return `${indentPrefix}• ${text}`;
+  }
+
+  if (lineType === "numbered") {
+    return `${indentPrefix}${line.dataset.listNumber ?? "1"}. ${text}`;
+  }
+
+  if (lineType === "checklist") {
+    const marker = line.dataset.checked === "true" ? "[x]" : "[ ]";
+    return `${indentPrefix}${marker} ${text}`;
+  }
+
+  return text;
+}
+
+function serializeDetailLineForClipboard(
+  line: HTMLElement,
+  range: Range,
+  isFirstLine: boolean,
+  isLastLine: boolean,
+) {
+  const clone = document.createElement("div");
+  clone.className = DETAIL_LINE_CLASS;
+  cloneLineMetadataForClipboard(line, clone);
+
+  const html = detailLineSelectionHtml(line, range, isFirstLine, isLastLine);
+  clone.innerHTML = html;
+
+  return {
+    element: clone,
+    plainText: detailLineToPlainText(line, html),
+  };
+}
+
+export function serializeEditorSelectionForClipboard(
+  editor: HTMLElement,
+  range: Range,
+) {
+  if (range.collapsed || !editor.contains(range.commonAncestorContainer)) {
+    return null;
+  }
+
+  const lines = getLinesIntersectingRange(editor, range);
+  if (lines.length === 0) {
+    return null;
+  }
+
+  const container = document.createElement("div");
+  container.setAttribute(DETAIL_CLIPBOARD_ROOT_ATTR, "1");
+
+  const plainParts: string[] = [];
+  const firstLine = lines[0];
+  const lastLine = lines[lines.length - 1];
+
+  for (const line of lines) {
+    const serialized = serializeDetailLineForClipboard(
+      line,
+      range,
+      line === firstLine,
+      line === lastLine,
+    );
+    container.appendChild(serialized.element);
+    plainParts.push(serialized.plainText);
+  }
+
+  return {
+    html: container.outerHTML,
+    plainText: plainParts.join("\n"),
+  };
 }
 
 function isDetailsHtmlEmpty(html: string) {

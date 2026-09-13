@@ -56,6 +56,7 @@ import {
   insertPlainTextAtSelection,
   insertTitleLinePaste,
   renumberNumberedLines,
+  serializeEditorSelectionForClipboard,
   shouldPreferPlainTextPaste,
   isChecklistLine,
   isChecklistToggleClick,
@@ -128,7 +129,10 @@ import {
   type DetailFontFamilyId,
   type DetailFontSizeOption,
 } from "./detail-fonts";
-import { clampPastePlainText } from "./detail-paste";
+import {
+  clampPastePlainText,
+  isDetailLinesClipboardHtml,
+} from "./detail-paste";
 import { DetailFontFamilyControl } from "./detail-font-family-control";
 import { DetailFontSizeControl } from "./detail-font-size-control";
 import {
@@ -5004,6 +5008,48 @@ export function TaskDetailsPanel({
     }
   }
 
+  function writeEditorSelectionToClipboard(
+    event: React.ClipboardEvent<HTMLDivElement>,
+  ) {
+    const editor = editorRef.current;
+    if (!editor) return false;
+
+    const selection = window.getSelection();
+    if (!selection?.rangeCount) return false;
+
+    const range = selection.getRangeAt(0);
+    if (range.collapsed || !editor.contains(range.commonAncestorContainer)) {
+      return false;
+    }
+
+    const payload = serializeEditorSelectionForClipboard(editor, range);
+    if (!payload) return false;
+
+    event.preventDefault();
+    event.clipboardData.setData("text/plain", payload.plainText);
+    event.clipboardData.setData("text/html", payload.html);
+    return true;
+  }
+
+  function handleEditorCopy(event: React.ClipboardEvent<HTMLDivElement>) {
+    writeEditorSelectionToClipboard(event);
+  }
+
+  function handleEditorCut(event: React.ClipboardEvent<HTMLDivElement>) {
+    const editor = editorRef.current;
+    if (!editor || !writeEditorSelectionToClipboard(event)) return;
+
+    const selection = window.getSelection();
+    if (!selection?.rangeCount) return;
+
+    selection.getRangeAt(0).deleteContents();
+    syncEditorLineEmptyState(editor);
+    syncEditorContent();
+    recordHistorySnapshot();
+    scheduleAutoSave();
+    updateLineControls();
+  }
+
   function handleEditorPaste(event: React.ClipboardEvent<HTMLDivElement>) {
     const editor = editorRef.current;
     if (!editor) return;
@@ -5057,12 +5103,14 @@ export function TaskDetailsPanel({
 
     const htmlHasListStructure = /<(ul|ol)\b/i.test(html);
     const htmlHasFormatting = Boolean(html) && pastedHtmlHasFormatting(html);
+    const htmlIsDetailLinesClipboard = isDetailLinesClipboardHtml(html);
 
     if (
       plainText &&
       shouldPreferPlainTextPaste(plainText, html) &&
       !htmlHasListStructure &&
-      !htmlHasFormatting
+      !htmlHasFormatting &&
+      !htmlIsDetailLinesClipboard
     ) {
       event.preventDefault();
       editor.focus();
@@ -5109,12 +5157,7 @@ export function TaskDetailsPanel({
           restoreEditorSelectionRange(savedPasteRange);
         }
 
-        if (
-          !insertHtmlAtSelection(
-            currentEditor,
-            sanitizePastedHtml(htmlToPaste),
-          )
-        ) {
+        if (!insertHtmlAtSelection(currentEditor, htmlToPaste)) {
           document.execCommand("insertText", false, plainText);
         }
 
@@ -5128,7 +5171,7 @@ export function TaskDetailsPanel({
     if (html && plainText) {
       event.preventDefault();
       editor.focus();
-      if (!insertHtmlAtSelection(editor, sanitizePastedHtml(html))) {
+      if (!insertHtmlAtSelection(editor, html)) {
         document.execCommand("insertText", false, plainText);
       }
 
@@ -6610,6 +6653,8 @@ export function TaskDetailsPanel({
               contentEditable
               suppressContentEditableWarning
               onInput={handleEditorInput}
+              onCopy={handleEditorCopy}
+              onCut={handleEditorCut}
               onPaste={handleEditorPaste}
               onDragStart={handleEditorDragStart}
               onBlur={handleEditorBlur}
