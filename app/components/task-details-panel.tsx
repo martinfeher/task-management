@@ -47,6 +47,7 @@ import {
   handleClickBelowLastLine,
   insertImagesIntoEditor,
   insertTypedLineBelowLine,
+  repairPastedEditorStructure,
   insertPlainTextAtSelection,
   shouldPreferPlainTextPaste,
   isChecklistLine,
@@ -109,6 +110,7 @@ import {
 import {
   applyDetailFontFamily,
   applyDetailFontSize,
+  clearAllPasteBatchMarkers,
   clearPasteBatchMarkers,
   getAppFontFamilyId,
   getDefaultDetailFontSizeOption,
@@ -245,6 +247,7 @@ type TaskDetailsPanelProps = {
   ) => Promise<TaskDetailsSubtask | null> | TaskDetailsSubtask | null;
   onRenameSubtask?: (subtaskId: string, name: string) => void | Promise<void>;
   onDeleteSubtask?: (subtaskId: string) => void | Promise<void>;
+  onEditSubtask?: (subtaskId: string) => void | Promise<void>;
   onRecurrenceUpdated?: (taskId: string, recurrenceRule: string | null) => void;
   onSaveTaskRecurrence?: (
     taskId: string,
@@ -1698,6 +1701,7 @@ export function TaskDetailsPanel({
   onAddSubtask,
   onRenameSubtask,
   onDeleteSubtask,
+  onEditSubtask,
   onRecurrenceUpdated,
   onSaveTaskRecurrence,
   onBack,
@@ -3321,6 +3325,8 @@ export function TaskDetailsPanel({
     ensureBlockLines(editor);
     splitBlockLinesOnBreaks(editor);
     ensureTitleLine(editor);
+    repairPastedEditorStructure(editor);
+    clearAllPasteBatchMarkers(editor);
     normalizeLinks(editor);
     syncEditorLineEmptyState(editor);
     syncEditorContent();
@@ -5031,11 +5037,7 @@ export function TaskDetailsPanel({
     const html = event.clipboardData.getData("text/html");
     const plainText = event.clipboardData.getData("text/plain");
 
-    if (
-      plainText &&
-      shouldPreferPlainTextPaste(plainText, html) &&
-      !pastedHtmlHasFormatting(html)
-    ) {
+    if (plainText && shouldPreferPlainTextPaste(plainText, html)) {
       event.preventDefault();
       editor.focus();
       insertPlainTextAtSelection(editor, plainText);
@@ -6637,6 +6639,7 @@ export function TaskDetailsPanel({
                 onToggleSubtask={onToggleTask}
                 onRenameSubtask={onRenameSubtask ?? onTaskRenamed}
                 onDeleteSubtask={onDeleteSubtask}
+                onEditSubtask={onEditSubtask}
               />
             </div>
           ) : null}

@@ -324,6 +324,9 @@ const LINE_BREAK_SENTINEL = "\u0000";
 function splitLegacyHtmlIntoParts(html: string): string[] {
   const normalized = html
     .replace(/\r\n/g, "\n")
+    .replace(/>\s*\n+\s*</g, "><")
+    .replace(/<p[^>]*>\s*<br\b[^>]*>\s*<\/p>/gi, LINE_BREAK_SENTINEL)
+    .replace(/<div[^>]*>\s*<br\b[^>]*>\s*<\/div>/gi, LINE_BREAK_SENTINEL)
     .replace(/<br\b[^>]*>/gi, LINE_BREAK_SENTINEL)
     .replace(/<\/p>\s*/gi, LINE_BREAK_SENTINEL)
     .replace(/<p[^>]*>/gi, "")

@@ -1011,12 +1011,55 @@ function cleanupStyledElement(element: HTMLElement) {
   }
 }
 
+function normalizePastedElement(element: HTMLElement) {
+  element.removeAttribute("contenteditable");
+  element.removeAttribute("spellcheck");
+  element.removeAttribute("autocorrect");
+  element.removeAttribute("autocapitalize");
+  element.draggable = false;
+
+  if (element.hasAttribute("style")) {
+    element.style.removeProperty("user-select");
+    element.style.removeProperty("-webkit-user-select");
+    element.style.removeProperty("-moz-user-select");
+    element.style.removeProperty("pointer-events");
+
+    if (!element.style.cssText.trim()) {
+      element.removeAttribute("style");
+    }
+  }
+
+  if (element.classList.contains(DETAIL_LINE_CLASS)) {
+    delete element.dataset.lineId;
+    delete element.dataset.lineType;
+    delete element.dataset.listNumber;
+    delete element.dataset.checked;
+    delete element.dataset.empty;
+    delete element.dataset.bodyPlaceholder;
+    element.classList.remove(DETAIL_LINE_CLASS);
+  }
+}
+
 export function sanitizePastedHtml(html: string) {
   const doc = new DOMParser().parseFromString(html, "text/html");
 
   doc
     .querySelectorAll("script, style, meta, link, head, title")
     .forEach((element) => element.remove());
+
+  for (const line of [
+    ...doc.body.querySelectorAll(`.${DETAIL_LINE_CLASS}`),
+  ]) {
+    if (line instanceof HTMLElement) {
+      unwrapElement(line);
+    }
+  }
+
+  for (const element of doc.body.querySelectorAll("*")) {
+    if (element instanceof HTMLElement) {
+      normalizePastedElement(element);
+    }
+  }
 
   return doc.body.innerHTML;
 }
@@ -1268,6 +1311,16 @@ export function getPasteBatchPromptPosition(
 export function clearPasteBatchMarkers(editor: HTMLElement, pasteId: string) {
   for (const element of Array.from(
     editor.querySelectorAll(getPasteBatchSelector(pasteId)),
+  )) {
+    if (element instanceof HTMLElement) {
+      delete element.dataset.pasteBatch;
+    }
+  }
+}
+
+export function clearAllPasteBatchMarkers(editor: HTMLElement) {
+  for (const element of Array.from(
+    editor.querySelectorAll(`[${PASTE_BATCH_ATTR}]`),
   )) {
     if (element instanceof HTMLElement) {
       delete element.dataset.pasteBatch;

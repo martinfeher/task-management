@@ -26,6 +26,7 @@ type TaskDetailsSubtasksSectionProps = {
   onToggleSubtask: (subtaskId: string) => void;
   onRenameSubtask: (subtaskId: string, name: string) => void | Promise<void>;
   onDeleteSubtask: (subtaskId: string) => void | Promise<void>;
+  onEditSubtask?: (subtaskId: string) => void | Promise<void>;
 };
 
 type SubtaskContextMenuState = {
@@ -35,7 +36,7 @@ type SubtaskContextMenuState = {
 };
 
 const SUBTASK_CONTEXT_MENU_WIDTH = 160;
-const SUBTASK_CONTEXT_MENU_HEIGHT = 88;
+const SUBTASK_CONTEXT_MENU_HEIGHT = 123;
 
 function clampSubtaskContextMenuPosition(top: number, left: number) {
   if (typeof window === "undefined") {
@@ -71,6 +72,7 @@ export function TaskDetailsSubtasksSection({
   onToggleSubtask,
   onRenameSubtask,
   onDeleteSubtask,
+  onEditSubtask,
 }: TaskDetailsSubtasksSectionProps) {
   const [isExpanded, setIsExpanded] = useState(() =>
     resolveSubtasksExpandedState(taskId, subtasks.length),
@@ -259,6 +261,11 @@ export function TaskDetailsSubtasksSection({
     });
   }
 
+  function handleEditFromContextMenu(subtaskId: string) {
+    setContextMenu(null);
+    void onEditSubtask?.(subtaskId);
+  }
+
   function handleRenameFromContextMenu(subtaskId: string) {
     const subtask = subtasks.find((item) => item.id === subtaskId);
     if (!subtask) return;
@@ -400,7 +407,11 @@ export function TaskDetailsSubtasksSection({
   }
 
   return (
-    <section className="task-details-subtasks-section shrink-0 pl-[15px] pr-3 pt-2">
+    <section
+      className={`task-details-subtasks-section shrink-0 pl-[15px] pr-3 ${
+        subtasks.length > 0 && isExpanded ? "pt-[12px]" : "pt-2"
+      }`}
+    >
       {subtasks.length === 0 ? (
         <div className="ml-1">{addSubtaskButton}</div>
       ) : (
@@ -425,7 +436,7 @@ export function TaskDetailsSubtasksSection({
       </button>
 
       {isExpanded ? (
-        <div className="mt-2">
+        <div className="mt-1">
           {activeSubtasks.map(renderSubtaskRow)}
 
           <div
@@ -461,6 +472,16 @@ export function TaskDetailsSubtasksSection({
                 left: contextMenu.left,
               }}
             >
+              {onEditSubtask ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="flex h-[35px] w-full items-center px-3 text-left text-sm text-zinc-900 hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800"
+                  onClick={() => handleEditFromContextMenu(contextMenu.subtaskId)}
+                >
+                  Edit sub task
+                </button>
+              ) : null}
               <button
                 type="button"
                 role="menuitem"

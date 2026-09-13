@@ -3165,6 +3165,13 @@ export function TodoApp({
     [isListCalendarOpen, selectTask],
   );
 
+  const handleEditSubtaskFromDetails = useCallback(
+    async (subtaskId: string) => {
+      await selectTask(subtaskId);
+    },
+    [selectTask],
+  );
+
   const handleListCalendarTaskSelect = useCallback(
     async (taskId: string) => {
       await selectTask(taskId);
@@ -3617,6 +3624,7 @@ export function TodoApp({
                     onAddSubtask={handleAddSubtaskFromDetails}
                     onRenameSubtask={renameTask}
                     onDeleteSubtask={deleteTaskById}
+                    onEditSubtask={handleEditSubtaskFromDetails}
                     onBack={isCompactLayout ? handleCompactBack : undefined}
                   />
                 </div>
@@ -3774,6 +3782,7 @@ export function TodoApp({
                   onAddSubtask={handleAddSubtaskFromDetails}
                   onRenameSubtask={renameTask}
                   onDeleteSubtask={deleteTaskById}
+                  onEditSubtask={handleEditSubtaskFromDetails}
                   onBack={isCompactLayout ? handleCompactBack : undefined}
                 />
               </div>

@@ -64,25 +64,48 @@ export function normalizeClipboardPlainText(plainText: string) {
   return plainText.replace(/\r\n?|\n/g, "\n");
 }
 
+export function splitClipboardPlainTextIntoLines(plainText: string) {
+  const lines = normalizeClipboardPlainText(plainText).split("\n");
+
+  // A single trailing newline is usually a paragraph terminator, not an extra
+  // blank line. Without this, "hello\n" becomes two lines: "hello" and "".
+  if (lines.length > 1 && lines.at(-1) === "") {
+    lines.pop();
+  }
+
+  return lines;
+}
+
 export function clipboardPlainTextHasLineBreaks(plainText: string) {
   return /\r\n|\n|\r/.test(plainText);
 }
 
 const CLIPBOARD_LIST_MARKER_LINE = /^\s*[-*•⁃]\s/;
 
-/** Prefer plain text only when HTML would drop list markers present in plain text. */
-export function shouldPreferPlainTextPaste(plainText: string, html: string) {
-  if (!plainText.trim() || !html.trim()) return false;
-  if (/<img[\s>]/i.test(html)) return false;
+export function clipboardPlainTextHasListMarkers(plainText: string) {
+  if (!plainText.trim()) return false;
 
   return normalizeClipboardPlainText(plainText)
     .split("\n")
     .some((line) => CLIPBOARD_LIST_MARKER_LINE.test(line));
 }
 
+/** Prefer plain text when list markers are present — HTML paste drops "-" prefixes. */
+export function shouldPreferPlainTextPaste(plainText: string, html: string) {
+  if (!clipboardPlainTextHasListMarkers(plainText)) return false;
+  if (/<img[\s>]/i.test(html)) return false;
+
+  return true;
+}
+
 function normalizeBlockBreaksInHtml(html: string) {
   return html
     .replace(/\r\n/g, "\n")
+    // Clipboard HTML often pretty-prints tags on separate lines; those newlines
+    // are not blank lines and must not become extra breaks on top of <p>/<br>.
+    .replace(/>\s*\n+\s*</g, "><")
+    .replace(/<p[^>]*>\s*<br\b[^>]*>\s*<\/p>/gi, LINE_BREAK_SENTINEL)
+    .replace(/<div[^>]*>\s*<br\b[^>]*>\s*<\/div>/gi, LINE_BREAK_SENTINEL)
     .replace(/<br\b[^>]*>/gi, LINE_BREAK_SENTINEL)
     .replace(/<\/p>\s*/gi, LINE_BREAK_SENTINEL)
     .replace(/<p[^>]*>/gi, "")
@@ -127,6 +150,74 @@ export function getLineById(editor: HTMLElement, lineId: string) {
     getLineElements(editor).find((line) => line.dataset.lineId === lineId) ??
     null
   );
+}
+
+function cleanupEmptyPastedListContainers(editor: HTMLElement) {
+  for (const list of editor.querySelectorAll("ul, ol")) {
+    if (!(list instanceof HTMLElement)) continue;
+    if ((list.textContent ?? "").replace(/\u00a0|\u200B/g, " ").trim()) {
+      continue;
+    }
+    list.remove();
+  }
+}
+
+export function repairPastedEditorStructure(editor: HTMLElement) {
+  absorbOrphanEditorNodes(editor);
+  cleanupEmptyPastedListContainers(editor);
+}
+
+function absorbOrphanEditorNodes(editor: HTMLElement) {
+  ensureBlockLines(editor);
+  ensureTitleLine(editor);
+
+  const orphanNodes: Node[] = [];
+
+  for (const child of [...editor.childNodes]) {
+    if (
+      child instanceof HTMLElement &&
+      child.classList.contains(DETAIL_LINE_CLASS)
+    ) {
+      continue;
+    }
+
+    if (
+      child.nodeType === Node.TEXT_NODE &&
+      !(child.textContent ?? "").replace(/\u00a0|\u200B/g, " ").trim()
+    ) {
+      child.remove();
+      continue;
+    }
+
+    orphanNodes.push(child);
+  }
+
+  if (orphanNodes.length === 0) {
+    return false;
+  }
+
+  const wrapper = document.createElement("div");
+  for (const node of orphanNodes) {
+    wrapper.appendChild(node);
+  }
+
+  const parts = htmlToLineParts(wrapper.innerHTML);
+  const lines = getLineElements(editor);
+  let previousLine = lines[lines.length - 1] ?? lines[0];
+
+  if (!previousLine) {
+    previousLine = createLineElement("<br>", "text");
+    editor.appendChild(previousLine);
+  }
+
+  for (const part of parts) {
+    const newLine = createLineElement(part, "text");
+    previousLine.after(newLine);
+    previousLine = newLine;
+  }
+
+  splitBlockLinesOnBreaks(editor);
+  return true;
 }
 
 export function ensureBlockLines(editor: HTMLElement) {
@@ -1049,7 +1140,7 @@ export function insertPlainTextAtSelection(editor: HTMLElement, plainText: strin
     return;
   }
 
-  const pastedLines = normalizeClipboardPlainText(plainText).split("\n");
+  const pastedLines = splitClipboardPlainTextIntoLines(plainText);
   const range = selection.getRangeAt(0);
 
   if (!activeLine.contains(range.commonAncestorContainer)) {
@@ -1568,6 +1659,7 @@ function setRangeEndAtLineEnd(range: Range, line: HTMLElement) {
 }
 
 export function selectAllEditorBodyContent(editor: HTMLElement) {
+  repairPastedEditorStructure(editor);
   ensureBlockLines(editor);
   ensureTitleLine(editor);
 
