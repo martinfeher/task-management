@@ -1760,11 +1760,6 @@ export function TaskListPanel({
     closeTaskMenus();
   }
 
-  function handleToggleTaskPinned(task: TaskListItem) {
-    onSetTaskPinned?.(task.id, !task.pinned);
-    closeTaskMenus();
-  }
-
   function handleToggleTaskImportant(task: TaskListItem) {
     onSetTaskImportant?.(task.id, !task.important);
     closeTaskMenus();
@@ -2413,7 +2408,6 @@ export function TaskListPanel({
           onSaveTaskRecurrence={handleSaveTaskRecurrence}
           onOpenTaskRowMenu={openTaskRowMenuFromButton}
           onTogglePriorityMenu={togglePriorityMenu}
-          onToggleTaskPinned={handleToggleTaskPinned}
           onToggleTaskImportant={handleToggleTaskImportant}
           onOpenLabelMenu={openLabelMenu}
           onOpenMoveMenu={openMoveMenu}
@@ -2437,7 +2431,6 @@ export function TaskListPanel({
           hasDueDateActions={Boolean(onSetTaskDueDate)}
           hasPriorityActions={Boolean(onSetTaskPriority)}
           hasNoteActions={Boolean(onConvertTaskToNote)}
-          hasPinActions={Boolean(onSetTaskPinned)}
           hasImportantActions={Boolean(onSetTaskImportant)}
           hasLabelActions={hasLabelActions}
           hasMoveActions={hasMoveActions}
@@ -2501,7 +2494,6 @@ export function TaskListPanel({
                 handleCreateLabel(pointerMenuTask.id, label, color)
               }
               onClose={closeTaskMenus}
-              onToggleTaskPinned={() => handleToggleTaskPinned(pointerMenuTask)}
               onToggleTaskImportant={() =>
                 handleToggleTaskImportant(pointerMenuTask)
               }
@@ -2534,7 +2526,6 @@ export function TaskListPanel({
               hasDueDateActions={Boolean(onSetTaskDueDate)}
               hasPriorityActions={Boolean(onSetTaskPriority)}
               hasNoteActions={Boolean(onConvertTaskToNote)}
-              hasPinActions={Boolean(onSetTaskPinned)}
               hasImportantActions={Boolean(onSetTaskImportant)}
               hasLabelActions={Boolean(onToggleTaskLabel)}
               hasMoveActions={Boolean(onMoveTaskToList) && lists.length > 1}

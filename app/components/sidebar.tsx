@@ -11,7 +11,6 @@ import { LABEL_PRESET_COLORS } from "@/lib/label-colors";
 import { getInboxListId } from "@/lib/inbox-list";
 import { FiSettings } from "react-icons/fi";
 import { getLabelDotColor } from "@/lib/label-colors";
-import { IoPricetag } from "react-icons/io5";
 import { IoMdPricetag } from "react-icons/io";
 
 import { AiFillTag } from "react-icons/ai";

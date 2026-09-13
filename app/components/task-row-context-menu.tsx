@@ -2,7 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 import { BiChevronRight } from "react-icons/bi";
+import { IoMdPricetag } from "react-icons/io";
+import { IoDuplicateOutline } from "react-icons/io5";
+import { PiListStarThin, PiNoteThin } from "react-icons/pi";
+import { RiDeleteBinLine } from "react-icons/ri";
+import { AiOutlineDelete } from "react-icons/ai";
+
+import { LuListVideo } from "react-icons/lu";
 import { TaskContextMenuDateShortcuts } from "./task-context-menu-date-shortcuts";
+import { TaskListSubtaskIcon } from "./task-list-subtask-icon";
 import { TaskMoveToSelector } from "./task-move-to-selector";
 import type { Label } from "./task-label-selector";
 import { TaskLabelSelector } from "./task-label-selector";
@@ -27,7 +35,6 @@ type TaskRowContextMenuProps = {
   onToggleLabelSelection: (labelId: string) => void;
   onCreateLabel: (label: string, color: string) => void;
   onClose: () => void;
-  onToggleTaskPinned: () => void;
   onToggleTaskImportant: () => void;
   onOpenLabelMenu: () => void;
   onOpenMoveMenu: () => void;
@@ -44,7 +51,6 @@ type TaskRowContextMenuProps = {
   hasDueDateActions: boolean;
   hasPriorityActions: boolean;
   hasNoteActions: boolean;
-  hasPinActions: boolean;
   hasImportantActions: boolean;
   hasLabelActions: boolean;
   hasMoveActions: boolean;
@@ -54,18 +60,26 @@ type TaskRowContextMenuProps = {
 };
 
 const menuClassName =
-  "overflow-visible rounded-[23px] bg-white py-1 shadow-[0_12px_32px_rgba(0,0,0,0.12)] dark:bg-zinc-900 dark:shadow-[0_12px_32px_rgba(0,0,0,0.32)]";
+  "overflow-visible rounded-[23px] bg-white p-[5px] shadow-[0_12px_32px_rgba(0,0,0,0.12)] dark:bg-zinc-900 dark:shadow-[0_12px_32px_rgba(0,0,0,0.32)]";
 
 const menuItemClassName =
   "flex h-[35px] w-full items-center px-3 text-left text-sm text-zinc-900 hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800";
 
 const deleteMenuItemClassName =
-  "flex h-[35px] w-full items-center px-3 text-left text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40";
+  "flex h-[35px] w-full items-center px-3 text-left text-sm text-red-600 dark:text-red-400 dark:hover:bg-red-950/40";
+
+const menuItemWithIconClassName =
+  "flex items-center gap-2 leading-none";
+
+const menuItemIconSlotClassName =
+  "flex size-[15px] shrink-0 items-center justify-center [&>svg]:block";
+
+const deleteMenuItemIconSlotClassName =
+  "flex size-[25px] shrink-0 items-center justify-center [&>svg]:block [&>svg]:size-[25px]";
 
 function MainMenuItems({
   task,
   view,
-  hasPinActions,
   hasImportantActions,
   hasPriorityActions,
   hasNoteActions,
@@ -76,7 +90,6 @@ function MainMenuItems({
   hasDuplicateActions,
   hasDeleteActions,
   onClose,
-  onToggleTaskPinned,
   onToggleTaskImportant,
   onOpenLabelMenu,
   onOpenMoveMenu,
@@ -95,7 +108,6 @@ function MainMenuItems({
   TaskRowContextMenuProps,
   | "task"
   | "view"
-  | "hasPinActions"
   | "hasImportantActions"
   | "hasPriorityActions"
   | "hasNoteActions"
@@ -106,7 +118,6 @@ function MainMenuItems({
   | "hasDuplicateActions"
   | "hasDeleteActions"
   | "onClose"
-  | "onToggleTaskPinned"
   | "onToggleTaskImportant"
   | "onOpenLabelMenu"
   | "onOpenMoveMenu"
@@ -155,7 +166,14 @@ function MainMenuItems({
             onOpenMoveMenu();
           }}
         >
-          Move to
+          <span className={menuItemWithIconClassName}>
+            <span className={menuItemIconSlotClassName}>
+              <LuListVideo
+                className="size-[15px] text-zinc-500 dark:text-zinc-400"
+              />
+            </span>
+            Move to
+          </span>
           <BiChevronRight className="size-4 shrink-0 text-zinc-400" aria-hidden />
         </button>
       ) : null}
@@ -188,7 +206,12 @@ function MainMenuItems({
             onAddSubtask();
           }}
         >
-          Add subtask
+          <span className={menuItemWithIconClassName}>
+            <span className={menuItemIconSlotClassName}>
+              <TaskListSubtaskIcon className="size-[15px] text-zinc-500 dark:text-zinc-400" />
+            </span>
+            Add subtask
+          </span>
         </button>
       ) : null}
       {hasLabelActions ? (
@@ -201,20 +224,14 @@ function MainMenuItems({
             onOpenLabelMenu();
           }}
         >
-          {task.labels.length > 0 ? "Labels" : "Add label"}
-        </button>
-      ) : null}
-      {hasPinActions ? (
-        <button
-          type="button"
-          role="menuitem"
-          className={menuItemClassName}
-          onClick={(event) => {
-            event.stopPropagation();
-            onToggleTaskPinned();
-          }}
-        >
-          {task.pinned ? "Unpin task" : "Pin task"}
+          <span className={menuItemWithIconClassName}>
+            <span className={menuItemIconSlotClassName}>
+              <IoMdPricetag
+                className="size-[15px] text-zinc-500 dark:text-zinc-400"
+              />
+            </span>
+            {task.labels.length > 0 ? "Labels" : "Add label"}
+          </span>
         </button>
       ) : null}
       {hasImportantActions ? (
@@ -227,7 +244,14 @@ function MainMenuItems({
             onToggleTaskImportant();
           }}
         >
-          {task.important ? "Remove from important" : "Mark as important"}
+          <span className={menuItemWithIconClassName}>
+            <span className={menuItemIconSlotClassName}>
+              <PiListStarThin
+                className="size-[15px] text-zinc-500 dark:text-zinc-400"
+              />
+            </span>
+            {task.important ? "Remove from important" : "Mark as important"}
+          </span>
         </button>
       ) : null}
       {hasNoteActions ? (
@@ -240,7 +264,14 @@ function MainMenuItems({
             onConvertTaskToNote();
           }}
         >
-          {task.isNote ? "turn into Task" : "convert to Note"}
+          <span className={menuItemWithIconClassName}>
+            <span className={menuItemIconSlotClassName}>
+              <PiNoteThin
+                className="size-[15px] text-zinc-500 dark:text-zinc-400"
+              />
+            </span>
+            {task.isNote ? "turn into Task" : "convert to Note"}
+          </span>
         </button>
       ) : null}
       {hasDuplicateActions ? (
@@ -253,21 +284,40 @@ function MainMenuItems({
             onDuplicateTask();
           }}
         >
-          Duplicate
+          <span className={menuItemWithIconClassName}>
+            <span className={menuItemIconSlotClassName}>
+              <IoDuplicateOutline
+                className="size-[15px] text-zinc-500 dark:text-zinc-400"
+              />
+            </span>
+            Duplicate
+          </span>
         </button>
       ) : null}
       {hasDeleteActions ? (
-        <button
-          type="button"
-          role="menuitem"
-          className={deleteMenuItemClassName}
-          onClick={(event) => {
-            event.stopPropagation();
-            onDeleteTask();
-          }}
-        >
-          Delete
-        </button>
+        <>
+          <div role="separator" className="mx-4 border-t border-[#e4e4e4]" />
+          <button
+            type="button"
+            role="menuitem"
+            className={`${deleteMenuItemClassName} -ml-[3px] cursor-pointer`}
+       
+            onClick={(event) => {
+              event.stopPropagation();
+              onDeleteTask();
+            }}
+          >
+            <span className={menuItemWithIconClassName}>
+              <span className={deleteMenuItemIconSlotClassName}>
+                <AiOutlineDelete
+                  className="size-[18px]! mb-[2px]! text-[#e07142] dark:text-red-400"
+                  strokeWidth={0.5}
+                />
+              </span>
+              <span className="text-[15px]">Delete</span>
+            </span>
+          </button>
+        </>
       ) : null}
     </div>
   );
@@ -289,7 +339,6 @@ export function TaskRowContextMenu({
   onToggleLabelSelection,
   onCreateLabel,
   onClose,
-  onToggleTaskPinned,
   onToggleTaskImportant,
   onOpenLabelMenu,
   onOpenMoveMenu,
@@ -306,7 +355,6 @@ export function TaskRowContextMenu({
   hasDueDateActions,
   hasPriorityActions,
   hasNoteActions,
-  hasPinActions,
   hasImportantActions,
   hasLabelActions,
   hasMoveActions,
@@ -361,7 +409,6 @@ export function TaskRowContextMenu({
   const mainMenuProps = {
     task,
     view: showMoveFlyout ? ("moveTo" as const) : view,
-    hasPinActions,
     hasImportantActions,
     hasPriorityActions,
     hasNoteActions,
@@ -372,7 +419,6 @@ export function TaskRowContextMenu({
     hasDuplicateActions,
     hasDeleteActions,
     onClose,
-    onToggleTaskPinned,
     onToggleTaskImportant,
     onOpenLabelMenu,
     onOpenMoveMenu,

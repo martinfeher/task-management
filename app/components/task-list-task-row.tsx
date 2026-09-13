@@ -100,7 +100,6 @@ type TaskListTaskRowProps = {
   ) => void | Promise<void>;
   onOpenTaskRowMenu: (task: TaskListItem, anchor: HTMLElement) => void;
   onTogglePriorityMenu: (taskId: string) => void;
-  onToggleTaskPinned: (task: TaskListItem) => void;
   onToggleTaskImportant: (task: TaskListItem) => void;
   onOpenLabelMenu: (taskId: string) => void;
   onOpenMoveMenu: (taskId: string) => void;
@@ -122,7 +121,6 @@ type TaskListTaskRowProps = {
   hasDueDateActions: boolean;
   hasPriorityActions: boolean;
   hasNoteActions: boolean;
-  hasPinActions: boolean;
   hasImportantActions: boolean;
   hasLabelActions: boolean;
   hasMoveActions: boolean;
@@ -281,7 +279,6 @@ export function TaskListTaskRow({
   onSaveTaskRecurrence,
   onOpenTaskRowMenu,
   onTogglePriorityMenu,
-  onToggleTaskPinned,
   onToggleTaskImportant,
   onOpenLabelMenu,
   onOpenMoveMenu,
@@ -303,7 +300,6 @@ export function TaskListTaskRow({
   hasDueDateActions,
   hasPriorityActions,
   hasNoteActions,
-  hasPinActions,
   hasImportantActions,
   hasLabelActions,
   hasMoveActions,
@@ -978,7 +974,6 @@ export function TaskListTaskRow({
                   onToggleLabelSelection={onToggleLabel}
                   onCreateLabel={onCreateLabel}
                   onClose={onCloseTaskMenu}
-                  onToggleTaskPinned={() => onToggleTaskPinned(task)}
                   onToggleTaskImportant={() => onToggleTaskImportant(task)}
                   onOpenLabelMenu={() => onOpenLabelMenu(task.id)}
                   onOpenMoveMenu={() => onOpenMoveMenu(task.id)}
@@ -1015,7 +1010,6 @@ export function TaskListTaskRow({
                   hasDueDateActions={hasDueDateActions}
                   hasPriorityActions={hasPriorityActions}
                   hasNoteActions={hasNoteActions}
-                  hasPinActions={hasPinActions}
                   hasImportantActions={hasImportantActions}
                   hasLabelActions={hasLabelActions}
                   hasMoveActions={hasMoveActions}
