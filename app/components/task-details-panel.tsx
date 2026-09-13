@@ -37,6 +37,7 @@ import {
   ensureBlockLines,
   ensureTitleLine,
   getActiveLineElement,
+  DETAIL_LINE_CLASS,
   getActiveTextBlockType,
   getDropIndex,
   getLineElementAtPoint,
@@ -48,6 +49,7 @@ import {
   insertImagesIntoEditor,
   insertTypedLineBelowLine,
   repairPastedEditorStructure,
+  insertHtmlAtSelection,
   insertPlainTextAtSelection,
   shouldPreferPlainTextPaste,
   isChecklistLine,
@@ -116,12 +118,11 @@ import {
   getDefaultDetailFontSizeOption,
   getDetailSelectionFontState,
   getPasteBatchPromptPosition,
-  insertPasteFragmentAtSelection,
   isDefaultAppFont,
   isDefaultDetailFontSize,
   PASTE_FORMAT_PROMPT_MS,
   pastedHtmlHasFormatting,
-  preparePasteFragment,
+  sanitizePastedHtml,
   stripFormattingInPasteBatch,
   stripFormattingInSelection,
   type DetailFontFamilyId,
@@ -1231,6 +1232,7 @@ function rangeHasFormatableEditorContent(
   return matchedLines.some(
     (line) =>
       !isCodeLine(line) &&
+      !isTitleLine(editor, line) &&
       !line.querySelector(".detail-image-wrapper"),
   );
 }
@@ -3418,6 +3420,15 @@ export function TaskDetailsPanel({
     ) {
       const link = getLinkFromSelection(selection, editor);
       if (link) {
+        const linkLine = link.closest(`.${DETAIL_LINE_CLASS}`);
+        if (
+          linkLine instanceof HTMLElement &&
+          isTitleLine(editor, linkLine)
+        ) {
+          closeFormatMenu();
+          return;
+        }
+
         const linkRect = link.getBoundingClientRect();
         const linkState = getLinkEditorState(editor, selection);
         savedLinkSelectionRef.current = selection.getRangeAt(0).cloneRange();
@@ -5040,7 +5051,9 @@ export function TaskDetailsPanel({
     if (plainText && shouldPreferPlainTextPaste(plainText, html)) {
       event.preventDefault();
       editor.focus();
-      insertPlainTextAtSelection(editor, plainText);
+      if (!insertPlainTextAtSelection(editor, plainText)) {
+        document.execCommand("insertText", false, plainText);
+      }
       requestAnimationFrame(() => {
         finalizePasteEditorState();
       });
@@ -5074,8 +5087,6 @@ export function TaskDetailsPanel({
         const currentEditor = editorRef.current;
         if (!currentEditor || taskIdRef.current !== currentTaskId) return;
 
-        const fragment = preparePasteFragment(htmlToPaste, pasteId);
-
         currentEditor.focus();
         if (
           savedPasteRange &&
@@ -5083,7 +5094,16 @@ export function TaskDetailsPanel({
         ) {
           restoreEditorSelectionRange(savedPasteRange);
         }
-        insertPasteFragmentAtSelection(fragment);
+
+        if (
+          !insertHtmlAtSelection(
+            currentEditor,
+            sanitizePastedHtml(htmlToPaste),
+            pasteId,
+          )
+        ) {
+          document.execCommand("insertText", false, plainText);
+        }
 
         requestAnimationFrame(() => {
           finalizePasteEditorState();
@@ -5095,11 +5115,10 @@ export function TaskDetailsPanel({
 
     if (html && plainText) {
       event.preventDefault();
-      const pasteId = crypto.randomUUID();
-      const fragment = preparePasteFragment(html, pasteId);
-
       editor.focus();
-      insertPasteFragmentAtSelection(fragment);
+      if (!insertHtmlAtSelection(editor, sanitizePastedHtml(html))) {
+        document.execCommand("insertText", false, plainText);
+      }
 
       requestAnimationFrame(() => {
         finalizePasteEditorState();
@@ -5110,7 +5129,9 @@ export function TaskDetailsPanel({
     if (plainText) {
       event.preventDefault();
       editor.focus();
-      insertPlainTextAtSelection(editor, plainText);
+      if (!insertPlainTextAtSelection(editor, plainText)) {
+        document.execCommand("insertText", false, plainText);
+      }
       requestAnimationFrame(() => {
         finalizePasteEditorState();
       });

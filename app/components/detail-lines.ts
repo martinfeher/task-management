@@ -1125,45 +1125,177 @@ function createLineFromPaste(html: string, sourceLine: HTMLElement, editor: HTML
   return line;
 }
 
-export function insertPlainTextAtSelection(editor: HTMLElement, plainText: string) {
+function markPasteBatchSubtree(root: HTMLElement, pasteId: string) {
+  root.dataset.pasteBatch = pasteId;
+
+  for (const element of root.querySelectorAll("*")) {
+    if (element instanceof HTMLElement) {
+      element.dataset.pasteBatch = pasteId;
+    }
+  }
+}
+
+export function resolveBodyPasteTarget(editor: HTMLElement) {
   ensureBlockLines(editor);
+  ensureTitleLine(editor);
+
+  let activeLine = getActiveLineElement(editor);
+  const lines = getLineElements(editor);
+
+  if (activeLine && (isTitleLine(editor, activeLine) || isCodeLine(activeLine))) {
+    activeLine = null;
+  }
+
+  if (!activeLine) {
+    const bodyLines = lines.slice(1).filter((line) => !isCodeLine(line));
+    const selection = window.getSelection();
+    const focusNode = selection?.focusNode ?? null;
+
+    activeLine =
+      bodyLines.find(
+        (line) => focusNode && line.contains(focusNode),
+      ) ??
+      bodyLines.find((line) => isBodyPlaceholderLine(line)) ??
+      bodyLines[0] ??
+      null;
+
+    if (activeLine) {
+      editor.focus();
+      placeCaretInLine(activeLine);
+    }
+  }
+
+  if (!activeLine || isTitleLine(editor, activeLine) || isCodeLine(activeLine)) {
+    return null;
+  }
 
   const selection = window.getSelection();
-  if (!selection || selection.rangeCount === 0) return;
+  if (!selection) return null;
 
-  const activeLine = getActiveLineElement(editor);
-  if (
-    !activeLine ||
-    isTitleLine(editor, activeLine) ||
-    isCodeLine(activeLine)
-  ) {
-    return;
+  if (selection.rangeCount === 0) {
+    placeCaretInLine(activeLine);
   }
 
-  const pastedLines = splitClipboardPlainTextIntoLines(plainText);
-  const range = selection.getRangeAt(0);
+  if (!selection.rangeCount) return null;
 
+  let range = selection.getRangeAt(0);
   if (!activeLine.contains(range.commonAncestorContainer)) {
-    return;
+    placeCaretInLine(activeLine);
+    if (!selection.rangeCount) return null;
+    range = selection.getRangeAt(0);
+    if (!activeLine.contains(range.commonAncestorContainer)) {
+      return null;
+    }
   }
 
-  if (pastedLines.length === 1) {
-    range.deleteContents();
-    const textNode = document.createTextNode(pastedLines[0]);
-    range.insertNode(textNode);
-    range.setStartAfter(textNode);
-    range.collapse(true);
-    selection.removeAllRanges();
-    selection.addRange(range);
-    return;
+  return { line: activeLine, range: range.cloneRange() };
+}
+
+function insertHtmlFragmentAtRange(range: Range, html: string) {
+  range.deleteContents();
+
+  const temp = document.createElement("div");
+  temp.innerHTML = html;
+  const fragment = document.createDocumentFragment();
+
+  while (temp.firstChild) {
+    fragment.appendChild(temp.firstChild);
   }
+
+  range.insertNode(fragment);
+  range.collapse(false);
+}
+
+function insertLinePartsAtSelection(
+  editor: HTMLElement,
+  parts: string[],
+  pasteId?: string,
+) {
+  if (parts.length === 0) return false;
+
+  const target = resolveBodyPasteTarget(editor);
+  if (!target) return false;
+
+  const selection = window.getSelection();
+  if (!selection) return false;
+
+  selection.removeAllRanges();
+  selection.addRange(target.range);
+
+  const range = target.range;
+  const selectedLines = getFullLinesInRange(editor, range).filter(
+    (line) => !isTitleLine(editor, line) && !isCodeLine(line),
+  );
+  const activeLine = selectedLines[0] ?? target.line;
+  const sourceLine = activeLine;
+
+  if (selectedLines.length <= 1) {
+    if (parts.length === 1) {
+      insertHtmlFragmentAtRange(range, parts[0]);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      if (pasteId) {
+        markPasteBatchSubtree(activeLine, pasteId);
+      }
+      return true;
+    }
+
+    const beforeRange = document.createRange();
+    beforeRange.selectNodeContents(activeLine);
+    beforeRange.setEnd(range.startContainer, range.startOffset);
+
+    const afterRange = document.createRange();
+    afterRange.selectNodeContents(activeLine);
+    afterRange.setStart(range.endContainer, range.endOffset);
+
+    const beforeWrapper = document.createElement("div");
+    beforeWrapper.appendChild(beforeRange.cloneContents());
+    const beforeHtml = beforeWrapper.innerHTML;
+
+    const afterWrapper = document.createElement("div");
+    afterWrapper.appendChild(afterRange.cloneContents());
+    const afterHtml = afterWrapper.innerHTML.trim() || "<br>";
+
+    range.deleteContents();
+
+    activeLine.innerHTML = mergeLineHtml(beforeHtml, parts[0]);
+    if (pasteId) {
+      markPasteBatchSubtree(activeLine, pasteId);
+    }
+
+    let previousLine = activeLine;
+
+    for (let index = 1; index < parts.length - 1; index += 1) {
+      const newLine = createLineFromPaste(parts[index], sourceLine, editor);
+      if (pasteId) {
+        markPasteBatchSubtree(newLine, pasteId);
+      }
+      previousLine.after(newLine);
+      previousLine = newLine;
+    }
+
+    const lastLine = createLineFromPaste(
+      mergeLineHtml(parts[parts.length - 1], afterHtml),
+      sourceLine,
+      editor,
+    );
+    if (pasteId) {
+      markPasteBatchSubtree(lastLine, pasteId);
+    }
+    previousLine.after(lastLine);
+    placeCaretInLine(lastLine);
+    return true;
+  }
+
+  const firstLine = selectedLines[0];
+  const lastLine = selectedLines[selectedLines.length - 1];
 
   const beforeRange = document.createRange();
-  beforeRange.selectNodeContents(activeLine);
+  beforeRange.selectNodeContents(firstLine);
   beforeRange.setEnd(range.startContainer, range.startOffset);
 
   const afterRange = document.createRange();
-  afterRange.selectNodeContents(activeLine);
+  afterRange.selectNodeContents(lastLine);
   afterRange.setStart(range.endContainer, range.endOffset);
 
   const beforeWrapper = document.createElement("div");
@@ -1174,36 +1306,69 @@ export function insertPlainTextAtSelection(editor: HTMLElement, plainText: strin
   afterWrapper.appendChild(afterRange.cloneContents());
   const afterHtml = afterWrapper.innerHTML.trim() || "<br>";
 
-  range.deleteContents();
+  const allLines = getLineElements(editor);
+  const firstIdx = allLines.indexOf(firstLine);
+  const lastIdx = allLines.indexOf(lastLine);
 
-  activeLine.innerHTML = mergeLineHtml(
-    beforeHtml,
-    plainTextToLineHtml(pastedLines[0]),
-  );
+  for (let index = lastIdx; index > firstIdx; index -= 1) {
+    allLines[index]?.remove();
+  }
 
-  let previousLine = activeLine;
-
-  for (let index = 1; index < pastedLines.length - 1; index += 1) {
-    const newLine = createLineFromPaste(
-      plainTextToLineHtml(pastedLines[index]),
-      activeLine,
-      editor,
+  if (parts.length === 1) {
+    firstLine.innerHTML = mergeLineHtml(
+      mergeLineHtml(beforeHtml, parts[0]),
+      afterHtml,
     );
+    if (pasteId) {
+      markPasteBatchSubtree(firstLine, pasteId);
+    }
+    placeCaretInLine(firstLine);
+    return true;
+  }
+
+  firstLine.innerHTML = mergeLineHtml(beforeHtml, parts[0]);
+  if (pasteId) {
+    markPasteBatchSubtree(firstLine, pasteId);
+  }
+
+  let previousLine = firstLine;
+
+  for (let index = 1; index < parts.length - 1; index += 1) {
+    const newLine = createLineFromPaste(parts[index], sourceLine, editor);
+    if (pasteId) {
+      markPasteBatchSubtree(newLine, pasteId);
+    }
     previousLine.after(newLine);
     previousLine = newLine;
   }
 
-  const lastLine = createLineFromPaste(
-    mergeLineHtml(
-      plainTextToLineHtml(pastedLines[pastedLines.length - 1]),
-      afterHtml,
-    ),
-    activeLine,
+  const trailingLine = createLineFromPaste(
+    mergeLineHtml(parts[parts.length - 1], afterHtml),
+    sourceLine,
     editor,
   );
-  previousLine.after(lastLine);
+  if (pasteId) {
+    markPasteBatchSubtree(trailingLine, pasteId);
+  }
+  previousLine.after(trailingLine);
+  placeCaretInLine(trailingLine);
+  return true;
+}
 
-  placeCaretInLine(lastLine);
+export function insertPlainTextAtSelection(
+  editor: HTMLElement,
+  plainText: string,
+) {
+  const parts = splitClipboardPlainTextIntoLines(plainText).map(plainTextToLineHtml);
+  return insertLinePartsAtSelection(editor, parts);
+}
+
+export function insertHtmlAtSelection(
+  editor: HTMLElement,
+  html: string,
+  pasteId?: string,
+) {
+  return insertLinePartsAtSelection(editor, htmlToLineParts(html), pasteId);
 }
 
 function escapeHtml(text: string) {
