@@ -88,10 +88,13 @@ export function TaskDetailsSubtasksSection({
   const editHistoryIndexRef = useRef(0);
   const skipEditHistoryPushRef = useRef(false);
 
-  const orderedSubtasks = useMemo(
-    () => orderSubtasksForDisplay(subtasks),
-    [subtasks],
-  );
+  const { activeSubtasks, completedSubtasks } = useMemo(() => {
+    const ordered = orderSubtasksForDisplay(subtasks);
+    return {
+      activeSubtasks: ordered.filter((subtask) => !subtask.completed),
+      completedSubtasks: ordered.filter((subtask) => subtask.completed),
+    };
+  }, [subtasks]);
   const completedCount = subtasks.filter((subtask) => subtask.completed).length;
 
   useEffect(() => {
@@ -231,7 +234,10 @@ export function TaskDetailsSubtasksSection({
     setEditingSubtaskId(null);
     setEditingName("");
 
-    if (!trimmed) return;
+    if (!trimmed) {
+      void onDeleteSubtask(subtaskId);
+      return;
+    }
 
     const current = subtasks.find((subtask) => subtask.id === subtaskId);
     if (!current || current.name === trimmed) return;
@@ -282,7 +288,7 @@ export function TaskDetailsSubtasksSection({
 
       setIsExpanded(true);
       saveSubtasksExpanded(taskId, true);
-      beginEditingSubtask(created.id, created.name);
+      beginEditingSubtask(created.id, "");
     } finally {
       setIsAdding(false);
     }
@@ -302,8 +308,99 @@ export function TaskDetailsSubtasksSection({
     </button>
   );
 
+  function renderSubtaskRow(subtask: TaskDetailsSubtask) {
+    return (
+      <div
+        key={subtask.id}
+        className="border-b border-zinc-200 dark:border-zinc-700"
+        onContextMenu={(event) => openSubtaskContextMenu(event, subtask.id)}
+      >
+        <div
+          className={`flex items-center gap-2.5 ml-1 ${
+            subtask.completed ? "py-1.5" : "py-2.5"
+          }`}
+        >
+          <TaskCompletionCheckbox
+            checked={subtask.completed}
+            onChange={() => onToggleSubtask(subtask.id)}
+            outlineClassName="cursor-pointer text-[#b2b2b2] hover:text-[#b2b2b2] dark:text-[#b2b2b2] dark:hover:text-[#b2b2b2]"
+            aria-label={
+              subtask.completed
+                ? `Mark ${subtask.name} incomplete`
+                : `Mark ${subtask.name} complete`
+            }
+            className="shrink-0"
+          />
+          {editingSubtaskId === subtask.id ? (
+            <input
+              ref={editInputRef}
+              data-subtask-edit-input
+              type="text"
+              value={editingName}
+              onChange={(event) => {
+                const nextValue = event.target.value;
+                setEditingName(nextValue);
+                pushEditHistory(nextValue);
+              }}
+              onBlur={() => commitSubtaskRename(subtask.id)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  commitSubtaskRename(subtask.id);
+                  return;
+                }
+
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  setEditingSubtaskId(null);
+                  setEditingName("");
+                  if (!subtask.name.trim()) {
+                    void onDeleteSubtask(subtask.id);
+                  }
+                  return;
+                }
+
+                if (!(event.metaKey || event.ctrlKey)) return;
+
+                const key = event.key.toLowerCase();
+
+                if (key === "z" && !event.shiftKey) {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  undoSubtaskEdit();
+                  return;
+                }
+
+                if (key === "y" || (key === "z" && event.shiftKey)) {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  redoSubtaskEdit();
+                }
+              }}
+              className="min-w-0 flex-1 bg-transparent text-[14px] text-zinc-600 outline-none dark:text-zinc-50"
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                beginEditingSubtask(subtask.id, subtask.name);
+              }}
+              className={`min-w-0 flex-1 truncate text-left  ${
+                subtask.completed
+                  ? "text-zinc-400 line-through dark:text-zinc-500 text-[12.5px]"
+                  : "text-slate-500 dark:text-zinc-50 text-[14px]"
+              }`}
+            >
+              {subtask.name}
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <section className="task-details-subtasks-section mt-4 shrink-0 pl-[15px] pr-3 pt-2">
+    <section className="task-details-subtasks-section shrink-0 pl-[15px] pr-3 pt-2">
       {subtasks.length === 0 ? (
         <div className="ml-1">{addSubtaskButton}</div>
       ) : (
@@ -319,7 +416,7 @@ export function TaskDetailsSubtasksSection({
         ) : (
           <BiChevronRight className="size-4 shrink-0 text-zinc-400" aria-hidden />
         )}
-        <span className="text-[14px] font-semibold text-slate-500 dark:text-zinc-50">
+        <span className="text-[14px] font-semibold text-slate-500 dark:text-zinc-50 cursor-pointer">
           Sub-tasks
         </span>
         <span className="text-[11.5px] text-zinc-400 dark:text-zinc-500">
@@ -328,90 +425,26 @@ export function TaskDetailsSubtasksSection({
       </button>
 
       {isExpanded ? (
-        <div className="mt-2 border-t border-zinc-200 dark:border-zinc-700">
-          {orderedSubtasks.map((subtask) => (
-            <div
-              key={subtask.id}
-              className="border-b border-zinc-200 dark:border-zinc-700"
-              onContextMenu={(event) => openSubtaskContextMenu(event, subtask.id)}
-            >
-              <div className="flex items-center gap-2.5 py-2.5 ml-1">
-                <TaskCompletionCheckbox
-                  checked={subtask.completed}
-                  onChange={() => onToggleSubtask(subtask.id)}
-                  outlineClassName="cursor-pointer text-[#b2b2b2] hover:text-[#b2b2b2] dark:text-[#b2b2b2] dark:hover:text-[#b2b2b2]"
-                  aria-label={
-                    subtask.completed
-                      ? `Mark ${subtask.name} incomplete`
-                      : `Mark ${subtask.name} complete`
-                  }
-                  className="shrink-0"
-                />
-                {editingSubtaskId === subtask.id ? (
-                  <input
-                    ref={editInputRef}
-                    data-subtask-edit-input
-                    type="text"
-                    value={editingName}
-                    onChange={(event) => {
-                      const nextValue = event.target.value;
-                      setEditingName(nextValue);
-                      pushEditHistory(nextValue);
-                    }}
-                    onBlur={() => commitSubtaskRename(subtask.id)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        commitSubtaskRename(subtask.id);
-                        return;
-                      }
+        <div className="mt-2">
+          {activeSubtasks.map(renderSubtaskRow)}
 
-                      if (event.key === "Escape") {
-                        event.preventDefault();
-                        setEditingSubtaskId(null);
-                        setEditingName("");
-                        return;
-                      }
+          <div
+            className={`ml-[20px] ${
+              completedSubtasks.length > 0
+                ? "border-b border-zinc-200/70 dark:border-zinc-700"
+                : ""
+            }`}
+          >
+            {addSubtaskButton}
+          </div>
 
-                      if (!(event.metaKey || event.ctrlKey)) return;
-
-                      const key = event.key.toLowerCase();
-
-                      if (key === "z" && !event.shiftKey) {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        undoSubtaskEdit();
-                        return;
-                      }
-
-                      if (key === "y" || (key === "z" && event.shiftKey)) {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        redoSubtaskEdit();
-                      }
-                    }}
-                    className="min-w-0 flex-1 bg-transparent text-[14px] text-zinc-600 outline-none dark:text-zinc-50"
-                  />
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      beginEditingSubtask(subtask.id, subtask.name);
-                    }}
-                    className={`min-w-0 flex-1 truncate text-left text-[14px] ${
-                      subtask.completed
-                        ? "text-zinc-400 line-through dark:text-zinc-500"
-                        : "text-slate-500 dark:text-zinc-50"
-                    }`}
-                  >
-                    {subtask.name}
-                  </button>
-                )}
-              </div>
+          {completedSubtasks.length > 0 ? (
+            <div className="pt-3 pb-1 pl-1 text-[12px] font-medium text-zinc-400 dark:text-zinc-500">
+              Completed
             </div>
-          ))}
+          ) : null}
 
-          <div className="ml-[20px]">{addSubtaskButton}</div>
+          {completedSubtasks.map(renderSubtaskRow)}
         </div>
       ) : null}
         </>

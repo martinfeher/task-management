@@ -58,19 +58,45 @@ function stripTrailingLineBreakMarkup(html: string) {
   return result;
 }
 
+const LINE_BREAK_SENTINEL = "\u0000";
+
+export function normalizeClipboardPlainText(plainText: string) {
+  return plainText.replace(/\r\n?|\n/g, "\n");
+}
+
+export function clipboardPlainTextHasLineBreaks(plainText: string) {
+  return /\r\n|\n|\r/.test(plainText);
+}
+
+const CLIPBOARD_LIST_MARKER_LINE = /^\s*[-*•⁃]\s/;
+
+/** Prefer plain text only when HTML would drop list markers present in plain text. */
+export function shouldPreferPlainTextPaste(plainText: string, html: string) {
+  if (!plainText.trim() || !html.trim()) return false;
+  if (/<img[\s>]/i.test(html)) return false;
+
+  return normalizeClipboardPlainText(plainText)
+    .split("\n")
+    .some((line) => CLIPBOARD_LIST_MARKER_LINE.test(line));
+}
+
 function normalizeBlockBreaksInHtml(html: string) {
   return html
     .replace(/\r\n/g, "\n")
-    .replace(/<br\s*\/?>/gi, "<<LINE_BREAK>>")
-    .replace(/<\/p>\s*/gi, "<<LINE_BREAK>>")
+    .replace(/<br\b[^>]*>/gi, LINE_BREAK_SENTINEL)
+    .replace(/<\/p>\s*/gi, LINE_BREAK_SENTINEL)
     .replace(/<p[^>]*>/gi, "")
-    .replace(/<\/div>\s*<div[^>]*>/gi, "<<LINE_BREAK>>")
-    .replace(/<\/div>/gi, "<<LINE_BREAK>>")
+    .replace(/<\/div>\s*<div[^>]*>/gi, LINE_BREAK_SENTINEL)
+    .replace(/<\/div>/gi, LINE_BREAK_SENTINEL)
     .replace(/<div[^>]*>/gi, "")
-    .replace(/<\/li>\s*<li[^>]*>/gi, "<<LINE_BREAK>>")
-    .replace(/<\/li>/gi, "<<LINE_BREAK>>")
-    .replace(/<li[^>]*>/gi, "")
-    .replace(/\n/g, "<<LINE_BREAK>>");
+    .replace(/<\/li>\s*<li\b[^>]*>/gi, LINE_BREAK_SENTINEL)
+    .replace(/<\/li>/gi, LINE_BREAK_SENTINEL)
+    .replace(/<li\b[^>]*>/gi, "")
+    .replace(/<\/ul>\s*/gi, LINE_BREAK_SENTINEL)
+    .replace(/<ul\b[^>]*>/gi, "")
+    .replace(/<\/ol>\s*/gi, LINE_BREAK_SENTINEL)
+    .replace(/<ol\b[^>]*>/gi, "")
+    .replace(/\n/g, LINE_BREAK_SENTINEL);
 }
 
 function htmlToLineParts(html: string) {
@@ -81,7 +107,7 @@ function htmlToLineParts(html: string) {
 
   const normalized = normalizeBlockBreaksInHtml(withoutTrailingBreaks);
 
-  const parts = normalized.split("<<LINE_BREAK>>").map((part) => part.trim());
+  const parts = normalized.split(LINE_BREAK_SENTINEL).map((part) => part.trim());
 
   while (parts.length > 1 && isBlankLinePart(parts[parts.length - 1])) {
     parts.pop();
@@ -1023,7 +1049,7 @@ export function insertPlainTextAtSelection(editor: HTMLElement, plainText: strin
     return;
   }
 
-  const pastedLines = plainText.replace(/\r\n/g, "\n").split("\n");
+  const pastedLines = normalizeClipboardPlainText(plainText).split("\n");
   const range = selection.getRangeAt(0);
 
   if (!activeLine.contains(range.commonAncestorContainer)) {

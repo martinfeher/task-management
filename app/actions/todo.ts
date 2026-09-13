@@ -1279,9 +1279,6 @@ export async function createSubtask(
   name: string,
 ): Promise<{ id: string; name: string; listId: string; parentId: string }> {
   const trimmed = name.trim();
-  if (!trimmed) {
-    throw new Error("Subtask name is required");
-  }
 
   const parent = await prisma.task.findUnique({
     where: { id: parentId },

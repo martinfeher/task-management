@@ -106,6 +106,7 @@ import {
   saveSubtasksExpanded,
 } from "@/lib/task-subtasks";
 import { AppFontSwitcher } from "./app-font-switcher";
+import { TaskEditorDefaultsBootstrap } from "./task-editor-defaults-bootstrap";
 import { TemplateOptionsDrawer } from "./template-options-drawer";
 import { UndoButton } from "./undo-button";
 import { LuMenu } from "react-icons/lu";
@@ -2857,7 +2858,7 @@ export function TodoApp({
     }
 
     try {
-      const subtask = await createSubtask(parentId, "Subtask");
+      const subtask = await createSubtask(parentId, "");
       const newTask: TaskListItem = {
         id: subtask.id,
         name: subtask.name,
@@ -3793,6 +3794,7 @@ export function TodoApp({
           subtasksEnabled={subtasksEnabled}
         />
       ) : null}
+      <TaskEditorDefaultsBootstrap />
       <AppFontSwitcher />
       <TemplateOptionsDrawer />
       <CalendarShortcutModal

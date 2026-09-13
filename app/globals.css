@@ -389,10 +389,17 @@ body {
   caret-color: #fafafa;
 }
 
+.task-details-editor {
+  font-size: var(--task-editor-default-font-size, 17px);
+}
+
 .task-details-editor .detail-line {
   display: block;
   position: relative;
-  line-height: var(--detail-line-height, 1.75);
+  line-height: var(
+    --detail-line-height,
+    var(--task-editor-default-line-height, 1.7)
+  );
   caret-color: #171717;
   -webkit-user-drag: none;
 }
@@ -455,7 +462,9 @@ body {
 
 .task-details-editor
   .detail-line[data-empty="true"]:not([data-line-type="code"]):not(:has(.detail-image-wrapper)) {
-  min-height: calc(1em * var(--detail-line-height, 1.75));
+  min-height: calc(
+    1em * var(--detail-line-height, var(--task-editor-default-line-height, 1.7))
+  );
 }
 
 @supports (height: 1lh) {
@@ -550,7 +559,7 @@ body {
 
 .detail-line[data-line-type="h1"][data-empty="true"]::before {
   content: "Title";
-  color: #a1a1aa;
+  color: #aeaeb3;
   pointer-events: none;
   font-family: var(--font-app), ui-sans-serif, system-ui, sans-serif !important;
 }
@@ -1132,7 +1141,10 @@ body {
   color: #3f3f46;
 }
 .search-result-content-preview .detail-line {
-  line-height: var(--detail-line-height, 1.75);
+  line-height: var(
+    --detail-line-height,
+    var(--task-editor-default-line-height, 1.7)
+  );
 }
 
 .search-result-content-preview .detail-line[data-empty="true"]::before,
@@ -1226,7 +1238,7 @@ body {
   border-radius: 9px;
   cursor: grabbing;
   scale: 0.965;
-  opacity: 1;
+  opacity: 0.7;
   background-color: #ffffff !important;
   border-bottom-color: transparent !important;
   box-shadow:
@@ -1248,6 +1260,33 @@ body {
   z-index: 1;
   background-color: transparent !important;
   cursor: grabbing;
+}
+
+.task-row-list-drag-source {
+  opacity: 0.45;
+  z-index: 1;
+  pointer-events: none;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  scale: none !important;
+  cursor: grabbing;
+}
+
+.task-row-drag-ghost {
+  position: fixed;
+  z-index: 30;
+  margin: 0;
+  list-style: none;
+  border-radius: 9px;
+  cursor: grabbing;
+  scale: 0.965;
+  opacity: 0.7;
+  background-color: #ffffff !important;
+  border-bottom-color: transparent !important;
+  box-shadow:
+    0 12px 24px -8px rgba(15, 23, 42, 0.28),
+    0 4px 10px -4px rgba(15, 23, 42, 0.16) !important;
+  pointer-events: none;
 }
 
 .calendar-task-item:not(.calendar-timed-task-block) {
@@ -1422,7 +1461,8 @@ body {
       0 4px 12px rgba(0, 0, 0, 0.2);
   }
 
-  .task-row-dragging {
+  .task-row-dragging,
+  .task-row-drag-ghost {
     background-color: #18181b !important;
     box-shadow:
       0 12px 24px -8px rgba(0, 0, 0, 0.6),
@@ -1816,17 +1856,6 @@ body {
   transform-origin: center center;
   opacity: 1;
   border-radius: 50%;
-}
-
-.task-details-subtasks-section {
-  background-image: linear-gradient(to right, transparent 2%, #e4e4e7 2%);
-  background-size: 100% 1px;
-  background-position: top left;
-  background-repeat: no-repeat;
-}
-
-.dark .task-details-subtasks-section {
-  background-image: linear-gradient(to right, transparent 4%, #3f3f46 4%);
 }
 
 .task-list-item-divider {

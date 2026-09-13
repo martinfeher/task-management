@@ -16,7 +16,7 @@ import { IoMdPricetag } from "react-icons/io";
 
 import { AiFillTag } from "react-icons/ai";
 
-import { LuInbox, LuList, LuPlus, LuStar } from "react-icons/lu";
+import { LuFolder, LuInbox, LuList, LuPlus, LuStar } from "react-icons/lu";
 import { PiCalendarDots, PiDotsThreeBold } from "react-icons/pi";
 import { LuCalendarDays } from "react-icons/lu";
 import { useSidebarBackground } from "@/lib/sidebar-background";
@@ -127,6 +127,7 @@ type SidebarProps = {
   onSelectSearchTask: (taskId: string, listId: string) => void;
   onToggleTask: (taskId: string) => void;
   onAddList: (name: string) => void;
+  onAddFolder?: (name: string) => void;
   onAddLabel: (name: string, color: string) => void;
   onRenameList: (listId: string, name: string) => void;
   onRemoveList: (listId: string) => void;
@@ -221,6 +222,7 @@ export function Sidebar({
   onSelectSearchTask,
   onToggleTask,
   onAddList,
+  onAddFolder,
   onAddLabel,
   onRenameList,
   onRemoveList,
@@ -284,6 +286,9 @@ export function Sidebar({
   const [renameLabel, setRenameLabel] = useState<TaskLabel | null>(null);
   const [removeLabel, setRemoveLabel] = useState<TaskLabel | null>(null);
   const [isAddListOpen, setIsAddListOpen] = useState(false);
+  const [isAddFolderOpen, setIsAddFolderOpen] = useState(false);
+  const [isBottomAddMenuOpen, setIsBottomAddMenuOpen] = useState(false);
+  const bottomAddMenuRef = useRef<HTMLDivElement>(null);
   const [editingListId, setEditingListId] = useState<string | null>(null);
   const [listNameDraft, setListNameDraft] = useState("");
   const menuRef = useRef<HTMLDivElement>(null);
@@ -445,6 +450,7 @@ export function Sidebar({
         renameList ||
         removeList ||
         isAddListOpen ||
+        isAddFolderOpen ||
         isAddLabelOpen ||
         renameLabel ||
         removeLabel
@@ -476,10 +482,24 @@ export function Sidebar({
     renameList,
     removeList,
     isAddListOpen,
+    isAddFolderOpen,
     isAddLabelOpen,
     renameLabel,
     removeLabel,
   ]);
+
+  useEffect(() => {
+    if (!isBottomAddMenuOpen) return;
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target as Node;
+      if (bottomAddMenuRef.current?.contains(target)) return;
+      setIsBottomAddMenuOpen(false);
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [isBottomAddMenuOpen]);
 
   const inboxListId = getInboxListId(lists);
   const sidebarLists = inboxListId
@@ -1215,14 +1235,14 @@ export function Sidebar({
           })}
           
           <div className="flex flex-col overflow-visible">
-            <div className="relative z-[200] flex items-center overflow-visible px-4">
+            <div className="group/lists-header relative z-[200] flex items-center overflow-visible px-4">
               <span className="min-w-0 flex-1 text-[11px] font-semibold uppercase tracking-[0.06em] ptxt-400 dark:ptxt-500">
                 Lists
               </span>
               <button
                 type="button"
                 aria-label="Add list"
-                className="group/add-list relative -mr-[9px] flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md ptxt-400 transition-colors hover:bg-zinc-200/60 hover:ptxt-600 dark:hover:bg-zinc-800/60 dark:hover:ptxt-300"
+                className="group/add-list relative -mr-[9px] flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md ptxt-400 opacity-0 transition-[opacity,colors] hover:bg-zinc-200/60 hover:ptxt-600 focus-visible:opacity-100 group-hover/lists-header:opacity-100 dark:hover:bg-zinc-800/60 dark:hover:ptxt-300"
                 onClick={() => setIsAddListOpen(true)}
               >
                 <LuPlus className="size-3.5 text-[#acadb2]" aria-hidden="true" />
@@ -1338,11 +1358,63 @@ export function Sidebar({
             </div>
               );
             })}
+            <div
+              ref={bottomAddMenuRef}
+              className="relative ml-[3px] w-fit"
+              onMouseEnter={() => setIsBottomAddMenuOpen(true)}
+              onMouseLeave={() => setIsBottomAddMenuOpen(false)}
+            >
+              <button
+                type="button"
+                aria-haspopup="menu"
+                aria-expanded={isBottomAddMenuOpen}
+                aria-label="Add list or folder"
+                onClick={() => setIsBottomAddMenuOpen((open) => !open)}
+                className="flex ml-[2px] cursor-pointer items-center -mt-[10px] px-3 py-2 text-left text-[13px] text-[#afafaf] transition-colors hover:text-[#969696] dark:hover:text-zinc-300"
+              >
+                <div className="text-[15px] mr-[5px] mb-[3px] leading-none" aria-hidden="true">
+                  +
+                </div>
+                Add
+              </button>
+              {isBottomAddMenuOpen ? (
+                <div
+                  role="menu"
+                  aria-label="Add list or folder"
+                  className="absolute left-full top-1/2 z-[1000] ml-0.5 w-[152px] -translate-y-1/2 overflow-hidden rounded-md border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
+                >
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="flex h-[35px] w-full cursor-pointer items-center gap-2.5 px-3 text-left text-sm ptxt-900 hover:bg-zinc-100 dark:ptxt-50 dark:hover:bg-zinc-800"
+                    onClick={() => {
+                      setIsBottomAddMenuOpen(false);
+                      setIsAddListOpen(true);
+                    }}
+                  >
+                    <LuList className="size-[14px] shrink-0 text-[#acadb7]" aria-hidden="true" />
+                    List
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="flex h-[35px] w-full cursor-pointer items-center gap-2.5 px-3 text-left text-sm ptxt-900 hover:bg-zinc-100 dark:ptxt-50 dark:hover:bg-zinc-800"
+                    onClick={() => {
+                      setIsBottomAddMenuOpen(false);
+                      setIsAddFolderOpen(true);
+                    }}
+                  >
+                    <LuFolder className="size-[14px] shrink-0 text-[#acadb7]" aria-hidden="true" />
+                    Folder
+                  </button>
+                </div>
+              ) : null}
+            </div>
           </div>
           </div>
 
           <div
-            className="flex flex-col overflow-visible"
+            className="group/labels-section flex flex-col overflow-visible"
             onMouseLeave={() => onSidebarHoverEnd?.()}
           >
             <div className="relative z-[200] flex items-center overflow-visible px-4 pb-1.5">
@@ -1358,22 +1430,8 @@ export function Sidebar({
               </button>
               <button
                 type="button"
-                aria-label={isLabelsOpen ? "Collapse labels" : "Expand labels"}
-                aria-expanded={isLabelsOpen}
-                className="flex -mr-[3px] size-6 shrink-0 items-center justify-center rounded-md ptxt-400 transition-colors cursor-pointer hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60"
-                onClick={() => setIsLabelsOpen((open) => !open)}
-              >
-                <BiChevronDown
-                  className={`size-4 transition-transform text-[#c0c5e0] ${
-                    isLabelsOpen ? "rotate-0" : "-rotate-90"
-                  }`}
-                  aria-hidden="true"
-                />
-              </button>
-              <button
-                type="button"
                 aria-label="Add label"
-                className="group/add-label relative -mr-[12px] flex size-6 shrink-0 items-center justify-center rounded-md ptxt-400 transition-colors hover:bg-zinc-200/60 cursor-pointer hover:ptxt-600 dark:hover:bg-zinc-800/60 dark:hover:ptxt-300"
+                className="group/add-label relative -mr-[3px] flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md ptxt-400 opacity-0 transition-[opacity,colors] hover:bg-zinc-200/60 hover:ptxt-600 focus-visible:opacity-100 group-hover/labels-section:opacity-100 dark:hover:bg-zinc-800/60 dark:hover:ptxt-300"
                 onClick={() => setIsAddLabelOpen(true)}
               >
                 <LuPlus className="size-3.5 text-[#acadb2]" aria-hidden="true" />
@@ -1384,7 +1442,20 @@ export function Sidebar({
                   Add Label
                 </span>
               </button>
-              
+              <button
+                type="button"
+                aria-label={isLabelsOpen ? "Collapse labels" : "Expand labels"}
+                aria-expanded={isLabelsOpen}
+                className="-mr-[12px] flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md ptxt-400 transition-colors hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60"
+                onClick={() => setIsLabelsOpen((open) => !open)}
+              >
+                <BiChevronDown
+                  className={`size-4 text-[#c0c5e0] transition-transform ${
+                    isLabelsOpen ? "rotate-0" : "-rotate-90"
+                  }`}
+                  aria-hidden="true"
+                />
+              </button>
             </div>
 
             {isLabelsOpen ? (
@@ -1448,7 +1519,7 @@ export function Sidebar({
                         <div className="absolute right-[var(--sidebar-row-trailing-inset)] top-1/2 flex -translate-y-1/2 items-center gap-2">
                           <span
                             aria-hidden="true"
-                            className="inline-flex size-[5px] shrink-0 items-center justify-center rounded-full mr-[6px]"
+                            className="inline-flex size-[6px] shrink-0 items-center justify-center rounded-full mr-[6px]"
                             style={{ backgroundColor: getLabelDotColor(item) }}
                           />
                           <span
@@ -1651,6 +1722,19 @@ export function Sidebar({
           setIsAddListOpen(false);
         }}
         onCancel={() => setIsAddListOpen(false)}
+      />
+
+      <RenameListModal
+        open={isAddFolderOpen}
+        title="New folder"
+        initialName=""
+        placeholder="Folder name"
+        confirmLabel="Add"
+        onConfirm={(name) => {
+          onAddFolder?.(name);
+          setIsAddFolderOpen(false);
+        }}
+        onCancel={() => setIsAddFolderOpen(false)}
       />
 
       <RenameListModal

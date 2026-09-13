@@ -5,6 +5,14 @@ import { LuX } from "react-icons/lu";
 import { useImportantEnabled } from "@/lib/important-settings";
 import { useListPreviewEnabled } from "@/lib/list-preview-settings";
 import { useSubtasksEnabled } from "@/lib/subtasks-settings";
+import {
+  TASK_EDITOR_FONT_SIZE_MAX_PX,
+  TASK_EDITOR_FONT_SIZE_MIN_PX,
+  TASK_EDITOR_LINE_HEIGHT_MAX,
+  TASK_EDITOR_LINE_HEIGHT_MIN,
+  TASK_EDITOR_LINE_HEIGHT_STEP,
+  useTaskEditorDefaults,
+} from "@/lib/task-editor-defaults-settings";
 
 type SettingsSection = "general" | "tasks" | "labels";
 
@@ -103,8 +111,90 @@ function GeneralSettingsContent() {
   );
 }
 
+function SettingsNumberField({
+  label,
+  value,
+  min,
+  max,
+  step,
+  unit,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  unit?: string;
+  onChange: (value: number) => void;
+}) {
+  const id = label.toLowerCase().replace(/\s+/g, "-");
+  const [draft, setDraft] = useState(String(value));
+
+  function commitDraft() {
+    const parsed = Number.parseFloat(draft);
+    if (!Number.isFinite(parsed)) {
+      setDraft(String(value));
+      return;
+    }
+
+    const clamped = Math.min(max, Math.max(min, parsed));
+    const stepped =
+      step === 1
+        ? Math.round(clamped)
+        : Number(
+            (Math.round(clamped / step) * step).toFixed(
+              String(step).includes(".") ? String(step).split(".")[1].length : 0,
+            ),
+          );
+
+    onChange(stepped);
+    setDraft(String(stepped));
+  }
+
+  return (
+    <div className="flex items-center justify-between gap-8">
+      <label
+        htmlFor={id}
+        className="text-sm text-zinc-900 dark:text-zinc-50"
+      >
+        {label}
+      </label>
+      <div className="flex shrink-0 items-center gap-1.5">
+        <input
+          id={id}
+          type="number"
+          min={min}
+          max={max}
+          step={step}
+          inputMode="decimal"
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          onBlur={commitDraft}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              commitDraft();
+            }
+          }}
+          className="w-[4.75rem] rounded-md border border-zinc-300 bg-white px-1.5 py-1 font-mono text-xs text-zinc-800 outline-none focus:border-zinc-400 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:focus:border-zinc-500"
+        />
+        {unit ? (
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">{unit}</span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function TasksSettingsContent() {
   const { subtasksEnabled, setSubtasksEnabled } = useSubtasksEnabled();
+  const {
+    defaultFontSizePx,
+    defaultLineHeight,
+    setDefaultFontSizePx,
+    setDefaultLineHeight,
+  } = useTaskEditorDefaults();
 
   return (
     <div className="space-y-4">
@@ -120,6 +210,25 @@ function TasksSettingsContent() {
         label="Sub-tasks"
         checked={subtasksEnabled}
         onChange={setSubtasksEnabled}
+      />
+      <SettingsNumberField
+        key={`default-font-size-${defaultFontSizePx}`}
+        label="Default font size"
+        value={defaultFontSizePx}
+        min={TASK_EDITOR_FONT_SIZE_MIN_PX}
+        max={TASK_EDITOR_FONT_SIZE_MAX_PX}
+        step={1}
+        unit="px"
+        onChange={setDefaultFontSizePx}
+      />
+      <SettingsNumberField
+        key={`default-line-height-${defaultLineHeight}`}
+        label="Default line height"
+        value={defaultLineHeight}
+        min={TASK_EDITOR_LINE_HEIGHT_MIN}
+        max={TASK_EDITOR_LINE_HEIGHT_MAX}
+        step={TASK_EDITOR_LINE_HEIGHT_STEP}
+        onChange={setDefaultLineHeight}
       />
     </div>
   );

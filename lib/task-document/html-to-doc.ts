@@ -324,15 +324,19 @@ const LINE_BREAK_SENTINEL = "\u0000";
 function splitLegacyHtmlIntoParts(html: string): string[] {
   const normalized = html
     .replace(/\r\n/g, "\n")
-    .replace(/<br\s*\/?>/gi, LINE_BREAK_SENTINEL)
+    .replace(/<br\b[^>]*>/gi, LINE_BREAK_SENTINEL)
     .replace(/<\/p>\s*/gi, LINE_BREAK_SENTINEL)
     .replace(/<p[^>]*>/gi, "")
     .replace(/<\/div>\s*<div[^>]*>/gi, LINE_BREAK_SENTINEL)
     .replace(/<\/div>/gi, LINE_BREAK_SENTINEL)
     .replace(/<div[^>]*>/gi, "")
-    .replace(/<\/li>\s*<li[^>]*>/gi, LINE_BREAK_SENTINEL)
+    .replace(/<\/li>\s*<li\b[^>]*>/gi, LINE_BREAK_SENTINEL)
     .replace(/<\/li>/gi, LINE_BREAK_SENTINEL)
-    .replace(/<li[^>]*>/gi, "")
+    .replace(/<li\b[^>]*>/gi, "")
+    .replace(/<\/ul>\s*/gi, LINE_BREAK_SENTINEL)
+    .replace(/<ul\b[^>]*>/gi, "")
+    .replace(/<\/ol>\s*/gi, LINE_BREAK_SENTINEL)
+    .replace(/<ol\b[^>]*>/gi, "")
     .replace(/\n/g, LINE_BREAK_SENTINEL);
 
   const parts = normalized.split(LINE_BREAK_SENTINEL).map((part) => part.trim());

@@ -72,7 +72,6 @@ import {
 } from "@/lib/task-subtasks";
 import {
   expandSectionReorderIds,
-  getReorderTargetIndex,
   getTaskDropIndex,
   getTaskRowElements,
   mergeReorderedPinnedTasks,
@@ -157,13 +156,19 @@ type TaskDragState = {
   startClientX: number;
   startClientY: number;
   rowHeight: number;
-  appliedTargetIndex: number | null;
   appliedNestSignal: number | null;
   lastCalendarDropTargetKey: string | null;
   lastSidebarListDropTargetKey: string | null;
+  dragGhost: HTMLElement | null;
+  ghostPointerOffsetX: number;
+  ghostPointerOffsetY: number;
 };
 
 const NEST_SIGNAL_OFFSET_PX = 15;
+const TASK_LIST_DRAG_SOURCE_CLASS = "task-row-list-drag-source";
+const TASK_LIST_DRAG_GHOST_CLASS = "task-row-drag-ghost";
+const TASK_LIST_DROP_INDICATOR_CLASS =
+  "pointer-events-none absolute right-4 z-20 h-[2px] bg-[#00a239]";
 
 function getCalendarDropTargetKey(
   target: CalendarExternalDragTarget | null,
@@ -173,40 +178,66 @@ function getCalendarDropTargetKey(
   return `${target.dateKey}:${target.dueTimeMinutes ?? "allday"}:${target.taskId}`;
 }
 
-function applyRowShifts(
-  rows: HTMLElement[],
-  sourceRow: HTMLElement,
-  sourceIndex: number,
-  targetIndex: number,
-  rowHeight: number,
-) {
-  rows.forEach((row, index) => {
-    if (row === sourceRow) return;
-
-    let shift = 0;
-    if (
-      targetIndex > sourceIndex &&
-      index > sourceIndex &&
-      index <= targetIndex
-    ) {
-      shift = -rowHeight;
-    } else if (
-      targetIndex < sourceIndex &&
-      index >= targetIndex &&
-      index < sourceIndex
-    ) {
-      shift = rowHeight;
-    }
-
-    row.style.transform = shift ? `translateY(${shift}px)` : "";
-  });
+function createTaskDragGhost(sourceRow: HTMLElement) {
+  const rect = sourceRow.getBoundingClientRect();
+  const ghost = sourceRow.cloneNode(true) as HTMLElement;
+  ghost.setAttribute("aria-hidden", "true");
+  ghost.classList.add(TASK_LIST_DRAG_GHOST_CLASS);
+  ghost.style.width = `${rect.width}px`;
+  ghost.style.left = `${rect.left}px`;
+  ghost.style.top = `${rect.top}px`;
+  document.body.appendChild(ghost);
+  return ghost;
 }
 
-function resetRowShifts(rows: HTMLElement[], sourceRow: HTMLElement) {
-  rows.forEach((row) => {
-    if (row === sourceRow) return;
-    row.style.transform = "";
-  });
+function updateTaskDragGhostPosition(
+  ghost: HTMLElement,
+  clientX: number,
+  clientY: number,
+  offsetX: number,
+  offsetY: number,
+  nestOffsetX: number,
+) {
+  ghost.style.left = `${clientX - offsetX}px`;
+  ghost.style.top = `${clientY - offsetY}px`;
+  ghost.style.transform = nestOffsetX ? `translateX(${nestOffsetX}px)` : "";
+}
+
+function removeTaskDragGhost(dragState: TaskDragState) {
+  dragState.dragGhost?.remove();
+  dragState.dragGhost = null;
+}
+
+function clearListDragVisuals(dragState: TaskDragState) {
+  removeTaskDragGhost(dragState);
+  dragState.sourceRow.classList.remove(TASK_LIST_DRAG_SOURCE_CLASS);
+  dragState.sourceRow.style.transform = "";
+  dragState.sourceRow.style.translate = "";
+  dragState.sourceRow.style.scale = "";
+}
+
+function ensureListDragVisuals(
+  dragState: TaskDragState,
+  clientX: number,
+  clientY: number,
+) {
+  dragState.sourceRow.classList.remove(
+    "task-row-dragging",
+    "task-row-calendar-drag-source",
+    "task-row-sidebar-drag-source",
+  );
+
+  if (!dragState.dragGhost) {
+    const rect = dragState.sourceRow.getBoundingClientRect();
+    dragState.ghostPointerOffsetX = clientX - rect.left;
+    dragState.ghostPointerOffsetY = clientY - rect.top;
+    dragState.dragGhost = createTaskDragGhost(dragState.sourceRow);
+  }
+
+  dragState.sourceRow.classList.add(TASK_LIST_DRAG_SOURCE_CLASS);
+  dragState.sourceRow.style.transform = "";
+  dragState.sourceRow.style.translate = "";
+  dragState.sourceRow.style.scale = "";
 }
 
 const SORT_OPTIONS: SortOption[] = [
@@ -1794,7 +1825,6 @@ export function TaskListPanel({
     dragState.lastPointerX = event.clientX;
     dragState.lastPointerY = event.clientY;
 
-    const deltaY = event.clientY - dragState.startClientY;
     const list =
       dragState.section === "pinned"
         ? pinnedListRef.current
@@ -1837,18 +1867,13 @@ export function TaskListPanel({
         }
 
         setDropIndicator((current) => (current === null ? current : null));
-        if (list) {
-          resetRowShifts(getTaskRowElements(list), dragState.sourceRow);
-        }
-        dragState.appliedTargetIndex = null;
-        if (dragState.appliedNestSignal !== 0) {
-          dragState.sourceRow.style.transform = "translateX(0px)";
-          dragState.appliedNestSignal = 0;
-        }
-        dragState.sourceRow.style.translate = "";
-        dragState.sourceRow.style.scale = "";
+        clearListDragVisuals(dragState);
+        dragState.appliedNestSignal = 0;
         dragState.sourceRow.classList.remove("task-row-calendar-drag-source");
-        dragState.sourceRow.classList.add("task-row-sidebar-drag-source");
+        dragState.sourceRow.classList.add(
+          "task-row-dragging",
+          "task-row-sidebar-drag-source",
+        );
         return;
       }
 
@@ -1882,17 +1907,12 @@ export function TaskListPanel({
         }
 
         setDropIndicator((current) => (current === null ? current : null));
-        if (list) {
-          resetRowShifts(getTaskRowElements(list), dragState.sourceRow);
-        }
-        dragState.appliedTargetIndex = null;
-        if (dragState.appliedNestSignal !== 0) {
-          dragState.sourceRow.style.transform = "translateX(0px)";
-          dragState.appliedNestSignal = 0;
-        }
-        dragState.sourceRow.style.translate = "";
-        dragState.sourceRow.style.scale = "";
-        dragState.sourceRow.classList.add("task-row-calendar-drag-source");
+        clearListDragVisuals(dragState);
+        dragState.appliedNestSignal = 0;
+        dragState.sourceRow.classList.add(
+          "task-row-dragging",
+          "task-row-calendar-drag-source",
+        );
         return;
       }
 
@@ -1903,9 +1923,9 @@ export function TaskListPanel({
       dragState.sourceRow.classList.remove("task-row-calendar-drag-source");
     }
 
-    dragState.sourceRow.style.translate = `0px ${deltaY}px`;
-
     if (!list) return;
+
+    ensureListDragVisuals(dragState, event.clientX, event.clientY);
 
     const rows = getTaskRowElements(list);
     let dropIndex = getTaskDropIndex(
@@ -1931,8 +1951,18 @@ export function TaskListPanel({
         ? NEST_SIGNAL_OFFSET_PX
         : 0;
     if (nestSignalOffset !== dragState.appliedNestSignal) {
-      dragState.sourceRow.style.transform = `translateX(${nestSignalOffset}px)`;
       dragState.appliedNestSignal = nestSignalOffset;
+    }
+
+    if (dragState.dragGhost) {
+      updateTaskDragGhostPosition(
+        dragState.dragGhost,
+        event.clientX,
+        event.clientY,
+        dragState.ghostPointerOffsetX,
+        dragState.ghostPointerOffsetY,
+        nestSignalOffset,
+      );
     }
 
     if (sourceParentId && hierarchyIntent === "keep") {
@@ -1946,18 +1976,6 @@ export function TaskListPanel({
     }
 
     dragState.dropIndex = dropIndex;
-
-    const targetIndex = getReorderTargetIndex(dragState.sourceIndex, dropIndex);
-    if (targetIndex !== dragState.appliedTargetIndex) {
-      applyRowShifts(
-        rows,
-        dragState.sourceRow,
-        dragState.sourceIndex,
-        targetIndex,
-        dragState.rowHeight,
-      );
-      dragState.appliedTargetIndex = targetIndex;
-    }
 
     let indicatorTop: number;
 
@@ -2025,19 +2043,29 @@ export function TaskListPanel({
       startClientX,
       startClientY,
       rowHeight: activeRow.getBoundingClientRect().height,
-      appliedTargetIndex: null,
       appliedNestSignal: null,
       lastCalendarDropTargetKey: null,
       lastSidebarListDropTargetKey: null,
+      dragGhost: null,
+      ghostPointerOffsetX: startClientX - activeRow.getBoundingClientRect().left,
+      ghostPointerOffsetY: startClientY - activeRow.getBoundingClientRect().top,
     };
 
-    if (list) {
-      getTaskRowElements(list).forEach((row) => {
-        if (row !== activeRow) row.classList.add("task-row-shifting");
-      });
+    ensureListDragVisuals(
+      dragStateRef.current,
+      startClientX,
+      startClientY,
+    );
+    if (dragStateRef.current.dragGhost) {
+      updateTaskDragGhostPosition(
+        dragStateRef.current.dragGhost,
+        startClientX,
+        startClientY,
+        dragStateRef.current.ghostPointerOffsetX,
+        dragStateRef.current.ghostPointerOffsetY,
+        0,
+      );
     }
-
-    activeRow.classList.add("task-row-dragging");
     trySetPointerCapture(activeRow, pointerId);
     activeRow.style.cursor = "grabbing";
     document.body.style.cursor = "grabbing";
@@ -2057,28 +2085,13 @@ export function TaskListPanel({
 
     if (dragState) {
       tryReleasePointerCapture(dragState.captureTarget, dragState.pointerId);
+      clearListDragVisuals(dragState);
       dragState.sourceRow.classList.remove(
         "task-row-dragging",
         "task-row-calendar-drag-source",
         "task-row-sidebar-drag-source",
       );
-      dragState.sourceRow.style.transform = "";
-      dragState.sourceRow.style.translate = "";
-      dragState.sourceRow.style.scale = "";
       dragState.sourceRow.style.cursor = "";
-
-      const list =
-        dragState.section === "pinned"
-          ? pinnedListRef.current
-          : listRef.current;
-      if (list) {
-        getTaskRowElements(list).forEach((row) => {
-          row.classList.remove("task-row-shifting");
-          if (row !== dragState.sourceRow) {
-            row.style.transform = "";
-          }
-        });
-      }
     }
 
     setDropIndicator(null);
@@ -2628,7 +2641,7 @@ export function TaskListPanel({
               <div className="flex shrink-0 items-center gap-1">
               {showSortButton && orderedTasks.length >= 2 ? (
                 <div
-                  className="relative flex shrink-0 items-center rounded-[5px] bg-[#f5f6f7]"
+                  className="relative flex shrink-0 items-center rounded-[6px] bg-[#fbfbfc] border border-[#e7e7eb]"
                   ref={sortMenuRef}
                   onMouseEnter={() => setIsSortMenuOpen(true)}
                   onMouseLeave={() => setIsSortMenuOpen(false)}
@@ -2956,7 +2969,7 @@ export function TaskListPanel({
               >
                 {dropIndicator?.section === "pinned" && (
                   <div
-                    className="pointer-events-none absolute right-4 z-20 h-0.5 bg-blue-500"
+                    className={TASK_LIST_DROP_INDICATOR_CLASS}
                     style={{
                       top: dropIndicator.top,
                       left: 16 + dropIndicator.indent,
@@ -2979,7 +2992,7 @@ export function TaskListPanel({
           >
             {dropIndicator?.section === "unpinned" && (
               <div
-                className="pointer-events-none absolute right-4 z-20 h-0.5 bg-blue-500"
+                className={TASK_LIST_DROP_INDICATOR_CLASS}
                 style={{
                   top: dropIndicator.top,
                   left: 16 + dropIndicator.indent,

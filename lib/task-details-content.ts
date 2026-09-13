@@ -64,23 +64,36 @@ export function taskDetailsHasContent(details: string) {
   return text.length > 0;
 }
 
-/** Avoid overwriting meaningful saved details with an empty snapshot. */
+type ResolveTaskDetailsForSaveOptions = {
+  /** When true, an intentional clear (empty body) is persisted. */
+  allowClear?: boolean;
+};
+
+/** Avoid overwriting meaningful saved details with an empty snapshot during load. */
 export function shouldPersistTaskDetails(
   nextDetails: string,
   savedDetails: string,
+  options?: ResolveTaskDetailsForSaveOptions,
 ) {
   if (nextDetails === savedDetails) return false;
 
-  return !(
-    !taskDetailsHasContent(nextDetails) && taskDetailsHasContent(savedDetails)
-  );
+  if (
+    !options?.allowClear &&
+    !taskDetailsHasContent(nextDetails) &&
+    taskDetailsHasContent(savedDetails)
+  ) {
+    return false;
+  }
+
+  return true;
 }
 
 export function resolveTaskDetailsForSave(
   nextDetails: string,
   savedDetails: string,
+  options?: ResolveTaskDetailsForSaveOptions,
 ) {
-  return shouldPersistTaskDetails(nextDetails, savedDetails)
+  return shouldPersistTaskDetails(nextDetails, savedDetails, options)
     ? nextDetails
     : savedDetails;
 }

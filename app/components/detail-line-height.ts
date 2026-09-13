@@ -1,4 +1,8 @@
 import {
+  getDefaultDetailLineHeight,
+  INITIAL_TASK_EDITOR_LINE_HEIGHT,
+} from "@/lib/task-editor-defaults-settings";
+import {
   ensureBlockLines,
   getActiveLineElement,
   getLinesInSelection,
@@ -9,7 +13,7 @@ import {
   stripTrailingBreakFromNonEmptyLine,
 } from "./detail-lines";
 
-export const DEFAULT_DETAIL_LINE_HEIGHT = 1.75;
+export const DEFAULT_DETAIL_LINE_HEIGHT = INITIAL_TASK_EDITOR_LINE_HEIGHT;
 export const DETAIL_LINE_HEIGHT_MIN = 1;
 export const DETAIL_LINE_HEIGHT_MAX = 2.5;
 export const DETAIL_LINE_HEIGHT_STEP = 0.1;
@@ -25,7 +29,7 @@ export const DETAIL_LINE_HEIGHT_OPTIONS = Array.from(
 export type DetailLineHeightOption = (typeof DETAIL_LINE_HEIGHT_OPTIONS)[number];
 
 export function isDefaultDetailLineHeight(lineHeight: number) {
-  return Math.abs(lineHeight - DEFAULT_DETAIL_LINE_HEIGHT) < 0.001;
+  return Math.abs(lineHeight - getDefaultDetailLineHeight()) < 0.001;
 }
 
 export function normalizeDetailLineHeight(value: string | number): DetailLineHeightOption {
@@ -56,7 +60,7 @@ function getLineHeightFromLine(line: HTMLElement) {
     return normalizeDetailLineHeight(cssVar);
   }
 
-  return DEFAULT_DETAIL_LINE_HEIGHT;
+  return getDefaultDetailLineHeight();
 }
 
 function filterLineHeightTargetLines(
@@ -125,7 +129,7 @@ function getTargetLinesForLineHeight(
 export function getDetailSelectionLineHeight(editor: HTMLElement): DetailLineHeightOption {
   const selection = window.getSelection();
   if (!selection?.rangeCount || !editor.contains(selection.anchorNode)) {
-    return DEFAULT_DETAIL_LINE_HEIGHT;
+    return getDefaultDetailLineHeight();
   }
 
   const lines = filterLineHeightTargetLines(
@@ -133,7 +137,7 @@ export function getDetailSelectionLineHeight(editor: HTMLElement): DetailLineHei
     getReadOnlyLinesForLineHeight(editor),
   );
   if (lines.length === 0) {
-    return DEFAULT_DETAIL_LINE_HEIGHT;
+    return getDefaultDetailLineHeight();
   }
 
   return getLineHeightFromLine(lines[0]);

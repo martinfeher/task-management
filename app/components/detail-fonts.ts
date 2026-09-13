@@ -9,13 +9,16 @@ import {
   renumberNumberedLines,
 } from "./detail-lines";
 import {
-  DEFAULT_DETAIL_LINE_HEIGHT,
+  getDefaultDetailFontSizePx,
+  INITIAL_TASK_EDITOR_FONT_SIZE_PX,
+} from "@/lib/task-editor-defaults-settings";
+import {
   resetDetailLineHeightOnLines,
 } from "./detail-line-height";
 
 export const PASTE_BATCH_ATTR = "data-paste-batch";
-export const DEFAULT_DETAIL_FONT_SIZE = "17px";
-export const DEFAULT_DETAIL_FONT_SIZE_PX = 17;
+export const DEFAULT_DETAIL_FONT_SIZE = `${INITIAL_TASK_EDITOR_FONT_SIZE_PX}px`;
+export const DEFAULT_DETAIL_FONT_SIZE_PX = INITIAL_TASK_EDITOR_FONT_SIZE_PX;
 export const PASTE_FORMAT_PROMPT_MS = 5000;
 
 export type DetailFontFamilyId =
@@ -209,14 +212,21 @@ export function isDefaultAppFont(fontFamily: string) {
 export function isDefaultDetailFontSize(fontSize: string) {
   if (!fontSize.trim()) return true;
 
+  const defaultSizePx = getDefaultDetailFontSizePx();
   const normalized = fontSize.trim().toLowerCase();
   if (
     normalized === "inherit" ||
     normalized === "initial" ||
     normalized === "unset" ||
     normalized === DEFAULT_DETAIL_FONT_SIZE ||
+    normalized === `${defaultSizePx}px` ||
     normalized === "1.0625rem"
   ) {
+    return true;
+  }
+
+  const parsed = Number.parseFloat(normalized);
+  if (Number.isFinite(parsed) && Math.round(parsed) === defaultSizePx) {
     return true;
   }
 
@@ -324,7 +334,7 @@ export function matchDetailFontFamilyId(fontFamily: string): DetailFontFamilyId 
 
 function parseFontSizePx(fontSize: string) {
   const parsed = Number.parseFloat(fontSize);
-  if (!Number.isFinite(parsed)) return DEFAULT_DETAIL_FONT_SIZE_PX;
+  if (!Number.isFinite(parsed)) return getDefaultDetailFontSizePx();
 
   if (fontSize.trim().toLowerCase().endsWith("rem")) {
     const rootSize = Number.parseFloat(
@@ -336,10 +346,30 @@ function parseFontSizePx(fontSize: string) {
   return Math.round(parsed);
 }
 
+export function getDefaultDetailFontSizeOption(): DetailFontSizeOption {
+  const px = getDefaultDetailFontSizePx();
+  if ((DETAIL_FONT_SIZE_OPTIONS as readonly number[]).includes(px)) {
+    return px as DetailFontSizeOption;
+  }
+
+  let closest: DetailFontSizeOption = DETAIL_FONT_SIZE_OPTIONS[0];
+  let closestDistance = Math.abs(px - closest);
+
+  for (const option of DETAIL_FONT_SIZE_OPTIONS) {
+    const distance = Math.abs(px - option);
+    if (distance < closestDistance) {
+      closest = option;
+      closestDistance = distance;
+    }
+  }
+
+  return closest;
+}
+
 export function matchDetailFontSize(fontSize: string): DetailFontSizeOption {
   const parsed = parseFontSizePx(fontSize);
   if (isDefaultDetailFontSize(`${parsed}px`)) {
-    return DEFAULT_DETAIL_FONT_SIZE_PX;
+    return getDefaultDetailFontSizeOption();
   }
 
   let closest: DetailFontSizeOption = DETAIL_FONT_SIZE_OPTIONS[0];
@@ -484,7 +514,7 @@ export function getDetailSelectionFontState(
   if (!selection?.rangeCount || !editor.contains(selection.anchorNode)) {
     return {
       familyId: getAppFontFamilyId(),
-      size: DEFAULT_DETAIL_FONT_SIZE_PX,
+      size: getDefaultDetailFontSizeOption(),
     };
   }
 
@@ -538,7 +568,7 @@ export function getDetailSelectionFontState(
   if (!element) {
     return {
       familyId,
-      size: DEFAULT_DETAIL_FONT_SIZE_PX,
+      size: getDefaultDetailFontSizeOption(),
     };
   }
 
@@ -948,7 +978,7 @@ export function applyDetailFontSize(
 
   if (!canApplyDetailFont(editor)) return false;
 
-  if (size === DEFAULT_DETAIL_FONT_SIZE_PX) {
+  if (size === getDefaultDetailFontSizePx()) {
     removeStylePropertyFromRange(range.cloneRange(), "fontSize");
     restoreSelectionRange(range);
     return true;
