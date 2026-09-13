@@ -959,6 +959,33 @@ export function insertLineBelowLine(editor: HTMLElement, line: HTMLElement) {
   insertTypedLineBelowLine(editor, line, "text");
 }
 
+export function insertLineBeforeBodyPlaceholder(
+  editor: HTMLElement,
+  placeholderLine: HTMLElement,
+) {
+  ensureBlockLines(editor);
+
+  const lineType =
+    (placeholderLine.dataset.lineType as LineBlockType | undefined) ?? "text";
+  const newLine = createLineElement(
+    "<br>",
+    lineType === "h1" ? "text" : lineType,
+  );
+
+  if (lineType === "numbered") {
+    newLine.dataset.listNumber = String(
+      getNextListNumber(editor, placeholderLine),
+    );
+  }
+
+  if (lineType === "checklist") {
+    newLine.dataset.checked = "false";
+  }
+
+  placeholderLine.before(newLine);
+  placeCaretInLine(newLine);
+}
+
 export function handleClickBelowLastLine(
   editor: HTMLElement,
   clientY: number,
@@ -2076,14 +2103,6 @@ function syncTrailingBodyPlaceholderLine(editor: HTMLElement) {
     }
 
     return;
-  }
-
-  let currentLines = getLineElements(editor);
-  while (currentLines.length > 1) {
-    const lastLine = currentLines[currentLines.length - 1];
-    if (!isRemovableTrailingEmptyBodyLine(lastLine)) break;
-    lastLine.remove();
-    currentLines = getLineElements(editor);
   }
 
   const lastLine = getLineElements(editor).at(-1);

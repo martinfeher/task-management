@@ -50,6 +50,7 @@ import {
   insertTypedLineBelowLine,
   repairPastedEditorStructure,
   insertHtmlAtSelection,
+  insertLineBeforeBodyPlaceholder,
   insertPlainTextAtSelection,
   insertTitleLinePaste,
   renumberNumberedLines,
@@ -114,18 +115,13 @@ import {
 import {
   applyDetailFontFamily,
   applyDetailFontSize,
-  clearAllPasteBatchMarkers,
-  clearPasteBatchMarkers,
   getAppFontFamilyId,
   getDefaultDetailFontSizeOption,
   getDetailSelectionFontState,
-  getPasteBatchPromptPosition,
   isDefaultAppFont,
   isDefaultDetailFontSize,
-  PASTE_FORMAT_PROMPT_MS,
   pastedHtmlHasFormatting,
   sanitizePastedHtml,
-  stripFormattingInPasteBatch,
   stripFormattingInSelection,
   type DetailFontFamilyId,
   type DetailFontSizeOption,
@@ -1522,6 +1518,9 @@ function captureLiveEditorFormatSelection(editor: HTMLElement) {
 
 const FORMAT_MENU_ABOVE_SELECTION_GAP = 10;
 const FORMAT_MENU_BELOW_SELECTION_GAP = 3;
+const FORMAT_MENU_LARGE_SELECTION_LINE_THRESHOLD = 7;
+const FORMAT_MENU_BELOW_FIRST_SELECTED_LINE_GAP = 27;
+const FORMAT_MENU_BELOW_TRANSFORM_OFFSET_PX = 8;
 const FORMAT_MENU_ESTIMATED_HEIGHT = 44;
 
 function shouldPlaceFormatMenuBelowTitle(
@@ -1546,10 +1545,43 @@ function shouldPlaceFormatMenuBelowTitle(
   return toolbarBottomWhenAbove < titleBottom;
 }
 
+function getFormatableSelectedLines(editor: HTMLElement, range: Range) {
+  return getLineElements(editor).filter(
+    (line) =>
+      range.intersectsNode(line) &&
+      !isTitleLine(editor, line) &&
+      !isCodeLine(line) &&
+      !line.querySelector(".detail-image-wrapper"),
+  );
+}
+
 function getFormatMenuPositionFromRange(range: Range, editor: HTMLElement) {
   const selectedLines = getLineElements(editor).filter((line) =>
     range.intersectsNode(line),
   );
+  const formatableSelectedLines = getFormatableSelectedLines(editor, range);
+
+  if (
+    formatableSelectedLines.length >
+    FORMAT_MENU_LARGE_SELECTION_LINE_THRESHOLD
+  ) {
+    const firstLine = formatableSelectedLines[0];
+    const firstRect = firstLine.getBoundingClientRect();
+    const alignLeft = formatableSelectedLines.length > 2;
+
+    return {
+      x: alignLeft ? firstRect.left : firstRect.left + firstRect.width / 2,
+      y:
+        firstRect.bottom +
+        FORMAT_MENU_BELOW_FIRST_SELECTED_LINE_GAP -
+        FORMAT_MENU_BELOW_TRANSFORM_OFFSET_PX,
+      alignLeft,
+      placement: "below" as const,
+      anchorBottom: firstRect.bottom,
+      preferBelow: true,
+    };
+  }
+
   const alignLeft = selectedLines.length > 2;
   const rects = Array.from(range.getClientRects()).filter(
     (rect) => rect.width > 0 && rect.height > 0,
@@ -1806,12 +1838,6 @@ export function TaskDetailsPanel({
   const [linkText, setLinkText] = useState("");
   const [linkUrl, setLinkUrl] = useState("");
   const [linkHasExisting, setLinkHasExisting] = useState(false);
-  const [pasteFormatPrompt, setPasteFormatPrompt] = useState<{
-    pasteId: string;
-    top: number;
-    left: number;
-    removeFormatting: boolean;
-  } | null>(null);
   const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false);
   const savedDetailsRef = useRef("");
   const detailsRef = useRef("");
@@ -1917,8 +1943,6 @@ export function TaskDetailsPanel({
   const isApplyingHistoryRef = useRef(false);
   const isReadyRef = useRef(false);
   const imageDropDepthRef = useRef(0);
-  const pasteFormatPromptTimerRef = useRef<number | null>(null);
-  const pasteFormatPromptRef = useRef(pasteFormatPrompt);
   const inputNormalizeFrameRef = useRef<number | null>(null);
   const inputNormalizeTimerRef = useRef<number | null>(null);
   const formatMenuTimerRef = useRef<number | null>(null);
@@ -3273,70 +3297,6 @@ export function TaskDetailsPanel({
   );
 
   useEffect(() => {
-    pasteFormatPromptRef.current = pasteFormatPrompt;
-  }, [pasteFormatPrompt]);
-
-  const dismissPasteFormatPrompt = useCallback((pasteId?: string) => {
-    if (pasteFormatPromptTimerRef.current !== null) {
-      window.clearTimeout(pasteFormatPromptTimerRef.current);
-      pasteFormatPromptTimerRef.current = null;
-    }
-
-    const editor = editorRef.current;
-    const idToClear = pasteId ?? pasteFormatPromptRef.current?.pasteId;
-    if (editor && idToClear) {
-      clearPasteBatchMarkers(editor, idToClear);
-    }
-
-    setPasteFormatPrompt(null);
-  }, []);
-
-  const getPastePromptPosition = useCallback((pasteId: string) => {
-    const editor = editorRef.current;
-    const wrapper = editorWrapperRef.current;
-    if (!editor || !wrapper) {
-      return { top: 12, left: 12 };
-    }
-
-    return getPasteBatchPromptPosition(editor, wrapper, pasteId);
-  }, []);
-
-  const showPasteFormatPrompt = useCallback(
-    (pasteId: string) => {
-      dismissPasteFormatPrompt();
-
-      const position = getPastePromptPosition(pasteId);
-      setPasteFormatPrompt({
-        pasteId,
-        top: position.top,
-        left: position.left,
-        removeFormatting: false,
-      });
-
-      pasteFormatPromptTimerRef.current = window.setTimeout(() => {
-        dismissPasteFormatPrompt(pasteId);
-      }, PASTE_FORMAT_PROMPT_MS);
-    },
-    [dismissPasteFormatPrompt, getPastePromptPosition],
-  );
-
-  useEffect(() => {
-    if (!pasteFormatPrompt) return;
-
-    function handlePastePromptEscape(event: KeyboardEvent) {
-      if (event.key !== "Escape") return;
-
-      event.preventDefault();
-      dismissPasteFormatPrompt();
-    }
-
-    document.addEventListener("keydown", handlePastePromptEscape);
-    return () => {
-      document.removeEventListener("keydown", handlePastePromptEscape);
-    };
-  }, [dismissPasteFormatPrompt, pasteFormatPrompt]);
-
-  useEffect(() => {
     if (!formatMenu) return;
 
     function handleFormatMenuEscape(event: KeyboardEvent) {
@@ -3365,7 +3325,6 @@ export function TaskDetailsPanel({
     ensureTitleLine(editor);
     repairPastedEditorStructure(editor);
     renumberNumberedLines(editor);
-    clearAllPasteBatchMarkers(editor);
     normalizeLinks(editor);
     syncEditorLineEmptyState(editor);
     syncEditorContent();
@@ -3380,46 +3339,6 @@ export function TaskDetailsPanel({
     syncTitleToTaskList,
     updateLineControls,
   ]);
-
-  const applyPasteFormatOption = useCallback(
-    (enabled: boolean) => {
-      const editor = editorRef.current;
-      const current = pasteFormatPromptRef.current;
-      if (!editor || !current) return;
-
-      const pasteId = current.pasteId;
-
-      requestAnimationFrame(() => {
-        const currentEditor = editorRef.current;
-        if (!currentEditor) return;
-
-        if (enabled) {
-          stripFormattingInPasteBatch(currentEditor, pasteId);
-        }
-
-        ensureBlockLines(currentEditor);
-        syncEditorLineEmptyState(currentEditor);
-        syncEditorContent();
-        recordHistorySnapshot();
-        scheduleAutoSave();
-        dismissPasteFormatPrompt(pasteId);
-      });
-    },
-    [
-      dismissPasteFormatPrompt,
-      recordHistorySnapshot,
-      scheduleAutoSave,
-      syncEditorContent,
-    ],
-  );
-
-  useEffect(() => {
-    return () => {
-      if (pasteFormatPromptTimerRef.current !== null) {
-        window.clearTimeout(pasteFormatPromptTimerRef.current);
-      }
-    };
-  }, []);
 
   const restoreSavedLinkSelection = useCallback(() => {
     const editor = editorRef.current;
@@ -5157,7 +5076,6 @@ export function TaskDetailsPanel({
     if (html && plainText && pastedHtmlHasFormatting(html)) {
       event.preventDefault();
 
-      const pasteId = crypto.randomUUID();
       const currentTaskId = taskIdRef.current;
       const selection = window.getSelection();
       const savedPasteRange =
@@ -5193,7 +5111,6 @@ export function TaskDetailsPanel({
           !insertHtmlAtSelection(
             currentEditor,
             sanitizePastedHtml(htmlToPaste),
-            pasteId,
           )
         ) {
           document.execCommand("insertText", false, plainText);
@@ -5201,7 +5118,6 @@ export function TaskDetailsPanel({
 
         requestAnimationFrame(() => {
           finalizePasteEditorState();
-          showPasteFormatPrompt(pasteId);
         });
       })();
       return;
@@ -5742,10 +5658,22 @@ export function TaskDetailsPanel({
       const editor = editorRef.current;
       if (!editor) return;
 
-      const activeLine = getActiveLineElement(editor);
+      let activeLine = getActiveLineElement(editor);
+      if (!activeLine) {
+        const lines = getLineElements(editor);
+        const lastLine = lines[lines.length - 1];
+        if (lastLine && isBodyPlaceholderLine(lastLine)) {
+          activeLine = lastLine;
+          placeCaretInLine(lastLine);
+        }
+      }
       if (!activeLine) return;
 
-      splitLineAtCursor(editor);
+      if (isBodyPlaceholderLine(activeLine)) {
+        insertLineBeforeBodyPlaceholder(editor, activeLine);
+      } else {
+        splitLineAtCursor(editor);
+      }
       setSlashCommandMenu(null);
       syncEditorContent();
       recordHistorySnapshot();
@@ -6647,29 +6575,6 @@ export function TaskDetailsPanel({
           >
             {isImageDropActive && (
               <div className="pointer-events-none absolute inset-0 z-30 rounded-[30px] border-2 border-dashed border-blue-400 bg-blue-50/40 dark:border-blue-500 dark:bg-blue-950/20" />
-            )}
-
-            {pasteFormatPrompt && (
-              <div
-                className="absolute z-40 flex max-w-[calc(100%-1rem)] items-center gap-2 rounded-lg border border-zinc-200 bg-white/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm dark:border-zinc-700 dark:bg-zinc-900/95"
-                style={{
-                  top: pasteFormatPrompt.top,
-                  left: pasteFormatPrompt.left,
-                }}
-                onMouseDown={(event) => event.preventDefault()}
-              >
-                <label className="flex cursor-pointer items-center gap-1.5 text-zinc-700 dark:text-zinc-200">
-                  <input
-                    type="checkbox"
-                    className="size-3.5 rounded border-zinc-300 accent-zinc-900 dark:border-zinc-600 dark:accent-zinc-100"
-                    checked={pasteFormatPrompt.removeFormatting}
-                    onChange={(event) =>
-                      applyPasteFormatOption(event.target.checked)
-                    }
-                  />
-                  Remove formatting
-                </label>
-              </div>
             )}
 
             <div
