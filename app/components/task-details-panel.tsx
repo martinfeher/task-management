@@ -44,7 +44,9 @@ import {
   getLineById,
   getLineElements,
   getLineIndex,
+  getSelectedListBlockLines,
   getSelectedBlockLinesInRange,
+  indentListLines,
   handleClickBelowLastLine,
   insertImagesIntoEditor,
   insertTypedLineBelowLine,
@@ -5653,6 +5655,32 @@ export function TaskDetailsPanel({
       }
     }
 
+    if (event.key === "Tab") {
+      const editor = editorRef.current;
+      if (!editor) return;
+
+      const selection = window.getSelection();
+      if (!selection?.rangeCount) return;
+
+      const listLines = getSelectedListBlockLines(
+        editor,
+        selection.getRangeAt(0),
+      );
+      if (listLines.length === 0) return;
+
+      event.preventDefault();
+      const delta = event.shiftKey ? -1 : 1;
+      if (!indentListLines(editor, listLines, delta)) return;
+
+      renumberNumberedLines(editor);
+      syncEditorLineEmptyState(editor);
+      syncEditorContent();
+      recordHistorySnapshot();
+      scheduleAutoSave();
+      updateLineControls();
+      return;
+    }
+
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
       const editor = editorRef.current;
@@ -6594,7 +6622,7 @@ export function TaskDetailsPanel({
               onKeyDown={handleEditorKeyDown}
               onKeyUp={handleEditorKeyUp}
               onScroll={updateLineControls}
-              className="task-details-editor min-h-[500px] w-full resize-none overflow-auto rounded-xl py-[2px] pl-[30px] pr-3 text-[#555555] outline-none transition-colors dark:text-zinc-300 [&_.detail-line[data-line-type=bullet]]:pl-1 [&_.detail-line[data-line-type=checklist]]:cursor-pointer [&_.detail-line[data-line-type=checklist]]:pl-1 [&_.detail-line[data-line-type=h1]]:text-[26px] [&_.detail-line[data-line-type=h1]]:font-bold [&_.detail-line[data-line-type=h1]]:leading-[36px] [&_.detail-line[data-line-type=h1]]:text-[#4B4B4B] dark:[&_.detail-line[data-line-type=h1]]:text-[#F5F5F5] [&_.detail-line[data-line-type=h2]]:text-[23px] [&_.detail-line[data-line-type=h2]]:font-semibold [&_.detail-line[data-line-type=h2]]:leading-[30px] [&_.detail-line[data-line-type=h3]]:text-[19px] [&_.detail-line[data-line-type=h3]]:font-semibold [&_.detail-line[data-line-type=h3]]:leading-[26px] [&_.detail-line[data-line-type=numbered]]:pl-1 [&_mark]:bg-yellow-200 dark:[&_mark]:bg-yellow-300/30 [&_s]:line-through [&_strike]:line-through [&_u]:underline"
+              className="task-details-editor min-h-[500px] w-full resize-none overflow-auto rounded-xl py-[2px] pl-[30px] pr-3 pb-3! text-[#555555] outline-none transition-colors dark:text-zinc-300 [&_.detail-line[data-line-type=bullet]]:pl-1 [&_.detail-line[data-line-type=checklist]]:cursor-pointer [&_.detail-line[data-line-type=checklist]]:pl-1 [&_.detail-line[data-line-type=h1]]:text-[26px] [&_.detail-line[data-line-type=h1]]:font-bold [&_.detail-line[data-line-type=h1]]:leading-[36px] [&_.detail-line[data-line-type=h1]]:text-[#4B4B4B] dark:[&_.detail-line[data-line-type=h1]]:text-[#F5F5F5] [&_.detail-line[data-line-type=h2]]:text-[23px] [&_.detail-line[data-line-type=h2]]:font-semibold [&_.detail-line[data-line-type=h2]]:leading-[30px] [&_.detail-line[data-line-type=h3]]:text-[19px] [&_.detail-line[data-line-type=h3]]:font-semibold [&_.detail-line[data-line-type=h3]]:leading-[26px] [&_.detail-line[data-line-type=numbered]]:pl-1 [&_mark]:bg-yellow-200 dark:[&_mark]:bg-yellow-300/30 [&_s]:line-through [&_strike]:line-through [&_u]:underline"
             />
 
             {dropIndicator && (

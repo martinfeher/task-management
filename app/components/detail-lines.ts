@@ -11,6 +11,7 @@ import {
 } from "./detail-paste";
 
 export const DETAIL_LINE_CLASS = "detail-line";
+export const MAX_LIST_INDENT_LEVEL = 16;
 
 export type LineBlockType =
   | "text"
@@ -445,7 +446,124 @@ function clearLineBlockType(line: HTMLElement) {
   unwrapChecklistTextWrapper(line);
   delete line.dataset.lineType;
   delete line.dataset.listNumber;
+  delete line.dataset.listIndent;
   delete line.dataset.checked;
+}
+
+export function isListBlockLine(line: HTMLElement | null | undefined) {
+  if (!line) return false;
+
+  const type = line.dataset.lineType;
+  return type === "bullet" || type === "numbered" || type === "checklist";
+}
+
+export function getListIndentLevel(line: HTMLElement) {
+  const parsed = Number.parseInt(line.dataset.listIndent ?? "0", 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return 0;
+  }
+
+  return Math.min(MAX_LIST_INDENT_LEVEL, parsed);
+}
+
+export function setListIndentLevel(line: HTMLElement, level: number) {
+  const clamped = Math.max(0, Math.min(MAX_LIST_INDENT_LEVEL, level));
+
+  if (clamped === 0) {
+    delete line.dataset.listIndent;
+    return;
+  }
+
+  line.dataset.listIndent = String(clamped);
+}
+
+export function copyListIndent(fromLine: HTMLElement, toLine: HTMLElement) {
+  setListIndentLevel(toLine, getListIndentLevel(fromLine));
+}
+
+function canIncreaseListIndent(editor: HTMLElement, line: HTMLElement) {
+  if (!isListBlockLine(line) || isTitleLine(editor, line)) {
+    return false;
+  }
+
+  const currentLevel = getListIndentLevel(line);
+  if (currentLevel >= MAX_LIST_INDENT_LEVEL) {
+    return false;
+  }
+
+  const lines = getLineElements(editor);
+  const index = lines.indexOf(line);
+  if (index <= 0) {
+    return false;
+  }
+
+  const previousLine = lines[index - 1];
+  if (isTitleLine(editor, previousLine)) {
+    return false;
+  }
+
+  const previousLevel = isListBlockLine(previousLine)
+    ? getListIndentLevel(previousLine)
+    : 0;
+
+  return currentLevel < previousLevel + 1;
+}
+
+export function indentListLines(
+  editor: HTMLElement,
+  lines: HTMLElement[],
+  delta: number,
+) {
+  if (lines.length === 0 || delta === 0) {
+    return false;
+  }
+
+  const ordered = [...lines].sort(
+    (left, right) => getLineIndex(editor, left) - getLineIndex(editor, right),
+  );
+
+  let changed = false;
+
+  if (delta > 0) {
+    for (const line of ordered) {
+      if (!isListBlockLine(line)) continue;
+
+      if (canIncreaseListIndent(editor, line)) {
+        setListIndentLevel(line, getListIndentLevel(line) + 1);
+        changed = true;
+      }
+    }
+    return changed;
+  }
+
+  for (const line of [...ordered].reverse()) {
+    if (!isListBlockLine(line)) continue;
+
+    const currentLevel = getListIndentLevel(line);
+    if (currentLevel > 0) {
+      setListIndentLevel(line, currentLevel - 1);
+      changed = true;
+    }
+  }
+
+  return changed;
+}
+
+export function getSelectedListBlockLines(
+  editor: HTMLElement,
+  range?: Range | null,
+) {
+  const selection = window.getSelection();
+  const activeRange =
+    range ?? (selection?.rangeCount ? selection.getRangeAt(0) : null);
+
+  if (!activeRange) {
+    return [];
+  }
+
+  return getSelectedBlockLinesInRange(editor, activeRange).filter((line) =>
+    isListBlockLine(line),
+  );
 }
 
 export function clearListBlockTypesFromLines(lines: HTMLElement[]) {
@@ -791,6 +909,10 @@ function createLineFromSplit(
     );
   }
 
+  if (preserveBlockType && isListBlockLine(sourceLine)) {
+    copyListIndent(sourceLine, line);
+  }
+
   return line;
 }
 
@@ -1048,6 +1170,9 @@ export function insertTypedLineBelowLine(
   }
 
   line.after(newLine);
+  if (isListBlockLine(line)) {
+    copyListIndent(line, newLine);
+  }
   focusDetailLine(editor, newLine);
 }
 
@@ -1101,6 +1226,10 @@ export function splitLineAtCursor(editor: HTMLElement) {
 
   if (lineType === "checklist") {
     newLine.dataset.checked = "false";
+  }
+
+  if (isListBlockLine(activeLine)) {
+    copyListIndent(activeLine, newLine);
   }
 
   activeLine.after(newLine);
@@ -1159,6 +1288,10 @@ function createLineFromPastePart(
 
     if (part.lineType === "checklist") {
       line.dataset.checked = part.checked ? "true" : "false";
+    }
+
+    if (part.listIndent && part.listIndent > 0) {
+      setListIndentLevel(line, part.listIndent);
     }
   } else {
     inheritLineBlockTypeFromSource(line, sourceLine, editor);

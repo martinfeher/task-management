@@ -81,6 +81,7 @@ export type PasteLinePart = {
   html: string;
   lineType?: "text" | "h2" | "h3" | "bullet" | "numbered" | "checklist";
   checked?: boolean;
+  listIndent?: number;
 };
 
 function normalizeClipboardPlainText(plainText: string) {
@@ -585,13 +586,51 @@ function pushPasteLine(
   html: string,
   lineType?: PasteLinePart["lineType"],
   checked?: boolean,
+  listIndent?: number,
 ) {
   const trimmed = html.trim();
   lines.push({
     html: trimmed || "<br>",
     lineType,
     checked,
+    listIndent,
   });
+}
+
+function getListItemInlineHtml(item: HTMLElement) {
+  const clone = item.cloneNode(true) as HTMLElement;
+  clone
+    .querySelectorAll(":scope > ul, :scope > ol")
+    .forEach((nestedList) => nestedList.remove());
+
+  return getInlineLineHtml(clone);
+}
+
+function processPasteListItems(
+  listElement: HTMLElement,
+  lines: PasteLinePart[],
+  depth: number,
+) {
+  const checklist = isChecklistList(listElement);
+  const lineType = checklist ? "checklist" : listElement.tagName === "OL" ? "numbered" : "bullet";
+
+  for (const item of listElement.querySelectorAll(":scope > li")) {
+    if (!(item instanceof HTMLElement)) continue;
+
+    pushPasteLine(
+      lines,
+      getListItemInlineHtml(item),
+      lineType,
+      checklist ? isListItemChecked(item) : undefined,
+      depth > 0 ? depth : undefined,
+    );
+
+    for (const nestedList of item.querySelectorAll(":scope > ul, :scope > ol")) {
+      if (nestedList instanceof HTMLElement) {
+        processPasteListItems(nestedList, lines, depth + 1);
+      }
+    }
+  }
 }
 
 function processPasteBlockNode(node: Node, lines: PasteLinePart[]) {
@@ -605,25 +644,8 @@ function processPasteBlockNode(node: Node, lines: PasteLinePart[]) {
 
   if (!(node instanceof HTMLElement)) return;
 
-  if (node.tagName === "UL") {
-    const checklist = isChecklistList(node);
-    for (const item of node.querySelectorAll(":scope > li")) {
-      if (!(item instanceof HTMLElement)) continue;
-      pushPasteLine(
-        lines,
-        getInlineLineHtml(item),
-        checklist ? "checklist" : "bullet",
-        checklist ? isListItemChecked(item) : undefined,
-      );
-    }
-    return;
-  }
-
-  if (node.tagName === "OL") {
-    for (const item of node.querySelectorAll(":scope > li")) {
-      if (!(item instanceof HTMLElement)) continue;
-      pushPasteLine(lines, getInlineLineHtml(item), "numbered");
-    }
+  if (node.tagName === "UL" || node.tagName === "OL") {
+    processPasteListItems(node, lines, 0);
     return;
   }
 
@@ -649,33 +671,45 @@ function processPasteBlockNode(node: Node, lines: PasteLinePart[]) {
   pushPasteLine(lines, getInlineLineHtml(node));
 }
 
-const PLAIN_BULLET_LINE = /^\s*[-*•⁃]\s+(.*)$/;
-const PLAIN_NUMBERED_LINE = /^\s*\d+[.)]\s+(.*)$/;
-const PLAIN_CHECKLIST_LINE = /^\s*\[( |x|X)\]\s+(.*)$/;
+const PLAIN_BULLET_LINE = /^(\s*)([-*•⁃]\s+)(.*)$/;
+const PLAIN_NUMBERED_LINE = /^(\s*)(\d+[.)]\s+)(.*)$/;
+const PLAIN_CHECKLIST_LINE = /^(\s*)\[( |x|X)\]\s+(.*)$/;
+const PLAIN_LIST_INDENT_SPACES = 2;
+
+function plainTextListIndentLevel(leadingWhitespace: string) {
+  const normalized = leadingWhitespace.replace(/\t/g, "  ");
+  return Math.max(0, Math.floor(normalized.length / PLAIN_LIST_INDENT_SPACES));
+}
 
 export function plainTextLineToPastePart(line: string): PasteLinePart {
   const checklistMatch = line.match(PLAIN_CHECKLIST_LINE);
   if (checklistMatch) {
+    const listIndent = plainTextListIndentLevel(checklistMatch[1]);
     return {
-      html: escapeHtml(checklistMatch[2].trim()) || "<br>",
+      html: escapeHtml(checklistMatch[3].trim()) || "<br>",
       lineType: "checklist",
-      checked: checklistMatch[1].toLowerCase() === "x",
+      checked: checklistMatch[2].toLowerCase() === "x",
+      listIndent: listIndent > 0 ? listIndent : undefined,
     };
   }
 
   const bulletMatch = line.match(PLAIN_BULLET_LINE);
   if (bulletMatch) {
+    const listIndent = plainTextListIndentLevel(bulletMatch[1]);
     return {
-      html: escapeHtml(bulletMatch[1].trim()) || "<br>",
+      html: escapeHtml(bulletMatch[3].trim()) || "<br>",
       lineType: "bullet",
+      listIndent: listIndent > 0 ? listIndent : undefined,
     };
   }
 
   const numberedMatch = line.match(PLAIN_NUMBERED_LINE);
   if (numberedMatch) {
+    const listIndent = plainTextListIndentLevel(numberedMatch[1]);
     return {
-      html: escapeHtml(numberedMatch[1].trim()) || "<br>",
+      html: escapeHtml(numberedMatch[3].trim()) || "<br>",
       lineType: "numbered",
+      listIndent: listIndent > 0 ? listIndent : undefined,
     };
   }
 
