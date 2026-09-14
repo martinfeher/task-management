@@ -81,6 +81,7 @@ import {
   splitEditorContent,
   splitBlockLinesOnBreaks,
   splitLineAtCursor,
+  removeLeadingEmptyBodyLineOnBackspace,
   syncEditorBodyPlaceholderVisibility,
   syncLineEmptyState,
   toggleChecklistLine,
@@ -5756,6 +5757,21 @@ export function TaskDetailsPanel({
       scheduleAutoSave();
       updateLineControls();
       return;
+    }
+
+    if (event.key === "Backspace") {
+      const editor = editorRef.current;
+      if (!editor) return;
+
+      if (removeLeadingEmptyBodyLineOnBackspace(editor)) {
+        event.preventDefault();
+        syncEditorLineEmptyState(editor);
+        syncEditorContent();
+        recordHistorySnapshot();
+        scheduleAutoSave();
+        updateLineControls();
+        return;
+      }
     }
 
     if (event.key === "Enter" && !event.shiftKey) {

@@ -670,6 +670,7 @@ export function CalendarMultiDayView({
               nextLabel="Next day"
             />
           </div>
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <div ref={timeScrollRef} className={CALENDAR_TIMED_GRID_SCROLL_CLASS}>
             <div style={{ minWidth: minGridWidth }}>
               <div className={CALENDAR_DAYS_HEADER_STICKY_CLASS}>
@@ -1095,6 +1096,7 @@ export function CalendarMultiDayView({
             ) : null}
               </div>
             </div>
+          </div>
           </div>
         </div>
       </div>

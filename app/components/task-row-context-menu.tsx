@@ -2,11 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { BiChevronRight } from "react-icons/bi";
-import { IoMdPricetag } from "react-icons/io";
+// import { IoMdPricetag } from "react-icons/io";
 import { IoDuplicateOutline } from "react-icons/io5";
 import { PiListStarThin, PiNoteThin } from "react-icons/pi";
 import { RiDeleteBinLine } from "react-icons/ri";
-import { AiOutlineDelete } from "react-icons/ai";
+
+import { LiaTagSolid } from "react-icons/lia";
+
 
 import { LuListVideo } from "react-icons/lu";
 import { TaskContextMenuDateShortcuts } from "./task-context-menu-date-shortcuts";
@@ -72,7 +74,10 @@ const menuItemWithIconClassName =
   "flex items-center gap-2 leading-none";
 
 const menuItemIconSlotClassName =
-  "flex size-[15px] shrink-0 items-center justify-center [&>svg]:block";
+  "flex size-[21px] shrink-0 items-center justify-center [&>svg]:block [&>svg]:size-[15px]";
+
+const menuItemIconSlot20ClassName =
+  "flex size-[19px] shrink-0 items-center justify-center [&>svg]:block [&>svg]:size-[20px]";
 
 const deleteMenuItemIconSlotClassName =
   "flex size-[25px] shrink-0 items-center justify-center [&>svg]:block [&>svg]:size-[25px]";
@@ -152,31 +157,7 @@ function MainMenuItems({
 
   return (
     <div role="menu" className={`${menuWidthClass} ${menuClassName}`}>
-      {hasMoveActions ? (
-        <button
-          type="button"
-          role="menuitem"
-          className={`${menuItemClassName} justify-between ${
-            view === "moveTo" ? "bg-zinc-100 dark:bg-zinc-800" : ""
-          }`}
-          onMouseEnter={onMoveMouseEnter}
-          onMouseLeave={onMoveMouseLeave}
-          onClick={(event) => {
-            event.stopPropagation();
-            onOpenMoveMenu();
-          }}
-        >
-          <span className={menuItemWithIconClassName}>
-            <span className={menuItemIconSlotClassName}>
-              <LuListVideo
-                className="size-[15px] text-zinc-500 dark:text-zinc-400"
-              />
-            </span>
-            Move to
-          </span>
-          <BiChevronRight className="size-4 shrink-0 text-zinc-400" aria-hidden />
-        </button>
-      ) : null}
+     
       {hasDueDateActions ? (
         <TaskContextMenuDateShortcuts
           hasDueDate={Boolean(task.dueDate)}
@@ -196,29 +177,37 @@ function MainMenuItems({
       ) : null}
       {hasDueDateActions && hasPriorityActions ? prioritySelector : null}
       {!hasDueDateActions && hasPriorityActions ? prioritySelector : null}
-      {hasSubtaskActions ? (
+       {hasMoveActions ? (
         <button
           type="button"
           role="menuitem"
-          className={menuItemClassName}
+          className={`${menuItemClassName} group cursor-pointer justify-between ${
+            view === "moveTo" ? "bg-zinc-100 dark:bg-zinc-800" : ""
+          }`}
+          onMouseEnter={onMoveMouseEnter}
+          onMouseLeave={onMoveMouseLeave}
           onClick={(event) => {
             event.stopPropagation();
-            onAddSubtask();
+            onOpenMoveMenu();
           }}
         >
-          <span className={menuItemWithIconClassName}>
+          <span className={`${menuItemWithIconClassName} group`}>
+     
             <span className={menuItemIconSlotClassName}>
-              <TaskListSubtaskIcon className="size-[15px] text-zinc-500 dark:text-zinc-400" />
+              <LuListVideo
+                className="size-[19px]! mt-[1px] text-zinc-350 group-hover:text-zinc-400 dark:text-zinc-400"
+              />
             </span>
-            Add subtask
+            <span className="text-[15px] text-zinc-800">Move to</span>
           </span>
+          <BiChevronRight className="size-5 shrink-0 text-zinc-350 group-hover:text-zinc-400" aria-hidden />
         </button>
       ) : null}
       {hasLabelActions ? (
         <button
           type="button"
           role="menuitem"
-          className={menuItemClassName}
+            className={`${menuItemClassName} group cursor-pointer`}
           onClick={(event) => {
             event.stopPropagation();
             onOpenLabelMenu();
@@ -226,28 +215,48 @@ function MainMenuItems({
         >
           <span className={menuItemWithIconClassName}>
             <span className={menuItemIconSlotClassName}>
-              <IoMdPricetag
-                className="size-[15px] text-zinc-500 dark:text-zinc-400"
+              <LiaTagSolid
+                className="size-[20px]! text-[#b4b4c8]! group-hover:text-zinc-450 dark:text-zinc-400"
               />
             </span>
-            {task.labels.length > 0 ? "Labels" : "Add label"}
+            <span className="text-[15px] text-zinc-800">{task.labels.length > 0 ? "Labels" : "Add label"}</span>
           </span>
         </button>
       ) : null}
+
+      {hasSubtaskActions ? (
+        <button
+          type="button"
+          role="menuitem"
+          className={`${menuItemClassName} group cursor-pointer`}
+          onClick={(event) => {
+            event.stopPropagation();
+            onAddSubtask();
+          }}
+        >
+          <span className={menuItemWithIconClassName}>
+            <span className={menuItemIconSlotClassName}>
+              <TaskListSubtaskIcon className="size-[19px]! text-zinc-400 group-hover:text-zinc-450 dark:text-zinc-400" />
+            </span>
+            Add subtask
+          </span>
+        </button>
+      ) : null}
+      
       {hasImportantActions ? (
         <button
           type="button"
           role="menuitem"
-          className={menuItemClassName}
+          className={`${menuItemClassName} group cursor-pointer`}
           onClick={(event) => {
             event.stopPropagation();
             onToggleTaskImportant();
           }}
         >
           <span className={menuItemWithIconClassName}>
-            <span className={menuItemIconSlotClassName}>
+            <span className={menuItemIconSlot20ClassName}>
               <PiListStarThin
-                className="size-[15px] text-zinc-500 dark:text-zinc-400"
+                className="size-[20px] text-zinc-500 group-hover:text-zinc-550 dark:text-zinc-400"
               />
             </span>
             {task.important ? "Remove from important" : "Mark as important"}
@@ -258,7 +267,7 @@ function MainMenuItems({
         <button
           type="button"
           role="menuitem"
-          className={menuItemClassName}
+          className={`${menuItemClassName} group cursor-pointer`}
           onClick={(event) => {
             event.stopPropagation();
             onConvertTaskToNote();
@@ -267,7 +276,8 @@ function MainMenuItems({
           <span className={menuItemWithIconClassName}>
             <span className={menuItemIconSlotClassName}>
               <PiNoteThin
-                className="size-[15px] text-zinc-500 dark:text-zinc-400"
+                style={{ transform: "scaleX(0.87)" }}
+                className="size-[19px]! text-zinc-600 group-hover:text-zinc-650 dark:text-zinc-400"
               />
             </span>
             {task.isNote ? "turn into Task" : "convert to Note"}
@@ -278,7 +288,7 @@ function MainMenuItems({
         <button
           type="button"
           role="menuitem"
-          className={menuItemClassName}
+          className={`${menuItemClassName} group cursor-pointer`}
           onClick={(event) => {
             event.stopPropagation();
             onDuplicateTask();
@@ -287,7 +297,7 @@ function MainMenuItems({
           <span className={menuItemWithIconClassName}>
             <span className={menuItemIconSlotClassName}>
               <IoDuplicateOutline
-                className="size-[15px] text-zinc-500 dark:text-zinc-400"
+                className="size-[15px] text-zinc-450 group-hover:text-zinc-500 dark:text-zinc-400"
               />
             </span>
             Duplicate
@@ -300,7 +310,7 @@ function MainMenuItems({
           <button
             type="button"
             role="menuitem"
-            className={`${deleteMenuItemClassName} -ml-[3px] cursor-pointer`}
+            className={`${deleteMenuItemClassName} group -ml-[3px] cursor-pointer`}
        
             onClick={(event) => {
               event.stopPropagation();
@@ -309,9 +319,10 @@ function MainMenuItems({
           >
             <span className={menuItemWithIconClassName}>
               <span className={deleteMenuItemIconSlotClassName}>
-                <AiOutlineDelete
-                  className="size-[18px]! mb-[2px]! text-[#e07142] dark:text-red-400"
-                  strokeWidth={0.5}
+                <RiDeleteBinLine
+                  className="!size-[18px] ml-[3px] mb-[1px] text-[#e07142] group-hover:text-red-500 dark:text-red-400"
+                  strokeWidth={0.2}
+                  style={{ transform: "scaleX(0.87)" }}
                 />
               </span>
               <span className="text-[15px]">Delete</span>

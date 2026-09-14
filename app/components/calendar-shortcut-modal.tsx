@@ -114,7 +114,7 @@ export function CalendarShortcutModal({
         className="absolute inset-10 z-10 flex min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-[#fbfbfc] shadow-2xl dark:border-zinc-700 dark:bg-zinc-950"
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <div className="min-h-0 flex-1 overflow-hidden">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <CalendarPanel
             {...calendarPanelProps}
             periodLabelAction={

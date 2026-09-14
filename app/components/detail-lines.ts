@@ -1244,6 +1244,54 @@ export function splitLineAtCursor(editor: HTMLElement) {
   placeCaretInLine(newLine);
 }
 
+function hasNonPlaceholderBodyContentBelow(
+  editor: HTMLElement,
+  fromIndex: number,
+) {
+  const lines = getLineElements(editor);
+  return lines
+    .slice(fromIndex + 1)
+    .some(
+      (line) => !isBodyPlaceholderLine(line) && isBodyLineWithContent(line),
+    );
+}
+
+export function removeLeadingEmptyBodyLineOnBackspace(
+  editor: HTMLElement,
+): boolean {
+  ensureBlockLines(editor);
+  ensureTitleLine(editor);
+
+  const activeLine = getActiveLineElement(editor);
+  if (!activeLine || isTitleLine(editor, activeLine)) {
+    return false;
+  }
+
+  const lines = getLineElements(editor);
+  const lineIndex = lines.indexOf(activeLine);
+  if (lineIndex !== 1) {
+    return false;
+  }
+
+  if (!isEmptyEditableBodyLine(editor, activeLine)) {
+    return false;
+  }
+
+  if (!hasNonPlaceholderBodyContentBelow(editor, lineIndex)) {
+    return false;
+  }
+
+  const nextLine = lines[2];
+  if (!nextLine) {
+    return false;
+  }
+
+  activeLine.remove();
+  placeCaretInLine(nextLine);
+  renumberNumberedLines(editor);
+  return true;
+}
+
 function mergeLineHtml(existingHtml: string, appendedHtml: string) {
   const left = existingHtml.trim();
   const right = appendedHtml.trim();

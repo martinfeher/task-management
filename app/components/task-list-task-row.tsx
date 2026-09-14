@@ -235,6 +235,13 @@ export function isTaskDatePickerTriggerElement(target: Node) {
   return isTaskDatePickerTrigger(target);
 }
 
+export function isTaskPriorityTriggerElement(target: Node) {
+  return (
+    target instanceof Element &&
+    Boolean(target.closest("[data-task-priority-trigger]"))
+  );
+}
+
 export function TaskListTaskRow({
   task,
   depth = 0,
@@ -342,6 +349,9 @@ export function TaskListTaskRow({
       isPriorityMenuOpen ||
       isPointerMenuOpen ||
       rowMenuView !== null);
+  const rowActionsPointerClass = isRowMenuOpen
+    ? "pointer-events-auto"
+    : "pointer-events-none group-hover:pointer-events-auto";
 
   const basePaddingLeft = useWiderRowPadding ? 1 : 0;
   const rowOuterPaddingLeft = depth * SUBTASK_INDENT_PX;
@@ -849,14 +859,14 @@ export function TaskListTaskRow({
         ) : null}
 
         <div
-          className={`absolute inset-y-0 -right-[5px] z-20 flex items-center transition-opacity ${
+          className={`absolute inset-y-0 -right-[5px] z-20 flex items-center pointer-events-none transition-opacity ${
             isRowMenuOpen
-              ? "pointer-events-auto opacity-100"
-              : "pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100"
+              ? "opacity-100"
+              : "opacity-0 group-hover:opacity-100"
           }`}
         >
           {showSetDateOnHover ? (
-            <div className="group/set-date relative">
+            <div className={`group/set-date relative ${rowActionsPointerClass}`}>
               <button
                 ref={datePickerAnchorRef}
                 type="button"
@@ -933,7 +943,7 @@ export function TaskListTaskRow({
             : null}
 
           <div
-            className="relative"
+            className={`relative ${rowActionsPointerClass}`}
             ref={rowMenuView ? taskContextMenuRef : null}
           >
             <button
@@ -1051,11 +1061,13 @@ export function TaskListTaskRow({
           ? createPortal(
               <div
                 ref={taskPriorityMenuRef}
+                data-task-priority-menu
                 className="fixed z-50"
                 style={{
                   top: priorityMenuPosition.top,
                   left: priorityMenuPosition.left,
                 }}
+                onPointerDown={(event) => event.stopPropagation()}
               >
                 <TaskPriorityMenu
                   selectedPriority={task.priority}

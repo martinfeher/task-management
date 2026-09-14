@@ -28,6 +28,7 @@ import {
   getTaskListItemDividerClass,
   getTaskRowLeftBorderClass,
   isTaskDatePickerTriggerElement,
+  isTaskPriorityTriggerElement,
 } from "./task-list-task-row";
 import { TaskLabelSelector, type Label } from "./task-label-selector";
 import { TaskPrioritySelector } from "./task-priority-selector";
@@ -940,6 +941,8 @@ export function TaskListPanel({
         return;
       }
       if (isTaskDatePickerTriggerElement(target)) return;
+      if (isTaskPriorityTriggerElement(target)) return;
+      if (targetElement?.closest("[data-task-priority-menu]")) return;
       if (targetElement?.closest("[data-task-label-menu]")) return;
       if (taskLabelMenuRef.current?.contains(target)) return;
       if (taskPriorityMenuRef.current?.contains(target)) return;

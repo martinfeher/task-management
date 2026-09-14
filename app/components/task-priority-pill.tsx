@@ -144,10 +144,15 @@ function TaskPriorityPillInner({
         <button
           ref={buttonRef}
           type="button"
+          data-task-priority-trigger
           aria-label={`${ariaLabel}. Change priority`}
           aria-haspopup="menu"
           aria-expanded={menuOpen}
           className={`inline-flex shrink-0 cursor-pointer rounded-full transition-opacity hover:opacity-90 ${className}`}
+          onPointerDown={(event) => {
+            if (event.button !== 0) return;
+            event.stopPropagation();
+          }}
           onClick={(event) => {
             event.stopPropagation();
             onToggleMenu?.(event);

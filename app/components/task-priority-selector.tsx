@@ -68,8 +68,8 @@ export function TaskPrioritySelector({
   const tooltipBaseId = useId();
 
   return (
-    <div className="overflow-visible px-3 pt-[6px] pb-[3px]">
-      <div className="mb-[3px] text-[11px] font-medium text-zinc-350 dark:text-zinc-500">
+    <div className="overflow-visible px-3 pt-[2px] pb-[3px]">
+      <div className="text-[11px] font-medium text-zinc-350 dark:text-zinc-500">
         priority
       </div>
       <div className="flex w-full items-center justify-between">

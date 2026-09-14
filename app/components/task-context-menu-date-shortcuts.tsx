@@ -88,24 +88,24 @@ export function TaskContextMenuDateShortcuts({
 
   return (
     <div className="overflow-visible px-3 pt-[6px]">
-      <div className="mb-[1px] flex items-center justify-between">
+      <div className="flex items-center justify-between">
         <div className="text-[11px] font-medium text-zinc-350 dark:text-zinc-500">
           Date
         </div>
         {hasDueDate ? (
-          <div className="group/clear-date relative cursor-pointer">
+          <div className="group relative cursor-pointer">
             <button
               type="button"
               aria-label="Clear date"
               aria-describedby={`${tooltipBaseId}-clear-date`}
-              className="flex gap-1 pr-[6px] cursor-pointer text-[11px] font-medium text-[#c8c1b6] transition-colors hover:text-zinc-600 dark:hover:text-zinc-300"
+              className="flex gap-1 pr-[6px] cursor-pointer text-[11px] font-medium text-[#c8c1b6] transition-colors group-hover:text-zinc-500 dark:hover:text-zinc-300"
               onClick={(event) => {
                 event.stopPropagation();
                 onClearDate?.();
               }}
             >
               Clear{" "}
-              <LuCalendarX2 className="mt-[2px] size-[10px] text-[#c8c1b6]" />
+              <LuCalendarX2 className="mt-[3px] size-[10px] text-[#c8c1b6] group-hover:text-zinc-500" />
             </button>
             <span
               id={`${tooltipBaseId}-clear-date`}

@@ -489,9 +489,9 @@ export function CalendarMultiWeekView({
 
         <div className={CALENDAR_GRID_SCROLL_CLASS}>
           <div
-            className="grid h-full min-h-full grid-cols-7"
+            className="grid grid-cols-7"
             style={{
-              gridTemplateRows: `repeat(${weekCount}, minmax(${rowMinHeightPx}px, 1fr))`,
+              gridTemplateRows: `repeat(${weekCount}, minmax(${rowMinHeightPx}px, auto))`,
             }}
           >
             {visibleDays.map((day, dayIndex) => {
