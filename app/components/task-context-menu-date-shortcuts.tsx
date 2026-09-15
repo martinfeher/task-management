@@ -2,9 +2,8 @@
 
 import { useId, type MouseEvent, type ReactNode } from "react";
 import { BsCalendarPlus } from "react-icons/bs";
-import { LiaCaretSquareRight } from "react-icons/lia";
-import { LuCalendarX2 } from "react-icons/lu";
 import { CgCalendarNext } from "react-icons/cg";
+import { LuCalendarX2 } from "react-icons/lu";
 import {
   getNextWeekendSaturdayDate,
   getNextWeekendSaturdayDateKey,
@@ -143,7 +142,10 @@ export function TaskContextMenuDateShortcuts({
             onSelectDate(getTomorrowDateKey());
           }}
         >
-          <LiaCaretSquareRight className="text-[#909295]" />
+          <CgCalendarNext 
+            className="text-[#adaeb2]! size-[24px]! mt-px"
+            strokeWidth={0.05}
+          />
         </DateShortcutButton>
         <DateShortcutButton
           label="Next weekend"

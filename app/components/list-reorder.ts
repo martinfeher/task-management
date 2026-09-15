@@ -7,6 +7,12 @@ export function getListRowElements(container: HTMLElement) {
   );
 }
 
+export function getSidebarTopLevelRowElements(container: HTMLElement) {
+  return Array.from(
+    container.querySelectorAll<HTMLElement>("[data-sidebar-reorder-row]"),
+  );
+}
+
 export function reorderListIds(
   listIds: string[],
   sourceIndex: number,
@@ -58,4 +64,28 @@ export function getListDropIndex(
   draggingIndex: number | null = null,
 ) {
   return getDropIndex(clientY, rows, draggingIndex);
+}
+
+export function getFolderDropTargetFromPoint(
+  clientX: number,
+  clientY: number,
+  container: HTMLElement,
+) {
+  const folderRows = Array.from(
+    container.querySelectorAll<HTMLElement>("[data-folder-id]"),
+  );
+
+  for (const row of folderRows) {
+    const rect = row.getBoundingClientRect();
+    if (
+      clientX >= rect.left &&
+      clientX <= rect.right &&
+      clientY >= rect.top &&
+      clientY <= rect.bottom
+    ) {
+      return row.dataset.folderId ?? null;
+    }
+  }
+
+  return null;
 }

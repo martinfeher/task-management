@@ -5,11 +5,11 @@ import {
   BiChevronDown,
   BiChevronLeft,
   BiChevronRight,
-  BiSun,
   BiTimeFive,
 } from "react-icons/bi";
 import { MdAlarm } from "react-icons/md";
-import { CalendarOff, Repeat } from "lucide-react";
+import { Repeat, Sparkles } from "lucide-react";
+import { getNextWeekendSaturdayDate } from "@/lib/task-due-date";
 import {
   formatDueTimeLabel,
   formatDurationInputText,
@@ -91,16 +91,6 @@ export function computeTaskDatePickerMenuPosition(
   };
 }
 
-/** Canvas Time Lens–aligned picker tokens (oklch approximations) */
-const PICKER_ACCENT = "#67676";
-const PICKER_ACCENT_SOFT = "#f1f1f1";
-const PICKER_BORDER = "#ebecef";
-const PICKER_MUTED = "#f4f5f7";
-const PICKER_MUTED_FG = "#71717a";
-const PICKER_FOREGROUND = "#1c2030";
-const PICKER_POPOVER_SHADOW =
-  "0 12px 40px -8px rgba(15, 23, 42, 0.18), 0 2px 8px rgba(15, 23, 42, 0.06)";
-
 function lightenHexColor(hex: string, amount: number) {
   const normalized = hex.replace("#", "");
   const channels = [
@@ -117,6 +107,16 @@ function lightenHexColor(hex: string, amount: number) {
     )
     .join("")}`;
 }
+
+/** Canvas Time Lens–aligned picker tokens */
+const PICKER_ACCENT = "#87a1cb";
+const PICKER_ACCENT_SOFT = lightenHexColor(PICKER_ACCENT, 0.88);
+const PICKER_BORDER = "#ebecef";
+const PICKER_MUTED = "#f4f5f7";
+const PICKER_MUTED_FG = "#71717a";
+const PICKER_FOREGROUND = "#63636d";
+const PICKER_POPOVER_SHADOW =
+  "0 12px 40px -8px rgba(15, 23, 42, 0.18), 0 2px 8px rgba(15, 23, 42, 0.06)";
 
 const PICKER_DURATION_SCROLL_THUMB = lightenHexColor("#a1a1aa", 0.15);
 const PICKER_DURATION_SCROLL_THUMB_HOVER = lightenHexColor("#71717a", 0.15);
@@ -178,7 +178,7 @@ const DATE_FORMAT_OPTIONS: {
   {
     value: "european",
     label: "dd/mm/yyyy",
-    placeholder: "dd/mm/yyyy",
+    placeholder: "next monday or dd/mm/yyyy ",
     example: "07/05/2026 or 15.09.2026",
   },
   {
@@ -359,6 +359,14 @@ function formatWeekdayShort(date: Date) {
   return new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(date);
 }
 
+function formatPickerFooterDate(date: Date) {
+  return new Intl.DateTimeFormat(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  }).format(date);
+}
+
 function getMonthDays(year: number, month: number, today: Date) {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const visibleDays: Date[] = [];
@@ -377,15 +385,6 @@ function getMonthDays(year: number, month: number, today: Date) {
   const padding = getMondayFirstWeekdayIndex(visibleDays[0]);
   const cells: (Date | null)[] = Array.from({ length: padding }, () => null);
   return [...cells, ...visibleDays];
-}
-
-function TodayIcon() {
-  const today = new Date().getDate();
-  return (
-    <span className="relative flex size-6 items-center justify-center rounded-md bg-emerald-500 text-[14px] font-semibold text-white">
-      {today}
-    </span>
-  );
 }
 
 function getVisiblePickerCalendarRange(
@@ -442,7 +441,10 @@ function MonthGrid({
         {WEEKDAY_LABELS.map((label, index) => (
           <div
             key={`${label}-${index}`}
-            className="flex h-7 items-center justify-center text-[13px] font-medium text-zinc-400"
+            className="flex h-7 items-center justify-center text-[13px] font-medium"
+            style={{
+              color: index >= 5 ? PICKER_ACCENT : PICKER_MUTED_FG,
+            }}
           >
             {label}
           </div>
@@ -466,11 +468,18 @@ function MonthGrid({
               onClick={() => onSelectDate(day)}
               className={`relative mx-auto flex size-[29px] items-center justify-center rounded-full text-[13px] transition-colors cursor-pointer ${
                 isSelected
-                  ? "bg-[#87a1cb] font-medium text-white"
+                  ? "font-medium text-white"
                   : isSunday
-                    ? "font-medium text-orange-700 hover:bg-slate-100 dark:hover:bg-zinc-800"
+                    ? "font-medium hover:bg-slate-100 dark:hover:bg-zinc-800"
                     : "text-zinc-600 hover:bg-slate-100 dark:text-zinc-100 dark:hover:bg-zinc-800"
               }`}
+              style={
+                isSelected
+                  ? { backgroundColor: PICKER_ACCENT }
+                  : isSunday
+                    ? { color: PICKER_ACCENT }
+                    : undefined
+              }
             >
               {day.getDate()}
               {isToday && !isSelected ? (
@@ -594,7 +603,7 @@ function TaskReminderMenu({
           }
           openMenu();
         }}
-        className={`flex w-full items-center justify-center gap-2 rounded-full border py-2 text-[13px] font-medium transition-colors ${
+        className={`flex w-full items-center justify-center gap-2 rounded-full border py-2 text-[13px] text-zinc-400! font-medium transition-colors ${
           disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"
         }`}
         style={{
@@ -603,14 +612,13 @@ function TaskReminderMenu({
         }}
       >
         <MdAlarm
-          className="size-4 shrink-0"
-          style={{ color: PICKER_MUTED_FG }}
+          className="size-4 shrink-0 text-[#808089]"
           aria-hidden="true"
         />
         <span
           className="truncate"
           style={{
-            color: hasActiveReminder ? PICKER_ACCENT : "#6c6d6d",
+            color: hasActiveReminder ? PICKER_ACCENT : "#808089",
           }}
         >
           {triggerLabel}
@@ -774,12 +782,12 @@ function TaskRecurrenceMenu({
         }}
       >
         <Repeat
-          className="size-4 shrink-0 text-[#929494]"
+          className="size-4 shrink-0 text-[#808089]"
           strokeWidth={2}
           style={{ color: PICKER_MUTED_FG }}
           aria-hidden="true"
         />
-        <span className="truncate text-[#6c6d6d]">{triggerLabel}</span>
+        <span className="truncate text-[#808089]">{triggerLabel}</span>
         <BiChevronDown
           className={`size-4 shrink-0 transition-transform ${
             isOpen ? "rotate-180" : ""
@@ -1447,30 +1455,54 @@ export function TaskDatePicker({
     );
   }
 
+  const nextWeekend = useMemo(
+    () => startOfDay(getNextWeekendSaturdayDate(today)),
+    [today],
+  );
+
   const quickOptions = [
     {
       key: "today",
       label: "Today",
       hint: formatWeekdayShort(today),
-      icon: <TodayIcon />,
       date: today,
     },
     {
       key: "tomorrow",
       label: "Tomorrow",
       hint: formatWeekdayShort(tomorrow),
-      icon: <BiSun className="size-6 text-amber-500" />,
       date: tomorrow,
+    },
+    {
+      key: "weekend",
+      label: "Weekend",
+      hint: formatWeekdayShort(nextWeekend),
+      date: nextWeekend,
     },
   ];
 
-  function handleRemoveDate(event: SyntheticEvent) {
-    event.preventDefault();
-    event.stopPropagation();
+  function handleClearDateAndTime(event?: SyntheticEvent) {
+    event?.preventDefault();
+    event?.stopPropagation();
     onSelectDate(null);
     setTypedDate("");
     setDateInputError(false);
+    setIsTimeMenuOpen(false);
+
+    if (onSaveDueTime) {
+      onSaveDueTime({
+        dueTimeMinutes: null,
+        dueDurationMinutes: null,
+        dueTimeZone: normalizeDueTimeZone(dueTimeZone),
+      });
+    }
   }
+
+  function jumpToToday() {
+    setViewMonth(todayMonth);
+  }
+
+  const hasDateOrTime = Boolean(dueDate) || dueTimeMinutes !== null;
 
   return (
     <div
@@ -1488,38 +1520,48 @@ export function TaskDatePicker({
         className="border-b p-2"
         style={{ borderColor: PICKER_BORDER }}
       >
-        <input
-          ref={dateInputRef}
-          type="text"
-          data-task-date-picker-date-input
-          value={typedDate}
-          onChange={(event) => {
-            setTypedDate(event.target.value);
-            if (dateInputError) {
-              setDateInputError(false);
-            }
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.preventDefault();
-              handleTypedDateSubmit();
-            }
-          }}
-          onFocus={() => setIsDateInputFocused(true)}
-          onBlur={() => setIsDateInputFocused(false)}
-          placeholder={
-            isDateInputFocused
-              ? activeFormat.placeholder
-              : "Type a date — e.g. next friday"
-          }
-          aria-invalid={dateInputError}
-          className={`w-full rounded-[12px] px-3.5 py-[6px] text-[13px] outline-none ${
-            dateInputError
-              ? "text-red-600 placeholder:text-red-300"
-              : "text-zinc-900 placeholder:text-zinc-400"
-          }`}
+        <div
+          className="flex items-center gap-2 rounded-[12px] px-3 py-[6px]"
           style={{ backgroundColor: PICKER_MUTED }}
-        />
+        >
+          <Sparkles
+            className="size-4 shrink-0"
+            strokeWidth={2}
+            aria-hidden="true"
+            style={{ color: "#a6a6a6" }}
+          />
+          <input
+            ref={dateInputRef}
+            type="text"
+            data-task-date-picker-date-input
+            value={typedDate}
+            onChange={(event) => {
+              setTypedDate(event.target.value);
+              if (dateInputError) {
+                setDateInputError(false);
+              }
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                handleTypedDateSubmit();
+              }
+            }}
+            onFocus={() => setIsDateInputFocused(true)}
+            onBlur={() => setIsDateInputFocused(false)}
+            placeholder={
+              isDateInputFocused
+                ? activeFormat.placeholder
+                : "next monday or dd/mm/yyyy "
+            }
+            aria-invalid={dateInputError}
+            className={`min-w-0 flex-1 bg-transparent py-0 text-[13px] outline-none ${
+              dateInputError
+                ? "text-red-600 placeholder:text-red-300"
+                : "text-zinc-900 placeholder:text-zinc-400"
+            }`}
+          />
+        </div>
         {dateInputError && (
           <p className="mt-1.5 text-[14px] text-red-500">
             Enter a valid future date, e.g. {activeFormat.example}
@@ -1531,49 +1573,41 @@ export function TaskDatePicker({
         className="flex gap-2 overflow-visible p-2"
         style={{ borderColor: PICKER_BORDER }}
       >
-        {quickOptions.map((option) => (
-          <button
-            key={option.key}
-            type="button"
-            onClick={() => selectDate(option.date)}
-            className="flex-1 rounded-xl border px-3 py-[5px] text-left transition-colors hover:border-[#d5d5d5] hover:bg-[#f0f0f0] cursor-pointer"
-            style={{ borderColor: PICKER_BORDER }}
-          >
-            <span className="block text-[13px] leading-[1.3] font-medium text-zinc-700">
-              {option.label}
-            </span>
-            <span
-              className="block text-[12px] text-zinc-450"
-            >
-              {option.hint}
-            </span>
-          </button>
-        ))}
-        {dueDate ? (
-          <div className="group/no-date relative shrink-0">
+        {quickOptions.map((option) => {
+          const isSelected =
+            selectedDate !== null && isSameDay(option.date, selectedDate);
+
+          return (
             <button
+              key={option.key}
               type="button"
-              onPointerDown={handleRemoveDate}
-              aria-label="Remove date"
-              aria-describedby="task-date-picker-remove-date-tooltip"
-              className="flex shrink-0 items-center justify-center rounded-xl border px-3 py-2 h-[46px]! transition-colors hover:border-red-300 hover:text-red-600 cursor-pointer"
-              style={{ borderColor: PICKER_BORDER, color: PICKER_MUTED_FG }}
+              onClick={() => selectDate(option.date)}
+              className={`flex-1 rounded-xl border px-2.5 py-[5px] text-left transition-colors cursor-pointer ${
+                isSelected ? "border-transparent" : "hover:border-[#d5d5d5] hover:bg-[#f0f0f0]"
+              }`}
+              style={
+                isSelected
+                  ? {
+                      backgroundColor: PICKER_ACCENT,
+                      borderColor: PICKER_ACCENT,
+                    }
+                  : { borderColor: PICKER_BORDER }
+              }
             >
-              <CalendarOff
-                className="pointer-events-none size-4 text-zinc-500"
-                strokeWidth={2}
-                aria-hidden="true"
-              />
+              <span
+                className="block text-[13px] leading-[1.3] font-medium"
+                style={{ color: isSelected ? "#ffffff" : PICKER_FOREGROUND }}
+              >
+                {option.label}
+              </span>
+              <span
+                className={`block text-[11px] ${isSelected ? "text-[#efefef]" : "text-[#a1a5aa]"}`}
+              >
+                {option.hint}
+              </span>
             </button>
-            <span
-              id="task-date-picker-remove-date-tooltip"
-              role="tooltip"
-              className="task-date-picker-remove-tooltip add-task-date-tooltip pointer-events-none absolute right-0 bottom-[calc(100%+10px)] z-40 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity group-hover/no-date:opacity-100"
-            >
-              Remove date
-            </span>
-          </div>
-        ) : null}
+          );
+        })}
       </div>
 
       <div className="border-t border-zinc-200 dark:border-zinc-700">
@@ -1582,6 +1616,13 @@ export function TaskDatePicker({
             {formatMonthYear(viewMonth)}
           </h4>
           <div className="flex items-center gap-1">
+            {/* <button
+              type="button"
+              onClick={jumpToToday}
+              className="mr-1 text-[10px] text-[#B5B5B5] transition-opacity hover:opacity-80 cursor-pointer"
+            >
+              Jump to today
+            </button> */}
             <button
               type="button"
               aria-label="Previous month"
@@ -1632,7 +1673,7 @@ export function TaskDatePicker({
             setOpenFooterSubmenu(null);
             setIsTimeMenuOpen((open) => !open);
           }}
-          className="flex w-full items-center justify-center mb-2 h-[37px]! gap-2 rounded-full border bg-white py-1 text-[13px] border-[#dedede] text-zinc-600 font-medium transition-colors cursor-pointer"
+          className="flex w-full items-center justify-center mb-2 h-[37px]! gap-2 rounded-full border bg-white py-1 text-[13px] border-[#dedede] text-[#808089] font-medium transition-colors cursor-pointer"
           style={
             isTimeMenuOpen || dueTimeMinutes !== null
               ? {
@@ -1647,7 +1688,7 @@ export function TaskDatePicker({
           <BiTimeFive className="size-4" />
           {timeButtonLabel}
           <BiChevronDown
-            className={`size-4 transition-transform ${
+            className={`size-4 text-[#808089] transition-transform ${
               isTimeMenuOpen ? "rotate-180" : ""
             }`}
             aria-hidden="true"
@@ -1690,6 +1731,28 @@ export function TaskDatePicker({
             });
           }}
         />
+      </div>
+
+      <div
+        className="flex items-center justify-between border-t px-4 py-2.5"
+        style={{ borderColor: PICKER_BORDER }}
+      >
+        <span className="text-[13px] text-zinc-400">
+          {selectedDate
+            ? formatPickerFooterDate(selectedDate)
+            : dueTimeMinutes !== null
+              ? formatDueTimeLabel(dueTimeMinutes) ?? "No date"
+              : "No date"}
+        </span>
+        {hasDateOrTime ? (
+          <button
+            type="button"
+            onClick={handleClearDateAndTime}
+            className="text-[13px] text-[#70707c] transition-opacity hover:opacity-80 cursor-pointer mr-2"
+          >
+            Clear
+          </button>
+        ) : null}
       </div>
     </div>
   );

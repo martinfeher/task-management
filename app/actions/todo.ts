@@ -662,6 +662,54 @@ export async function renameTodoList(listId: string, name: string) {
   return list;
 }
 
+export type UpdateTodoListInput = {
+  name: string;
+  folderId: string | null;
+  color: string | null;
+};
+
+export async function updateTodoList(listId: string, input: UpdateTodoListInput) {
+  const trimmedName = input.name.trim();
+  if (!trimmedName) {
+    throw new Error("List name is required");
+  }
+
+  await prisma.$transaction(async (tx) => {
+    const existing = await tx.todoList.findUnique({
+      where: { id: listId },
+      select: { folderId: true },
+    });
+
+    if (!existing) {
+      throw new Error("List not found");
+    }
+
+    const data: {
+      name: string;
+      color: string | null;
+      folderId?: string | null;
+      position?: number;
+    } = {
+      name: trimmedName,
+      color: input.color,
+    };
+
+    if (input.folderId !== existing.folderId) {
+      data.folderId = input.folderId;
+      data.position = input.folderId
+        ? await getNextFolderListPosition(tx, input.folderId)
+        : await getNextTopLevelSidebarPosition(tx);
+    }
+
+    await tx.todoList.update({
+      where: { id: listId },
+      data,
+    });
+  });
+
+  revalidatePath("/");
+}
+
 export async function deleteTodoList(listId: string) {
   const tasks = await prisma.task.findMany({
     where: { listId },
@@ -875,6 +923,49 @@ export async function reorderTodoLists(listIds: string[]) {
       }),
     ),
   );
+
+  revalidatePath("/");
+}
+
+export async function reorderSidebarTopLevel(
+  listPositions: Array<{ id: string; position: number }>,
+  folderPositions: Array<{ id: string; position: number }>,
+) {
+  const [lists, folders] = await Promise.all([
+    prisma.todoList.findMany({
+      where: { id: { in: listPositions.map((item) => item.id) } },
+      select: { id: true },
+    }),
+    prisma.listFolder.findMany({
+      where: { id: { in: folderPositions.map((item) => item.id) } },
+      select: { id: true },
+    }),
+  ]);
+
+  const validListIds = new Set(lists.map((list) => list.id));
+  const validFolderIds = new Set(folders.map((folder) => folder.id));
+
+  if (
+    listPositions.some((item) => !validListIds.has(item.id)) ||
+    folderPositions.some((item) => !validFolderIds.has(item.id))
+  ) {
+    throw new Error("Invalid sidebar order payload");
+  }
+
+  await prisma.$transaction([
+    ...listPositions.map(({ id, position }) =>
+      prisma.todoList.update({
+        where: { id },
+        data: { position },
+      }),
+    ),
+    ...folderPositions.map(({ id, position }) =>
+      prisma.listFolder.update({
+        where: { id },
+        data: { position },
+      }),
+    ),
+  ]);
 
   revalidatePath("/");
 }

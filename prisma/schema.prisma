@@ -24,6 +24,7 @@ model ListFolder {
 model TodoList {
   id        String      @id @default(cuid())
   name      String
+  color     String?
   position  Int         @default(0)
   folderId  String?
   folder    ListFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)

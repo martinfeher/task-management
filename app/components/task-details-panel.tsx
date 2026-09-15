@@ -81,6 +81,7 @@ import {
   splitEditorContent,
   splitBlockLinesOnBreaks,
   splitLineAtCursor,
+  enterFromTitleLine,
   removeLeadingEmptyBodyLineOnBackspace,
   syncEditorBodyPlaceholderVisibility,
   syncLineEmptyState,
@@ -123,6 +124,7 @@ import {
   applyDetailFontSize,
   getAppFontFamilyId,
   getDefaultDetailFontSizeOption,
+  getDetailFontFamilyValue,
   getDetailSelectionFontState,
   isDefaultAppFont,
   isDefaultDetailFontSize,
@@ -349,7 +351,7 @@ const DEFAULT_FORMAT_MENU_INLINE_FORMATS: FormatMenuInlineFormats = {
   underline: false,
   highlight: false,
   highlightColor: "#fef08a",
-  textColor: "#37352f",
+  textColor: "#2e2e2e",
 };
 
 const RECENT_FORMAT_COLORS_STORAGE_KEY = "todolist:recent-format-colors";
@@ -527,19 +529,21 @@ const HIGHLIGHT_COLOR_OPTIONS = [
   { label: "Red", value: "#fecaca" },
 ] as const;
 
-const DEFAULT_TEXT_COLOR = "#37352f";
+const DEFAULT_TEXT_COLOR = "#2e2e2e";
 
 const TEXT_COLOR_OPTIONS = [
-  { label: "Default", value: "#37352f", borderColor: "#e9e9e7" },
-  { label: "Gray", value: "#787774", borderColor: "#e3e2e0" },
-  { label: "Brown", value: "#9f6b53", borderColor: "#ece0db" },
-  { label: "Orange", value: "#d9730d", borderColor: "#fadec9" },
-  { label: "Yellow", value: "#cb912f", borderColor: "#fdecc8" },
-  { label: "Green", value: "#448361", borderColor: "#dbeddb" },
-  { label: "Blue", value: "#337ea9", borderColor: "#d3e5ef" },
-  { label: "Purple", value: "#9065b0", borderColor: "#e8deee" },
-  { label: "Pink", value: "#c14c8a", borderColor: "#f5e0e9" },
-  { label: "Red", value: "#d44c47", borderColor: "#ffe2dd" },
+  { label: "Charcoal", value: "#2e2e2e" },
+  { label: "Dark gray", value: "#545454" },
+  { label: "Gray", value: "#878787" },
+  { label: "Light gray", value: "#b4b4b4" },
+  { label: "Purple", value: "#7838d2" },
+  { label: "Magenta", value: "#c438c4" },
+  { label: "Red", value: "#e03131" },
+  { label: "Orange", value: "#e8590c" },
+  { label: "Gold", value: "#d4a012" },
+  { label: "Green", value: "#17a148" },
+  { label: "Blue", value: "#228be6" },
+  { label: "Navy", value: "#1c44b3" },
 ] as const;
 
 function colorsEquivalent(a: string, b: string) {
@@ -880,6 +884,49 @@ function getSelectionHighlightColor(editor: HTMLElement) {
   }
 
   return colors[0] ?? DEFAULT_HIGHLIGHT_COLOR;
+}
+
+function getFormatSelectionPreviewText(range: Range | null) {
+  if (!range || range.collapsed) return "";
+
+  const normalized = range
+    .toString()
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .split("\n")
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  if (!normalized) return "";
+
+  const maxLines = 6;
+  const lines = normalized.split("\n");
+  let preview = lines.slice(0, maxLines).join("\n");
+  if (lines.length > maxLines) {
+    preview += "\n…";
+  }
+
+  if (preview.length > 200) {
+    preview = `${preview.slice(0, 200)}…`;
+  }
+
+  return preview;
+}
+
+function getTextColorPreviewTypography(
+  fontFamilyId: DetailFontFamilyId,
+  fontSize: DetailFontSizeOption,
+  lineHeight: DetailLineHeightOption,
+) {
+  return {
+    fontFamily:
+      getDetailFontFamilyValue(fontFamilyId) ??
+      getDetailFontFamilyValue(getAppFontFamilyId()),
+    fontSize,
+    lineHeight,
+  };
 }
 
 function resolveTextColorOption(color: string) {
@@ -1879,6 +1926,10 @@ export function TaskDetailsPanel({
   const savedFormatLineIdsRef = useRef<string[]>([]);
   const openFormatDropdownRef = useRef<FormatToolbarDropdown | null>(null);
   openFormatDropdownRef.current = openFormatDropdown;
+  const openHeaderFormatDropdownRef = useRef<HeaderFormatDropdown | null>(null);
+  openHeaderFormatDropdownRef.current = openHeaderFormatDropdown;
+  const openModalFormatDropdownRef = useRef<HeaderFormatDropdown | null>(null);
+  openModalFormatDropdownRef.current = openModalFormatDropdown;
   const showLinkMenuRef = useRef(false);
   const addBlockMenuRef = useRef<HTMLDivElement>(null);
   const slashCommandMenuRef = useRef<HTMLDivElement>(null);
@@ -3369,7 +3420,11 @@ export function TaskDetailsPanel({
   const updateFormatMenu = useCallback(() => {
     if (showLinkMenuRef.current) return;
 
-    if (openFormatDropdownRef.current) {
+    if (
+      openFormatDropdownRef.current ||
+      openHeaderFormatDropdownRef.current ||
+      openModalFormatDropdownRef.current
+    ) {
       syncFormatMenuSelectionState();
       return;
     }
@@ -3763,11 +3818,6 @@ export function TaskDetailsPanel({
       syncEditorContent();
       recordHistorySnapshot();
       scheduleAutoSave();
-      closeFormatDropdowns();
-      setFormatMenuInlineFormats({
-        ...getDetailSelectionInlineFormatState(editor),
-        textColor: resolvedColor,
-      });
       setRecentFormatColors((current) =>
         rememberRecentFormatColor(current, {
           kind: "text",
@@ -3778,10 +3828,25 @@ export function TaskDetailsPanel({
             )?.label ?? "Text color",
         }),
       );
+
+      const selection = window.getSelection();
+      if (
+        selection?.rangeCount &&
+        selection.anchorNode &&
+        editor.contains(selection.anchorNode) &&
+        !selection.isCollapsed
+      ) {
+        const range = selection.getRangeAt(0);
+        range.collapse(false);
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+
+      closeFormatMenu({ clearSavedSelection: true });
     },
     [
       captureFormatSelectionFromEditor,
-      closeFormatDropdowns,
+      closeFormatMenu,
       recordHistorySnapshot,
       scheduleAutoSave,
       syncEditorContent,
@@ -5790,7 +5855,9 @@ export function TaskDetailsPanel({
       }
       if (!activeLine) return;
 
-      if (isBodyPlaceholderLine(activeLine)) {
+      if (isTitleLine(editor, activeLine)) {
+        enterFromTitleLine(editor);
+      } else if (isBodyPlaceholderLine(activeLine)) {
         insertLineBeforeBodyPlaceholder(editor, activeLine);
       } else {
         splitLineAtCursor(editor);
@@ -6394,7 +6461,9 @@ export function TaskDetailsPanel({
       ref={panelRef}
       data-task-details-panel
       data-task-details-layout={layout}
-      className="task-details-panel-background relative flex min-h-0 min-w-[300px] flex-1 flex-col"
+      className={`task-details-panel-background relative flex min-w-[300px] flex-col ${
+        isModalLayout ? "" : "min-h-0 flex-1"
+      }`}
       aria-busy={saveStatus === "loading" ? true : undefined}
     >
       {renderModalHeaderActions()}
@@ -6678,8 +6747,8 @@ export function TaskDetailsPanel({
       ) : task ? (
         <div
           data-task-details-content
-          className={`flex min-h-0 flex-1 flex-col px-4 ${
-            isModalLayout ? "pb-4" : "pb-[30px]"
+          className={`flex flex-col px-4 ${
+            isModalLayout ? "pb-4" : "min-h-0 flex-1 pb-[30px]"
           }`}
         >
           <div
@@ -6717,7 +6786,11 @@ export function TaskDetailsPanel({
               onKeyDown={handleEditorKeyDown}
               onKeyUp={handleEditorKeyUp}
               onScroll={updateLineControls}
-              className="task-details-editor min-h-[500px] w-full resize-none overflow-auto rounded-xl pt-[13px] pl-[30px] pr-3 pb-4! text-[#555555] outline-none transition-colors dark:text-zinc-300 [&_.detail-line[data-line-type=bullet]]:pl-1 [&_.detail-line[data-line-type=checklist]]:cursor-pointer [&_.detail-line[data-line-type=checklist]]:pl-1 [&_.detail-line[data-line-type=h1]]:text-[26px] [&_.detail-line[data-line-type=h1]]:font-bold [&_.detail-line[data-line-type=h1]]:leading-[36px] [&_.detail-line[data-line-type=h1]]:text-[#4B4B4B] dark:[&_.detail-line[data-line-type=h1]]:text-[#F5F5F5] [&_.detail-line[data-line-type=h2]]:text-[23px] [&_.detail-line[data-line-type=h2]]:font-semibold [&_.detail-line[data-line-type=h2]]:leading-[30px] [&_.detail-line[data-line-type=h3]]:text-[19px] [&_.detail-line[data-line-type=h3]]:font-semibold [&_.detail-line[data-line-type=h3]]:leading-[26px] [&_.detail-line[data-line-type=numbered]]:pl-1 [&_mark]:bg-yellow-200 dark:[&_mark]:bg-yellow-300/30 [&_s]:line-through [&_strike]:line-through [&_u]:underline"
+              className={`task-details-editor w-full resize-none rounded-xl pt-[13px] pl-[30px] pr-3 pb-4! text-[#555555] outline-none transition-colors dark:text-zinc-300 [&_.detail-line[data-line-type=bullet]]:pl-1 [&_.detail-line[data-line-type=checklist]]:cursor-pointer [&_.detail-line[data-line-type=checklist]]:pl-1 [&_.detail-line[data-line-type=h1]]:text-[26px] [&_.detail-line[data-line-type=h1]]:font-bold [&_.detail-line[data-line-type=h1]]:leading-[36px] [&_.detail-line[data-line-type=h1]]:text-[#4B4B4B] dark:[&_.detail-line[data-line-type=h1]]:text-[#F5F5F5] [&_.detail-line[data-line-type=h2]]:text-[23px] [&_.detail-line[data-line-type=h2]]:font-semibold [&_.detail-line[data-line-type=h2]]:leading-[30px] [&_.detail-line[data-line-type=h3]]:text-[19px] [&_.detail-line[data-line-type=h3]]:font-semibold [&_.detail-line[data-line-type=h3]]:leading-[26px] [&_.detail-line[data-line-type=numbered]]:pl-1 [&_mark]:bg-yellow-200 dark:[&_mark]:bg-yellow-300/30 [&_s]:line-through [&_strike]:line-through [&_u]:underline ${
+                isModalLayout
+                  ? "min-h-0 max-h-[min(60vh,560px)] overflow-auto"
+                  : "min-h-[500px] overflow-auto"
+              }`}
             />
 
             {dropIndicator && (
@@ -7049,6 +7122,14 @@ export function TaskDetailsPanel({
                   textColorOptions={TEXT_COLOR_OPTIONS}
                   onSelectTextColor={applyTextColor}
                   recentColors={recentFormatColors}
+                  previewText={getFormatSelectionPreviewText(
+                    savedFormatSelectionRef.current,
+                  )}
+                  previewTypography={getTextColorPreviewTypography(
+                    formatMenuFontFamily,
+                    formatMenuFontSize,
+                    formatMenuLineHeight,
+                  )}
                 />
 
                 <DetailFormatHighlightColorDropdown

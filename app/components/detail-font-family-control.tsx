@@ -4,6 +4,7 @@ import { useRef } from "react";
 import { LuChevronDown } from "react-icons/lu";
 import {
   getDetailFontFamilyLabel,
+  getDetailFontFamilyValue,
   getFormatToolbarFontFamilyOptions,
   type DetailFontFamilyId,
 } from "./detail-fonts";
@@ -37,10 +38,11 @@ export function DetailFontFamilyControl({
   const closeTimerRef = useRef<number | null>(null);
   const fontOptions = getFormatToolbarFontFamilyOptions();
   const label = getDetailFontFamilyLabel(value);
+  const selectedFontFamily = getDetailFontFamilyValue(value);
 
   const buttonClassName = formatToolbar
-    ? "flex h-8 min-w-[72px] cursor-pointer items-center justify-center rounded-lg px-2 text-[13px] text-zinc-700 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-zinc-200 dark:hover:bg-zinc-800"
-    : "flex h-8 min-w-[112px] cursor-pointer items-center justify-between gap-1 rounded-md border border-zinc-200 bg-white px-2.5 text-sm text-zinc-800 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800";
+    ? "flex h-8 min-w-[95px] cursor-pointer items-center justify-center rounded-lg px-2 text-[13px] text-zinc-700 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-zinc-200 dark:hover:bg-zinc-800"
+    : "flex h-8 min-w-[125px] cursor-pointer items-center justify-between gap-1 rounded-md border border-zinc-200 bg-white px-2.5 text-sm text-zinc-800 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800";
 
   function clearCloseTimer() {
     if (closeTimerRef.current !== null) {
@@ -78,9 +80,20 @@ export function DetailFontFamilyControl({
         onMouseDown={(event) => event.preventDefault()}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        onClick={() => onOpenChange?.(!open)}
+        onClick={() => {
+          if (!open) {
+            onOpenChange?.(true);
+          }
+        }}
       >
-        <span className="truncate">{label}</span>
+        <span
+          className="truncate"
+          style={
+            selectedFontFamily ? { fontFamily: selectedFontFamily } : undefined
+          }
+        >
+          {label}
+        </span>
         {formatToolbar ? null : (
           <LuChevronDown className="size-3.5 shrink-0 text-zinc-500" />
         )}

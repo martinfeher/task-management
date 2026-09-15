@@ -9,6 +9,7 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
+import { createPortal } from "react-dom";
 import { AiOutlineLineHeight } from "react-icons/ai";
 import { HiNumberedList } from "react-icons/hi2";
 import { IoTextOutline } from "react-icons/io5";
@@ -18,6 +19,7 @@ import type { DetailTextBlockType, LineBlockType } from "./detail-lines";
 import {
   DETAIL_FONT_SIZE_OPTIONS,
   getDetailFontFamilyLabel,
+  getDetailFontFamilyValue,
   getFormatToolbarFontFamilyOptions,
   type DetailFontFamilyId,
   type DetailFontSizeOption,
@@ -201,6 +203,28 @@ function hexToRgb(hex: string): [number, number, number] | null {
   return null;
 }
 
+function rgbToHex(r: number, g: number, b: number) {
+  return `#${[r, g, b]
+    .map((value) =>
+      Math.min(255, Math.max(0, Math.round(value)))
+        .toString(16)
+        .padStart(2, "0"),
+    )
+    .join("")}`;
+}
+
+/** Mix each channel 15% toward white for a brighter ring around text-color swatches. */
+function brightenHexColor(hex: string, amount = 0.15) {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return hex;
+
+  const [r, g, b] = rgb.map((channel) =>
+    Math.min(255, Math.round(channel + (255 - channel) * amount)),
+  );
+
+  return rgbToHex(r, g, b);
+}
+
 function normalizeColorValue(color: string) {
   return color.toLowerCase().replace(/\s/g, "");
 }
@@ -352,7 +376,11 @@ function FormatToolbarDropdownShell({
           onMouseDown={(event) => event.preventDefault()}
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
-          onClick={() => onOpenChange(!open)}
+          onClick={() => {
+            if (!open) {
+              onOpenChange(true);
+            }
+          }}
         >
           {trigger}
         </button>
@@ -400,35 +428,92 @@ export type RecentFormatColor = {
 const FORMAT_COLOR_MENU_SECTION_TITLE_CLASS =
   "mb-2 text-[11px] font-medium text-gray-600 dark:text-zinc-300";
 
+export type TextColorPreviewTypography = {
+  fontFamily?: string;
+  fontSize: number;
+  lineHeight: number;
+};
+
 function TextColorSwatchButton({
   option,
   selected,
   onSelect,
+  previewText,
+  previewTypography,
 }: {
   option: DetailTextColorOption;
   selected: boolean;
   onSelect: () => void;
+  previewText?: string;
+  previewTypography?: TextColorPreviewTypography;
 }) {
+  const swatchBorderColor = brightenHexColor(option.value, 0.15);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewPosition, setPreviewPosition] = useState({ top: 0, left: 0 });
+  const previewContent = previewText?.trim() ?? "";
+  const showPreview = previewOpen && previewContent.length > 0;
+  const previewFontSize = previewTypography
+    ? Math.min(previewTypography.fontSize, 16)
+    : 16;
+
+  function openPreview() {
+    if (!previewContent) return;
+
+    const rect = buttonRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    setPreviewPosition({
+      top: rect.bottom + 6,
+      left: rect.left + rect.width / 2,
+    });
+    setPreviewOpen(true);
+  }
+
   return (
-    <button
-      type="button"
-      role="menuitem"
-      aria-label={option.label}
-      title={option.label}
-      className={`flex size-7 items-center justify-center rounded-full border bg-white text-[13px] font-medium leading-none transition-transform hover:scale-110 dark:bg-zinc-900 ${
-        selected
-          ? "ring-1 ring-zinc-200 ring-offset-1 dark:ring-zinc-700"
-          : ""
-      }`}
-      style={{
-        color: option.value,
-        borderColor: option.borderColor ?? "#f4f4f3",
-      }}
-      onMouseDown={(event) => event.preventDefault()}
-      onClick={onSelect}
-    >
-      A
-    </button>
+    <>
+      <button
+        ref={buttonRef}
+        type="button"
+        role="menuitem"
+        aria-label={option.label}
+        title={option.label}
+        className={`flex size-7 items-center justify-center rounded-full border-[0.5px] bg-white cursor-pointer text-[15px] font-medium leading-none transition-transform hover:scale-110 dark:bg-zinc-900 ${
+          selected
+            ? "ring-[1px] ring-zinc-200 ring-offset-1 dark:ring-zinc-700"
+            : ""
+        }`}
+        style={{
+          color: option.value,
+          borderColor: swatchBorderColor,
+        }}
+        onMouseDown={(event) => event.preventDefault()}
+        onMouseEnter={openPreview}
+        onMouseLeave={() => setPreviewOpen(false)}
+        onClick={onSelect}
+      >
+        A
+      </button>
+      {showPreview
+        ? createPortal(
+            <div
+              className="pointer-events-none fixed z-[300] px-4 py-2 w-max max-h-[200px] max-w-[min(320px,calc(100vw-16px))] -translate-x-1/2 overflow-y-auto overflow-x-hidden border border-zinc-200 bg-white px-2.5 py-1.5 whitespace-pre-wrap break-words shadow-md"
+              style={{
+                top: previewPosition.top,
+                left: previewPosition.left,
+                color: option.value,
+                borderRadius: 19,
+                fontFamily: previewTypography?.fontFamily,
+                fontSize: `${previewFontSize}px`,
+                lineHeight: previewTypography?.lineHeight,
+              }}
+            >
+              {previewContent}
+            </div>,
+            document.body,
+          )
+        : null}
+    </>
   );
 }
 
@@ -470,6 +555,8 @@ type DetailFormatTextColorDropdownProps = {
   textColorOptions: readonly DetailTextColorOption[];
   onSelectTextColor: (color: string) => void;
   recentColors?: RecentFormatColor[];
+  previewText?: string;
+  previewTypography?: TextColorPreviewTypography;
 };
 
 export function DetailFormatTextColorDropdown({
@@ -479,6 +566,8 @@ export function DetailFormatTextColorDropdown({
   textColorOptions,
   onSelectTextColor,
   recentColors = [],
+  previewText,
+  previewTypography,
 }: DetailFormatTextColorDropdownProps) {
   const matchedTextColorOption = textColorOptions.find((option) =>
     colorsEquivalent(option.value, selectedTextColor),
@@ -493,14 +582,17 @@ export function DetailFormatTextColorDropdown({
       tooltipId="format-toolbar-text-color-tooltip"
       tooltipLabel="Text color"
       openClassName=""
-      menuClassName={`${FORMAT_TOOLBAR_DROPDOWN_MENU_CLASS} min-w-[220px]`}
+      menuClassName={`${FORMAT_TOOLBAR_DROPDOWN_MENU_CLASS} min-w-[260px]`}
       triggerClassName={`format-text-color-trigger flex h-8 cursor-pointer items-center gap-0.5 rounded-lg px-2 text-sm ${FORMAT_TOOLBAR_ICON_COLOR} transition-[background-color] duration-150`}
       trigger={
         <>
           <span
             className="size-[16px] shrink-0 rounded-full border bg-white p-[2px] dark:bg-zinc-900"
             style={{
-              borderColor: matchedTextColorOption?.borderColor ?? "#454454",
+              borderColor: brightenHexColor(
+                matchedTextColorOption?.value ?? selectedTextColor,
+                0.15,
+              ),
             }}
           >
             <span
@@ -523,11 +615,10 @@ export function DetailFormatTextColorDropdown({
                   option={{
                     label: entry.label,
                     value: entry.color,
-                    borderColor: textColorOptions.find((option) =>
-                      colorsEquivalent(option.value, entry.color),
-                    )?.borderColor,
                   }}
                   selected={colorsEquivalent(entry.color, selectedTextColor)}
+                  previewText={previewText}
+                  previewTypography={previewTypography}
                   onSelect={() => {
                     onSelectTextColor(entry.color);
                     onOpenChange(false);
@@ -540,12 +631,14 @@ export function DetailFormatTextColorDropdown({
 
         <section>
           <p className={FORMAT_COLOR_MENU_SECTION_TITLE_CLASS}>Text Color</p>
-          <div className="grid grid-cols-5 gap-1.5">
+          <div className="grid grid-cols-7 gap-1.5">
             {textColorOptions.map((option) => (
               <TextColorSwatchButton
                 key={option.value}
                 option={option}
                 selected={colorsEquivalent(option.value, selectedTextColor)}
+                previewText={previewText}
+                previewTypography={previewTypography}
                 onSelect={() => {
                   onSelectTextColor(option.value);
                   onOpenChange(false);
@@ -785,6 +878,7 @@ export function DetailFormatFontFamilyDropdown({
 }: DetailFormatFontFamilyDropdownProps) {
   const formatToolbarFontOptions = getFormatToolbarFontFamilyOptions();
   const familyLabel = getDetailFontFamilyLabel(familyId);
+  const selectedFontFamily = getDetailFontFamilyValue(familyId);
 
   return (
     <FormatToolbarDropdownShell
@@ -798,7 +892,14 @@ export function DetailFormatFontFamilyDropdown({
       menuStyle={{ minWidth: "128px" }}
       trigger={
         <>
-          <span className="max-w-[120px] truncate whitespace-nowrap">
+          <span
+            className="max-w-[120px] truncate whitespace-nowrap"
+            style={
+              selectedFontFamily
+                ? { fontFamily: selectedFontFamily }
+                : undefined
+            }
+          >
             {familyLabel}
           </span>
           <LuChevronDown className={`size-3.5 shrink-0 ${FORMAT_TOOLBAR_CHEVRON_COLOR}`} />

@@ -33,8 +33,9 @@ import {
   renameListFolder,
   renameTask as renameTaskInDb,
   renameTodoList,
+  updateTodoList as updateTodoListInDb,
   reorderLabels as reorderLabelsInDb,
-  reorderTodoLists as reorderTodoListsInDb,
+  reorderSidebarTopLevel as reorderSidebarTopLevelInDb,
   reorderTasks as reorderTasksInDb,
   toggleTask as toggleTaskInDb,
   updateTaskDueDate as updateTaskDueDateInDb,
@@ -155,6 +156,7 @@ export type ListFolder = {
 export type TodoList = {
   id: string;
   name: string;
+  color?: string | null;
   folderId?: string | null;
   position?: number;
 };
@@ -2068,6 +2070,7 @@ export function TodoApp({
       {
         id: list.id,
         name: list.name,
+        color: list.color,
         folderId: list.folderId,
         position: list.position,
       },
@@ -2099,15 +2102,49 @@ export function TodoApp({
     );
   }
 
-  async function reorderLists(listIds: string[]) {
-    setLists((current) => {
-      const listMap = new Map(current.map((list) => [list.id, list]));
-      return listIds
-        .map((id) => listMap.get(id))
-        .filter((list): list is TodoList => list !== undefined);
-    });
+  async function updateList(
+    listId: string,
+    input: { name: string; folderId: string | null; color: string | null },
+  ) {
+    await updateTodoListInDb(listId, input);
+    setLists((current) =>
+      current.map((item) =>
+        item.id === listId
+          ? {
+              ...item,
+              name: input.name,
+              folderId: input.folderId,
+              color: input.color,
+            }
+          : item,
+      ),
+    );
+  }
 
-    await reorderTodoListsInDb(listIds);
+  async function reorderLists(payload: {
+    lists: TodoList[];
+    folders: ListFolder[];
+  }) {
+    const inboxListId = getInboxListId(payload.lists);
+
+    setLists(payload.lists);
+    setFolders(payload.folders);
+
+    const topLevelListIds = new Set(
+      payload.lists
+        .filter((list) => list.id !== inboxListId && !list.folderId)
+        .map((list) => list.id),
+    );
+
+    await reorderSidebarTopLevelInDb(
+      payload.lists
+        .filter((list) => topLevelListIds.has(list.id))
+        .map((list) => ({ id: list.id, position: list.position ?? 0 })),
+      payload.folders.map((folder) => ({
+        id: folder.id,
+        position: folder.position,
+      })),
+    );
   }
 
   async function reorderLabels(labelIds: string[]) {
@@ -3524,6 +3561,7 @@ export function TodoApp({
           onAddFolder={addFolder}
           onAddLabel={addLabel}
           onRenameList={renameList}
+          onUpdateList={updateList}
           onRenameFolder={renameFolder}
           onRemoveList={removeList}
           onRemoveFolder={removeFolder}

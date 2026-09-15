@@ -124,11 +124,11 @@ export function CalendarTaskModal({
   }, [handleClose]);
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex flex-col px-6 pt-6 pb-[80px]">
+    <div className="fixed inset-0 z-[100] overflow-y-auto px-6 py-6">
       <button
         type="button"
         aria-label="Close task editor"
-        className="absolute inset-0 bg-zinc-900/25 backdrop-brightness-[1.1]"
+        className="fixed inset-0 bg-zinc-900/25 backdrop-brightness-[1.1]"
         onClick={() => void handleClose()}
       />
 
@@ -136,10 +136,10 @@ export function CalendarTaskModal({
         role="dialog"
         aria-modal="true"
         aria-label="Edit task"
-        className="calendar-task-modal relative z-10 mx-auto flex min-h-0 w-full min-w-[600px] max-w-4xl flex-1 flex-col overflow-hidden bg-white dark:bg-zinc-950"
+        className="calendar-task-modal relative z-10 mx-auto flex w-full min-w-[600px] max-w-4xl flex-col overflow-hidden bg-white dark:bg-zinc-950"
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="flex flex-col">
           <TaskDetailsPanel
             taskId={taskId}
             taskSnapshot={taskSnapshot}

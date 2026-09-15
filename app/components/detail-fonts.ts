@@ -144,6 +144,14 @@ export function getDetailFontFamilyLabel(familyId: DetailFontFamilyId) {
   );
 }
 
+export function getDetailFontFamilyValue(familyId: DetailFontFamilyId) {
+  if (familyId === "mixed") {
+    return undefined;
+  }
+
+  return DETAIL_FONT_FAMILY_OPTIONS.find((option) => option.id === familyId)?.value;
+}
+
 const FORMATTING_TAGS = new Set([
   "B",
   "STRONG",

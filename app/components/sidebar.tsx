@@ -32,14 +32,14 @@ import type {
 } from "./todo-app";
 import {
   buildSidebarTopLevelEntries,
+  computeNestedListMoveToTopLevel,
+  computeSidebarTopLevelAfterReorder,
   getListsForFolder,
-  getUngroupedSidebarListIds,
 } from "@/lib/sidebar-list-layout";
 import {
+  getFolderDropTargetFromPoint,
   getListDropIndex,
-  getListRowElements,
-  mergeReorderedSidebarListIds,
-  reorderListIds,
+  getSidebarTopLevelRowElements,
 } from "./list-reorder";
 import {
   applyLabelRowShifts,
@@ -50,7 +50,9 @@ import {
 import { getReorderTargetIndex } from "./task-reorder";
 import { ConfirmModal } from "./confirm-modal";
 import { MacCmdIcon } from "./mac-cmd-icon";
+import { EditListModal } from "./edit-list-modal";
 import { RenameListModal } from "./rename-list-modal";
+import { getListColor } from "@/lib/list-colors";
 import { LabelContextMenu, clampLabelContextMenuPosition } from "./label-context-menu";
 import {
   ListContextMenu,
@@ -165,6 +167,10 @@ type SidebarProps = {
   onAddFolder: (name: string) => void;
   onAddLabel: (name: string, color: string) => void;
   onRenameList: (listId: string, name: string) => void;
+  onUpdateList: (
+    listId: string,
+    input: { name: string; folderId: string | null; color: string | null },
+  ) => void;
   onRenameFolder: (folderId: string, name: string) => void;
   onRemoveList: (listId: string) => void;
   onRemoveFolder: (folderId: string) => void;
@@ -172,7 +178,10 @@ type SidebarProps = {
   onRenameLabel: (labelId: string, name: string) => void;
   onRemoveLabel: (labelId: string) => void;
   onUpdateLabelColor: (labelId: string, color: string) => void;
-  onReorderLists?: (listIds: string[]) => void;
+  onReorderLists?: (payload: {
+    lists: TodoList[];
+    folders: ListFolder[];
+  }) => void;
   onReorderLabels?: (labelIds: string[]) => void;
   onArchivedTasksRestored?: (
     tasks: import("@/app/actions/todo").RestoredTaskItem[],
@@ -264,6 +273,7 @@ export function Sidebar({
   onAddFolder,
   onAddLabel,
   onRenameList,
+  onUpdateList,
   onRenameFolder,
   onRemoveList,
   onRemoveFolder,
@@ -295,6 +305,9 @@ export function Sidebar({
     () => new Set(),
   );
   const [dropIndicatorTop, setDropIndicatorTop] = useState<number | null>(null);
+  const [listDragOverFolderId, setListDragOverFolderId] = useState<string | null>(
+    null,
+  );
   const [labelDropIndicatorTop, setLabelDropIndicatorTop] = useState<
     number | null
   >(null);
@@ -333,6 +346,7 @@ export function Sidebar({
     left: number;
   } | null>(null);
   const [renameList, setRenameList] = useState<TodoList | null>(null);
+  const [editList, setEditList] = useState<TodoList | null>(null);
   const [removeList, setRemoveList] = useState<TodoList | null>(null);
   const [renameFolder, setRenameFolder] = useState<ListFolder | null>(null);
   const [removeFolder, setRemoveFolder] = useState<ListFolder | null>(null);
@@ -359,13 +373,14 @@ export function Sidebar({
   const dragStateRef = useRef<{
     sourceRow: HTMLElement;
     captureTarget: HTMLElement;
+    dragMode: "top-level" | "nested-list";
     sourceIndex: number;
     dropIndex: number;
-    sidebarListIds: string[];
-    fullListIds: string[];
-    inboxListId: string | null;
-    listIdsInFolders: ReadonlySet<string>;
     pointerId: number;
+    startClientY: number;
+    rowHeight: number;
+    appliedTargetIndex: number | null;
+    folderDropTargetId: string | null;
   } | null>(null);
   const labelDragStateRef = useRef<{
     sourceRow: HTMLElement;
@@ -537,6 +552,7 @@ export function Sidebar({
       if (
         isSearchOpen ||
         renameList ||
+        editList ||
         removeList ||
         renameFolder ||
         removeFolder ||
@@ -578,6 +594,7 @@ export function Sidebar({
     openMenuFolderId,
     isSearchOpen,
     renameList,
+    editList,
     removeList,
     renameFolder,
     removeFolder,
@@ -602,15 +619,6 @@ export function Sidebar({
   }, [isBottomAddMenuOpen]);
 
   const inboxListId = getInboxListId(lists);
-  const listIdsInFolders = new Set(
-    orderedLists
-      .filter((list) => list.folderId)
-      .map((list) => list.id),
-  );
-  const sidebarUngroupedListIds = getUngroupedSidebarListIds(
-    orderedLists,
-    inboxListId,
-  );
   const sidebarTopLevelEntries = buildSidebarTopLevelEntries(
     orderedFolders,
     orderedLists,
@@ -747,6 +755,11 @@ export function Sidebar({
     });
   }
 
+  function openEditListModal(list: TodoList) {
+    closeListMenu();
+    setEditList(list);
+  }
+
   function openRenameModal(list: TodoList) {
     closeListMenu();
     setRenameList(list);
@@ -804,18 +817,92 @@ export function Sidebar({
     }
   }
 
-  function handleListDragMove(event: PointerEvent) {
+  function resetSidebarTopLevelRowShifts(
+    container: HTMLElement,
+    sourceRow: HTMLElement,
+  ) {
+    getSidebarTopLevelRowElements(container).forEach((row) => {
+      row.classList.remove("task-row-shifting");
+      if (row !== sourceRow) {
+        row.style.transform = "";
+      }
+    });
+  }
+
+  function handleSidebarTopLevelDragMove(event: PointerEvent) {
     const dragState = dragStateRef.current;
     const container = listContainerRef.current;
     if (!dragState || !container) return;
 
-    const rows = getListRowElements(container);
-    const dropIndex = getListDropIndex(
-      event.clientY,
-      rows,
-      dragState.sourceIndex,
-    );
+    const deltaY = event.clientY - dragState.startClientY;
+    dragState.sourceRow.style.translate = `0px ${deltaY}px`;
+
+    const isListDrag =
+      dragState.dragMode === "top-level" ||
+      dragState.dragMode === "nested-list";
+    const draggedListId =
+      dragState.sourceRow.dataset.sidebarReorderId ??
+      dragState.sourceRow.dataset.sidebarNestedListId;
+    const draggedList = draggedListId
+      ? orderedLists.find((list) => list.id === draggedListId)
+      : null;
+
+    if (isListDrag && draggedListId) {
+      const folderDropTargetId = getFolderDropTargetFromPoint(
+        event.clientX,
+        event.clientY,
+        container,
+      );
+      const canDropOnFolder =
+        folderDropTargetId !== null &&
+        draggedList?.folderId !== folderDropTargetId;
+
+      if (canDropOnFolder) {
+        if (dragState.folderDropTargetId !== folderDropTargetId) {
+          dragState.folderDropTargetId = folderDropTargetId;
+          setListDragOverFolderId(folderDropTargetId);
+          setDropIndicatorTop(null);
+          resetSidebarTopLevelRowShifts(container, dragState.sourceRow);
+          dragState.appliedTargetIndex = null;
+        }
+        return;
+      }
+    }
+
+    if (dragState.folderDropTargetId) {
+      dragState.folderDropTargetId = null;
+      setListDragOverFolderId(null);
+      if (dragState.dragMode === "top-level") {
+        getSidebarTopLevelRowElements(container).forEach((row) => {
+          if (row !== dragState.sourceRow) {
+            row.classList.add("task-row-shifting");
+          }
+        });
+      }
+    }
+
+    const rows = getSidebarTopLevelRowElements(container);
+    const draggingIndex =
+      dragState.dragMode === "nested-list" ? null : dragState.sourceIndex;
+    const dropIndex = getListDropIndex(event.clientY, rows, draggingIndex);
     dragState.dropIndex = dropIndex;
+
+    if (dragState.dragMode === "top-level") {
+      const targetIndex = getReorderTargetIndex(
+        dragState.sourceIndex,
+        dropIndex,
+      );
+      if (targetIndex !== dragState.appliedTargetIndex) {
+        applyLabelRowShifts(
+          rows,
+          dragState.sourceRow,
+          dragState.sourceIndex,
+          targetIndex,
+          dragState.rowHeight,
+        );
+        dragState.appliedTargetIndex = targetIndex;
+      }
+    }
 
     const containerRect = container.getBoundingClientRect();
     let indicatorTop: number;
@@ -834,111 +921,169 @@ export function Sidebar({
     setDropIndicatorTop(indicatorTop);
   }
 
-  function handleListDragEnd() {
+  function handleSidebarTopLevelDragEnd() {
     const dragState = dragStateRef.current;
     const wasDragging = dragState !== null;
 
-    document.removeEventListener("pointermove", handleListDragMove);
-    document.removeEventListener("pointerup", handleListDragEnd);
-    document.removeEventListener("pointercancel", handleListDragEnd);
+    document.removeEventListener("pointermove", handleSidebarTopLevelDragMove);
+    document.removeEventListener("pointerup", handleSidebarTopLevelDragEnd);
+    document.removeEventListener("pointercancel", handleSidebarTopLevelDragEnd);
     document.body.style.cursor = "";
 
     if (dragState) {
       if (dragState.captureTarget.hasPointerCapture(dragState.pointerId)) {
         dragState.captureTarget.releasePointerCapture(dragState.pointerId);
       }
-      dragState.sourceRow.classList.remove("opacity-50");
+      dragState.sourceRow.classList.remove("task-row-dragging");
+      dragState.sourceRow.style.transform = "";
+      dragState.sourceRow.style.translate = "";
+      dragState.sourceRow.style.scale = "";
       dragState.sourceRow.style.cursor = "";
+
+      const container = listContainerRef.current;
+      if (container) {
+        getSidebarTopLevelRowElements(container).forEach((row) => {
+          row.classList.remove("task-row-shifting");
+          if (row !== dragState.sourceRow) {
+            row.style.transform = "";
+          }
+        });
+      }
     }
 
     setDropIndicatorTop(null);
+    setListDragOverFolderId(null);
 
-    if (dragState && onReorderLists) {
-      const reorderedSidebarIds = reorderListIds(
-        dragState.sidebarListIds,
+    if (dragState) {
+      const draggedListId =
+        dragState.sourceRow.dataset.sidebarReorderId ??
+        dragState.sourceRow.dataset.sidebarNestedListId;
+      const isListDrag =
+        dragState.dragMode === "top-level" ||
+        dragState.dragMode === "nested-list";
+
+      if (isListDrag && draggedListId && dragState.folderDropTargetId) {
+        onMoveListToFolder(draggedListId, dragState.folderDropTargetId);
+        setExpandedFolderIds((current) =>
+          new Set([...current, dragState.folderDropTargetId!]),
+        );
+      } else if (
+        dragState.dragMode === "nested-list" &&
+        draggedListId &&
+        onReorderLists
+      ) {
+        const listsWithUngrouped = orderedLists.map((list) =>
+          list.id === draggedListId ? { ...list, folderId: null } : list,
+        );
+        const nextState = computeNestedListMoveToTopLevel(
+          orderedFolders,
+          listsWithUngrouped,
+          inboxListId,
+          draggedListId,
+          dragState.dropIndex,
+        );
+
+        setOrderedLists(nextState.lists);
+        setOrderedFolders(nextState.folders);
+        onMoveListToFolder(draggedListId, null);
+        onReorderLists({
+          lists: nextState.lists,
+          folders: nextState.folders,
+        });
+      }
+    }
+
+    if (
+      dragState &&
+      onReorderLists &&
+      !dragState.folderDropTargetId &&
+      dragState.dragMode === "top-level"
+    ) {
+      const nextState = computeSidebarTopLevelAfterReorder(
+        orderedFolders,
+        orderedLists,
+        inboxListId,
         dragState.sourceIndex,
         dragState.dropIndex,
       );
 
-      const nextIds = mergeReorderedSidebarListIds(
-        dragState.fullListIds,
-        dragState.inboxListId,
-        reorderedSidebarIds,
-        dragState.listIdsInFolders,
-      );
-
-      if (nextIds.join(",") !== dragState.fullListIds.join(",")) {
-        const listMap = new Map(orderedLists.map((list) => [list.id, list]));
-        setOrderedLists(
-          nextIds
-            .map((id) => listMap.get(id))
-            .filter((list): list is TodoList => list !== undefined),
-        );
-        onReorderLists(nextIds);
+      if (nextState.changed) {
+        setOrderedLists(nextState.lists);
+        setOrderedFolders(nextState.folders);
+        onReorderLists({
+          lists: nextState.lists,
+          folders: nextState.folders,
+        });
       }
     }
 
-    if (wasDragging) {
-      suppressListClickRef.current = true;
+    if (wasDragging && dragState) {
+      if (dragState.sourceRow.dataset.sidebarReorderRow === "folder") {
+        suppressFolderClickRef.current = true;
+      } else {
+        suppressListClickRef.current = true;
+      }
     }
 
     dragStateRef.current = null;
   }
 
-  function beginListDrag(
+  function beginSidebarTopLevelDrag(
     sourceRow: HTMLElement,
     pointerId: number,
     sourceIndex: number,
-    sidebarListIds: string[],
-    fullListIds: string[],
+    startClientY: number,
+    dragMode: "top-level" | "nested-list" = "top-level",
   ) {
+    const rowHeight = sourceRow.getBoundingClientRect().height;
+
     dragStateRef.current = {
       sourceRow,
       captureTarget: sourceRow,
+      dragMode,
       sourceIndex,
-      dropIndex: sourceIndex,
-      sidebarListIds,
-      fullListIds,
-      inboxListId,
-      listIdsInFolders,
+      dropIndex: dragMode === "nested-list" ? 0 : sourceIndex,
       pointerId,
+      startClientY,
+      rowHeight,
+      appliedTargetIndex: null,
+      folderDropTargetId: null,
     };
 
-    sourceRow.classList.add("opacity-50");
+    const container = listContainerRef.current;
+    if (container && dragMode === "top-level") {
+      getSidebarTopLevelRowElements(container).forEach((row) => {
+        if (row !== sourceRow) row.classList.add("task-row-shifting");
+      });
+    }
+
+    sourceRow.classList.add("task-row-dragging");
+    sourceRow.style.scale = "1.02";
     sourceRow.setPointerCapture(pointerId);
-    sourceRow.style.cursor = "move";
-    document.body.style.cursor = "move";
-    document.addEventListener("pointermove", handleListDragMove);
-    document.addEventListener("pointerup", handleListDragEnd);
-    document.addEventListener("pointercancel", handleListDragEnd);
+    sourceRow.style.cursor = "grabbing";
+    document.body.style.cursor = "grabbing";
+    document.addEventListener("pointermove", handleSidebarTopLevelDragMove);
+    document.addEventListener("pointerup", handleSidebarTopLevelDragEnd);
+    document.addEventListener("pointercancel", handleSidebarTopLevelDragEnd);
   }
 
-  function handleListPointerDown(
+  function handleNestedListPointerDown(
     event: React.PointerEvent<HTMLElement>,
     listId: string,
   ) {
     if (editingListId === listId) return;
-    if (!onReorderLists || event.button !== 0) return;
+    if (!onMoveListToFolder || event.button !== 0) return;
     if (!shouldStartListDrag(event.target)) return;
 
-    const container = listContainerRef.current;
-    if (!container) return;
+    const dragRow = event.currentTarget;
 
-    const rows = getListRowElements(container);
-    const sourceRow = rows.find((row) => row.dataset.listId === listId);
-    if (!sourceRow) return;
-
-    const dragRow = sourceRow;
-    const sourceIndex = rows.indexOf(dragRow);
-    if (sourceIndex < 0) return;
-
-    const sidebarListIds = sidebarUngroupedListIds;
-    const fullListIds = orderedLists.map((list) => list.id);
     const startX = event.clientX;
     const startY = event.clientY;
     const pointerId = event.pointerId;
     let dragStarted = false;
 
+    dragRow.style.cursor = "move";
+    document.body.style.cursor = "move";
     event.preventDefault();
 
     function clearPendingListeners() {
@@ -957,18 +1102,82 @@ export function Sidebar({
 
       dragStarted = true;
       clearPendingListeners();
-      beginListDrag(
-        dragRow,
-        pointerId,
-        sourceIndex,
-        sidebarListIds,
-        fullListIds,
-      );
+      beginSidebarTopLevelDrag(dragRow, pointerId, -1, startY, "nested-list");
     }
 
     function onPointerUp(upEvent: PointerEvent) {
       if (upEvent.pointerId !== pointerId) return;
       clearPendingListeners();
+      if (!dragStarted) {
+        dragRow.style.cursor = "";
+        document.body.style.cursor = "";
+      }
+    }
+
+    document.addEventListener("pointermove", onPointerMove);
+    document.addEventListener("pointerup", onPointerUp);
+    document.addEventListener("pointercancel", onPointerUp);
+  }
+
+  function handleSidebarTopLevelPointerDown(
+    event: React.PointerEvent<HTMLElement>,
+    rowKind: "list" | "folder",
+    rowId: string,
+  ) {
+    if (rowKind === "list" && editingListId === rowId) return;
+    if (!onReorderLists || event.button !== 0) return;
+    if (!shouldStartListDrag(event.target)) return;
+
+    const container = listContainerRef.current;
+    if (!container) return;
+
+    const rows = getSidebarTopLevelRowElements(container);
+    const sourceRow = rows.find(
+      (row) =>
+        row.dataset.sidebarReorderRow === rowKind &&
+        row.dataset.sidebarReorderId === rowId,
+    );
+    if (!sourceRow) return;
+
+    const dragRow = sourceRow;
+    const sourceIndex = rows.indexOf(dragRow);
+    if (sourceIndex < 0) return;
+
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const pointerId = event.pointerId;
+    let dragStarted = false;
+
+    dragRow.style.cursor = "move";
+    document.body.style.cursor = "move";
+    event.preventDefault();
+
+    function clearPendingListeners() {
+      document.removeEventListener("pointermove", onPointerMove);
+      document.removeEventListener("pointerup", onPointerUp);
+      document.removeEventListener("pointercancel", onPointerUp);
+    }
+
+    function onPointerMove(moveEvent: PointerEvent) {
+      if (moveEvent.pointerId !== pointerId) return;
+      if (dragStarted) return;
+
+      const dx = moveEvent.clientX - startX;
+      const dy = moveEvent.clientY - startY;
+      if (Math.hypot(dx, dy) < LIST_DRAG_THRESHOLD_PX) return;
+
+      dragStarted = true;
+      clearPendingListeners();
+      beginSidebarTopLevelDrag(dragRow, pointerId, sourceIndex, startY);
+    }
+
+    function onPointerUp(upEvent: PointerEvent) {
+      if (upEvent.pointerId !== pointerId) return;
+      clearPendingListeners();
+      if (!dragStarted) {
+        dragRow.style.cursor = "";
+        document.body.style.cursor = "";
+      }
     }
 
     document.addEventListener("pointermove", onPointerMove);
@@ -1243,14 +1452,31 @@ export function Sidebar({
       sidebarHoverPreview?.kind === "list" &&
       sidebarHoverPreview.listId === list.id;
     const allowReorder = Boolean(onReorderLists) && !nested && !list.folderId;
+    const allowNestedDrag = nested && Boolean(onMoveListToFolder);
+    const isDraggable = allowReorder || allowNestedDrag;
 
     return (
       <div
         key={list.id}
-        {...(allowReorder ? { "data-list-id": list.id } : {})}
+        {...(allowReorder
+          ? {
+              "data-list-id": list.id,
+              "data-sidebar-reorder-row": "list",
+              "data-sidebar-reorder-id": list.id,
+            }
+          : allowNestedDrag
+            ? {
+                "data-sidebar-nested-list-id": list.id,
+              }
+            : {})}
         onPointerDown={(event) => {
-          if (!allowReorder) return;
-          handleListPointerDown(event, list.id);
+          if (allowReorder) {
+            handleSidebarTopLevelPointerDown(event, "list", list.id);
+            return;
+          }
+          if (allowNestedDrag) {
+            handleNestedListPointerDown(event, list.id);
+          }
         }}
         onClick={() => handleListClick(list.id)}
         onContextMenu={(event) => {
@@ -1280,13 +1506,14 @@ export function Sidebar({
           }
         }}
         className={`group relative mb-1 flex h-[34px] cursor-pointer items-center gap-2 rounded-md px-3 transition-[background-color] duration-200 ${
-          nested ? "ml-[18px]" : "ml-[3px]"
+          nested ? "ml-[13px]" : "ml-[3px]"
         } ${isNameHovered ? "bg-zinc-200/70 dark:bg-zinc-800/70" : ""} ${getListRowClassName(list.id)} ${
-          allowReorder ? "touch-none" : ""
+          isDraggable ? "touch-none" : ""
         }`}
       >
         <LuList
-          className="size-[14px] shrink-0 text-[#acadb7]"
+          className="size-[14px] shrink-0"
+          style={{ color: getListColor(list) }}
           aria-hidden="true"
         />
         <div className="group min-w-0 flex-1 pr-8 text-left">
@@ -1559,12 +1786,20 @@ export function Sidebar({
 
               const folder = entry.folder;
               const isExpanded = expandedFolderIds.has(folder.id);
+              const isListDragOver = listDragOverFolderId === folder.id;
+              const showChevronOpen = isExpanded || isListDragOver;
               const folderLists = getListsForFolder(orderedLists, folder.id);
 
               return (
                 <div key={folder.id} className="flex flex-col">
                   <div
                     data-folder-id={folder.id}
+                    data-sidebar-reorder-row="folder"
+                    data-sidebar-reorder-id={folder.id}
+                    onPointerDown={(event) => {
+                      if (!onReorderLists) return;
+                      handleSidebarTopLevelPointerDown(event, "folder", folder.id);
+                    }}
                     onClick={() => handleFolderClick(folder.id)}
                     onContextMenu={(event) => {
                       event.preventDefault();
@@ -1574,16 +1809,20 @@ export function Sidebar({
                         left: event.clientX,
                       });
                     }}
-                    className="group relative ml-[3px] mb-1 flex h-[34px] cursor-pointer items-center gap-1 rounded-md px-3 transition-[background-color] duration-200 hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60"
+                    className={`group relative ml-[3px] mb-1 flex h-[34px] cursor-pointer items-center rounded-md pr-3 pl-1.5 transition-[background-color] duration-200 hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 ${
+                      isListDragOver
+                        ? "bg-zinc-200/70 ring-2 ring-inset ring-blue-400 dark:bg-zinc-800/70 dark:ring-blue-500"
+                        : ""
+                    } ${onReorderLists ? "touch-none" : ""}`}
                   >
                     <BiChevronDown
                       className={`size-4 shrink-0 text-[#acadb7] transition-transform duration-200 ${
-                        isExpanded ? "" : "-rotate-90"
+                        showChevronOpen ? "" : "-rotate-90"
                       }`}
                       aria-hidden="true"
                     />
                     <LuFolder
-                      className="size-[14px] shrink-0 text-[#acadb7]"
+                      className="size-[14px] mr-1 shrink-0 text-[#acadb7]"
                       aria-hidden="true"
                     />
                     <span className="min-w-0 flex-1 truncate pr-8 text-left text-sm ptxt-list-items">
@@ -1951,6 +2190,7 @@ export function Sidebar({
           menuRef={menuRef}
           folders={orderedFolders}
           currentFolderId={openListMenuItem.folderId ?? null}
+          onEdit={() => openEditListModal(openListMenuItem)}
           onRename={() => openRenameModal(openListMenuItem)}
           onRemove={() => openRemoveModal(openListMenuItem)}
           onMoveToFolder={(folderId) => {
@@ -2026,6 +2266,36 @@ export function Sidebar({
           setIsAddLabelOpen(false);
         }}
         onCancel={() => setIsAddLabelOpen(false)}
+      />
+
+      <EditListModal
+        open={editList !== null}
+        list={editList}
+        folders={orderedFolders}
+        onConfirm={(values) => {
+          if (editList) {
+            onUpdateList(editList.id, values);
+            setOrderedLists((current) =>
+              current.map((item) =>
+                item.id === editList.id
+                  ? {
+                      ...item,
+                      name: values.name,
+                      folderId: values.folderId,
+                      color: values.color,
+                    }
+                  : item,
+              ),
+            );
+            if (values.folderId) {
+              setExpandedFolderIds((current) =>
+                new Set([...current, values.folderId as string]),
+              );
+            }
+          }
+          setEditList(null);
+        }}
+        onCancel={() => setEditList(null)}
       />
 
       <RenameListModal

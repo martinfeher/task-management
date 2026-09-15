@@ -1,0 +1,1 @@
+ALTER TABLE "TodoList" ADD COLUMN "color" TEXT;

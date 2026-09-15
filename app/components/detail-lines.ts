@@ -1192,6 +1192,33 @@ export function insertLineBelow(editor: HTMLElement) {
   focusDetailLine(editor, newLine);
 }
 
+export function enterFromTitleLine(editor: HTMLElement) {
+  ensureBlockLines(editor);
+  ensureTitleLine(editor);
+
+  const lines = getLineElements(editor);
+  const titleLine = lines[0];
+  if (!titleLine) return;
+
+  const firstBodyLine = lines[1];
+  if (!firstBodyLine) {
+    insertLineBelowLine(editor, titleLine);
+    return;
+  }
+
+  if (isBodyPlaceholderLine(firstBodyLine)) {
+    insertLineBeforeBodyPlaceholder(editor, firstBodyLine);
+    return;
+  }
+
+  if (isLineEmpty(firstBodyLine)) {
+    placeCaretInLine(firstBodyLine);
+    return;
+  }
+
+  insertLineBelowLine(editor, titleLine);
+}
+
 export function splitLineAtCursor(editor: HTMLElement) {
   ensureBlockLines(editor);
 
@@ -1200,6 +1227,11 @@ export function splitLineAtCursor(editor: HTMLElement) {
 
   const activeLine = getActiveLineElement(editor);
   if (!activeLine) return;
+
+  if (isTitleLine(editor, activeLine)) {
+    enterFromTitleLine(editor);
+    return;
+  }
 
   const range = selection.getRangeAt(0);
   if (!activeLine.contains(range.startContainer)) return;

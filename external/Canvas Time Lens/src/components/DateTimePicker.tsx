@@ -103,7 +103,7 @@ export function DateTimePicker() {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Type a date — e.g. next friday"
+              placeholder="next monday or dd/mm/yyyy "
               className="w-full rounded-xl bg-muted px-3.5 py-2.5 text-[12px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/40"
             />
           </div>

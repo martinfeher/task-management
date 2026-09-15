@@ -125,9 +125,10 @@ export async function getTodoData() {
 
   return {
     folders,
-    lists: lists.map(({ id, name, folderId, position }) => ({
+    lists: lists.map(({ id, name, color, folderId, position }) => ({
       id,
       name,
+      color,
       folderId,
       position,
     })),

@@ -2637,7 +2637,7 @@ export function TaskListPanel({
                       className={`group flex w-full items-center overflow-hidden rounded-lg py-[4px] pl-[9px] pr-[9px] transition-[background-color,padding,max-width,opacity] cursor-pointer ${
                         isListCalendarToggleActive
                           ? "bg-[#4873c7] text-white"
-                          : "bg-[#eceef0] ptxt-700 hover:bg-zinc-250 dark:bg-zinc-800 dark:ptxt-200 dark:hover:bg-zinc-700"
+                          : "bg-[#f4f6f8] ptxt-700 hover:bg-zinc-250 dark:bg-zinc-800 dark:ptxt-200 dark:hover:bg-zinc-700 border border-[#d9dbe0]"
                       }`}
                     >
                       <LuCalendarCheck2
@@ -3041,7 +3041,7 @@ export function TaskListPanel({
             )}
           </ul>
 
-          {showAddTask && listId ? (
+          {showAddTask && listId && completedTasks.length > 0 ? (
             <div className="border-t border-zinc-200 dark:border-zinc-700">
               <button
                 type="button"
@@ -3056,19 +3056,12 @@ export function TaskListPanel({
                   aria-hidden="true"
                 />
                 <span>Completed</span>
-                {completedTasks.length > 0 ? (
-                  <span className="text-xs ptxt-400 dark:ptxt-500">
-                    {completedTasks.length}
-                  </span>
-                ) : null}
+                <span className="text-xs ptxt-400 dark:ptxt-500">
+                  {completedTasks.length}
+                </span>
               </button>
 
               {isCompletedOpen ? (
-                completedTasks.length === 0 ? (
-                  <p className="px-4 pb-3 text-sm ptxt-completed-tasks">
-                    No completed tasks
-                  </p>
-                ) : (
                   <ul className="flex flex-col">
                     {completedTasks.map((task) => (
                       <li
@@ -3107,7 +3100,6 @@ export function TaskListPanel({
                       </li>
                     ))}
                   </ul>
-                )
               ) : null}
             </div>
           ) : null}
