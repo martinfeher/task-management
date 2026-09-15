@@ -12,13 +12,24 @@ datasource db {
   provider = "postgresql"
 }
 
-model TodoList {
-  id        String   @id @default(cuid())
+model ListFolder {
+  id        String     @id @default(cuid())
   name      String
-  position  Int      @default(0)
+  position  Int        @default(0)
+  lists     TodoList[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model TodoList {
+  id        String      @id @default(cuid())
+  name      String
+  position  Int         @default(0)
+  folderId  String?
+  folder    ListFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
   tasks     Task[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
 }
 
 model Task {

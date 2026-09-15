@@ -16,7 +16,9 @@ import {
   duplicateTask as duplicateTaskInDb,
   createSubtask,
   createLabel as createLabelInDb,
+  createListFolder,
   createTodoList,
+  deleteListFolder,
   deleteTask as deleteTaskInDb,
   deleteLabel as deleteLabelInDb,
   deleteTodoList,
@@ -26,7 +28,9 @@ import {
   renameLabel as renameLabelInDb,
   setTaskLabel as setTaskLabelInDb,
   updateLabelColor as updateLabelColorInDb,
+  moveListToFolder as moveListToFolderInDb,
   moveTaskToList as moveTaskToListInDb,
+  renameListFolder,
   renameTask as renameTaskInDb,
   renameTodoList,
   reorderLabels as reorderLabelsInDb,
@@ -142,9 +146,17 @@ export type Task = {
   labels: TaskLabel[];
 };
 
+export type ListFolder = {
+  id: string;
+  name: string;
+  position: number;
+};
+
 export type TodoList = {
   id: string;
   name: string;
+  folderId?: string | null;
+  position?: number;
 };
 
 export type CompletedTask = Task & {
@@ -221,6 +233,7 @@ const DOUBLE_ALT_CALENDAR_MAX_GAP_MS = 400;
 
 type TodoAppProps = {
   initialLists: TodoList[];
+  initialFolders: ListFolder[];
   initialLabels: TaskLabel[];
   initialTasksByList: Record<string, Task[]>;
   initialRoute?: TodoRoute;
@@ -687,6 +700,7 @@ export type SidebarHoverPreview = {
 
 export function TodoApp({
   initialLists,
+  initialFolders,
   initialLabels,
   initialTasksByList,
   initialRoute,
@@ -706,6 +720,7 @@ export function TodoApp({
     initialTasks,
   );
   const [lists, setLists] = useState(initialLists);
+  const [folders, setFolders] = useState(initialFolders);
   const [labels, setLabels] = useState(initialLabels);
   const [selectedListId, setSelectedListId] = useState<string | null>(
     bootState.selectedListId,
@@ -2006,11 +2021,57 @@ export function TodoApp({
     await selectTask(taskId);
   }
 
+  async function addFolder(name: string) {
+    if (!name.trim()) return;
+
+    const folder = await createListFolder(name.trim());
+    setFolders((current) => [
+      ...current,
+      { id: folder.id, name: folder.name, position: folder.position },
+    ]);
+  }
+
+  async function renameFolder(folderId: string, name: string) {
+    const folder = await renameListFolder(folderId, name);
+    setFolders((current) =>
+      current.map((item) =>
+        item.id === folderId ? { ...item, name: folder.name } : item,
+      ),
+    );
+  }
+
+  async function removeFolder(folderId: string) {
+    await deleteListFolder(folderId);
+    setFolders((current) => current.filter((item) => item.id !== folderId));
+    setLists((current) =>
+      current.map((item) =>
+        item.folderId === folderId ? { ...item, folderId: null } : item,
+      ),
+    );
+  }
+
+  async function moveListToFolder(listId: string, folderId: string | null) {
+    await moveListToFolderInDb(listId, folderId);
+    setLists((current) =>
+      current.map((item) =>
+        item.id === listId ? { ...item, folderId } : item,
+      ),
+    );
+  }
+
   async function addList(name: string) {
     if (!name.trim()) return;
 
     const list = await createTodoList(name.trim());
-    setLists((current) => [...current, { id: list.id, name: list.name }]);
+    setLists((current) => [
+      ...current,
+      {
+        id: list.id,
+        name: list.name,
+        folderId: list.folderId,
+        position: list.position,
+      },
+    ]);
     setTasksByList((current) => ({ ...current, [list.id]: [] }));
     setActiveView(null);
     setSelectedLabelId(null);
@@ -3458,10 +3519,15 @@ export function TodoApp({
           onSelectCompletedTask={selectCompletedTask}
           onSelectSearchTask={selectSearchTask}
           onToggleTask={toggleTask}
+          folders={folders}
           onAddList={addList}
+          onAddFolder={addFolder}
           onAddLabel={addLabel}
           onRenameList={renameList}
+          onRenameFolder={renameFolder}
           onRemoveList={removeList}
+          onRemoveFolder={removeFolder}
+          onMoveListToFolder={moveListToFolder}
           onRenameLabel={renameLabel}
           onRemoveLabel={removeLabel}
           onUpdateLabelColor={updateLabelColor}

@@ -16,7 +16,6 @@ import { CalendarMultiDayView } from "./calendar-days-view";
 import {
   buildTasksByDate,
   formatMonthYear,
-  formatSelectedDay,
   fromDateKey,
   getFullMonthDays,
   getMonthCalendarRange,
@@ -26,22 +25,20 @@ import {
 } from "./calendar-mini-month";
 import { getCalendarTaskKey } from "@/lib/calendar-recurring-tasks";
 import { CalendarMultiWeekView } from "./calendar-weeks-view";
-import { CalendarViewSidebarLayout } from "./calendar-view-sidebar-layout";
+import {
+  CalendarViewSidebarLayout,
+  type CalendarSidebarSyncProps,
+} from "./calendar-view-sidebar-layout";
 import { CalendarWeekView } from "./calendar-week-view";
 import {
   CalendarTaskHoverButton,
   CalendarTaskHoverPreviewProvider,
   useCalendarTaskDragPreview,
-  useCalendarTaskHoverPreview,
 } from "./calendar-task-hover-preview";
 import { CalendarTaskColorMenuProvider } from "./calendar-task-color-menu";
 import { CalendarTaskTitle } from "./calendar-task-title";
 import { CalendarTaskCompletionCheckbox } from "./calendar-timed-task-block";
-import {
-  getCompletionAnimationMs,
-  TaskCompletionCheckbox,
-  TASK_COMPLETE_ANIMATION_MS,
-} from "./task-completion-checkbox";
+import { TaskCompletionCheckbox } from "./task-completion-checkbox";
 import type { SearchTask, TaskLabel, TaskListItem, TodoList } from "./todo-app";
 import type { TaskDueTime } from "@/lib/task-due-time";
 import { resolveCalendarDayFromPoint } from "@/lib/calendar-drag";
@@ -369,87 +366,6 @@ function CalendarViewPlaceholder({ label }: { label: string }) {
   );
 }
 
-type CalendarMonthSidebarTaskRowProps = {
-  task: TaskListItem;
-  selected: boolean;
-  isCompleting: boolean;
-  isCheckAnimating: boolean;
-  showCompletionBackground: boolean;
-  completionAnimationMs: number;
-  onToggleTask: (taskId: string) => void;
-  onSelectTask: (taskId: string) => void;
-};
-
-function CalendarMonthSidebarTaskRow({
-  task,
-  selected,
-  isCompleting,
-  isCheckAnimating,
-  showCompletionBackground,
-  completionAnimationMs,
-  onToggleTask,
-  onSelectTask,
-}: CalendarMonthSidebarTaskRowProps) {
-  const hoverHandlers = useCalendarTaskHoverPreview(task);
-
-  return (
-    <li
-      {...hoverHandlers}
-      className={`flex items-center border-b border-zinc-100 py-1 pr-2 pl-4 dark:border-zinc-900 ${
-        isCompleting
-          ? showCompletionBackground
-            ? "task-row-completing"
-            : "task-row-completing task-row-completing-no-bg"
-          : selected
-            ? "bg-zinc-100 dark:bg-zinc-900"
-            : ""
-      }`}
-      style={
-        isCompleting
-          ? ({
-              "--task-complete-duration": `${completionAnimationMs}ms`,
-            } as React.CSSProperties)
-          : undefined
-      }
-    >
-      <TaskCompletionCheckbox
-        variant="box"
-        checkKey={task.id}
-        animateCheck={isCheckAnimating}
-        checked={task.completed || isCheckAnimating || isCompleting}
-        className="self-center shrink-0"
-        onChange={isCompleting ? () => {} : () => onToggleTask(task.id)}
-        onClick={(event) => event.stopPropagation()}
-        aria-label={
-          isCompleting
-            ? `${task.name} completed`
-            : `Mark ${task.name} complete`
-        }
-      />
-      <button
-        type="button"
-        onClick={() => onSelectTask(task.id)}
-        className="min-w-0 flex-1 ml-[9px] text-left"
-      >
-        <span
-          className={`block truncate text-sm leading-[19px] ${
-            isCompleting || isCheckAnimating
-              ? "text-zinc-400 dark:text-zinc-500"
-              : "text-zinc-900 dark:text-zinc-50"
-          }`}
-        >
-          {task.name}
-        </span>
-        {task.listName ? (
-          <span className="block truncate text-[10px] text-zinc-400 dark:text-zinc-500">
-            {task.listName}
-          </span>
-        ) : null}
-      </button>
-    </li>
-  );
-}
-
 export function CalendarMonthView({
   tasks,
   lists,
@@ -476,6 +392,7 @@ export function CalendarMonthView({
   onMonthNavigationChange,
   sidebarFocusDate,
   sidebarJumpRequestId,
+  onSidebarFocusDateChange,
 }: {
   tasks: TaskListItem[];
   lists: TodoList[];
@@ -504,9 +421,7 @@ export function CalendarMonthView({
   externalDropTargetDateKey?: string | null;
   onPeriodLabelChange?: (label: string) => void;
   onMonthNavigationChange?: (navigation: CalendarMonthNavigation | null) => void;
-  sidebarFocusDate?: Date;
-  sidebarJumpRequestId?: number;
-}) {
+} & CalendarSidebarSyncProps) {
   const [today, setToday] = useState<Date | null>(null);
   const [monthDate, setMonthDate] = useState<Date | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -567,26 +482,41 @@ export function CalendarMonthView({
   }, [monthDate]);
   const monthRowCount = Math.max(1, Math.ceil(monthDays.length / 7));
 
-  const selectedDateKey = selectedDate ? toDateKey(selectedDate) : "";
-  const selectedDayTasks = tasksByDate.get(selectedDateKey) ?? [];
   const modalTaskSnapshot = useMemo(
     () => (modalTaskId ? getCalendarTaskSnapshot(modalTaskId, tasks) : null),
     [modalTaskId, tasks],
   );
 
+  function syncSidebarFocusForMonth(nextMonthDate: Date) {
+    if (!onSidebarFocusDateChange) return;
+
+    const focusDate =
+      selectedDate &&
+      selectedDate.getFullYear() === nextMonthDate.getFullYear() &&
+      selectedDate.getMonth() === nextMonthDate.getMonth()
+        ? selectedDate
+        : nextMonthDate;
+
+    onSidebarFocusDateChange(focusDate);
+  }
+
   const handleGoToPreviousMonth = useCallback(() => {
     if (!monthDate) return;
-    setMonthDate(
-      startOfDay(new Date(monthDate.getFullYear(), monthDate.getMonth() - 1, 1)),
+    const nextMonthDate = startOfDay(
+      new Date(monthDate.getFullYear(), monthDate.getMonth() - 1, 1),
     );
-  }, [monthDate]);
+    setMonthDate(nextMonthDate);
+    syncSidebarFocusForMonth(nextMonthDate);
+  }, [monthDate, onSidebarFocusDateChange, selectedDate]);
 
   const handleGoToNextMonth = useCallback(() => {
     if (!monthDate) return;
-    setMonthDate(
-      startOfDay(new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 1)),
+    const nextMonthDate = startOfDay(
+      new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 1),
     );
-  }, [monthDate]);
+    setMonthDate(nextMonthDate);
+    syncSidebarFocusForMonth(nextMonthDate);
+  }, [monthDate, onSidebarFocusDateChange, selectedDate]);
 
   useEffect(() => {
     if (!onMonthNavigationChange || !monthDate) return;
@@ -608,9 +538,16 @@ export function CalendarMonthView({
   }
 
   function handleDaySelect(day: Date) {
-    setSelectedDate(day);
+    const normalized = startOfDay(day);
+    setSelectedDate(normalized);
+    onSidebarFocusDateChange?.(normalized);
     setModalTaskId(null);
     closeAddTaskPopover();
+  }
+
+  function isFocusedMonthDay(day: Date) {
+    const focusDate = sidebarFocusDate ?? selectedDate;
+    return focusDate !== null && isSameDay(day, focusDate);
   }
 
   function handleDayDoubleClick(
@@ -768,93 +705,29 @@ export function CalendarMonthView({
   if (!monthDate || !selectedDate || !today) {
     return (
       <div className="flex min-h-0 flex-1 flex-col">
-        <div className="flex shrink-0 border-b border-zinc-200 dark:border-zinc-800">
-          <div className="flex w-[320px] shrink-0 items-end border-r border-zinc-200 px-4 pb-3 dark:border-zinc-800">
-            <div className="h-5 w-32 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
-          </div>
-          <div className="flex min-w-0 flex-1 flex-col bg-white dark:bg-zinc-950">
-            <div className="grid shrink-0 grid-cols-7 pb-2">
-              <div className="col-span-7 h-4 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
-            </div>
-          </div>
+        <div className="grid shrink-0 grid-cols-7 border-b border-zinc-200 pb-2 dark:border-zinc-800">
+          <div className="col-span-7 h-4 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
         </div>
-        <div className="flex min-h-0 flex-1">
-          <aside className="flex mt-[10px] w-[320px] shrink-0 flex-col border-r border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950" />
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-            <div className="min-h-0 flex-1 animate-pulse bg-zinc-50 dark:bg-zinc-900/40" />
-          </div>
-        </div>
+        <div className="min-h-0 flex-1 animate-pulse bg-zinc-50 dark:bg-zinc-900/40" />
       </div>
     );
   }
 
-  const sidebar = (
-    <aside className="flex pt-[10px] w-[320px] shrink-0 flex-col border-r border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
-      <ul className="min-h-0 flex-1 overflow-y-auto">
-        {selectedDayTasks.length === 0 ? (
-          <li className="px-4 py-3 text-sm text-zinc-500 dark:text-zinc-400">
-            No tasks scheduled
-          </li>
-        ) : (
-          selectedDayTasks.map((task) => {
-            const isCompleting = completingTaskIds?.has(task.id) ?? false;
-            const isCheckAnimating = checkAnimatingTaskIds?.has(task.id) ?? false;
-            const showCompletionBackground =
-              isCompleting &&
-              !(completingWithoutBackgroundTaskIds?.has(task.id) ?? false);
-            const useFastCompletionAnimation =
-              completingWithoutBackgroundTaskIds?.has(task.id) ?? false;
-            const completionAnimationMs = getCompletionAnimationMs(
-              TASK_COMPLETE_ANIMATION_MS,
-              useFastCompletionAnimation,
-            );
-
-            return (
-              <CalendarMonthSidebarTaskRow
-                key={getCalendarTaskKey(task)}
-                task={task}
-                selected={task.id === selectedTaskId}
-                isCompleting={isCompleting}
-                isCheckAnimating={isCheckAnimating}
-                showCompletionBackground={showCompletionBackground}
-                completionAnimationMs={completionAnimationMs}
-                onToggleTask={onToggleTask}
-                onSelectTask={onSelectTask}
-              />
-            );
-          })
-        )}
-      </ul>
-    </aside>
-  );
-
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex shrink-0 border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
-        <div className="flex w-[320px] shrink-0 items-end border-r border-zinc-200 px-4 pb-3 dark:border-zinc-800">
-          <h3 className="text-[13px] text-[#b2b1be] dark:text-zinc-50">
-            {formatSelectedDay(selectedDate)}
-          </h3>
-        </div>
-        <div className="flex min-w-0 flex-1 flex-col">
-          <div className="grid shrink-0 grid-cols-7 pb-2">
-            {CALENDAR_WEEKDAY_LABELS.map((label, dayIndex) => (
-              <div
-                key={label}
-                className={`px-2 text-center text-[14px] font-medium uppercase tracking-wide text-zinc-700 ${getCalendarDayColumnDividerClass(dayIndex, CALENDAR_WEEKDAY_LABELS.length)}`}
-              >
-                {label}
-              </div>
-            ))}
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="grid shrink-0 grid-cols-7 border-b border-zinc-200 bg-white pb-2 dark:border-zinc-800 dark:bg-zinc-950">
+        {CALENDAR_WEEKDAY_LABELS.map((label, dayIndex) => (
+          <div
+            key={label}
+            className={`px-2 text-center text-[14px] font-medium uppercase tracking-wide text-zinc-700 ${getCalendarDayColumnDividerClass(dayIndex, CALENDAR_WEEKDAY_LABELS.length)}`}
+          >
+            {label}
           </div>
-        </div>
+        ))}
       </div>
 
-      <div className="flex min-h-0 flex-1">
-      {sidebar}
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <div className={getCalendarShellClassName(fullWidth)}>
-          <div className={CALENDAR_GRID_SCROLL_CLASS}>
+      <div className={getCalendarShellClassName(fullWidth)}>
+        <div className={CALENDAR_GRID_SCROLL_CLASS}>
             <div
               className="grid h-full min-h-full grid-cols-7"
               style={{
@@ -873,7 +746,7 @@ export function CalendarMonthView({
 
               const dateKey = toDateKey(day);
               const dayTasks = tasksByDate.get(dateKey) ?? [];
-              const isSelected = isSameDay(day, selectedDate);
+              const isSelected = isFocusedMonthDay(day);
               const isToday = isSameDay(day, today);
               const isCurrentMonth = day.getMonth() === monthDate.getMonth();
 
@@ -981,8 +854,6 @@ export function CalendarMonthView({
             </div>
           </div>
         </div>
-      </div>
-      </div>
 
       {addTaskPopover && onAddCalendarTask ? (
         <CalendarAddTaskPopover
@@ -1404,34 +1275,35 @@ export function CalendarViewsPanel({
       />
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       {activeView === "month" ? (
-        <CalendarMonthView
-          tasks={tasks}
-          lists={lists}
-          completingTaskIds={completingTaskIds}
-          completingWithoutBackgroundTaskIds={
-            completingWithoutBackgroundTaskIds
-          }
-          checkAnimatingTaskIds={checkAnimatingTaskIds}
-          selectedTaskId={selectedTaskId}
-          onSelectTask={onSelectTask}
-          onToggleTask={onToggleTask}
-          onSetTaskDueDate={onSetTaskDueDate}
-          onSetTaskDueTime={onSetTaskDueTime}
-          onDetailsSaved={onDetailsSaved}
-          onTaskHasDetailsKnown={onTaskHasDetailsKnown}
-          onTaskRenamed={onTaskRenamed}
-          onDueDateUpdated={onDueDateUpdated}
-          onRecurrenceUpdated={onRecurrenceUpdated}
-          onSaveTaskRecurrence={onSaveTaskRecurrence}
-          onAddCalendarTask={onAddCalendarTask}
-          defaultListId={defaultListId}
-          fullWidth={fullWidth}
-          externalDropTargetDateKey={externalDropTargetDateKey}
-          onPeriodLabelChange={handlePeriodLabelChange}
-          onMonthNavigationChange={setMonthNavigation}
-          sidebarFocusDate={sidebarFocusDate}
-          sidebarJumpRequestId={sidebarJumpRequestId}
-        />
+        wrapViewWithSidebar(
+          <CalendarMonthView
+            tasks={tasks}
+            lists={lists}
+            completingTaskIds={completingTaskIds}
+            completingWithoutBackgroundTaskIds={
+              completingWithoutBackgroundTaskIds
+            }
+            checkAnimatingTaskIds={checkAnimatingTaskIds}
+            selectedTaskId={selectedTaskId}
+            onSelectTask={onSelectTask}
+            onToggleTask={onToggleTask}
+            onSetTaskDueDate={onSetTaskDueDate}
+            onSetTaskDueTime={onSetTaskDueTime}
+            onDetailsSaved={onDetailsSaved}
+            onTaskHasDetailsKnown={onTaskHasDetailsKnown}
+            onTaskRenamed={onTaskRenamed}
+            onDueDateUpdated={onDueDateUpdated}
+            onRecurrenceUpdated={onRecurrenceUpdated}
+            onSaveTaskRecurrence={onSaveTaskRecurrence}
+            onAddCalendarTask={onAddCalendarTask}
+            defaultListId={defaultListId}
+            fullWidth={fullWidth}
+            externalDropTargetDateKey={externalDropTargetDateKey}
+            onPeriodLabelChange={handlePeriodLabelChange}
+            onMonthNavigationChange={setMonthNavigation}
+            {...sidebarSyncProps}
+          />,
+        )
       ) : activeView === "week" ? (
         wrapViewWithSidebar(
           <CalendarWeekView

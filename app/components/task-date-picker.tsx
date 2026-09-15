@@ -568,7 +568,7 @@ function TaskReminderMenu({
   return (
     <div
       ref={menuRef}
-      className="relative"
+      className="relative mb-2"
       onMouseEnter={() => {
         cancelScheduledClose();
         openMenu();
@@ -594,7 +594,7 @@ function TaskReminderMenu({
           }
           openMenu();
         }}
-        className={`flex w-full items-center justify-between gap-2 rounded-full border pl-5 pr-3 py-2 text-[13px] font-medium transition-colors ${
+        className={`flex w-full items-center justify-center gap-2 rounded-full border py-2 text-[13px] font-medium transition-colors ${
           disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"
         }`}
         style={{
@@ -602,20 +602,18 @@ function TaskReminderMenu({
           color: PICKER_FOREGROUND,
         }}
       >
-        <span className="flex min-w-0 flex-1 items-center gap-4">
-          <MdAlarm
-            className="size-4 shrink-0"
-            style={{ color: PICKER_MUTED_FG }}
-            aria-hidden="true"
-          />
-          <span
-            className="truncate"
-            style={{
-              color: hasActiveReminder ? PICKER_ACCENT : "#6c6d6d",
-            }}
-          >
-            {triggerLabel}
-          </span>
+        <MdAlarm
+          className="size-4 shrink-0"
+          style={{ color: PICKER_MUTED_FG }}
+          aria-hidden="true"
+        />
+        <span
+          className="truncate"
+          style={{
+            color: hasActiveReminder ? PICKER_ACCENT : "#6c6d6d",
+          }}
+        >
+          {triggerLabel}
         </span>
         <BiChevronDown
           className={`size-4 shrink-0 transition-transform ${
@@ -767,7 +765,7 @@ function TaskRecurrenceMenu({
           }
           openMenu();
         }}
-        className={`flex w-full items-center justify-between gap-2 rounded-full border pl-5 pr-3 py-2 text-[13px] font-medium transition-colors ${
+        className={`flex w-full items-center justify-center gap-2 rounded-full border py-2 text-[13px] font-medium transition-colors ${
           disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"
         }`}
         style={{
@@ -775,15 +773,13 @@ function TaskRecurrenceMenu({
           color: PICKER_FOREGROUND,
         }}
       >
-        <span className="flex min-w-0 flex-1 items-center gap-4">
-          <Repeat
-            className="size-4 shrink-0 text-[#929494]"
-            strokeWidth={2}
-            style={{ color: PICKER_MUTED_FG }}
-            aria-hidden="true"
-          />
-          <span className="truncate text-[#6c6d6d]">{triggerLabel}</span>
-        </span>
+        <Repeat
+          className="size-4 shrink-0 text-[#929494]"
+          strokeWidth={2}
+          style={{ color: PICKER_MUTED_FG }}
+          aria-hidden="true"
+        />
+        <span className="truncate text-[#6c6d6d]">{triggerLabel}</span>
         <BiChevronDown
           className={`size-4 shrink-0 transition-transform ${
             isOpen ? "rotate-180" : ""
@@ -1059,7 +1055,7 @@ function TaskTimeMenu({
   return (
     <div
       data-task-time-menu
-      className="mt-3 space-y-3 rounded-2xl border bg-white px-3 pt-3 pb-2"
+      className="space-y-3 rounded-2xl border bg-white px-3 pt-3 pb-2"
       style={{ borderColor: PICKER_BORDER }}
     >
       <div
@@ -1630,45 +1626,45 @@ export function TaskDatePicker({
         className="space-y-3 border-t p-3"
         style={{ borderColor: PICKER_BORDER }}
       >
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setIsTimeMenuOpen((open) => !open)}
-            className="flex w-full items-center justify-center gap-2 rounded-full border bg-white py-2 text-[13px] border-[#dedede] text-zinc-600 font-medium transition-colors cursor-pointer"
-            style={
-              isTimeMenuOpen || dueTimeMinutes !== null
-                ? {
-                    color: PICKER_ACCENT,
-                  }
-                : {
-                    borderColor: PICKER_BORDER,
-                    color: PICKER_MUTED_FG,
-                  }
-            }
-          >
-            <BiTimeFive className="size-4" />
-            {timeButtonLabel}
-            <BiChevronDown
-              className={`size-4 transition-transform ${
-                isTimeMenuOpen ? "rotate-180" : ""
-              }`}
-              aria-hidden="true"
-            />
-          </button>
-
-          {isTimeMenuOpen && onSaveDueTime ? (
-            <TaskTimeMenu
-              initialDueTime={{
-                dueTimeMinutes: normalizeDueTimeMinutes(dueTimeMinutes),
-                dueDurationMinutes: dueDurationMinutes ?? null,
-                dueTimeZone: normalizeDueTimeZone(dueTimeZone),
-              }}
-              onSave={(dueTime, options) => {
-                onSaveDueTime(dueTime, options);
-              }}
-            />
-          ) : null}
-        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setOpenFooterSubmenu(null);
+            setIsTimeMenuOpen((open) => !open);
+          }}
+          className="flex w-full items-center justify-center mb-2 h-[37px]! gap-2 rounded-full border bg-white py-1 text-[13px] border-[#dedede] text-zinc-600 font-medium transition-colors cursor-pointer"
+          style={
+            isTimeMenuOpen || dueTimeMinutes !== null
+              ? {
+                  color: PICKER_ACCENT,
+                }
+              : {
+                  borderColor: PICKER_BORDER,
+                  color: PICKER_MUTED_FG,
+                }
+          }
+        >
+          <BiTimeFive className="size-4" />
+          {timeButtonLabel}
+          <BiChevronDown
+            className={`size-4 transition-transform ${
+              isTimeMenuOpen ? "rotate-180" : ""
+            }`}
+            aria-hidden="true"
+          />
+        </button>
+        {isTimeMenuOpen && onSaveDueTime ? (
+          <TaskTimeMenu
+            initialDueTime={{
+              dueTimeMinutes: normalizeDueTimeMinutes(dueTimeMinutes),
+              dueDurationMinutes: dueDurationMinutes ?? null,
+              dueTimeZone: normalizeDueTimeZone(dueTimeZone),
+            }}
+            onSave={(dueTime, options) => {
+              onSaveDueTime(dueTime, options);
+            }}
+          />
+        ) : null}
         <TaskReminderMenu
           activeReminder={displayReminder}
           isOpen={openFooterSubmenu === "reminder"}

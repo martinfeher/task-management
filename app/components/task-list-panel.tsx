@@ -12,8 +12,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { BiChevronDown, BiSortAlt2 } from "react-icons/bi";
-import { IoPricetagsOutline } from "react-icons/io5";
-import { LuCalendarCheck2, LuCheck, LuMenu, LuX } from "react-icons/lu";
+import { LuCalendarCheck2, LuCheck, LuMenu, LuPlus, LuX } from "react-icons/lu";
 import { MdOutlineKeyboardDoubleArrowRight } from "react-icons/md";
 import { createLabel, getLabels } from "@/app/actions/todo";
 import {
@@ -91,6 +90,7 @@ import {
   type TaskListPointerContextMenuState,
 } from "@/lib/task-list-interaction-store";
 import { useTaskListBackground } from "@/lib/task-list-background";
+import { LiaTagSolid } from "react-icons/lia";
 
 export const TASK_LIST_PANEL_DEFAULT_WIDTH = 520;
 export const TASK_LIST_PANEL_AUTO_EXPAND_MAX_WIDTH = 620;
@@ -2864,7 +2864,7 @@ export function TaskListPanel({
                           : ""
                       }`}
                     >
-                      <IoPricetagsOutline className="size-[15px] ptxt-400 group-hover/add-label:ptxt-600" />
+                      <LiaTagSolid className="size-4 text-[#acadb2]" />
                     </button>
                     <span
                       id="add-task-label-tooltip"

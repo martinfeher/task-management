@@ -677,12 +677,42 @@ export async function deleteTodoList(listId: string) {
   revalidatePath("/");
 }
 
+async function getNextTopLevelSidebarPosition(
+  tx: Pick<typeof prisma, "todoList" | "listFolder">,
+) {
+  const [listAggregate, folderAggregate] = await Promise.all([
+    tx.todoList.aggregate({
+      where: { folderId: null },
+      _max: { position: true },
+    }),
+    tx.listFolder.aggregate({
+      _max: { position: true },
+    }),
+  ]);
+
+  return (
+    Math.max(
+      listAggregate._max.position ?? -1,
+      folderAggregate._max.position ?? -1,
+    ) + 1
+  );
+}
+
+async function getNextFolderListPosition(
+  tx: Pick<typeof prisma, "todoList">,
+  folderId: string,
+) {
+  const aggregate = await tx.todoList.aggregate({
+    where: { folderId },
+    _max: { position: true },
+  });
+
+  return (aggregate._max.position ?? -1) + 1;
+}
+
 export async function createTodoList(name: string) {
   const list = await prisma.$transaction(async (tx) => {
-    const aggregate = await tx.todoList.aggregate({
-      _max: { position: true },
-    });
-    const position = (aggregate._max.position ?? -1) + 1;
+    const position = await getNextTopLevelSidebarPosition(tx);
 
     return tx.todoList.create({
       data: {
@@ -694,6 +724,79 @@ export async function createTodoList(name: string) {
 
   revalidatePath("/");
   return list;
+}
+
+export async function createListFolder(name: string) {
+  const folder = await prisma.$transaction(async (tx) => {
+    const position = await getNextTopLevelSidebarPosition(tx);
+
+    return tx.listFolder.create({
+      data: {
+        name,
+        position,
+      },
+    });
+  });
+
+  revalidatePath("/");
+  return folder;
+}
+
+export async function renameListFolder(folderId: string, name: string) {
+  const folder = await prisma.listFolder.update({
+    where: { id: folderId },
+    data: { name },
+  });
+
+  revalidatePath("/");
+  return folder;
+}
+
+export async function deleteListFolder(folderId: string) {
+  await prisma.$transaction(async (tx) => {
+    const lists = await tx.todoList.findMany({
+      where: { folderId },
+      select: { id: true },
+      orderBy: [{ position: "asc" }, { createdAt: "asc" }],
+    });
+
+    let nextPosition = await getNextTopLevelSidebarPosition(tx);
+
+    for (const list of lists) {
+      await tx.todoList.update({
+        where: { id: list.id },
+        data: {
+          folderId: null,
+          position: nextPosition,
+        },
+      });
+      nextPosition += 1;
+    }
+
+    await tx.listFolder.delete({
+      where: { id: folderId },
+    });
+  });
+
+  revalidatePath("/");
+}
+
+export async function moveListToFolder(listId: string, folderId: string | null) {
+  await prisma.$transaction(async (tx) => {
+    const position = folderId
+      ? await getNextFolderListPosition(tx, folderId)
+      : await getNextTopLevelSidebarPosition(tx);
+
+    await tx.todoList.update({
+      where: { id: listId },
+      data: {
+        folderId,
+        position,
+      },
+    });
+  });
+
+  revalidatePath("/");
 }
 
 export async function reorderLabels(labelIds: string[]) {
@@ -738,6 +841,7 @@ export async function reorderLabels(labelIds: string[]) {
 
 export async function reorderTodoLists(listIds: string[]) {
   const lists = await prisma.todoList.findMany({
+    where: { folderId: null },
     select: { id: true },
     orderBy: [{ position: "asc" }, { createdAt: "asc" }],
   });

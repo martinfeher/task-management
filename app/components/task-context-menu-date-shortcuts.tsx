@@ -2,7 +2,9 @@
 
 import { useId, type MouseEvent, type ReactNode } from "react";
 import { BsCalendarPlus } from "react-icons/bs";
-import { LuCalendarFold, LuCalendarX2 } from "react-icons/lu";
+import { LiaCaretSquareRight } from "react-icons/lia";
+import { LuCalendarX2 } from "react-icons/lu";
+import { CgCalendarNext } from "react-icons/cg";
 import {
   getNextWeekendSaturdayDate,
   getNextWeekendSaturdayDateKey,
@@ -47,12 +49,12 @@ function DateShortcutButton({
         : "left-1/2 -translate-x-1/2";
 
   return (
-    <div className="group/date-option relative cursor-pointer">
+    <div className="group/date-option relative cursor-pointer mx-1">
       <button
         type="button"
         aria-label={label}
         aria-describedby={tooltipId}
-        className="flex size-8 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800"
+        className="flex cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800"
         onClick={onClick}
       >
         <span
@@ -117,7 +119,7 @@ export function TaskContextMenuDateShortcuts({
           </div>
         ) : null}
       </div>
-      <div className="flex min-h-8 items-center justify-between overflow-visible pr-[5px]">
+      <div className="flex min-h-8 items-center justify-between overflow-visible">
         <DateShortcutButton
           label="Today"
           tooltipId={`${tooltipBaseId}-today`}
@@ -141,10 +143,7 @@ export function TaskContextMenuDateShortcuts({
             onSelectDate(getTomorrowDateKey());
           }}
         >
-          <LuCalendarFold
-            className="text-[#909295] size-[19px]!"
-            strokeWidth={1}
-          />
+          <LiaCaretSquareRight className="text-[#909295]" />
         </DateShortcutButton>
         <DateShortcutButton
           label="Next weekend"

@@ -8,16 +8,24 @@ export type ListContextMenuPosition = {
   left: number;
 };
 
+type ListFolderOption = {
+  id: string;
+  name: string;
+};
+
 type ListContextMenuProps = {
   listName: string;
   fixedPosition: ListContextMenuPosition;
   menuRef?: RefObject<HTMLDivElement | null>;
+  folders?: ListFolderOption[];
+  currentFolderId?: string | null;
   onRename: () => void;
   onRemove: () => void;
+  onMoveToFolder?: (folderId: string | null) => void;
 };
 
-const MENU_WIDTH = 144;
-const MENU_HEIGHT = 88;
+const MENU_WIDTH = 176;
+const MENU_HEIGHT = 220;
 
 export function clampListContextMenuPosition(
   top: number,
@@ -42,9 +50,15 @@ export function ListContextMenu({
   listName,
   fixedPosition,
   menuRef,
+  folders = [],
+  currentFolderId = null,
   onRename,
   onRemove,
+  onMoveToFolder,
 }: ListContextMenuProps) {
+  const moveTargets = folders.filter((folder) => folder.id !== currentFolderId);
+  const showMoveSection = Boolean(onMoveToFolder && (moveTargets.length > 0 || currentFolderId));
+
   return createPortal(
     <div
       ref={menuRef}
@@ -56,7 +70,7 @@ export function ListContextMenu({
         left: fixedPosition.left,
       }}
     >
-      <div className="w-36 overflow-hidden rounded-md border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+      <div className="sidebar-context-menu w-44 py-1">
         <button
           type="button"
           role="menuitem"
@@ -65,6 +79,33 @@ export function ListContextMenu({
         >
           Rename
         </button>
+        {showMoveSection ? (
+          <>
+            <div className="mx-3 my-1 h-px bg-zinc-200 dark:bg-zinc-700" />
+            {moveTargets.map((folder) => (
+              <button
+                key={folder.id}
+                type="button"
+                role="menuitem"
+                className="flex h-[35px] w-full items-center px-3 text-left text-sm ptxt-900 hover:bg-zinc-100 dark:ptxt-50 dark:hover:bg-zinc-800"
+                onClick={() => onMoveToFolder?.(folder.id)}
+              >
+                Move to {folder.name}
+              </button>
+            ))}
+            {currentFolderId ? (
+              <button
+                type="button"
+                role="menuitem"
+                className="flex h-[35px] w-full items-center px-3 text-left text-sm ptxt-900 hover:bg-zinc-100 dark:ptxt-50 dark:hover:bg-zinc-800"
+                onClick={() => onMoveToFolder?.(null)}
+              >
+                Remove from folder
+              </button>
+            ) : null}
+          </>
+        ) : null}
+        <div className="mx-3 my-1 h-px bg-zinc-200 dark:bg-zinc-700" />
         <button
           type="button"
           role="menuitem"

@@ -6,8 +6,8 @@ import { BiChevronRight } from "react-icons/bi";
 import { IoDuplicateOutline } from "react-icons/io5";
 import { PiListStarThin, PiNoteThin } from "react-icons/pi";
 import { RiDeleteBinLine } from "react-icons/ri";
-
 import { LiaTagSolid } from "react-icons/lia";
+import { CgCalendarNext } from "react-icons/cg";
 
 
 import { LuListVideo } from "react-icons/lu";
@@ -195,7 +195,7 @@ function MainMenuItems({
      
             <span className={menuItemIconSlotClassName}>
               <LuListVideo
-                className="size-[19px]! mt-[1px] text-zinc-350 group-hover:text-zinc-400 dark:text-zinc-400"
+                className="size-[19px]! mb-[1.5px] text-zinc-350 group-hover:text-zinc-400 dark:text-zinc-400"
               />
             </span>
             <span className="text-[15px] text-zinc-800">Move to</span>
@@ -280,7 +280,7 @@ function MainMenuItems({
                 className="size-[19px]! text-zinc-600 group-hover:text-zinc-650 dark:text-zinc-400"
               />
             </span>
-            {task.isNote ? "turn into Task" : "convert to Note"}
+            {task.isNote ? "convert to Task" : "convert to Note"}
           </span>
         </button>
       ) : null}

@@ -89,7 +89,8 @@ export async function getTodoData() {
     detailFlags.map((row) => [row.id, Boolean(row.hasDetails)]),
   );
 
-  const lists = await prisma.todoList.findMany({
+  const [lists, folders] = await Promise.all([
+    prisma.todoList.findMany({
     include: {
       tasks: {
         where: { deletedAt: null },
@@ -115,10 +116,21 @@ export async function getTodoData() {
       },
     },
     orderBy: [{ position: "asc" }, { createdAt: "asc" }],
-  });
+  }),
+    prisma.listFolder.findMany({
+      orderBy: [{ position: "asc" }, { createdAt: "asc" }],
+      select: { id: true, name: true, position: true },
+    }),
+  ]);
 
   return {
-    lists: lists.map(({ id, name }) => ({ id, name })),
+    folders,
+    lists: lists.map(({ id, name, folderId, position }) => ({
+      id,
+      name,
+      folderId,
+      position,
+    })),
     labels: await prisma.tag.findMany({
       where: { category: LABEL_CATEGORY },
       orderBy: [{ position: "asc" }, { createdAt: "asc" }],

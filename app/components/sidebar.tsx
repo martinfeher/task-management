@@ -23,12 +23,18 @@ import { useImportantEnabled } from "@/lib/important-settings";
 
 import type {
   CompletedTask,
+  ListFolder,
   SearchTask,
   SidebarHoverPreview,
   TaskLabel,
   TaskListItem,
   TodoList,
 } from "./todo-app";
+import {
+  buildSidebarTopLevelEntries,
+  getListsForFolder,
+  getUngroupedSidebarListIds,
+} from "@/lib/sidebar-list-layout";
 import {
   getListDropIndex,
   getListRowElements,
@@ -50,6 +56,10 @@ import {
   ListContextMenu,
   clampListContextMenuPosition,
 } from "./list-context-menu";
+import {
+  FolderContextMenu,
+  clampFolderContextMenuPosition,
+} from "./folder-context-menu";
 import { TodayCalendarIcon } from "./today-calendar-icon";
 
 
@@ -91,8 +101,34 @@ const NAV_ITEMS = [
   { label: "Calendar", action: "calendar" as const },
 ];
 
+const EXPANDED_FOLDERS_STORAGE_KEY = "sidebar-expanded-list-folders";
+
+function readExpandedFolderIds() {
+  if (typeof window === "undefined") return new Set<string>();
+
+  try {
+    const raw = window.localStorage.getItem(EXPANDED_FOLDERS_STORAGE_KEY);
+    if (!raw) return new Set<string>();
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? new Set(parsed.filter((value): value is string => typeof value === "string"))
+      : new Set<string>();
+  } catch {
+    return new Set<string>();
+  }
+}
+
+function writeExpandedFolderIds(folderIds: Set<string>) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(
+    EXPANDED_FOLDERS_STORAGE_KEY,
+    JSON.stringify([...folderIds]),
+  );
+}
+
 type SidebarProps = {
   lists: TodoList[];
+  folders: ListFolder[];
   labels: TaskLabel[];
   taskCountByListId: Record<string, number>;
   taskCountByLabelId: Record<string, number>;
@@ -126,10 +162,13 @@ type SidebarProps = {
   onSelectSearchTask: (taskId: string, listId: string) => void;
   onToggleTask: (taskId: string) => void;
   onAddList: (name: string) => void;
-  onAddFolder?: (name: string) => void;
+  onAddFolder: (name: string) => void;
   onAddLabel: (name: string, color: string) => void;
   onRenameList: (listId: string, name: string) => void;
+  onRenameFolder: (folderId: string, name: string) => void;
   onRemoveList: (listId: string) => void;
+  onRemoveFolder: (folderId: string) => void;
+  onMoveListToFolder: (listId: string, folderId: string | null) => void;
   onRenameLabel: (labelId: string, name: string) => void;
   onRemoveLabel: (labelId: string) => void;
   onUpdateLabelColor: (labelId: string, color: string) => void;
@@ -192,6 +231,7 @@ function getItemClassName(isSelected: boolean, baseClassName = itemClassName) {
 
 export function Sidebar({
   lists,
+  folders,
   labels,
   taskCountByListId,
   taskCountByLabelId,
@@ -224,7 +264,10 @@ export function Sidebar({
   onAddFolder,
   onAddLabel,
   onRenameList,
+  onRenameFolder,
   onRemoveList,
+  onRemoveFolder,
+  onMoveListToFolder,
   onRenameLabel,
   onRemoveLabel,
   onUpdateLabelColor,
@@ -246,7 +289,11 @@ export function Sidebar({
     : NAV_ITEMS.filter((item) => item.action !== "important");
   const closeDrawer = () => onDrawerClose?.();
   const [orderedLists, setOrderedLists] = useState(lists);
+  const [orderedFolders, setOrderedFolders] = useState(folders);
   const [orderedLabels, setOrderedLabels] = useState(labels);
+  const [expandedFolderIds, setExpandedFolderIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [dropIndicatorTop, setDropIndicatorTop] = useState<number | null>(null);
   const [labelDropIndicatorTop, setLabelDropIndicatorTop] = useState<
     number | null
@@ -275,6 +322,11 @@ export function Sidebar({
     top: number;
     left: number;
   } | null>(null);
+  const [openMenuFolderId, setOpenMenuFolderId] = useState<string | null>(null);
+  const [folderMenuPosition, setFolderMenuPosition] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
   const [openMenuLabelId, setOpenMenuLabelId] = useState<string | null>(null);
   const [labelMenuPosition, setLabelMenuPosition] = useState<{
     top: number;
@@ -282,6 +334,8 @@ export function Sidebar({
   } | null>(null);
   const [renameList, setRenameList] = useState<TodoList | null>(null);
   const [removeList, setRemoveList] = useState<TodoList | null>(null);
+  const [renameFolder, setRenameFolder] = useState<ListFolder | null>(null);
+  const [removeFolder, setRemoveFolder] = useState<ListFolder | null>(null);
   const [renameLabel, setRenameLabel] = useState<TaskLabel | null>(null);
   const [removeLabel, setRemoveLabel] = useState<TaskLabel | null>(null);
   const [isAddListOpen, setIsAddListOpen] = useState(false);
@@ -291,6 +345,7 @@ export function Sidebar({
   const [editingListId, setEditingListId] = useState<string | null>(null);
   const [listNameDraft, setListNameDraft] = useState("");
   const menuRef = useRef<HTMLDivElement>(null);
+  const folderMenuRef = useRef<HTMLDivElement>(null);
   const labelMenuRef = useRef<HTMLDivElement>(null);
   const listPanelScrollRef = useRef<HTMLElement>(null);
   const [hasVerticalScroll, setHasVerticalScroll] = useState(false);
@@ -309,6 +364,7 @@ export function Sidebar({
     sidebarListIds: string[];
     fullListIds: string[];
     inboxListId: string | null;
+    listIdsInFolders: ReadonlySet<string>;
     pointerId: number;
   } | null>(null);
   const labelDragStateRef = useRef<{
@@ -323,7 +379,9 @@ export function Sidebar({
     appliedTargetIndex: number | null;
   } | null>(null);
   const suppressListClickRef = useRef(false);
+  const suppressFolderClickRef = useRef(false);
   const suppressLabelClickRef = useRef(false);
+  const expandedFoldersHydratedRef = useRef(false);
 
 
   useEffect(() => {
@@ -348,7 +406,9 @@ export function Sidebar({
     isCompletedOpen,
     isLabelsOpen,
     labels.length,
+    folders.length,
     lists.length,
+    orderedFolders.length,
     orderedLabels.length,
     orderedLists.length,
   ]);
@@ -358,8 +418,35 @@ export function Sidebar({
   }, [lists]);
 
   useEffect(() => {
+    setOrderedFolders(folders);
+  }, [folders]);
+
+  useEffect(() => {
     setOrderedLabels(labels);
   }, [labels]);
+
+  useEffect(() => {
+    if (expandedFoldersHydratedRef.current) return;
+    expandedFoldersHydratedRef.current = true;
+    setExpandedFolderIds(readExpandedFolderIds());
+  }, []);
+
+  useEffect(() => {
+    if (!expandedFoldersHydratedRef.current) return;
+    writeExpandedFolderIds(expandedFolderIds);
+  }, [expandedFolderIds]);
+
+  useEffect(() => {
+    if (!selectedListId) return;
+
+    const selectedList = orderedLists.find((list) => list.id === selectedListId);
+    if (!selectedList?.folderId) return;
+
+    setExpandedFolderIds((current) => {
+      if (current.has(selectedList.folderId!)) return current;
+      return new Set([...current, selectedList.folderId!]);
+    });
+  }, [orderedLists, selectedListId]);
 
   useEffect(() => {
     if (!editingListId) return;
@@ -428,6 +515,9 @@ export function Sidebar({
       if (!menuRef.current?.contains(event.target as Node)) {
         closeListMenu();
       }
+      if (!folderMenuRef.current?.contains(event.target as Node)) {
+        closeFolderMenu();
+      }
       if (!labelMenuRef.current?.contains(event.target as Node)) {
         setOpenMenuLabelId(null);
         setLabelMenuPosition(null);
@@ -448,6 +538,8 @@ export function Sidebar({
         isSearchOpen ||
         renameList ||
         removeList ||
+        renameFolder ||
+        removeFolder ||
         isAddListOpen ||
         isAddFolderOpen ||
         isAddLabelOpen ||
@@ -464,22 +556,31 @@ export function Sidebar({
         return;
       }
 
+      if (openMenuFolderId) {
+        event.preventDefault();
+        closeFolderMenu();
+        return;
+      }
+
       if (openMenuListId) {
         event.preventDefault();
         closeListMenu();
       }
     }
 
-    if (!openMenuLabelId && !openMenuListId) return;
+    if (!openMenuLabelId && !openMenuListId && !openMenuFolderId) return;
 
     document.addEventListener("keydown", handleEscape);
     return () => document.removeEventListener("keydown", handleEscape);
   }, [
     openMenuLabelId,
     openMenuListId,
+    openMenuFolderId,
     isSearchOpen,
     renameList,
     removeList,
+    renameFolder,
+    removeFolder,
     isAddListOpen,
     isAddFolderOpen,
     isAddLabelOpen,
@@ -501,9 +602,20 @@ export function Sidebar({
   }, [isBottomAddMenuOpen]);
 
   const inboxListId = getInboxListId(lists);
-  const sidebarLists = inboxListId
-    ? orderedLists.filter((list) => list.id !== inboxListId)
-    : orderedLists;
+  const listIdsInFolders = new Set(
+    orderedLists
+      .filter((list) => list.folderId)
+      .map((list) => list.id),
+  );
+  const sidebarUngroupedListIds = getUngroupedSidebarListIds(
+    orderedLists,
+    inboxListId,
+  );
+  const sidebarTopLevelEntries = buildSidebarTopLevelEntries(
+    orderedFolders,
+    orderedLists,
+    inboxListId,
+  );
 
   function isListSelected(listId: string) {
     return (
@@ -545,6 +657,68 @@ export function Sidebar({
   function closeListMenu() {
     setOpenMenuListId(null);
     setListMenuPosition(null);
+  }
+
+  function closeFolderMenu() {
+    setOpenMenuFolderId(null);
+    setFolderMenuPosition(null);
+  }
+
+  function toggleFolderExpanded(folderId: string) {
+    setExpandedFolderIds((current) => {
+      const next = new Set(current);
+      if (next.has(folderId)) {
+        next.delete(folderId);
+      } else {
+        next.add(folderId);
+      }
+      return next;
+    });
+  }
+
+  function handleFolderClick(folderId: string) {
+    if (suppressFolderClickRef.current) {
+      suppressFolderClickRef.current = false;
+      return;
+    }
+
+    toggleFolderExpanded(folderId);
+  }
+
+  function openFolderMenu(
+    folderId: string,
+    position: { top: number; left: number },
+  ) {
+    setOpenMenuFolderId(folderId);
+    setFolderMenuPosition(
+      clampFolderContextMenuPosition(position.top, position.left),
+    );
+  }
+
+  function toggleFolderMenuFromButton(
+    folderId: string,
+    button: HTMLButtonElement,
+  ) {
+    if (openMenuFolderId === folderId) {
+      closeFolderMenu();
+      return;
+    }
+
+    const rect = button.getBoundingClientRect();
+    openFolderMenu(folderId, {
+      top: rect.bottom + 4,
+      left: rect.right - 144,
+    });
+  }
+
+  function openRenameFolderModal(folder: ListFolder) {
+    closeFolderMenu();
+    setRenameFolder(folder);
+  }
+
+  function openRemoveFolderModal(folder: ListFolder) {
+    closeFolderMenu();
+    setRemoveFolder(folder);
   }
 
   function openListMenu(
@@ -690,6 +864,7 @@ export function Sidebar({
         dragState.fullListIds,
         dragState.inboxListId,
         reorderedSidebarIds,
+        dragState.listIdsInFolders,
       );
 
       if (nextIds.join(",") !== dragState.fullListIds.join(",")) {
@@ -725,6 +900,7 @@ export function Sidebar({
       sidebarListIds,
       fullListIds,
       inboxListId,
+      listIdsInFolders,
       pointerId,
     };
 
@@ -756,7 +932,7 @@ export function Sidebar({
     const sourceIndex = rows.indexOf(dragRow);
     if (sourceIndex < 0) return;
 
-    const sidebarListIds = sidebarLists.map((list) => list.id);
+    const sidebarListIds = sidebarUngroupedListIds;
     const fullListIds = orderedLists.map((list) => list.id);
     const startX = event.clientX;
     const startY = event.clientY;
@@ -1041,6 +1217,11 @@ export function Sidebar({
       ? (orderedLists.find((item) => item.id === openMenuListId) ?? null)
       : null;
 
+  const openFolderMenuItem =
+    openMenuFolderId !== null
+      ? (orderedFolders.find((item) => item.id === openMenuFolderId) ?? null)
+      : null;
+
   const openLabelMenuItem =
     openMenuLabelId !== null
       ? (orderedLabels.find((item) => item.id === openMenuLabelId) ?? null)
@@ -1055,6 +1236,111 @@ export function Sidebar({
 
     onSelectList(listId);
     closeDrawer();
+  }
+
+  function renderListRow(list: TodoList, nested = false) {
+    const isNameHovered =
+      sidebarHoverPreview?.kind === "list" &&
+      sidebarHoverPreview.listId === list.id;
+    const allowReorder = Boolean(onReorderLists) && !nested && !list.folderId;
+
+    return (
+      <div
+        key={list.id}
+        {...(allowReorder ? { "data-list-id": list.id } : {})}
+        onPointerDown={(event) => {
+          if (!allowReorder) return;
+          handleListPointerDown(event, list.id);
+        }}
+        onClick={() => handleListClick(list.id)}
+        onContextMenu={(event) => {
+          if (editingListId === list.id) return;
+
+          event.preventDefault();
+          event.stopPropagation();
+          openListMenu(list.id, {
+            top: event.clientY,
+            left: event.clientX,
+          });
+        }}
+        onMouseEnter={(event) => {
+          const rect = event.currentTarget.getBoundingClientRect();
+          onSidebarHoverStart?.({
+            kind: "list",
+            listId: list.id,
+            anchorTop: rect.top,
+            anchorLeft: rect.left,
+            anchorWidth: rect.width,
+            anchorHeight: rect.height,
+          });
+        }}
+        onMouseLeave={() => {
+          if (isNameHovered) {
+            onSidebarHoverEnd?.();
+          }
+        }}
+        className={`group relative mb-1 flex h-[34px] cursor-pointer items-center gap-2 rounded-md px-3 transition-[background-color] duration-200 ${
+          nested ? "ml-[18px]" : "ml-[3px]"
+        } ${isNameHovered ? "bg-zinc-200/70 dark:bg-zinc-800/70" : ""} ${getListRowClassName(list.id)} ${
+          allowReorder ? "touch-none" : ""
+        }`}
+      >
+        <LuList
+          className="size-[14px] shrink-0 text-[#acadb7]"
+          aria-hidden="true"
+        />
+        <div className="group min-w-0 flex-1 pr-8 text-left">
+          {editingListId === list.id ? (
+            <input
+              ref={listNameInputRef}
+              type="text"
+              value={listNameDraft}
+              onChange={(event) => setListNameDraft(event.target.value)}
+              onClick={(event) => event.stopPropagation()}
+              onPointerDown={(event) => event.stopPropagation()}
+              onDoubleClick={(event) => event.stopPropagation()}
+              onBlur={() => commitListNameEdit(list)}
+              onKeyDown={(event) => handleListNameKeyDown(event, list)}
+              aria-label={`Rename ${list.name}`}
+              className="min-w-0 w-full bg-transparent text-sm ptxt-list-items outline-none cursor-text"
+            />
+          ) : (
+            <span
+              className="block truncate text-sm ptxt-list-items"
+              onDoubleClick={(event) => {
+                event.stopPropagation();
+                startListNameEdit(list);
+              }}
+            >
+              {list.name}
+            </span>
+          )}
+        </div>
+        <span
+          className={`${SIDEBAR_ROW_COUNT_CLASS} ${
+            openMenuListId === list.id ? "opacity-0" : ""
+          }`}
+        >
+          {taskCountByListId[list.id] ?? 0}
+        </span>
+        <div className={SIDEBAR_ROW_MENU_WRAPPER_CLASS}>
+          <button
+            type="button"
+            aria-label={`Open menu for ${list.name}`}
+            aria-expanded={openMenuListId === list.id}
+            aria-haspopup="menu"
+            className={`${getSidebarRowMenuButtonClass(openMenuListId === list.id)} -mr-[6px]`}
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              toggleListMenuFromButton(list.id, event.currentTarget);
+            }}
+          >
+            <PiDotsThreeBold className="size-[15px] ptxt-500" />
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -1266,95 +1552,67 @@ export function Sidebar({
                 style={{ top: dropIndicatorTop }}
               />
             )}
-            {sidebarLists.map((list) => {
-              const isNameHovered =
-                sidebarHoverPreview?.kind === "list" &&
-                sidebarHoverPreview.listId === list.id;
+            {sidebarTopLevelEntries.map((entry) => {
+              if (entry.kind === "list") {
+                return renderListRow(entry.list);
+              }
+
+              const folder = entry.folder;
+              const isExpanded = expandedFolderIds.has(folder.id);
+              const folderLists = getListsForFolder(orderedLists, folder.id);
 
               return (
-            <div
-              key={list.id}
-              data-list-id={list.id}
-              onPointerDown={(event) => handleListPointerDown(event, list.id)}
-              onClick={() => handleListClick(list.id)}
-              onMouseEnter={(event) => {
-                const rect = event.currentTarget.getBoundingClientRect();
-                onSidebarHoverStart?.({
-                  kind: "list",
-                  listId: list.id,
-                  anchorTop: rect.top,
-                  anchorLeft: rect.left,
-                  anchorWidth: rect.width,
-                  anchorHeight: rect.height,
-                });
-              }}
-              onMouseLeave={() => {
-                if (isNameHovered) {
-                  onSidebarHoverEnd?.();
-                }
-              }}
-              className={`group relative ml-[3px] mb-1 flex h-[34px] cursor-pointer items-center gap-2 rounded-md px-3 transition-[background-color] duration-200 ${
-                isNameHovered ? "bg-zinc-200/70 dark:bg-zinc-800/70" : ""
-              } ${getListRowClassName(list.id)} ${
-                onReorderLists ? "touch-none" : ""
-              }`}
-            >
-              <LuList
-                className="size-[14px] shrink-0 text-[#acadb7]"
-                aria-hidden="true"
-              />
-              <div className="group min-w-0 flex-1 pr-8 text-left">
-                {editingListId === list.id ? (
-                  <input
-                    ref={listNameInputRef}
-                    type="text"
-                    value={listNameDraft}
-                    onChange={(event) => setListNameDraft(event.target.value)}
-                    onClick={(event) => event.stopPropagation()}
-                    onPointerDown={(event) => event.stopPropagation()}
-                    onDoubleClick={(event) => event.stopPropagation()}
-                    onBlur={() => commitListNameEdit(list)}
-                    onKeyDown={(event) => handleListNameKeyDown(event, list)}
-                    aria-label={`Rename ${list.name}`}
-                    className="min-w-0 w-full bg-transparent text-sm ptxt-list-items outline-none cursor-text"
-                  />
-                ) : (
-                  <span
-                    className="block truncate text-sm ptxt-list-items"
-                    onDoubleClick={(event) => {
+                <div key={folder.id} className="flex flex-col">
+                  <div
+                    data-folder-id={folder.id}
+                    onClick={() => handleFolderClick(folder.id)}
+                    onContextMenu={(event) => {
+                      event.preventDefault();
                       event.stopPropagation();
-                      startListNameEdit(list);
+                      openFolderMenu(folder.id, {
+                        top: event.clientY,
+                        left: event.clientX,
+                      });
                     }}
+                    className="group relative ml-[3px] mb-1 flex h-[34px] cursor-pointer items-center gap-1 rounded-md px-3 transition-[background-color] duration-200 hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60"
                   >
-                    {list.name}
-                  </span>
-                )}
-              </div>
-              <span
-                className={`${SIDEBAR_ROW_COUNT_CLASS} ${
-                  openMenuListId === list.id ? "opacity-0" : ""
-                }`}
-              >
-                {taskCountByListId[list.id] ?? 0}
-              </span>
-              <div className={SIDEBAR_ROW_MENU_WRAPPER_CLASS}>
-                <button
-                  type="button"
-                  aria-label={`Open menu for ${list.name}`}
-                  aria-expanded={openMenuListId === list.id}
-                  aria-haspopup="menu"
-                  className={`${getSidebarRowMenuButtonClass(openMenuListId === list.id)} -mr-[6px]`}
-                  onPointerDown={(event) => event.stopPropagation()}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    toggleListMenuFromButton(list.id, event.currentTarget);
-                  }}
-                >
-                  <PiDotsThreeBold className="size-[15px] ptxt-500" />
-                </button>
-              </div>
-
-            </div>
+                    <BiChevronDown
+                      className={`size-4 shrink-0 text-[#acadb7] transition-transform duration-200 ${
+                        isExpanded ? "" : "-rotate-90"
+                      }`}
+                      aria-hidden="true"
+                    />
+                    <LuFolder
+                      className="size-[14px] shrink-0 text-[#acadb7]"
+                      aria-hidden="true"
+                    />
+                    <span className="min-w-0 flex-1 truncate pr-8 text-left text-sm ptxt-list-items">
+                      {folder.name}
+                    </span>
+                    <div className={SIDEBAR_ROW_MENU_WRAPPER_CLASS}>
+                      <button
+                        type="button"
+                        aria-label={`Open menu for ${folder.name}`}
+                        aria-expanded={openMenuFolderId === folder.id}
+                        aria-haspopup="menu"
+                        className={`${getSidebarRowMenuButtonClass(openMenuFolderId === folder.id)} -mr-[6px]`}
+                        onPointerDown={(event) => event.stopPropagation()}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          toggleFolderMenuFromButton(
+                            folder.id,
+                            event.currentTarget,
+                          );
+                        }}
+                      >
+                        <PiDotsThreeBold className="size-[15px] ptxt-500" />
+                      </button>
+                    </div>
+                  </div>
+                  {isExpanded
+                    ? folderLists.map((list) => renderListRow(list, true))
+                    : null}
+                </div>
               );
             })}
             <div
@@ -1377,11 +1635,13 @@ export function Sidebar({
                 Add
               </button>
               {isBottomAddMenuOpen ? (
-                <div
-                  role="menu"
-                  aria-label="Add list or folder"
-                  className="absolute left-full top-1/2 z-[1000] ml-0.5 w-[152px] -translate-y-1/2 overflow-hidden rounded-md border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
-                >
+                <div className="absolute left-full top-1/2 z-[1000] flex -translate-y-1/2 items-stretch -ml-2">
+                  <div className="w-3 shrink-0" aria-hidden="true" />
+                  <div
+                    role="menu"
+                    aria-label="Add list or folder"
+                    className="w-[152px] overflow-hidden rounded-md border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
+                  >
                   <button
                     type="button"
                     role="menuitem"
@@ -1406,6 +1666,7 @@ export function Sidebar({
                     <LuFolder className="size-[14px] shrink-0 text-[#acadb7]" aria-hidden="true" />
                     Folder
                   </button>
+                  </div>
                 </div>
               ) : null}
             </div>
@@ -1433,7 +1694,7 @@ export function Sidebar({
                 className="group/add-label relative -mr-[3px] flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md ptxt-400 opacity-0 transition-[opacity,colors] hover:bg-zinc-200/60 hover:ptxt-600 focus-visible:opacity-100 group-hover/labels-section:opacity-100 dark:hover:bg-zinc-800/60 dark:hover:ptxt-300"
                 onClick={() => setIsAddLabelOpen(true)}
               >
-                <LuPlus className="size-3.5 text-[#acadb2]" aria-hidden="true" />
+                <LuPlus className="size-3.5 text-[#acadb2]" />
                 <span
                   aria-hidden="true"
                   className="task-date-picker-remove-tooltip add-task-date-tooltip pointer-events-none absolute right-0 bottom-[calc(100%+8px)] z-[200] whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity group-hover/add-label:opacity-100"
@@ -1688,8 +1949,27 @@ export function Sidebar({
           listName={openListMenuItem.name}
           fixedPosition={listMenuPosition}
           menuRef={menuRef}
+          folders={orderedFolders}
+          currentFolderId={openListMenuItem.folderId ?? null}
           onRename={() => openRenameModal(openListMenuItem)}
           onRemove={() => openRemoveModal(openListMenuItem)}
+          onMoveToFolder={(folderId) => {
+            onMoveListToFolder(openListMenuItem.id, folderId);
+            if (folderId) {
+              setExpandedFolderIds((current) => new Set([...current, folderId]));
+            }
+            closeListMenu();
+          }}
+        />
+      ) : null}
+
+      {openFolderMenuItem && folderMenuPosition ? (
+        <FolderContextMenu
+          folderName={openFolderMenuItem.name}
+          fixedPosition={folderMenuPosition}
+          menuRef={folderMenuRef}
+          onRename={() => openRenameFolderModal(openFolderMenuItem)}
+          onRemove={() => openRemoveFolderModal(openFolderMenuItem)}
         />
       ) : null}
 
@@ -1730,7 +2010,7 @@ export function Sidebar({
         placeholder="Folder name"
         confirmLabel="Add"
         onConfirm={(name) => {
-          onAddFolder?.(name);
+          onAddFolder(name);
           setIsAddFolderOpen(false);
         }}
         onCancel={() => setIsAddFolderOpen(false)}
@@ -1777,6 +2057,39 @@ export function Sidebar({
           setRemoveList(null);
         }}
         onCancel={() => setRemoveList(null)}
+      />
+
+      <RenameListModal
+        open={renameFolder !== null}
+        title="Rename folder"
+        initialName={renameFolder?.name ?? ""}
+        placeholder="Folder name"
+        onConfirm={(name) => {
+          if (renameFolder) {
+            onRenameFolder(renameFolder.id, name);
+            setOrderedFolders((current) =>
+              current.map((item) =>
+                item.id === renameFolder.id ? { ...item, name } : item,
+              ),
+            );
+          }
+          setRenameFolder(null);
+        }}
+        onCancel={() => setRenameFolder(null)}
+      />
+
+      <ConfirmModal
+        open={removeFolder !== null}
+        title="Delete folder"
+        message={`Are you sure you want to delete "${removeFolder?.name}"? Lists in this folder will be moved to the top level.`}
+        confirmLabel="Delete"
+        onConfirm={() => {
+          if (removeFolder) {
+            onRemoveFolder(removeFolder.id);
+          }
+          setRemoveFolder(null);
+        }}
+        onCancel={() => setRemoveFolder(null)}
       />
 
       <RenameListModal

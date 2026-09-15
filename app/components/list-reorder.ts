@@ -27,15 +27,18 @@ export function mergeReorderedSidebarListIds(
   fullListIds: string[],
   inboxListId: string | null,
   reorderedSidebarIds: string[],
+  listIdsInFolders: ReadonlySet<string> = new Set(),
 ) {
-  if (!inboxListId) return reorderedSidebarIds;
+  if (!inboxListId && listIdsInFolders.size === 0) {
+    return reorderedSidebarIds;
+  }
 
   const next: string[] = [];
   let sidebarIndex = 0;
 
   for (const id of fullListIds) {
-    if (id === inboxListId) {
-      next.push(inboxListId);
+    if (id === inboxListId || listIdsInFolders.has(id)) {
+      next.push(id);
       continue;
     }
 
