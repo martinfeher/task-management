@@ -6,8 +6,10 @@ import { IoIosSearch } from "react-icons/io";
 import { CalendarAddTaskPopover } from "./calendar-add-task-popover";
 import {
   CalendarTaskModal,
+  getCalendarTaskClickAnchorRect,
   getCalendarTaskSnapshot,
   type CalendarTaskEditorCallbacks,
+  type CalendarTaskModalAnchorRect,
 } from "./calendar-task-modal";
 import { CalendarTaskModalActionsProvider } from "./calendar-task-modal-actions";
 import { CalendarDayView } from "./calendar-day-view";
@@ -426,6 +428,13 @@ export function CalendarMonthView({
   const [monthDate, setMonthDate] = useState<Date | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [modalTaskId, setModalTaskId] = useState<string | null>(null);
+  const [modalAnchorRect, setModalAnchorRect] =
+    useState<CalendarTaskModalAnchorRect | null>(null);
+
+  function closeTaskModal() {
+    setModalTaskId(null);
+    setModalAnchorRect(null);
+  }
   const [addTaskPopover, setAddTaskPopover] = useState<{
     date: Date;
     x: number;
@@ -541,7 +550,7 @@ export function CalendarMonthView({
     const normalized = startOfDay(day);
     setSelectedDate(normalized);
     onSidebarFocusDateChange?.(normalized);
-    setModalTaskId(null);
+    closeTaskModal();
     closeAddTaskPopover();
   }
 
@@ -555,7 +564,7 @@ export function CalendarMonthView({
     day: Date,
   ) {
     setSelectedDate(day);
-    setModalTaskId(null);
+    closeTaskModal();
 
     if (!onAddCalendarTask || lists.length === 0) return;
 
@@ -582,6 +591,7 @@ export function CalendarMonthView({
     setSelectedDate(day);
     onSelectTask(task.id);
     closeAddTaskPopover();
+    setModalAnchorRect(getCalendarTaskClickAnchorRect(event.currentTarget));
     setModalTaskId(task.id);
   }
 
@@ -650,7 +660,7 @@ export function CalendarMonthView({
         dragStarted = true;
         clearPendingListeners();
         beginTaskDrag?.();
-        setModalTaskId(null);
+        closeTaskModal();
         dragStateRef.current = {
           taskId: task.id,
           sourceDateKey,
@@ -693,7 +703,7 @@ export function CalendarMonthView({
 
   useEffect(() => {
     if (!monthDate) return;
-    setModalTaskId(null);
+    closeTaskModal();
     closeAddTaskPopover();
   }, [monthDate]);
 
@@ -819,6 +829,7 @@ export function CalendarMonthView({
                         <CalendarTaskTitle
                           name={task.name}
                           recurrenceRule={task.recurrenceRule}
+                          priority={task.priority}
                         />
                         <CalendarTaskCompletionCheckbox
                           task={task}
@@ -873,7 +884,8 @@ export function CalendarMonthView({
         <CalendarTaskModal
           taskId={modalTaskId}
           taskSnapshot={modalTaskSnapshot}
-          onClose={() => setModalTaskId(null)}
+          anchorRect={modalAnchorRect}
+          onClose={closeTaskModal}
           onDetailsSaved={onDetailsSaved}
           onTaskHasDetailsKnown={onTaskHasDetailsKnown}
           onTaskRenamed={onTaskRenamed}

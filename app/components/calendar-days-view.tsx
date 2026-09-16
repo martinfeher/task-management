@@ -8,8 +8,10 @@ import { CalendarCurrentTimeLine } from "./calendar-current-time-line";
 import { CalendarNewTaskSlotPreview } from "./calendar-new-task-slot-preview";
 import {
   CalendarTaskModal,
+  getCalendarTaskClickAnchorRect,
   getCalendarTaskSnapshot,
   type CalendarTaskEditorCallbacks,
+  type CalendarTaskModalAnchorRect,
 } from "./calendar-task-modal";
 import type { TaskListItem, TodoList } from "./todo-app";
 import type { TaskDueTime } from "@/lib/task-due-time";
@@ -265,6 +267,13 @@ export function CalendarMultiDayView({
   const [now, setNow] = useState<Date | null>(null);
   const lastSidebarJumpRequestIdRef = useRef(0);
   const [modalTaskId, setModalTaskId] = useState<string | null>(null);
+  const [modalAnchorRect, setModalAnchorRect] =
+    useState<CalendarTaskModalAnchorRect | null>(null);
+
+  function closeTaskModal() {
+    setModalTaskId(null);
+    setModalAnchorRect(null);
+  }
   const [addTaskPopover, setAddTaskPopover] = useState<{
     date: Date;
     x: number;
@@ -453,7 +462,7 @@ export function CalendarMultiDayView({
     day: Date,
   ) {
     handleDaySelect(day);
-    setModalTaskId(null);
+    closeTaskModal();
 
     if (!onAddCalendarTask || lists.length === 0) return;
 
@@ -477,7 +486,7 @@ export function CalendarMultiDayView({
 
     event.stopPropagation();
     handleDaySelect(day);
-    setModalTaskId(null);
+    closeTaskModal();
 
     if (!onAddCalendarTask || lists.length === 0) return;
 
@@ -515,6 +524,7 @@ export function CalendarMultiDayView({
 
     onSelectTask(task.id);
     closeAddTaskPopover();
+    setModalAnchorRect(getCalendarTaskClickAnchorRect(event.currentTarget));
     setModalTaskId(task.id);
   }
 
@@ -544,7 +554,7 @@ export function CalendarMultiDayView({
       setDropTargetSlot: handleSetDropTargetSlot,
       resizingTaskIdRef,
       onDragStart: (point) => {
-        setModalTaskId(null);
+        closeTaskModal();
         setDraggingTaskPreview({
           taskId: task.id,
           sourceDateKey: toDateKey(day),
@@ -566,7 +576,7 @@ export function CalendarMultiDayView({
 
   useEffect(() => {
     if (!rangeStart) return;
-    setModalTaskId(null);
+    closeTaskModal();
     closeAddTaskPopover();
   }, [rangeStart, dayCount]);
 
@@ -791,6 +801,7 @@ export function CalendarMultiDayView({
                               <CalendarTaskTitle
                                 name={task.name}
                                 recurrenceRule={task.recurrenceRule}
+                                priority={task.priority}
                               />
                               <CalendarTaskCompletionCheckbox
                                 task={task}
@@ -1011,7 +1022,7 @@ export function CalendarMultiDayView({
                           isMaskedForDrop={isTaskMaskedForDrop(task.id)}
                           onDropped={markTaskJustDropped}
                           onDragStart={() => {
-                            setModalTaskId(null);
+                            closeTaskModal();
                             setDraggingTaskPreview({
                               taskId: task.id,
                               sourceDateKey: dateKey,
@@ -1133,7 +1144,8 @@ export function CalendarMultiDayView({
         <CalendarTaskModal
           taskId={modalTaskId}
           taskSnapshot={modalTaskSnapshot}
-          onClose={() => setModalTaskId(null)}
+          anchorRect={modalAnchorRect}
+          onClose={closeTaskModal}
           onDetailsSaved={onDetailsSaved}
           onTaskHasDetailsKnown={onTaskHasDetailsKnown}
           onTaskRenamed={onTaskRenamed}

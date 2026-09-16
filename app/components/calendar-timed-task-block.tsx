@@ -26,6 +26,7 @@ import { calendarTaskItemClassName, calendarTaskSecondaryTextClassName, CALENDAR
 import { useCalendarTaskDefaultColor } from "@/lib/calendar-task-default-color-settings";
 import { useCalendarTaskDragPreview, useCalendarTaskHoverPreview } from "./calendar-task-hover-preview";
 import { useCalendarTaskColorMenu } from "./calendar-task-color-menu";
+import { CalendarTaskPriorityFlag } from "./calendar-task-title";
 import { TaskCompletionCheckbox } from "./task-completion-checkbox";
 import type { TaskListItem } from "./todo-app";
 
@@ -193,10 +194,17 @@ export function CalendarTaskDropPreview({
         }}
       >
         <span
-          className={getCalendarTaskTitleClassName(titleMaxLines)}
-          style={getCalendarTaskTitleStyle(titleMaxLines)}
+          className={`flex min-w-0 gap-0.5 ${
+            titleMaxLines === 1 ? "items-center" : "items-start"
+          }`}
         >
-          {taskName}
+          <span
+            className={`${getCalendarTaskTitleClassName(titleMaxLines)} min-w-0 flex-1`}
+            style={getCalendarTaskTitleStyle(titleMaxLines)}
+          >
+            {taskName}
+          </span>
+          <CalendarTaskPriorityFlag priority={priority} />
         </span>
         {showTimeRange ? (
           <span
@@ -319,10 +327,17 @@ export function CalendarTimedTaskContent({
     >
       <div className="flex min-w-0 flex-1 flex-col justify-start overflow-hidden">
         <span
-          className={getCalendarTaskTitleClassName(titleMaxLines)}
-          style={getCalendarTaskTitleStyle(titleMaxLines)}
+          className={`flex min-w-0 gap-0.5 ${
+            isSingleLineOnly ? "items-center" : "items-start"
+          }`}
         >
-          {task.name}
+          <span
+            className={`${getCalendarTaskTitleClassName(titleMaxLines)} min-w-0 flex-1`}
+            style={getCalendarTaskTitleStyle(titleMaxLines)}
+          >
+            {task.name}
+          </span>
+          <CalendarTaskPriorityFlag priority={task.priority} />
         </span>
         {showTime ? (
           <span className={`mt-[3px] truncate ${timeClassName}`}>{timeLabel}</span>

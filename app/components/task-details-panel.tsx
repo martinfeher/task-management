@@ -62,6 +62,7 @@ import {
   isChecklistLine,
   isChecklistToggleClick,
   isCodeLine,
+  isListBlockLine,
   isDetailLineEmpty,
   isBodyPlaceholderLine,
   isEmptyEditableBodyLine,
@@ -351,6 +352,7 @@ const DEFAULT_FORMAT_MENU_INLINE_FORMATS: FormatMenuInlineFormats = {
   underline: false,
   highlight: false,
   highlightColor: "#fef08a",
+  // textColor: "#414141",
   textColor: "#2e2e2e",
 };
 
@@ -1799,7 +1801,7 @@ const TASK_DETAILS_SKELETON_BAR_CLASS =
 
 function TaskDetailsSkeleton() {
   return (
-    <div className="flex flex-col px-4 pb-4" aria-hidden="true">
+    <div className="flex flex-col px-2 pb-4" aria-hidden="true">
       <div className="min-h-[850px] rounded-xl bg-white py-3 pl-[60px] pr-3 dark:bg-zinc-950">
         <div className={`h-7 w-1/2 rounded ${TASK_DETAILS_SKELETON_BAR_CLASS}`} />
         <div className={`mt-5 h-3.5 w-[92%] rounded ${TASK_DETAILS_SKELETON_BAR_CLASS}`} />
@@ -2985,10 +2987,17 @@ export function TaskDetailsPanel({
     );
   }, []);
 
-  const closeFormatMenu = useCallback((options?: { clearSavedSelection?: boolean }) => {
+  const closeFormatMenu = useCallback((options?: {
+    clearSavedSelection?: boolean;
+    preserveToolbarDropdowns?: boolean;
+  }) => {
     setFormatMenu(null);
     formatMenuVisibleRef.current = false;
-    closeFormatDropdowns();
+    if (options?.preserveToolbarDropdowns) {
+      setOpenFormatDropdown(null);
+    } else {
+      closeFormatDropdowns();
+    }
     setShowLinkMenu(false);
     showLinkMenuRef.current = false;
     setLinkHasExisting(false);
@@ -3163,12 +3172,27 @@ export function TaskDetailsPanel({
   const setHeaderFormatDropdownOpen = useCallback(
     (dropdown: HeaderFormatDropdown, open: boolean) => {
       if (open) {
+        if (formatMenuTimerRef.current !== null) {
+          window.clearTimeout(formatMenuTimerRef.current);
+          formatMenuTimerRef.current = null;
+        }
+        if (formatMenuRevealTimerRef.current !== null) {
+          window.clearTimeout(formatMenuRevealTimerRef.current);
+          formatMenuRevealTimerRef.current = null;
+        }
+        if (formatMenuRevealFrameRef.current !== null) {
+          window.cancelAnimationFrame(formatMenuRevealFrameRef.current);
+          formatMenuRevealFrameRef.current = null;
+        }
+        closeFormatMenu({
+          clearSavedSelection: false,
+          preserveToolbarDropdowns: true,
+        });
         syncFormatMenuFontState();
-        setOpenFormatDropdown(null);
       }
       setOpenHeaderFormatDropdown(open ? dropdown : null);
     },
-    [syncFormatMenuFontState],
+    [closeFormatMenu, syncFormatMenuFontState],
   );
 
   const setModalFormatDropdownOpen = useCallback(
@@ -5542,6 +5566,24 @@ export function TaskDetailsPanel({
       return;
     }
 
+    if (
+      isListBlockLine(line) &&
+      isEmptyEditableBodyLine(editor, line) &&
+      !(isChecklistLine(line) && isChecklistToggleClick(line, event.clientX)) &&
+      !event.shiftKey &&
+      !isMultiClick
+    ) {
+      event.preventDefault();
+      focusDetailLine(editor, line);
+      clickedLineRef.current = line;
+      pendingClickLineRef.current = line;
+      updateLineControls();
+      requestAnimationFrame(() => {
+        updateLineControls();
+      });
+      return;
+    }
+
     clickedLineRef.current = line;
     pendingClickLineRef.current = line;
 
@@ -5841,6 +5883,15 @@ export function TaskDetailsPanel({
 
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
+      if (inputNormalizeTimerRef.current !== null) {
+        window.clearTimeout(inputNormalizeTimerRef.current);
+        inputNormalizeTimerRef.current = null;
+      }
+      if (inputNormalizeFrameRef.current !== null) {
+        window.cancelAnimationFrame(inputNormalizeFrameRef.current);
+        inputNormalizeFrameRef.current = null;
+      }
+
       const editor = editorRef.current;
       if (!editor) return;
 
@@ -5863,6 +5914,7 @@ export function TaskDetailsPanel({
         splitLineAtCursor(editor);
       }
       setSlashCommandMenu(null);
+      syncEditorLineEmptyState(editor);
       syncEditorContent();
       recordHistorySnapshot();
       scheduleAutoSave();
@@ -6468,7 +6520,7 @@ export function TaskDetailsPanel({
     >
       {renderModalHeaderActions()}
       <div
-        className={`relative flex shrink-0 items-center justify-between overflow-visible px-4 pt-[2.5px] pb-[2.5px] ${
+        className={`relative flex shrink-0 items-center justify-between overflow-visible px-2.5 pt-[6px] pb-[4px] ${
           isModalLayout
             ? isModalFormatToolbarOpen
               ? "pr-[22rem]"
@@ -6748,7 +6800,7 @@ export function TaskDetailsPanel({
         <div
           data-task-details-content
           className={`flex flex-col px-4 ${
-            isModalLayout ? "pb-4" : "min-h-0 flex-1 pb-[30px]"
+            isModalLayout ? "pb-0" : "min-h-0 flex-1 pb-[30px]"
           }`}
         >
           <div

@@ -315,6 +315,7 @@ type DropdownShellProps = {
   menuClassName?: string;
   menuStyle?: CSSProperties;
   align?: "left" | "right" | "center";
+  menuRef?: RefObject<HTMLDivElement | null>;
   trigger: ReactNode;
   children: ReactNode;
 };
@@ -333,6 +334,7 @@ function FormatToolbarDropdownShell({
   menuClassName = FORMAT_TOOLBAR_DROPDOWN_MENU_CLASS,
   menuStyle,
   align = "left",
+  menuRef,
   trigger,
   children,
 }: DropdownShellProps) {
@@ -398,6 +400,7 @@ function FormatToolbarDropdownShell({
             onMouseLeave={handleMouseLeave}
           >
             <div
+              ref={menuRef}
               role="menu"
               aria-label={ariaLabel}
               className={menuClassName}
@@ -438,82 +441,36 @@ function TextColorSwatchButton({
   option,
   selected,
   onSelect,
-  previewText,
-  previewTypography,
+  onPreviewHover,
 }: {
   option: DetailTextColorOption;
   selected: boolean;
   onSelect: () => void;
-  previewText?: string;
-  previewTypography?: TextColorPreviewTypography;
+  onPreviewHover?: (option: DetailTextColorOption) => void;
 }) {
   const swatchBorderColor = brightenHexColor(option.value, 0.15);
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewPosition, setPreviewPosition] = useState({ top: 0, left: 0 });
-  const previewContent = previewText?.trim() ?? "";
-  const showPreview = previewOpen && previewContent.length > 0;
-  const previewFontSize = previewTypography
-    ? Math.min(previewTypography.fontSize, 16)
-    : 16;
-
-  function openPreview() {
-    if (!previewContent) return;
-
-    const rect = buttonRef.current?.getBoundingClientRect();
-    if (!rect) return;
-
-    setPreviewPosition({
-      top: rect.bottom + 6,
-      left: rect.left + rect.width / 2,
-    });
-    setPreviewOpen(true);
-  }
 
   return (
-    <>
-      <button
-        ref={buttonRef}
-        type="button"
-        role="menuitem"
-        aria-label={option.label}
-        title={option.label}
-        className={`flex size-7 items-center justify-center rounded-full border-[0.5px] bg-white cursor-pointer text-[15px] font-medium leading-none transition-transform hover:scale-110 dark:bg-zinc-900 ${
-          selected
-            ? "ring-[1px] ring-zinc-200 ring-offset-1 dark:ring-zinc-700"
-            : ""
-        }`}
-        style={{
-          color: option.value,
-          borderColor: swatchBorderColor,
-        }}
-        onMouseDown={(event) => event.preventDefault()}
-        onMouseEnter={openPreview}
-        onMouseLeave={() => setPreviewOpen(false)}
-        onClick={onSelect}
-      >
-        A
-      </button>
-      {showPreview
-        ? createPortal(
-            <div
-              className="pointer-events-none fixed z-[300] px-4 py-2 w-max max-h-[200px] max-w-[min(320px,calc(100vw-16px))] -translate-x-1/2 overflow-y-auto overflow-x-hidden border border-zinc-200 bg-white px-2.5 py-1.5 whitespace-pre-wrap break-words shadow-md"
-              style={{
-                top: previewPosition.top,
-                left: previewPosition.left,
-                color: option.value,
-                borderRadius: 19,
-                fontFamily: previewTypography?.fontFamily,
-                fontSize: `${previewFontSize}px`,
-                lineHeight: previewTypography?.lineHeight,
-              }}
-            >
-              {previewContent}
-            </div>,
-            document.body,
-          )
-        : null}
-    </>
+    <button
+      type="button"
+      role="menuitem"
+      aria-label={option.label}
+      title={option.label}
+      className={`flex size-7 items-center justify-center rounded-full border-[0.5px] bg-white cursor-pointer text-[15px] font-medium leading-none transition-transform hover:scale-110 dark:bg-zinc-900 ${
+        selected
+          ? "ring-[1px] ring-zinc-200 ring-offset-1 dark:ring-zinc-700"
+          : ""
+      }`}
+      style={{
+        color: option.value,
+        borderColor: swatchBorderColor,
+      }}
+      onMouseDown={(event) => event.preventDefault()}
+      onMouseEnter={() => onPreviewHover?.(option)}
+      onClick={onSelect}
+    >
+      A
+    </button>
   );
 }
 
@@ -569,86 +526,156 @@ export function DetailFormatTextColorDropdown({
   previewText,
   previewTypography,
 }: DetailFormatTextColorDropdownProps) {
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [previewColor, setPreviewColor] = useState<string | null>(null);
+  const [previewPosition, setPreviewPosition] = useState({ top: 0, left: 0 });
+  const previewContent = previewText?.trim() ?? "";
+  const previewFontSize = previewTypography
+    ? Math.min(previewTypography.fontSize, 16)
+    : 16;
   const matchedTextColorOption = textColorOptions.find((option) =>
     colorsEquivalent(option.value, selectedTextColor),
   );
   const recentTextColors = recentColors.filter((entry) => entry.kind === "text");
 
+  function updatePreviewPosition() {
+    const rect = menuRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    setPreviewPosition({
+      top: rect.bottom + 8,
+      left: rect.left + rect.width / 2,
+    });
+  }
+
+  function handlePreviewHover(option: DetailTextColorOption) {
+    if (!previewContent) return;
+
+    updatePreviewPosition();
+    setPreviewColor(option.value);
+  }
+
+  function clearPreview() {
+    setPreviewColor(null);
+  }
+
+  useEffect(() => {
+    if (!open) {
+      clearPreview();
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (!previewColor) return;
+
+    function handleReposition() {
+      updatePreviewPosition();
+    }
+
+    window.addEventListener("scroll", handleReposition, true);
+    window.addEventListener("resize", handleReposition);
+
+    return () => {
+      window.removeEventListener("scroll", handleReposition, true);
+      window.removeEventListener("resize", handleReposition);
+    };
+  }, [previewColor]);
+
   return (
-    <FormatToolbarDropdownShell
-      open={open}
-      onOpenChange={onOpenChange}
-      ariaLabel="Text color"
-      tooltipId="format-toolbar-text-color-tooltip"
-      tooltipLabel="Text color"
-      openClassName=""
-      menuClassName={`${FORMAT_TOOLBAR_DROPDOWN_MENU_CLASS} min-w-[260px]`}
-      triggerClassName={`format-text-color-trigger flex h-8 cursor-pointer items-center gap-0.5 rounded-lg px-2 text-sm ${FORMAT_TOOLBAR_ICON_COLOR} transition-[background-color] duration-150`}
-      trigger={
-        <>
-          <span
-            className="size-[16px] shrink-0 rounded-full border bg-white p-[2px] dark:bg-zinc-900"
-            style={{
-              borderColor: brightenHexColor(
-                matchedTextColorOption?.value ?? selectedTextColor,
-                0.15,
-              ),
-            }}
-          >
+    <>
+      <FormatToolbarDropdownShell
+        open={open}
+        onOpenChange={onOpenChange}
+        ariaLabel="Text color"
+        tooltipId="format-toolbar-text-color-tooltip"
+        tooltipLabel="Text color"
+        openClassName=""
+        menuRef={menuRef}
+        menuClassName={`${FORMAT_TOOLBAR_DROPDOWN_MENU_CLASS} min-w-[260px]`}
+        triggerClassName={`format-text-color-trigger flex h-8 cursor-pointer items-center gap-0.5 rounded-lg px-2 text-sm ${FORMAT_TOOLBAR_ICON_COLOR} transition-[background-color] duration-150`}
+        trigger={
+          <>
             <span
-              className="block size-full rounded-full"
-              style={{ backgroundColor: selectedTextColor }}
-            />
-          </span>
-          <LuChevronDown className={`size-3.5 shrink-0 ${FORMAT_TOOLBAR_CHEVRON_COLOR}`} />
-        </>
-      }
-    >
-      <div className="space-y-3 px-3 py-2">
-        {recentTextColors.length > 0 ? (
+              className="size-[16px] shrink-0 rounded-full border bg-white p-[2px] dark:bg-zinc-900"
+              style={{
+                borderColor: brightenHexColor(
+                  matchedTextColorOption?.value ?? selectedTextColor,
+                  0.15,
+                ),
+              }}
+            >
+              <span
+                className="block size-full rounded-full"
+                style={{ backgroundColor: selectedTextColor }}
+              />
+            </span>
+            <LuChevronDown className={`size-3.5 shrink-0 ${FORMAT_TOOLBAR_CHEVRON_COLOR}`} />
+          </>
+        }
+      >
+        <div className="space-y-3 px-3 py-2" onMouseLeave={clearPreview}>
+          {recentTextColors.length > 0 ? (
+            <section>
+              <p className={FORMAT_COLOR_MENU_SECTION_TITLE_CLASS}>Recently Used</p>
+              <div className="flex flex-wrap gap-1.5">
+                {recentTextColors.map((entry) => (
+                  <TextColorSwatchButton
+                    key={`recent-text-${entry.color}`}
+                    option={{
+                      label: entry.label,
+                      value: entry.color,
+                    }}
+                    selected={colorsEquivalent(entry.color, selectedTextColor)}
+                    onPreviewHover={handlePreviewHover}
+                    onSelect={() => {
+                      onSelectTextColor(entry.color);
+                      onOpenChange(false);
+                    }}
+                  />
+                ))}
+              </div>
+            </section>
+          ) : null}
+
           <section>
-            <p className={FORMAT_COLOR_MENU_SECTION_TITLE_CLASS}>Recently Used</p>
-            <div className="flex flex-wrap gap-1.5">
-              {recentTextColors.map((entry) => (
+            <p className={FORMAT_COLOR_MENU_SECTION_TITLE_CLASS}>Text Color</p>
+            <div className="grid grid-cols-7 gap-1.5">
+              {textColorOptions.map((option) => (
                 <TextColorSwatchButton
-                  key={`recent-text-${entry.color}`}
-                  option={{
-                    label: entry.label,
-                    value: entry.color,
-                  }}
-                  selected={colorsEquivalent(entry.color, selectedTextColor)}
-                  previewText={previewText}
-                  previewTypography={previewTypography}
+                  key={option.value}
+                  option={option}
+                  selected={colorsEquivalent(option.value, selectedTextColor)}
+                  onPreviewHover={handlePreviewHover}
                   onSelect={() => {
-                    onSelectTextColor(entry.color);
+                    onSelectTextColor(option.value);
                     onOpenChange(false);
                   }}
                 />
               ))}
             </div>
           </section>
-        ) : null}
+        </div>
+      </FormatToolbarDropdownShell>
 
-        <section>
-          <p className={FORMAT_COLOR_MENU_SECTION_TITLE_CLASS}>Text Color</p>
-          <div className="grid grid-cols-7 gap-1.5">
-            {textColorOptions.map((option) => (
-              <TextColorSwatchButton
-                key={option.value}
-                option={option}
-                selected={colorsEquivalent(option.value, selectedTextColor)}
-                previewText={previewText}
-                previewTypography={previewTypography}
-                onSelect={() => {
-                  onSelectTextColor(option.value);
-                  onOpenChange(false);
-                }}
-              />
-            ))}
-          </div>
-        </section>
-      </div>
-    </FormatToolbarDropdownShell>
+      {previewColor && previewContent
+        ? createPortal(
+            <div
+              className="pointer-events-none fixed z-[300] w-max max-h-[200px] max-w-[min(320px,calc(100vw-16px))] -translate-x-1/2 overflow-y-auto overflow-x-hidden whitespace-pre-wrap break-words rounded-[19px] border border-zinc-200 bg-white px-4 py-2 shadow-md dark:border-zinc-700 dark:bg-zinc-900"
+              style={{
+                top: previewPosition.top,
+                left: previewPosition.left,
+                color: previewColor,
+                fontFamily: previewTypography?.fontFamily,
+                fontSize: `${previewFontSize}px`,
+                lineHeight: previewTypography?.lineHeight,
+              }}
+            >
+              {previewContent}
+            </div>,
+            document.body,
+          )
+        : null}
+    </>
   );
 }
 

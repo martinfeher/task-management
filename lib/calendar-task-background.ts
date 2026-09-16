@@ -2,6 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  runSettingsLoadEffect,
+  shouldIgnoreSettingsLoadError,
+} from "@/lib/client-settings-fetch";
+import {
   areCalendarTaskBackgroundSettingsEqual,
   CALENDAR_TASK_BACKGROUND_OPTIONS,
   DEFAULT_CALENDAR_TASK_BASE_COLOR,
@@ -258,12 +262,10 @@ export function useCalendarTaskBackground() {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function loadSettings() {
+    return runSettingsLoadEffect(async (isCancelled) => {
       try {
         const settings = await fetchCalendarTaskBackgroundSettings();
-        if (cancelled) return;
+        if (isCancelled()) return;
 
         applyCalendarTaskBackgroundSettings(settings);
         setBackgroundIdState(settings.backgroundId);
@@ -273,23 +275,23 @@ export function useCalendarTaskBackground() {
         setTimeColorState(settings.timeColor);
         setSavedSettings(settings);
       } catch (error) {
-        console.error(error);
-        if (!cancelled) {
+        if (shouldIgnoreSettingsLoadError(error, { cancelled: isCancelled() })) {
+          return;
+        }
+
+        console.warn(
+          "Failed to load calendar task background settings from server.",
+        );
+        if (!isCancelled()) {
           const stored = readCalendarTaskBackgroundSettingsFromStorage();
           setSavedSettings(stored);
         }
       } finally {
-        if (!cancelled) {
+        if (!isCancelled()) {
           setIsLoading(false);
         }
       }
-    }
-
-    void loadSettings();
-
-    return () => {
-      cancelled = true;
-    };
+    });
   }, []);
 
   useEffect(() => {

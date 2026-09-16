@@ -1,6 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  runSettingsLoadEffect,
+  shouldIgnoreSettingsLoadError,
+} from "@/lib/client-settings-fetch";
 import { normalizeHexColor } from "@/lib/sidebar-background-types";
 import {
   areTaskListBackgroundSettingsEqual,
@@ -142,35 +146,31 @@ export function useTaskListBackground() {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function loadSettings() {
+    return runSettingsLoadEffect(async (isCancelled) => {
       try {
         const settings = await fetchTaskListBackgroundSettings();
-        if (cancelled) return;
+        if (isCancelled()) return;
 
         applyTaskListBackgroundSettings(settings);
         setBackgroundIdState(settings.backgroundId);
         setBaseColorState(settings.baseColor);
         setSavedSettings(settings);
       } catch (error) {
-        console.error(error);
-        if (!cancelled) {
+        if (shouldIgnoreSettingsLoadError(error, { cancelled: isCancelled() })) {
+          return;
+        }
+
+        console.warn("Failed to load task list background settings from server.");
+        if (!isCancelled()) {
           const stored = readTaskListBackgroundSettingsFromStorage();
           setSavedSettings(stored);
         }
       } finally {
-        if (!cancelled) {
+        if (!isCancelled()) {
           setIsLoading(false);
         }
       }
-    }
-
-    void loadSettings();
-
-    return () => {
-      cancelled = true;
-    };
+    });
   }, []);
 
   useEffect(() => {

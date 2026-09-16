@@ -2,11 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarAddTaskPopover } from "./calendar-add-task-popover";
+import { CalendarTaskPriorityFlag } from "./calendar-task-title";
 import { CalendarPeriodNavigation } from "./calendar-period-navigation";
 import {
   CalendarTaskModal,
+  getCalendarTaskClickAnchorRect,
   getCalendarTaskSnapshot,
   type CalendarTaskEditorCallbacks,
+  type CalendarTaskModalAnchorRect,
 } from "./calendar-task-modal";
 import type { TaskListItem, TodoList } from "./todo-app";
 import type { TaskDueTime } from "@/lib/task-due-time";
@@ -186,6 +189,13 @@ export function CalendarMultiWeekView({
   const [rangeStart, setRangeStart] = useState<Date | null>(null);
   const lastSidebarJumpRequestIdRef = useRef(0);
   const [modalTaskId, setModalTaskId] = useState<string | null>(null);
+  const [modalAnchorRect, setModalAnchorRect] =
+    useState<CalendarTaskModalAnchorRect | null>(null);
+
+  function closeTaskModal() {
+    setModalTaskId(null);
+    setModalAnchorRect(null);
+  }
   const [addTaskPopover, setAddTaskPopover] = useState<{
     date: Date;
     x: number;
@@ -305,7 +315,7 @@ export function CalendarMultiWeekView({
       | React.KeyboardEvent<HTMLDivElement>,
     day: Date,
   ) {
-    setModalTaskId(null);
+    closeTaskModal();
 
     if (!onAddCalendarTask || lists.length === 0) return;
 
@@ -342,6 +352,7 @@ export function CalendarMultiWeekView({
 
     onSelectTask(task.id);
     closeAddTaskPopover();
+    setModalAnchorRect(getCalendarTaskClickAnchorRect(event.currentTarget));
     setModalTaskId(task.id);
   }
 
@@ -406,7 +417,7 @@ export function CalendarMultiWeekView({
         dragStarted = true;
         clearPendingListeners();
         beginTaskDrag?.();
-        setModalTaskId(null);
+        closeTaskModal();
         dragStateRef.current = {
           taskId: task.id,
           sourceDateKey,
@@ -449,7 +460,7 @@ export function CalendarMultiWeekView({
 
   useEffect(() => {
     if (!rangeStart) return;
-    setModalTaskId(null);
+    closeTaskModal();
     closeAddTaskPopover();
   }, [rangeStart, weekCount]);
 
@@ -563,7 +574,10 @@ export function CalendarMultiWeekView({
                           calendarTaskDefaultColor,
                         )}
                       >
-                        {task.name}
+                        <span className="flex min-w-0 items-center gap-0.5">
+                          <span className="min-w-0 flex-1 truncate">{task.name}</span>
+                          <CalendarTaskPriorityFlag priority={task.priority} />
+                        </span>
                       </CalendarTaskHoverButton>
                     ))}
                     {dayTasks.length > maxVisibleTasks && (
@@ -598,7 +612,8 @@ export function CalendarMultiWeekView({
         <CalendarTaskModal
           taskId={modalTaskId}
           taskSnapshot={modalTaskSnapshot}
-          onClose={() => setModalTaskId(null)}
+          anchorRect={modalAnchorRect}
+          onClose={closeTaskModal}
           onDetailsSaved={onDetailsSaved}
           onTaskHasDetailsKnown={onTaskHasDetailsKnown}
           onTaskRenamed={onTaskRenamed}

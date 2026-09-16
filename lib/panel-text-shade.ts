@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { runSettingsLoadEffect } from "@/lib/client-settings-fetch";
 import {
   arePanelTextColorsSettingsEqual,
   getDefaultPanelTextColorsSettings,
@@ -146,13 +147,11 @@ export function usePanelTextColors() {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function loadSettings() {
+    return runSettingsLoadEffect(async (isCancelled) => {
       try {
         const loaded = await fetchPanelTextColorsSettings();
-        if (cancelled || !loaded) {
-          if (!cancelled) {
+        if (isCancelled() || !loaded) {
+          if (!isCancelled()) {
             setSavedSettings(readPanelTextColorsSettingsFromStorage());
           }
           return;
@@ -162,17 +161,11 @@ export function usePanelTextColors() {
         setSettingsState(loaded);
         setSavedSettings(loaded);
       } finally {
-        if (!cancelled) {
+        if (!isCancelled()) {
           setIsLoading(false);
         }
       }
-    }
-
-    void loadSettings();
-
-    return () => {
-      cancelled = true;
-    };
+    });
   }, []);
 
   useEffect(() => {

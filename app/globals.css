@@ -375,7 +375,8 @@ body {
 }
 
 .task-details-editor {
-  color: #2e2e2e;
+  color: #414141;
+  /* color: #2e2e2e; */
   color-scheme: light;
   caret-color: #171717;
   cursor: text;

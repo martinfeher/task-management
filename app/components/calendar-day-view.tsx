@@ -9,8 +9,10 @@ import { CalendarPeriodNavigation } from "./calendar-period-navigation";
 import { formatDayMonthYear } from "./calendar-mini-month";
 import {
   CalendarTaskModal,
+  getCalendarTaskClickAnchorRect,
   getCalendarTaskSnapshot,
   type CalendarTaskEditorCallbacks,
+  type CalendarTaskModalAnchorRect,
 } from "./calendar-task-modal";
 import type { TaskListItem, TodoList } from "./todo-app";
 import type { TaskDueTime } from "@/lib/task-due-time";
@@ -180,6 +182,13 @@ export function CalendarDayView({
   const lastSidebarJumpRequestIdRef = useRef(0);
   const lastSyncedSidebarDateKeyRef = useRef<string | null>(null);
   const [modalTaskId, setModalTaskId] = useState<string | null>(null);
+  const [modalAnchorRect, setModalAnchorRect] =
+    useState<CalendarTaskModalAnchorRect | null>(null);
+
+  function closeTaskModal() {
+    setModalTaskId(null);
+    setModalAnchorRect(null);
+  }
   const { defaultColor: calendarTaskDefaultColor } =
     useCalendarTaskDefaultColor();
   const [addTaskPopover, setAddTaskPopover] = useState<{
@@ -320,7 +329,7 @@ export function CalendarDayView({
 
   useEffect(() => {
     if (!selectedDay) return;
-    setModalTaskId(null);
+    closeTaskModal();
     closeAddTaskPopover();
   }, [selectedDay]);
 
@@ -332,7 +341,7 @@ export function CalendarDayView({
   function handleAllDayClick(event: React.MouseEvent<HTMLElement>) {
     if (!selectedDay) return;
 
-    setModalTaskId(null);
+    closeTaskModal();
 
     if (!onAddCalendarTask || lists.length === 0) return;
 
@@ -354,7 +363,7 @@ export function CalendarDayView({
     }
 
     event.stopPropagation();
-    setModalTaskId(null);
+    closeTaskModal();
 
     if (!onAddCalendarTask || lists.length === 0) return;
 
@@ -400,6 +409,7 @@ export function CalendarDayView({
 
     onSelectTask(task.id);
     closeAddTaskPopover();
+    setModalAnchorRect(getCalendarTaskClickAnchorRect(event.currentTarget));
     setModalTaskId(task.id);
   }
 
@@ -434,7 +444,7 @@ export function CalendarDayView({
       suppressTaskClickRef,
       setDropTargetSlot: handleSetDropTargetSlot,
       onDragStart: (point) => {
-        setModalTaskId(null);
+        closeTaskModal();
         setDraggingTaskPreview({
           taskId: task.id,
           sourceDateKey: toDateKey(day),
@@ -661,6 +671,7 @@ export function CalendarDayView({
                 <CalendarTaskTitle
                   name={task.name}
                   recurrenceRule={task.recurrenceRule}
+                  priority={task.priority}
                 />
                 <CalendarTaskCompletionCheckbox
                   task={task}
@@ -829,7 +840,7 @@ export function CalendarDayView({
                       isMaskedForDrop={isTaskMaskedForDrop(task.id)}
                       onDropped={markTaskJustDropped}
                       onDragStart={() => {
-                        setModalTaskId(null);
+                        closeTaskModal();
                         setDraggingTaskPreview({
                           taskId: task.id,
                           sourceDateKey: dateKey,
@@ -945,7 +956,8 @@ export function CalendarDayView({
         <CalendarTaskModal
           taskId={modalTaskId}
           taskSnapshot={modalTaskSnapshot}
-          onClose={() => setModalTaskId(null)}
+          anchorRect={modalAnchorRect}
+          onClose={closeTaskModal}
           onDetailsSaved={onDetailsSaved}
           onTaskHasDetailsKnown={onTaskHasDetailsKnown}
           onTaskRenamed={onTaskRenamed}

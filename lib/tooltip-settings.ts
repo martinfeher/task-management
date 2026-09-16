@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { runSettingsLoadEffect } from "@/lib/client-settings-fetch";
 import { normalizeHexColor } from "@/lib/sidebar-background-types";
 import {
   areTooltipSettingsEqual,
@@ -211,13 +212,11 @@ export function useTooltipSettings() {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function loadSettings() {
+    return runSettingsLoadEffect(async (isCancelled) => {
       try {
         const settings = await fetchTooltipSettings();
-        if (cancelled || !settings) {
-          if (!cancelled) {
+        if (isCancelled() || !settings) {
+          if (!isCancelled()) {
             setSavedSettings(readTooltipSettingsFromStorage());
           }
           return;
@@ -229,17 +228,11 @@ export function useTooltipSettings() {
         setCornerRadiusPxState(settings.cornerRadiusPx);
         setSavedSettings(settings);
       } finally {
-        if (!cancelled) {
+        if (!isCancelled()) {
           setIsLoading(false);
         }
       }
-    }
-
-    void loadSettings();
-
-    return () => {
-      cancelled = true;
-    };
+    });
   }, []);
 
   useEffect(() => {

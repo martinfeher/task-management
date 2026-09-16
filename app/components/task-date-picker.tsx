@@ -1521,14 +1521,14 @@ export function TaskDatePicker({
         style={{ borderColor: PICKER_BORDER }}
       >
         <div
-          className="flex items-center gap-2 rounded-[12px] px-3 py-[6px]"
+          className="flex items-center gap-2 rounded-full px-3.5 py-[6px]"
           style={{ backgroundColor: PICKER_MUTED }}
         >
           <Sparkles
             className="size-4 shrink-0"
             strokeWidth={2}
             aria-hidden="true"
-            style={{ color: "#a6a6a6" }}
+            style={{ color: "#bfbfd5" }}
           />
           <input
             ref={dateInputRef}

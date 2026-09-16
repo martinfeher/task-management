@@ -70,12 +70,16 @@ export function getFolderDropTargetFromPoint(
   clientX: number,
   clientY: number,
   container: HTMLElement,
+  excludeFolderIds: ReadonlySet<string> = new Set(),
 ) {
   const folderRows = Array.from(
     container.querySelectorAll<HTMLElement>("[data-folder-id]"),
   );
 
   for (const row of folderRows) {
+    const folderId = row.dataset.folderId;
+    if (!folderId || excludeFolderIds.has(folderId)) continue;
+
     const rect = row.getBoundingClientRect();
     if (
       clientX >= rect.left &&
@@ -83,7 +87,7 @@ export function getFolderDropTargetFromPoint(
       clientY >= rect.top &&
       clientY <= rect.bottom
     ) {
-      return row.dataset.folderId ?? null;
+      return folderId;
     }
   }
 

@@ -264,6 +264,15 @@ export function splitBlockLinesOnBreaks(editor: HTMLElement) {
     const parts = htmlToLineParts(line.innerHTML);
     if (parts.length <= 1) continue;
 
+    if (isListBlockLine(line) && isLineEmpty(line)) {
+      line.innerHTML = "<br>";
+      if (isChecklistLine(line)) {
+        ensureChecklistTextWrapper(line);
+      }
+      changed = true;
+      continue;
+    }
+
     const lineType = (line.dataset.lineType as LineBlockType | undefined) ?? "text";
     line.innerHTML = parts[0];
 
@@ -1154,6 +1163,34 @@ function getNextListNumber(editor: HTMLElement, afterLine: HTMLElement) {
   return 1;
 }
 
+function getTrailingBodyPlaceholderLine(editor: HTMLElement) {
+  const lines = getLineElements(editor);
+  if (lines.length <= 1) return null;
+
+  const lastLine = lines.at(-1);
+  if (lastLine && isBodyPlaceholderLine(lastLine)) {
+    return lastLine;
+  }
+
+  return null;
+}
+
+function removeTrailingEmptyNonListLines(editor: HTMLElement) {
+  while (true) {
+    const lines = getLineElements(editor);
+    if (lines.length <= 1) return;
+
+    const lastLine = lines.at(-1);
+    if (!lastLine) return;
+    if (isListBlockLine(lastLine)) return;
+    if (isCodeLine(lastLine)) return;
+    if (lastLine.querySelector(".detail-image-wrapper")) return;
+    if (!isLineEmpty(lastLine)) return;
+
+    lastLine.remove();
+  }
+}
+
 export function insertTypedLineBelowLine(
   editor: HTMLElement,
   line: HTMLElement,
@@ -1174,6 +1211,9 @@ export function insertTypedLineBelowLine(
   line.after(newLine);
   if (isListBlockLine(line)) {
     copyListIndent(line, newLine);
+  }
+  if (isListBlockLine(newLine)) {
+    removeTrailingEmptyNonListLines(editor);
   }
   focusDetailLine(editor, newLine);
 }
@@ -1219,6 +1259,109 @@ export function enterFromTitleLine(editor: HTMLElement) {
   insertLineBelowLine(editor, titleLine);
 }
 
+function getListLineEditableRoot(line: HTMLElement) {
+  if (isChecklistLine(line)) {
+    ensureChecklistTextWrapper(line);
+    const wrapper = line.querySelector(`:scope > .${CHECKLIST_TEXT_CLASS}`);
+    if (wrapper instanceof HTMLElement) {
+      return wrapper;
+    }
+  }
+
+  return line;
+}
+
+function rangeFragmentHtml(range: Range) {
+  const wrapper = document.createElement("div");
+  wrapper.appendChild(range.cloneContents());
+  return wrapper.innerHTML.trim() || "<br>";
+}
+
+function splitListLineAtCursor(
+  editor: HTMLElement,
+  activeLine: HTMLElement,
+  lineType: Extract<LineBlockType, "bullet" | "numbered" | "checklist">,
+  range: Range,
+) {
+  if (isLineEmpty(activeLine)) {
+    const trailingPlaceholder = getTrailingBodyPlaceholderLine(editor);
+
+    if (trailingPlaceholder && activeLine.nextElementSibling === trailingPlaceholder) {
+      activeLine.remove();
+      renumberNumberedLines(editor);
+      focusDetailLine(editor, trailingPlaceholder);
+      return;
+    }
+
+    clearLineBlockType(activeLine);
+    activeLine.innerHTML = "<br>";
+    if (trailingPlaceholder) {
+      trailingPlaceholder.remove();
+    }
+    placeCaretInLine(activeLine);
+    renumberNumberedLines(editor);
+    return;
+  }
+
+  const contentRoot = getListLineEditableRoot(activeLine);
+  if (!contentRoot.contains(range.startContainer)) {
+    placeCaretInLine(activeLine);
+    return;
+  }
+
+  const afterRange = range.cloneRange();
+  afterRange.selectNodeContents(contentRoot);
+  afterRange.setStart(range.endContainer, range.endOffset);
+  const afterHtml = rangeFragmentHtml(afterRange);
+
+  const beforeRange = range.cloneRange();
+  beforeRange.selectNodeContents(contentRoot);
+  beforeRange.setEnd(range.startContainer, range.startOffset);
+  const beforeHtml = rangeFragmentHtml(beforeRange);
+
+  const afterIsEmpty = isEmptySplitHtml(afterHtml);
+  const beforeIsEmpty = isEmptySplitHtml(beforeHtml);
+
+  if (afterIsEmpty && !beforeIsEmpty) {
+    insertTypedLineBelowLine(editor, activeLine, lineType);
+    renumberNumberedLines(editor);
+    return;
+  }
+
+  if (beforeIsEmpty && !afterIsEmpty) {
+    const newLine = createLineElement(afterHtml);
+    applyBlockTypeToLine(newLine, lineType, getLineElements(editor));
+    if (lineType === "checklist") {
+      newLine.dataset.checked = "false";
+      ensureChecklistTextWrapper(newLine);
+    }
+    copyListIndent(activeLine, newLine);
+    activeLine.after(newLine);
+    removeTrailingEmptyNonListLines(editor);
+    contentRoot.innerHTML = "<br>";
+    placeCaretInLine(newLine);
+    renumberNumberedLines(editor);
+    return;
+  }
+
+  contentRoot.innerHTML = beforeIsEmpty ? "<br>" : beforeHtml;
+  if (isChecklistLine(activeLine)) {
+    ensureChecklistTextWrapper(activeLine);
+  }
+
+  const newLine = createLineElement(afterHtml);
+  applyBlockTypeToLine(newLine, lineType, getLineElements(editor));
+  if (lineType === "checklist") {
+    newLine.dataset.checked = "false";
+    ensureChecklistTextWrapper(newLine);
+  }
+  copyListIndent(activeLine, newLine);
+  activeLine.after(newLine);
+  removeTrailingEmptyNonListLines(editor);
+  placeCaretInLine(newLine);
+  renumberNumberedLines(editor);
+}
+
 export function splitLineAtCursor(editor: HTMLElement) {
   ensureBlockLines(editor);
 
@@ -1236,6 +1379,16 @@ export function splitLineAtCursor(editor: HTMLElement) {
   const range = selection.getRangeAt(0);
   if (!activeLine.contains(range.startContainer)) return;
 
+  const lineType = activeLine.dataset.lineType as LineBlockType | undefined;
+  if (
+    lineType === "bullet" ||
+    lineType === "numbered" ||
+    lineType === "checklist"
+  ) {
+    splitListLineAtCursor(editor, activeLine, lineType, range);
+    return;
+  }
+
   const afterRange = range.cloneRange();
   afterRange.selectNodeContents(activeLine);
   afterRange.setStart(range.endContainer, range.endOffset);
@@ -1252,27 +1405,17 @@ export function splitLineAtCursor(editor: HTMLElement) {
   }
 
   const newLine = createLineElement(afterHtml);
-  const lineType = activeLine.dataset.lineType as LineBlockType | undefined;
 
   if (lineType && lineType !== "text") {
     applyBlockTypeToLine(newLine, lineType, getLineElements(editor));
   }
-
-  if (lineType === "checklist") {
-    newLine.dataset.checked = "false";
-  }
-
-  if (isListBlockLine(activeLine)) {
-    copyListIndent(activeLine, newLine);
-  }
-
-  activeLine.after(newLine);
 
   if (lineType === "code") {
     normalizeCodeLine(activeLine);
     normalizeCodeLine(newLine);
   }
 
+  activeLine.after(newLine);
   placeCaretInLine(newLine);
 }
 
@@ -2065,6 +2208,15 @@ export function isCaretAtStartOfLine(line: HTMLElement) {
 function normalizeEmptyLineForCaret(line: HTMLElement) {
   if (line.querySelector(".detail-image-wrapper")) return;
 
+  if (isChecklistLine(line)) {
+    ensureChecklistTextWrapper(line);
+    const wrapper = line.querySelector(`:scope > .${CHECKLIST_TEXT_CLASS}`);
+    if (wrapper instanceof HTMLElement && !wrapper.querySelector("br")) {
+      wrapper.innerHTML = "<br>";
+    }
+    return;
+  }
+
   if (!line.querySelector("br")) {
     line.innerHTML = "<br>";
     return;
@@ -2076,18 +2228,40 @@ function normalizeEmptyLineForCaret(line: HTMLElement) {
   }
 }
 
+function placeCaretInEmptyLine(line: HTMLElement, selection: Selection) {
+  normalizeEmptyLineForCaret(line);
+
+  const range = document.createRange();
+
+  if (isChecklistLine(line)) {
+    const wrapper = line.querySelector(`:scope > .${CHECKLIST_TEXT_CLASS}`);
+    if (wrapper instanceof HTMLElement) {
+      const br = wrapper.querySelector("br");
+      if (br) {
+        range.setStartBefore(br);
+      } else {
+        range.selectNodeContents(wrapper);
+        range.collapse(true);
+      }
+      range.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      return;
+    }
+  }
+
+  range.setStart(line, 0);
+  range.collapse(true);
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
+
 export function placeCaretInLine(line: HTMLElement) {
   const selection = window.getSelection();
   if (!selection) return;
 
   if (isLineEmpty(line) || isBodyPlaceholderLine(line)) {
-    normalizeEmptyLineForCaret(line);
-
-    const range = document.createRange();
-    range.setStart(line, 0);
-    range.collapse(true);
-    selection.removeAllRanges();
-    selection.addRange(range);
+    placeCaretInEmptyLine(line, selection);
     return;
   }
 
@@ -2517,7 +2691,11 @@ function syncTrailingBodyPlaceholderLine(editor: HTMLElement) {
   }
 
   const lastLine = getLineElements(editor).at(-1);
-  if (lastLine && isBodyLineWithContent(lastLine)) {
+  if (
+    lastLine &&
+    isBodyLineWithContent(lastLine) &&
+    !isListBlockLine(lastLine)
+  ) {
     editor.appendChild(createLineElement("<br>", "text"));
   }
 }

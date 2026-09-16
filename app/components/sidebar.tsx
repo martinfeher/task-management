@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { BiCheckboxChecked, BiChevronDown } from "react-icons/bi";
 import { BiSolidCheckboxChecked } from "react-icons/bi";
 
-import { BsArchiveFill } from "react-icons/bs";
+import { BsArchiveFill, BsFolder2Open } from "react-icons/bs";
 import { IoIosSearch } from "react-icons/io";
 import { LABEL_PRESET_COLORS } from "@/lib/label-colors";
 import { getInboxListId } from "@/lib/inbox-list";
@@ -837,17 +837,21 @@ export function Sidebar({
     const deltaY = event.clientY - dragState.startClientY;
     dragState.sourceRow.style.translate = `0px ${deltaY}px`;
 
-    const isListDrag =
-      dragState.dragMode === "top-level" ||
-      dragState.dragMode === "nested-list";
+    const sourceRowKind = dragState.sourceRow.dataset.sidebarReorderRow;
     const draggedListId =
-      dragState.sourceRow.dataset.sidebarReorderId ??
-      dragState.sourceRow.dataset.sidebarNestedListId;
+      dragState.dragMode === "nested-list"
+        ? dragState.sourceRow.dataset.sidebarNestedListId
+        : sourceRowKind === "list"
+          ? dragState.sourceRow.dataset.sidebarReorderId
+          : null;
     const draggedList = draggedListId
       ? orderedLists.find((list) => list.id === draggedListId)
       : null;
+    const isListFolderDropDrag =
+      Boolean(draggedList) &&
+      (dragState.dragMode === "nested-list" || sourceRowKind === "list");
 
-    if (isListDrag && draggedListId) {
+    if (isListFolderDropDrag && draggedList && draggedListId) {
       const folderDropTargetId = getFolderDropTargetFromPoint(
         event.clientX,
         event.clientY,
@@ -855,7 +859,7 @@ export function Sidebar({
       );
       const canDropOnFolder =
         folderDropTargetId !== null &&
-        draggedList?.folderId !== folderDropTargetId;
+        draggedList.folderId !== folderDropTargetId;
 
       if (canDropOnFolder) {
         if (dragState.folderDropTargetId !== folderDropTargetId) {
@@ -955,15 +959,19 @@ export function Sidebar({
     setListDragOverFolderId(null);
 
     if (dragState) {
+      const sourceRowKind = dragState.sourceRow.dataset.sidebarReorderRow;
       const draggedListId =
-        dragState.sourceRow.dataset.sidebarReorderId ??
-        dragState.sourceRow.dataset.sidebarNestedListId;
-      const isListDrag =
-        dragState.dragMode === "top-level" ||
-        dragState.dragMode === "nested-list";
+        dragState.dragMode === "nested-list"
+          ? dragState.sourceRow.dataset.sidebarNestedListId
+          : sourceRowKind === "list"
+            ? dragState.sourceRow.dataset.sidebarReorderId
+            : null;
+      const draggedList = draggedListId
+        ? orderedLists.find((list) => list.id === draggedListId)
+        : null;
 
-      if (isListDrag && draggedListId && dragState.folderDropTargetId) {
-        onMoveListToFolder(draggedListId, dragState.folderDropTargetId);
+      if (draggedList && dragState.folderDropTargetId) {
+        onMoveListToFolder(draggedList.id, dragState.folderDropTargetId);
         setExpandedFolderIds((current) =>
           new Set([...current, dragState.folderDropTargetId!]),
         );
@@ -1821,10 +1829,17 @@ export function Sidebar({
                       }`}
                       aria-hidden="true"
                     />
-                    <LuFolder
-                      className="size-[14px] mr-1 shrink-0 text-[#acadb7]"
-                      aria-hidden="true"
-                    />
+                    {isExpanded ? (
+                      <BsFolder2Open
+                        className="size-[15px] mr-1 shrink-0 text-[#acadb7]"
+                        aria-hidden="true"
+                      />
+                    ) : (
+                      <LuFolder
+                        className="size-[15px] mr-1 shrink-0 text-[#acadb7]"
+                        aria-hidden="true"
+                      />
+                    )}
                     <span className="min-w-0 flex-1 truncate pr-8 text-left text-sm ptxt-list-items">
                       {folder.name}
                     </span>
@@ -1866,7 +1881,7 @@ export function Sidebar({
                 aria-expanded={isBottomAddMenuOpen}
                 aria-label="Add list or folder"
                 onClick={() => setIsBottomAddMenuOpen((open) => !open)}
-                className="flex ml-[2px] cursor-pointer items-center -mt-[10px] px-3 py-2 text-left text-[13px] text-[#afafaf] transition-colors hover:text-[#969696] dark:hover:text-zinc-300"
+                className="flex ml-[2px] cursor-pointer items-center -mt-[10px] px-3 py-2 text-left text-[13px] text-[#afafaf] transition-colors hover:text-[#77797e] dark:hover:text-zinc-300"
               >
                 <div className="text-[15px] mr-[5px] mb-[3px] leading-none" aria-hidden="true">
                   +
@@ -1874,12 +1889,12 @@ export function Sidebar({
                 Add
               </button>
               {isBottomAddMenuOpen ? (
-                <div className="absolute left-full top-1/2 z-[1000] flex -translate-y-1/2 items-stretch -ml-2">
+                <div className="absolute left-full top-1/2 z-[1000] flex -translate-y-1/2 items-stretch -ml-4">
                   <div className="w-3 shrink-0" aria-hidden="true" />
                   <div
                     role="menu"
                     aria-label="Add list or folder"
-                    className="w-[152px] overflow-hidden rounded-md border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
+                    className="w-[152px] overflow-hidden border border-zinc-200 bg-white py-1 rounded-[20px]! shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
                   >
                   <button
                     type="button"

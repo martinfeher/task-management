@@ -2,6 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  runSettingsLoadEffect,
+  shouldIgnoreSettingsLoadError,
+} from "@/lib/client-settings-fetch";
+import {
   areSidebarBackgroundSettingsEqual,
   DEFAULT_SIDEBAR_BASE_COLOR,
   DEFAULT_SIDEBAR_BACKGROUND_ID,
@@ -143,35 +147,31 @@ export function useSidebarBackground() {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function loadSettings() {
+    return runSettingsLoadEffect(async (isCancelled) => {
       try {
         const settings = await fetchSidebarBackgroundSettings();
-        if (cancelled) return;
+        if (isCancelled()) return;
 
         applySidebarBackgroundSettings(settings);
         setBackgroundIdState(settings.backgroundId);
         setBaseColorState(settings.baseColor);
         setSavedSettings(settings);
       } catch (error) {
-        console.error(error);
-        if (!cancelled) {
+        if (shouldIgnoreSettingsLoadError(error, { cancelled: isCancelled() })) {
+          return;
+        }
+
+        console.warn("Failed to load sidebar background settings from server.");
+        if (!isCancelled()) {
           const stored = readSidebarBackgroundSettingsFromStorage();
           setSavedSettings(stored);
         }
       } finally {
-        if (!cancelled) {
+        if (!isCancelled()) {
           setIsLoading(false);
         }
       }
-    }
-
-    void loadSettings();
-
-    return () => {
-      cancelled = true;
-    };
+    });
   }, []);
 
   useEffect(() => {
