@@ -7,9 +7,6 @@ import { IoDuplicateOutline } from "react-icons/io5";
 import { PiListStarThin, PiNoteThin } from "react-icons/pi";
 import { RiDeleteBinLine } from "react-icons/ri";
 import { LiaTagSolid } from "react-icons/lia";
-import { CgCalendarNext } from "react-icons/cg";
-
-
 import { LuListVideo } from "react-icons/lu";
 import { TaskContextMenuDateShortcuts } from "./task-context-menu-date-shortcuts";
 import { TaskListSubtaskIcon } from "./task-list-subtask-icon";

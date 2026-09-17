@@ -49,7 +49,7 @@ import {
   updateTaskRecurrence as updateTaskRecurrenceInDb,
 } from "@/app/actions/todo";
 import type { TaskParentUpdate } from "@/app/actions/todo";
-import type { TaskDueTime } from "@/lib/task-due-time";
+import { normalizeDueTimeZone, type TaskDueTime } from "@/lib/task-due-time";
 import type { TaskRecurrenceRule } from "@/lib/task-recurrence";
 import {
   getRecurrenceUndoMessage,
@@ -94,6 +94,15 @@ import { plainTextToTaskDetails } from "./calendar-add-task-popover";
 import { TaskDetailsPanel, type TaskDetailsSaveController } from "./task-details-panel";
 import { PanelResizeHandle } from "./panel-resize-handle";
 import { TaskListPanel, TASK_LIST_PANEL_AUTO_EXPAND_MAX_WIDTH, TASK_LIST_PANEL_DEFAULT_WIDTH, TASK_LIST_PANEL_MIN_WIDTH } from "./task-list-panel";
+import { ListKanbanPanel } from "./list-kanban-panel";
+import {
+  createKanbanColumn,
+  createKanbanTask,
+  deleteKanbanColumn,
+  getKanbanColumnsForList,
+  moveKanbanTask as moveKanbanTaskInDb,
+  type KanbanColumnRecord,
+} from "@/app/actions/kanban";
 import {
   SidebarListTaskPreview,
   type SidebarListPreviewRect,
@@ -144,6 +153,7 @@ export type Task = {
   important: boolean;
   isNote: boolean;
   parentId: string | null;
+  kanbanColumnId?: string | null;
   labels: TaskLabel[];
 };
 
@@ -159,6 +169,7 @@ export type TodoList = {
   color?: string | null;
   folderId?: string | null;
   position?: number;
+  viewMode?: "stack" | "kanban";
 };
 
 export type CompletedTask = Task & {
@@ -238,6 +249,7 @@ type TodoAppProps = {
   initialFolders: ListFolder[];
   initialLabels: TaskLabel[];
   initialTasksByList: Record<string, Task[]>;
+  initialKanbanColumnsByList?: Record<string, KanbanColumnRecord[]>;
   initialRoute?: TodoRoute;
 };
 
@@ -680,6 +692,48 @@ export type TaskListItem = Task & {
   listName?: string;
 };
 
+function rebuildKanbanListTasks(
+  listTasks: Task[],
+  columns: KanbanColumnRecord[],
+  movedTaskId: string,
+  targetColumnId: string,
+  targetIndex: number,
+): Task[] {
+  const movedTask = listTasks.find((task) => task.id === movedTaskId);
+  if (!movedTask) return listTasks;
+
+  const activeByColumn = new Map<string, Task[]>();
+  for (const column of columns) {
+    activeByColumn.set(column.id, []);
+  }
+
+  for (const task of listTasks) {
+    if (task.completed || task.parentId || task.id === movedTaskId) continue;
+    const columnId = task.kanbanColumnId;
+    if (columnId && activeByColumn.has(columnId)) {
+      activeByColumn.get(columnId)!.push(task);
+    }
+  }
+
+  const targetTasks = activeByColumn.get(targetColumnId) ?? [];
+  const clampedIndex = Math.max(0, Math.min(targetIndex, targetTasks.length));
+  targetTasks.splice(clampedIndex, 0, {
+    ...movedTask,
+    kanbanColumnId: targetColumnId,
+  });
+  activeByColumn.set(targetColumnId, targetTasks);
+
+  const activeOrdered = columns.flatMap(
+    (column) => activeByColumn.get(column.id) ?? [],
+  );
+  const activeIds = new Set(activeOrdered.map((task) => task.id));
+  const inactiveTasks = listTasks.filter(
+    (task) => task.completed || task.parentId || !activeIds.has(task.id),
+  );
+
+  return [...inactiveTasks, ...activeOrdered];
+}
+
 export type AddTaskOptions = {
   dueDate?: string | null;
   dueTime?: TaskDueTime | null;
@@ -705,6 +759,7 @@ export function TodoApp({
   initialFolders,
   initialLabels,
   initialTasksByList,
+  initialKanbanColumnsByList = {},
   initialRoute,
 }: TodoAppProps) {
   const pathname = usePathname();
@@ -756,6 +811,9 @@ export function TodoApp({
   const { listPreviewEnabled } = useListPreviewEnabled();
   const { subtasksEnabled } = useSubtasksEnabled();
   const [tasksByList, setTasksByList] = useState(() => initialTasks);
+  const [kanbanColumnsByList, setKanbanColumnsByList] = useState<
+    Record<string, KanbanColumnRecord[]>
+  >(initialKanbanColumnsByList);
   const [pendingUndo, setPendingUndo] = useState<PendingUndo | null>(null);
   const [pendingRecurrenceUndo, setPendingRecurrenceUndo] =
     useState<PendingRecurrenceUndo | null>(null);
@@ -1038,6 +1096,11 @@ export function TodoApp({
   const showingCalendarMonth = displayedActiveView === "calendar";
 
   const selectedList = lists.find((list) => list.id === selectedListId) ?? null;
+  const showKanbanListView =
+    displayedListId !== null &&
+    displayedLabelId === null &&
+    displayedActiveView === null &&
+    selectedList?.viewMode === "kanban";
   const selectedLabel =
     labels.find((item) => item.id === selectedLabelId) ?? null;
   const inboxListId = useMemo(() => getInboxListId(lists), [lists]);
@@ -2104,7 +2167,12 @@ export function TodoApp({
 
   async function updateList(
     listId: string,
-    input: { name: string; folderId: string | null; color: string | null },
+    input: {
+      name: string;
+      folderId: string | null;
+      color: string | null;
+      viewMode?: "stack" | "kanban";
+    },
   ) {
     await updateTodoListInDb(listId, input);
     setLists((current) =>
@@ -2115,11 +2183,137 @@ export function TodoApp({
               name: input.name,
               folderId: input.folderId,
               color: input.color,
+              viewMode: input.viewMode ?? item.viewMode ?? "stack",
             }
           : item,
       ),
     );
+
+    if (input.viewMode === "kanban") {
+      const columns = await getKanbanColumnsForList(listId);
+      setKanbanColumnsByList((current) => ({
+        ...current,
+        [listId]: columns,
+      }));
+
+      const notAssignedColumn = columns.find(
+        (column) => column.name === "Not assigned",
+      );
+      if (notAssignedColumn) {
+        setTasksByList((current) => ({
+          ...current,
+          [listId]:
+            current[listId]?.map((task) =>
+              !task.parentId && !task.kanbanColumnId
+                ? { ...task, kanbanColumnId: notAssignedColumn.id }
+                : task,
+            ) ?? [],
+        }));
+      }
+
+      if (selectedListId === listId) {
+        setSelectedTaskId(null);
+        setIsListCalendarOpen(false);
+        setIsListCalendarPreview(false);
+        setListCalendarShowingDetails(false);
+      }
+    }
   }
+
+  const addKanbanColumn = useCallback(
+    async (name: string) => {
+      if (!selectedListId) return;
+
+      const column = await createKanbanColumn(selectedListId, name);
+      setKanbanColumnsByList((current) => ({
+        ...current,
+        [selectedListId]: [...(current[selectedListId] ?? []), column],
+      }));
+    },
+    [selectedListId],
+  );
+
+  const addKanbanTask = useCallback(
+    async (columnId: string, name: string) => {
+      if (!selectedListId) return;
+
+      const created = await createKanbanTask(selectedListId, columnId, name);
+      const newTask: Task = {
+        id: created.id,
+        name: created.name,
+        completed: created.completed,
+        details: "",
+        hasDetails: false,
+        dueDate: created.dueDate ? created.dueDate.toISOString() : null,
+        dueTimeMinutes: created.dueTimeMinutes,
+        dueDurationMinutes: created.dueDurationMinutes,
+        dueTimeZone: normalizeDueTimeZone(created.dueTimeZone),
+        calendarColor: created.calendarColor ?? null,
+        recurrenceRule: created.recurrenceRule ?? null,
+        priority: null,
+        pinned: Boolean(created.pinned),
+        important: Boolean(created.important),
+        isNote: Boolean(created.isNote),
+        parentId: created.parentId ?? null,
+        kanbanColumnId: columnId,
+        labels: [],
+      };
+
+      setTasksByList((current) => ({
+        ...current,
+        [selectedListId]: [newTask, ...(current[selectedListId] ?? [])],
+      }));
+    },
+    [selectedListId],
+  );
+
+  const moveKanbanTask = useCallback(
+    async (taskId: string, targetColumnId: string, targetIndex: number) => {
+      if (!selectedListId) return;
+
+      const columns = kanbanColumnsByList[selectedListId] ?? [];
+      setTasksByList((current) => {
+        const listTasks = current[selectedListId] ?? [];
+        const nextTasks = rebuildKanbanListTasks(
+          listTasks,
+          columns,
+          taskId,
+          targetColumnId,
+          targetIndex,
+        );
+
+        if (nextTasks === listTasks) return current;
+
+        return {
+          ...current,
+          [selectedListId]: nextTasks,
+        };
+      });
+
+      await moveKanbanTaskInDb(
+        selectedListId,
+        taskId,
+        targetColumnId,
+        targetIndex,
+      );
+    },
+    [kanbanColumnsByList, selectedListId],
+  );
+
+  const removeKanbanColumn = useCallback(
+    async (columnId: string) => {
+      if (!selectedListId) return;
+
+      await deleteKanbanColumn(selectedListId, columnId);
+      setKanbanColumnsByList((current) => ({
+        ...current,
+        [selectedListId]: (current[selectedListId] ?? []).filter(
+          (column) => column.id !== columnId,
+        ),
+      }));
+    },
+    [selectedListId],
+  );
 
   async function reorderLists(payload: {
     lists: TodoList[];
@@ -3401,12 +3595,22 @@ export function TodoApp({
     };
   }, [cancelListCalendarPreviewClose, cancelSidebarHoverClear]);
 
+  useEffect(() => {
+    if (!showKanbanListView) return;
+
+    setSelectedTaskId(null);
+    setIsListCalendarOpen(false);
+    setIsListCalendarPreview(false);
+    setListCalendarShowingDetails(false);
+  }, [showKanbanListView]);
+
   const useFixedWidthTaskListPanel =
-    displayedListId !== null ||
-    displayedLabelId !== null ||
-    displayedActiveView === "today" ||
-    displayedActiveView === "inbox" ||
-    displayedActiveView === "important";
+    !showKanbanListView &&
+    (displayedListId !== null ||
+      displayedLabelId !== null ||
+      displayedActiveView === "today" ||
+      displayedActiveView === "inbox" ||
+      displayedActiveView === "important");
   const showListCalendar = isListCalendarOpen || isListCalendarPreview;
   const showListCalendarPanel =
     showListCalendar && !(isListCalendarOpen && listCalendarShowingDetails);
@@ -3609,6 +3813,24 @@ export function TodoApp({
               onMultiDayCountChange={handleCalendarMultiDayCountChange}
               onMultiWeekCountChange={handleCalendarMultiWeekCountChange}
               persistViewSession={false}
+            />
+          </div>
+        ) : showKanbanListView && selectedList ? (
+          <div
+            className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+            onMouseEnter={commitSidebarHoverSelection}
+          >
+            <ListKanbanPanel
+              list={selectedList}
+              columns={kanbanColumnsByList[selectedList.id] ?? []}
+              tasks={tasksByList[selectedList.id] ?? []}
+              onToggleTask={toggleTask}
+              onAddColumn={addKanbanColumn}
+              onAddTask={addKanbanTask}
+              onMoveTask={moveKanbanTask}
+              onRemoveColumn={removeKanbanColumn}
+              showSidebarMenu={isCompactLayout}
+              onOpenSidebar={() => setSidebarDrawerOpen(true)}
             />
           </div>
         ) : showRightPanel ? (

@@ -10,10 +10,13 @@ import {
 } from "@/lib/list-colors";
 import type { ListFolder, TodoList } from "./todo-app";
 
+export type ListViewMode = "stack" | "kanban";
+
 export type EditListModalValues = {
   name: string;
   folderId: string | null;
   color: string | null;
+  viewMode: ListViewMode;
 };
 
 type EditListModalProps = {
@@ -39,6 +42,7 @@ export function EditListModal({
   const [name, setName] = useState("");
   const [folderId, setFolderId] = useState<string | null>(null);
   const [color, setColor] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<ListViewMode>("stack");
   const [isMounted, setIsMounted] = useState(open);
   const [isEntered, setIsEntered] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -70,6 +74,7 @@ export function EditListModal({
     setName(list.name);
     setFolderId(list.folderId ?? null);
     setColor(list.color ?? null);
+    setViewMode(list.viewMode ?? "stack");
 
     requestAnimationFrame(() => {
       inputRef.current?.focus();
@@ -98,6 +103,7 @@ export function EditListModal({
       name: name.trim(),
       folderId,
       color,
+      viewMode,
     });
   }
 
@@ -183,6 +189,36 @@ export function EditListModal({
           </label>
 
           <div>
+            <p className="mb-2 text-sm text-zinc-500 dark:text-zinc-400">View</p>
+            <div className="flex gap-2 w-[260px]">
+              <button
+                type="button"
+                aria-pressed={viewMode === "stack"}
+                onClick={() => setViewMode("stack")}
+                className={`h-[35px] flex-1 rounded-md border px-3 text-sm transition-colors cursor-pointer ${
+                  viewMode === "stack"
+                    ? "border-zinc-600 bg-zinc-500 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
+                    : "border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900"
+                }`}
+              >
+                Task stack
+              </button>
+              <button
+                type="button"
+                aria-pressed={viewMode === "kanban"}
+                onClick={() => setViewMode("kanban")}
+                className={`h-[35px] flex-1 rounded-md border px-3 text-sm transition-colors cursor-pointer ${
+                  viewMode === "kanban"
+                    ? "border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
+                    : "border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900"
+                }`}
+              >
+                Kanban
+              </button>
+            </div>
+          </div>
+
+          <div>
             <p className="mb-2 text-sm text-zinc-500 dark:text-zinc-400">Color</p>
             <div className="flex flex-wrap items-center gap-2">
               <button
@@ -241,7 +277,7 @@ export function EditListModal({
           <button
             type="submit"
             disabled={!name.trim()}
-            className="h-[35px] rounded-md bg-zinc-900 px-4 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200 cursor-pointer!"
+            className="h-[35px] rounded-md bg-zinc-500 px-4 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200 cursor-pointer!"
           >
             Save
           </button>

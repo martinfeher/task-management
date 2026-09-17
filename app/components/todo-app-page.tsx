@@ -7,7 +7,8 @@ type TodoAppPageProps = {
 };
 
 export async function TodoAppPage({ initialRoute }: TodoAppPageProps) {
-  const { lists, folders, labels, tasksByList } = await getTodoData();
+  const { lists, folders, labels, tasksByList, kanbanColumnsByList } =
+    await getTodoData();
 
   return (
     <TodoApp
@@ -15,6 +16,7 @@ export async function TodoAppPage({ initialRoute }: TodoAppPageProps) {
       initialFolders={folders}
       initialLabels={labels}
       initialTasksByList={tasksByList}
+      initialKanbanColumnsByList={kanbanColumnsByList}
       initialRoute={initialRoute}
     />
   );

@@ -22,15 +22,30 @@ model ListFolder {
 }
 
 model TodoList {
-  id        String      @id @default(cuid())
+  id            String         @id @default(cuid())
+  name          String
+  color         String?
+  position      Int            @default(0)
+  folderId      String?
+  viewMode      String         @default("stack")
+  folder        ListFolder?    @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  tasks         Task[]
+  kanbanColumns KanbanColumn[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model KanbanColumn {
+  id        String   @id @default(cuid())
+  listId    String
+  list      TodoList @relation(fields: [listId], references: [id], onDelete: Cascade)
   name      String
-  color     String?
-  position  Int         @default(0)
-  folderId  String?
-  folder    ListFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  position  Int      @default(0)
   tasks     Task[]
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([listId, position])
 }
 
 model Task {
@@ -55,8 +70,10 @@ model Task {
   parentId           String?
   parent             Task?     @relation("TaskSubtasks", fields: [parentId], references: [id], onDelete: SetNull)
   subtasks           Task[]    @relation("TaskSubtasks")
-  listId    String
-  list      TodoList  @relation(fields: [listId], references: [id], onDelete: Cascade)
+  listId         String
+  kanbanColumnId String?
+  list           TodoList      @relation(fields: [listId], references: [id], onDelete: Cascade)
+  kanbanColumn   KanbanColumn? @relation(fields: [kanbanColumnId], references: [id], onDelete: SetNull)
   tags      TaskTag[]
   versions  TaskVersion[]
   deletedAt DateTime?

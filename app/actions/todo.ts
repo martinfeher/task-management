@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { initializeKanbanBoard } from "@/app/actions/kanban";
 import { prisma } from "@/lib/prisma";
 import {
   normalizeDueDurationMinutes,
@@ -662,10 +663,13 @@ export async function renameTodoList(listId: string, name: string) {
   return list;
 }
 
+export type ListViewMode = "stack" | "kanban";
+
 export type UpdateTodoListInput = {
   name: string;
   folderId: string | null;
   color: string | null;
+  viewMode?: ListViewMode;
 };
 
 export async function updateTodoList(listId: string, input: UpdateTodoListInput) {
@@ -687,12 +691,17 @@ export async function updateTodoList(listId: string, input: UpdateTodoListInput)
     const data: {
       name: string;
       color: string | null;
+      viewMode?: ListViewMode;
       folderId?: string | null;
       position?: number;
     } = {
       name: trimmedName,
       color: input.color,
     };
+
+    if (input.viewMode) {
+      data.viewMode = input.viewMode;
+    }
 
     if (input.folderId !== existing.folderId) {
       data.folderId = input.folderId;
@@ -706,6 +715,10 @@ export async function updateTodoList(listId: string, input: UpdateTodoListInput)
       data,
     });
   });
+
+  if (input.viewMode === "kanban") {
+    await initializeKanbanBoard(listId);
+  }
 
   revalidatePath("/");
 }

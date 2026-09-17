@@ -8,6 +8,7 @@ type ConfirmModalProps = {
   title: string;
   message: string;
   confirmLabel?: string;
+  showConfirm?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 };
@@ -17,6 +18,7 @@ export function ConfirmModal({
   title,
   message,
   confirmLabel = "Remove",
+  showConfirm = true,
   onConfirm,
   onCancel,
 }: ConfirmModalProps) {
@@ -72,13 +74,15 @@ export function ConfirmModal({
           >
             Cancel
           </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            className="h-[35px] rounded-md bg-red-600 px-4 text-sm font-medium text-white transition-colors hover:bg-red-700 cursor-pointer!"
-          >
-            {confirmLabel}
-          </button>
+          {showConfirm ? (
+            <button
+              type="button"
+              onClick={onConfirm}
+              className="h-[35px] rounded-md bg-red-600 px-4 text-sm font-medium text-white transition-colors hover:bg-red-700 cursor-pointer!"
+            >
+              {confirmLabel}
+            </button>
+          ) : null}
         </div>
       </div>
     </div>,

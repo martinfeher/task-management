@@ -92,6 +92,15 @@ export async function getTodoData() {
   const [lists, folders] = await Promise.all([
     prisma.todoList.findMany({
     include: {
+      kanbanColumns: {
+        orderBy: [{ position: "asc" }, { createdAt: "asc" }],
+        select: {
+          id: true,
+          listId: true,
+          name: true,
+          position: true,
+        },
+      },
       tasks: {
         where: { deletedAt: null },
         orderBy: [{ position: "asc" }, { createdAt: "asc" }],
@@ -109,6 +118,7 @@ export async function getTodoData() {
           important: true,
           isNote: true,
           parentId: true,
+          kanbanColumnId: true,
           tags: {
             include: { tag: true },
           },
@@ -125,13 +135,19 @@ export async function getTodoData() {
 
   return {
     folders,
-    lists: lists.map(({ id, name, color, folderId, position }) => ({
+    lists: lists.map(({ id, name, color, folderId, position, viewMode }) => ({
       id,
       name,
       color,
       folderId,
       position,
+      viewMode: (viewMode === "kanban" ? "kanban" : "stack") as
+        | "stack"
+        | "kanban",
     })),
+    kanbanColumnsByList: Object.fromEntries(
+      lists.map((list) => [list.id, list.kanbanColumns]),
+    ),
     labels: await prisma.tag.findMany({
       where: { category: LABEL_CATEGORY },
       orderBy: [{ position: "asc" }, { createdAt: "asc" }],
@@ -156,6 +172,7 @@ export async function getTodoData() {
             important,
             isNote,
             parentId,
+            kanbanColumnId,
           }) => ({
           id,
           name,
@@ -174,6 +191,7 @@ export async function getTodoData() {
           important: Boolean(important),
           isNote: Boolean(isNote),
           parentId: parentId ?? null,
+          kanbanColumnId: kanbanColumnId ?? null,
         }),
         ),
       ]),

@@ -169,7 +169,12 @@ type SidebarProps = {
   onRenameList: (listId: string, name: string) => void;
   onUpdateList: (
     listId: string,
-    input: { name: string; folderId: string | null; color: string | null },
+    input: {
+      name: string;
+      folderId: string | null;
+      color: string | null;
+      viewMode?: "stack" | "kanban";
+    },
   ) => void;
   onRenameFolder: (folderId: string, name: string) => void;
   onRemoveList: (listId: string) => void;
@@ -203,6 +208,9 @@ const SIDEBAR_ROW_COUNT_CLASS =
 
 const SIDEBAR_ROW_COUNT_STATIC_CLASS =
   "pointer-events-none absolute right-[var(--sidebar-row-trailing-inset)] top-1/2 -translate-y-1/2 text-xs tabular-nums ptxt-400 dark:ptxt-500";
+
+const SIDEBAR_CALENDAR_SHORTCUT_CLASS =
+  "pointer-events-none absolute right-[var(--sidebar-row-trailing-inset)] top-1/2 flex -translate-y-1/2 items-center gap-0.5 text-[8px] font-medium leading-none text-[#c8c8c8]";
 
 const SIDEBAR_ROW_MENU_WRAPPER_CLASS =
   "absolute right-[var(--sidebar-row-trailing-inset)] top-1/2 -translate-y-1/2";
@@ -1706,6 +1714,12 @@ export function Sidebar({
                 <span className={SIDEBAR_ROW_COUNT_STATIC_CLASS}>
                   {navTaskCounts.important}
                 </span>
+              ) : item.action === "calendar" ? (
+                <span className={SIDEBAR_CALENDAR_SHORTCUT_CLASS} aria-hidden="true">
+                  <span>Alt</span>
+                  <span>+</span>
+                  <span>Alt</span>
+                </span>
               ) : null}
             </div>
               );
@@ -1742,7 +1756,7 @@ export function Sidebar({
                   aria-hidden="true"
                 >
                   <div className="flex items-center gap-px text-zinc-400/80">
-                    <MacCmdIcon className="size-[9px] shrink-0" />
+                    <MacCmdIcon className="size-[9px] shrink-0 mt-[2px]" />
                     <span className="text-[10px] font-bold leading-none text-zinc-400/80">
                       +K
                     </span>
@@ -1817,32 +1831,34 @@ export function Sidebar({
                         left: event.clientX,
                       });
                     }}
-                    className={`group relative ml-[3px] mb-1 flex h-[34px] cursor-pointer items-center rounded-md pr-3 pl-1.5 transition-[background-color] duration-200 hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 ${
+                    className={`group relative ml-[11px] mb-1 flex h-[34px] cursor-pointer items-center rounded-md pr-3 pl-1.5 transition-[background-color] duration-200 hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 ${
                       isListDragOver
                         ? "bg-zinc-200/70 ring-2 ring-inset ring-blue-400 dark:bg-zinc-800/70 dark:ring-blue-500"
                         : ""
                     } ${onReorderLists ? "touch-none" : ""}`}
                   >
-                    <BiChevronDown
-                      className={`size-4 shrink-0 text-[#acadb7] transition-transform duration-200 ${
-                        showChevronOpen ? "" : "-rotate-90"
-                      }`}
-                      aria-hidden="true"
-                    />
                     {isExpanded ? (
                       <BsFolder2Open
-                        className="size-[15px] mr-1 shrink-0 text-[#acadb7]"
+                        className="size-[15px] mb-[1px] mr-1 shrink-0 text-[#acadb7] group-hover:text-[#9191af]"
                         aria-hidden="true"
                       />
                     ) : (
                       <LuFolder
-                        className="size-[15px] mr-1 shrink-0 text-[#acadb7]"
+                        className="size-[15px] mb-[1px] mr-1 shrink-0 text-[#acadb7] group-hover:text-[#9191af]"
                         aria-hidden="true"
                       />
                     )}
-                    <span className="min-w-0 flex-1 truncate pr-8 text-left text-sm ptxt-list-items">
-                      {folder.name}
-                    </span>
+                    <div className="ml-[2px] flex min-w-0 flex-1 items-center gap-0.5 pr-8">
+                      <span className="min-w-0 truncate text-left text-sm ptxt-list-items">
+                        {folder.name}
+                      </span>
+                      <BiChevronDown
+                        className={`size-4 shrink-0 text-[#acadb7] mb-[1px] ml-1 transition-transform duration-200 ${
+                          showChevronOpen ? "" : "-rotate-90"
+                        }`}
+                        aria-hidden="true"
+                      />
+                    </div>
                     <div className={SIDEBAR_ROW_MENU_WRAPPER_CLASS}>
                       <button
                         type="button"
@@ -2032,12 +2048,11 @@ export function Sidebar({
                         </div>
                         <div className="absolute right-[var(--sidebar-row-trailing-inset)] top-1/2 flex -translate-y-1/2 items-center gap-2">
                           <span
-                            aria-hidden="true"
-                            className="inline-flex size-[6px] shrink-0 items-center justify-center rounded-full mr-[6px]"
+                            className="inline-flex size-[7px] shrink-0 items-center justify-center rounded-full mr-[6px]"
                             style={{ backgroundColor: getLabelDotColor(item) }}
                           />
                           <span
-                            className={`pointer-events-none inline-flex items-center text-[11px] leading-none tabular-nums transition-opacity ${
+                            className={`pointer-events-none inline-flex items-center text-[12px] leading-none tabular-nums mt-[2px] transition-opacity ${
                               openMenuLabelId === item.id
                                 ? "opacity-0"
                                 : "group-hover:opacity-0"
@@ -2298,6 +2313,7 @@ export function Sidebar({
                       name: values.name,
                       folderId: values.folderId,
                       color: values.color,
+                      viewMode: values.viewMode,
                     }
                   : item,
               ),

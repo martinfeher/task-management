@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { IoPricetagsOutline } from "react-icons/io5";
+import { LiaTagSolid } from "react-icons/lia";
 import { createLabel } from "@/app/actions/todo";
 import { buildTodoPath } from "@/lib/todo-routes";
 import {
@@ -222,14 +222,14 @@ export function TaskModalFooter({
               setIsMoveMenuOpen(false);
               setIsPriorityMenuOpen((open) => !open);
             }}
-            className="flex size-7 cursor-pointer items-center justify-center rounded-md transition-opacity hover:opacity-80"
+            className="flex h-7 cursor-pointer items-center justify-center rounded-md transition-opacity hover:opacity-80"
           >
             <TaskPriorityFlagIcon
               level={priorityLevel}
               outline={priorityLevel === null}
               className={
                 priorityLevel === null
-                  ? "size-[15px] text-[#a4a4a4]"
+                  ? "size-[15px] !text-[#a4a4a4]"
                   : "size-[15px]"
               }
             />
@@ -259,10 +259,10 @@ export function TaskModalFooter({
               setIsMoveMenuOpen(false);
               setIsLabelMenuOpen((open) => !open);
             }}
-            className="flex size-7 cursor-pointer items-center justify-center rounded-md transition-opacity hover:opacity-80"
+            className="flex h-7 cursor-pointer items-center justify-center rounded-md transition-opacity hover:opacity-80"
           >
-            <IoPricetagsOutline
-              className="size-[15px]"
+            <LiaTagSolid
+              className="size-[18px]"
               style={{ color: MODAL_FOOTER_ACTION_COLOR }}
               aria-hidden="true"
             />

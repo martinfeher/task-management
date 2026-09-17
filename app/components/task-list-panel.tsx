@@ -168,8 +168,32 @@ type TaskDragState = {
 const NEST_SIGNAL_OFFSET_PX = 15;
 const TASK_LIST_DRAG_SOURCE_CLASS = "task-row-list-drag-source";
 const TASK_LIST_DRAG_GHOST_CLASS = "task-row-drag-ghost";
-const TASK_LIST_DROP_INDICATOR_CLASS =
-  "pointer-events-none absolute right-4 z-20 h-[2px] bg-[#00a239]";
+const TASK_LIST_DROP_INDICATOR_COLOR = "#00a239";
+
+function TaskListDropIndicator({
+  top,
+  left,
+}: {
+  top: number;
+  left: number;
+}) {
+  return (
+    <div
+      className="pointer-events-none absolute right-4 z-20 flex items-center"
+      style={{ top, left }}
+    >
+      <div
+        className="size-[7px] shrink-0 rounded-full bg-transparent box-border"
+        style={{ border: `2px solid ${TASK_LIST_DROP_INDICATOR_COLOR}` }}
+        aria-hidden="true"
+      />
+      <div
+        className="h-[2px] flex-1"
+        style={{ backgroundColor: TASK_LIST_DROP_INDICATOR_COLOR }}
+      />
+    </div>
+  );
+}
 
 function getCalendarDropTargetKey(
   target: CalendarExternalDragTarget | null,
@@ -2987,12 +3011,9 @@ export function TaskListPanel({
                 onContextMenu={handleTaskListContextMenu}
               >
                 {dropIndicator?.section === "pinned" && (
-                  <div
-                    className={TASK_LIST_DROP_INDICATOR_CLASS}
-                    style={{
-                      top: dropIndicator.top,
-                      left: 16 + dropIndicator.indent,
-                    }}
+                  <TaskListDropIndicator
+                    top={dropIndicator.top}
+                    left={16 + dropIndicator.indent}
                   />
                 )}
                 {renderTaskItems(pinnedVisibleTasks, "pinned")}
@@ -3010,12 +3031,9 @@ export function TaskListPanel({
             onContextMenu={handleTaskListContextMenu}
           >
             {dropIndicator?.section === "unpinned" && (
-              <div
-                className={TASK_LIST_DROP_INDICATOR_CLASS}
-                style={{
-                  top: dropIndicator.top,
-                  left: 16 + dropIndicator.indent,
-                }}
+              <TaskListDropIndicator
+                top={dropIndicator.top}
+                left={16 + dropIndicator.indent}
               />
             )}
 

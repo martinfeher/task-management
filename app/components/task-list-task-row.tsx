@@ -737,40 +737,42 @@ export function TaskListTaskRow({
                     <RiArrowDropRightLine className="size-[21px] shrink-0 text-[#babbbd] group-hover/subtask-collapse:text-[#8c8c8e]" aria-hidden="true" />
                   )}
                 </button>
-                {!subtasksExpanded ? (
-                  <div
-                    className={`group/subtask-toggle relative${
-                      hasSubtasksWithoutSchedule ? " top-[2px]" : ""
+                <div
+                  className={`group/subtask-toggle relative${
+                    hasSubtasksWithoutSchedule ? " top-[2px]" : ""
+                  }`}
+                >
+                  <button
+                    type="button"
+                    aria-label={
+                      subtasksExpanded ? "Collapse subtasks" : "Show subtasks"
+                    }
+                    aria-expanded={subtasksExpanded}
+                    title="Subtasks"
+                    aria-describedby={`subtask-toggle-tooltip-${task.id}`}
+                    className={`flex mr-[2px] h-[18px] shrink-0 cursor-pointer items-center justify-center rounded border-0 bg-transparent p-0 outline-none transition-colors${
+                      subtasksExpanded ? "-ml-0.5" : "-ml-[9px]!"
                     }`}
+                    style={{ transition: dimTransition }}
+                    onPointerDown={(event) => {
+                      if (event.button !== 0) return;
+                      event.stopPropagation();
+                    }}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onToggleSubtasksExpanded?.();
+                    }}
                   >
-                    <button
-                      type="button"
-                      aria-label="Show subtasks"
-                      aria-expanded={false}
-                      title="Subtasks"
-                      aria-describedby={`subtask-toggle-tooltip-${task.id}`}
-                      className="flex -ml-[9px]! mr-[2px] size-[18px] shrink-0 cursor-pointer items-center justify-center rounded border-0 bg-transparent p-0 outline-none transition-colors"
-                      style={{ transition: dimTransition }}
-                      onPointerDown={(event) => {
-                        if (event.button !== 0) return;
-                        event.stopPropagation();
-                      }}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onToggleSubtasksExpanded?.();
-                      }}
-                    >
-                      <TaskListSubtaskIcon className="  size-[13px] shrink-0 text-[#afafaf] transition-colors group-hover:text-[#767679]" />
-                    </button>
-                    <span
-                      id={`subtask-toggle-tooltip-${task.id}`}
-                      role="tooltip"
-                      className="add-task-date-tooltip pointer-events-none absolute bottom-[calc(100%+10px)] left-1/2 z-40 -translate-x-1/2 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity group-hover/subtask-toggle:opacity-100"
-                    >
-                      Subtasks
-                    </span>
-                  </div>
-                ) : null}
+                    <TaskListSubtaskIcon className="size-[13px] shrink-0 text-[#afafaf] transition-colors group-hover:text-[#767679]" />
+                  </button>
+                  <span
+                    id={`subtask-toggle-tooltip-${task.id}`}
+                    role="tooltip"
+                    className="add-task-date-tooltip pointer-events-none absolute bottom-[calc(100%+10px)] left-1/2 z-40 -translate-x-1/2 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity group-hover/subtask-toggle:opacity-100"
+                  >
+                    Subtasks
+                  </span>
+                </div>
               </>
             ) : null}
             {showDueSchedule && dueScheduleSubline ? (

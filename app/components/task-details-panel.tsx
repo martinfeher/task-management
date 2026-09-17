@@ -3,8 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { BiLink, BiLeftArrowAlt, BiRedo, BiUndo } from "react-icons/bi";
-import { CgFormatText } from "react-icons/cg";
-import { LuCheck, LuCode, LuHeading1, LuHeading2, LuHeading3, LuHistory, LuPilcrow, LuRemoveFormatting, LuX } from "react-icons/lu";
+import { LuCheck, LuCode, LuHeading1, LuHeading2, LuHeading3, LuHistory, LuPilcrow, LuRemoveFormatting, LuType, LuX } from "react-icons/lu";
 import { renameTask, updateTaskDueDate, updateTaskDueTime, updateTaskRecurrence } from "@/app/actions/todo";
 import type { TaskRecurrenceRule } from "@/lib/task-recurrence";
 import { serializeRecurrenceRule } from "@/lib/task-recurrence";
@@ -6333,7 +6332,7 @@ export function TaskDetailsPanel({
                   : "text-zinc-500 hover:bg-zinc-200/80 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
               }`}
             >
-              <CgFormatText className="size-[18px]" aria-hidden="true" />
+              <LuType className="size-[18px]" aria-hidden="true" />
             </button>
 
             {isModalFormatToolbarOpen ? (
@@ -7313,7 +7312,7 @@ export function TaskDetailsPanel({
       />
 
       {isModalLayout && task && modalFooterConfig ? (
-        <footer className="flex shrink-0 items-center justify-between gap-4 border-t border-zinc-100 px-4 py-2.5 dark:border-zinc-800">
+        <footer className="flex shrink-0 items-center justify-between gap-4 border-t border-zinc-100 px-[22px] py-2.5 dark:border-zinc-800">
           <TaskModalFooter taskId={task.id} {...modalFooterConfig} />
           {taskId &&
           saveStatus !== "loading" &&

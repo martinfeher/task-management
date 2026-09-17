@@ -3,6 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { BiChevronLeft, BiChevronRight } from "react-icons/bi";
 import { IoIosSearch } from "react-icons/io";
+import {
+  TbLayoutSidebarRightCollapseFilled,
+  TbLayoutSidebarRightExpandFilled,
+} from "react-icons/tb";
 import { CalendarAddTaskPopover } from "./calendar-add-task-popover";
 import {
   CalendarTaskModal,
@@ -207,6 +211,8 @@ function CalendarViewTabs({
   onSearchQueryChange,
   periodLabelAction,
   headerTrailingAction,
+  sidebarOpen,
+  onSidebarOpenChange,
 }: {
   activeView: CalendarViewTab;
   multiDayCount: number;
@@ -222,6 +228,8 @@ function CalendarViewTabs({
   onSearchQueryChange: (query: string) => void;
   periodLabelAction?: ReactNode;
   headerTrailingAction?: ReactNode;
+  sidebarOpen: boolean;
+  onSidebarOpenChange: (open: boolean) => void;
 }) {
   const tabButtonClassName = (isActive: boolean) =>
     `rounded-full px-3.5 py-1.5 text-[14px] transition-colors hover:bg-[#F1F5F9] cursor-pointer ${
@@ -231,7 +239,7 @@ function CalendarViewTabs({
     }`;
 
   return (
-    <div className={`relative z-40 ${activeView === "month" ? "mb-[26px]" : "mb-2"} grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-4 pl-4 pr-[15px] pt-3`}>
+    <div className={`relative z-40 ${activeView === "month" ? "mb-[26px]" : "mb-2"} grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-4 pl-4 pt-3`}>
       {periodLabel ? (
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-2">
@@ -335,9 +343,9 @@ function CalendarViewTabs({
           );
         })}
       </div>
-      <div className="flex w-full items-center justify-end gap-2 pr-[25px]!">
-        {activeView !== "month" ? (
-          <label className="relative flex h-9 w-full max-w-[220px] items-center rounded-full border border-zinc-200 bg-[#f9f9fa] px-3 dark:border-zinc-700 dark:bg-zinc-900">
+      <div className="flex w-full items-center justify-end gap-2">
+        {activeView !== "month" && sidebarOpen ? (
+          <label className="relative flex h-9 w-full max-w-[210px] items-center rounded-full border border-zinc-200 bg-[#f9f9fa] px-3 dark:border-zinc-700 dark:bg-zinc-900">
             <IoIosSearch
               className="size-4 shrink-0 text-zinc-400 dark:text-zinc-500"
               aria-hidden="true"
@@ -352,6 +360,21 @@ function CalendarViewTabs({
             />
           </label>
         ) : null}
+        <button
+          type="button"
+          aria-label={sidebarOpen ? "Close calendar sidebar" : "Open calendar sidebar"}
+          onClick={() => onSidebarOpenChange(!sidebarOpen)}
+          className="group hidden size-9 min-[1801px]:flex shrink-0 cursor-pointer items-center mb-2 justify-center rounded-full text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+        >
+          {sidebarOpen ? (
+            <TbLayoutSidebarRightCollapseFilled 
+            className="size-5 text-zinc-350"
+            style={{ strokeWidth: 0.1 }}
+             />
+          ) : (
+            <TbLayoutSidebarRightExpandFilled className="size-5 text-zinc-350 group-text-zinc-450 " />
+          )}
+        </button>
         {headerTrailingAction}
       </div>
     </div>
@@ -1072,6 +1095,7 @@ export function CalendarViewsPanel({
     startOfDay(new Date()),
   );
   const [sidebarJumpRequestId, setSidebarJumpRequestId] = useState(0);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
 
   const calendarTaskModalActions = useMemo(
@@ -1253,6 +1277,7 @@ export function CalendarViewsPanel({
         onSaveTaskRecurrence={onSaveTaskRecurrence}
         sidebarPosition={sidebarPosition}
         sidebarMinViewportWidth={sidebarMinViewportWidth}
+        sidebarOpen={sidebarOpen}
       >
         {view}
       </CalendarViewSidebarLayout>
@@ -1284,6 +1309,8 @@ export function CalendarViewsPanel({
         onSearchQueryChange={setSearchQuery}
         periodLabelAction={periodLabelAction}
         headerTrailingAction={headerTrailingAction}
+        sidebarOpen={sidebarOpen}
+        onSidebarOpenChange={setSidebarOpen}
       />
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       {activeView === "month" ? (

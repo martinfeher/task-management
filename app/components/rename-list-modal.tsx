@@ -121,7 +121,7 @@ export function RenameListModal({
           <button
             type="submit"
             disabled={!name.trim()}
-            className="h-[35px] rounded-md bg-zinc-900 px-4 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200 cursor-pointer!"
+            className="h-[35px] rounded-md bg-zinc-500 px-4 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200 cursor-pointer!"
           >
             {confirmLabel}
           </button>

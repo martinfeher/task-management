@@ -660,7 +660,7 @@ export function DetailFormatTextColorDropdown({
       {previewColor && previewContent
         ? createPortal(
             <div
-              className="pointer-events-none fixed z-[300] w-max max-h-[200px] max-w-[min(320px,calc(100vw-16px))] -translate-x-1/2 overflow-y-auto overflow-x-hidden whitespace-pre-wrap break-words rounded-[19px] border border-zinc-200 bg-white px-4 py-2 shadow-md dark:border-zinc-700 dark:bg-zinc-900"
+              className="pointer-events-none fixed z-[300] w-max max-h-[200px] max-w-[min(400px,calc(100vw-16px))] -translate-x-1/2 overflow-y-auto overflow-x-hidden whitespace-pre-wrap break-words rounded-[19px] border border-zinc-200 bg-white px-4 py-2 shadow-md dark:border-zinc-700 dark:bg-zinc-900"
               style={{
                 top: previewPosition.top,
                 left: previewPosition.left,

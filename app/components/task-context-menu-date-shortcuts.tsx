@@ -2,7 +2,7 @@
 
 import { useId, type MouseEvent, type ReactNode } from "react";
 import { BsCalendarPlus } from "react-icons/bs";
-import { CgCalendarNext } from "react-icons/cg";
+import { ImCircleRight } from "react-icons/im";
 import { LuCalendarX2 } from "react-icons/lu";
 import {
   getNextWeekendSaturdayDate,
@@ -142,10 +142,7 @@ export function TaskContextMenuDateShortcuts({
             onSelectDate(getTomorrowDateKey());
           }}
         >
-          <CgCalendarNext 
-            className="text-[#adaeb2]! size-[24px]! mt-px"
-            strokeWidth={0.05}
-          />
+          <ImCircleRight className="text-[#adaeb2]! size-[24px]! mt-px" />
         </DateShortcutButton>
         <DateShortcutButton
           label="Next weekend"

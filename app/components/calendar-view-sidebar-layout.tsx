@@ -51,6 +51,7 @@ type CalendarViewSidebarLayoutProps = {
   onSelectSearchTask?: (task: SearchTask) => void;
   sidebarPosition?: "left" | "right";
   sidebarMinViewportWidth?: number;
+  sidebarOpen?: boolean;
   children: React.ReactNode;
 } & CalendarTaskEditorCallbacks;
 
@@ -285,6 +286,7 @@ export function CalendarViewSidebarLayout({
   onSaveTaskRecurrence,
   sidebarPosition = "right",
   sidebarMinViewportWidth = 1800,
+  sidebarOpen = true,
   children,
 }: CalendarViewSidebarLayoutProps) {
   const [modalTaskId, setModalTaskId] = useState<string | null>(null);
@@ -313,11 +315,11 @@ export function CalendarViewSidebarLayout({
   );
   const isSearching = searchQuery.trim().length > 0;
 
-  const sidebarVisibilityClass = getSidebarVisibilityClass(
-    sidebarMinViewportWidth,
-  );
+  const sidebarVisibilityClass = sidebarOpen
+    ? getSidebarVisibilityClass(sidebarMinViewportWidth)
+    : "hidden";
 
-  const sidebar = (
+  const sidebar = sidebarOpen ? (
     <aside
       className={`${sidebarVisibilityClass} flex min-h-0 w-[260px] shrink-0 flex-col bg-white dark:bg-zinc-950 ${
         sidebarPosition === "left"
@@ -357,7 +359,7 @@ export function CalendarViewSidebarLayout({
         />
       )}
     </aside>
-  );
+  ) : null;
 
   const main = (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">

@@ -2,18 +2,23 @@
 
 import {
   useEffect,
-  useLayoutEffect,
   useRef,
   useState,
   type RefObject,
 } from "react";
+import { createPortal } from "react-dom";
 import { BiListUl } from "react-icons/bi";
 import { LuCheck, LuX } from "react-icons/lu";
+import { formatShortDayMonthYear } from "@/lib/date-format";
+import { formatDueTimeLabel } from "@/lib/task-due-time";
+import { plainTextToTaskDetails } from "@/lib/task-details-content";
 import { TaskMoveToSelector } from "./task-move-to-selector";
 import type { TodoList } from "./todo-app";
-import { plainTextToTaskDetails } from "@/lib/task-details-content";
 
 export { plainTextToTaskDetails };
+
+export const CALENDAR_ADD_TASK_MODAL_WIDTH_PX = 350;
+export const CALENDAR_ADD_TASK_MODAL_HEIGHT_PX = 420;
 
 type CalendarAddTaskPopoverProps = {
   date: Date;
@@ -42,63 +47,20 @@ function toDateKey(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
-function formatPopoverDate(date: Date) {
-  return new Intl.DateTimeFormat(undefined, {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  }).format(date);
-}
-
-function formatPopoverDateTime(date: Date, dueTimeMinutes: number | null) {
-  const today = new Date();
-  const isToday =
-    date.getFullYear() === today.getFullYear() &&
-    date.getMonth() === today.getMonth() &&
-    date.getDate() === today.getDate();
-  const dayLabel = isToday
-    ? "Today"
-    : new Intl.DateTimeFormat(undefined, {
-        weekday: "short",
-      }).format(date);
-  const dateLabel = new Intl.DateTimeFormat(undefined, {
-    day: "numeric",
-    month: "short",
-  }).format(date);
-
-  if (dueTimeMinutes === null || dueTimeMinutes === undefined) {
-    return `${dayLabel}, ${dateLabel}`;
-  }
-
-  const hours = Math.floor(dueTimeMinutes / 60);
-  const minutes = dueTimeMinutes % 60;
-  const timeLabel = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
-
-  return `${dayLabel}, ${dateLabel}, ${timeLabel}`;
-}
-
 export function CalendarAddTaskPopover({
   date,
   dueTimeMinutes = null,
   lists,
   defaultListId,
-  x,
-  y,
-  anchorRef,
   name,
   onNameChange,
   onClose,
   onAddTask,
 }: CalendarAddTaskPopoverProps) {
-  const popoverRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const listButtonRef = useRef<HTMLButtonElement>(null);
   const listMenuRef = useRef<HTMLDivElement>(null);
-  const [position, setPosition] = useState(() => ({
-    left: x ?? 12,
-    top: (y ?? 12) + 8,
-  }));
   const [content, setContent] = useState("");
   const [selectedListId, setSelectedListId] = useState(
     () => defaultListId ?? lists[0]?.id ?? null,
@@ -108,58 +70,17 @@ export function CalendarAddTaskPopover({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const dueDate = toDateKey(date);
-  const heading = formatPopoverDateTime(date, dueTimeMinutes);
+  const dueDateLabel = formatShortDayMonthYear(date);
+  const dueTimeLabel =
+    dueTimeMinutes === null || dueTimeMinutes === undefined
+      ? null
+      : formatDueTimeLabel(dueTimeMinutes);
   const selectedList =
     lists.find((list) => list.id === selectedListId) ?? lists[0] ?? null;
 
-  useLayoutEffect(() => {
-    const popover = popoverRef.current;
-    if (!popover) return;
-
-    const rect = popover.getBoundingClientRect();
-    const padding = 12;
-    const anchor = anchorRef?.current;
-    const anchorGap = 10;
-
-    let left = anchor
-      ? anchor.getBoundingClientRect().right + anchorGap
-      : (x ?? padding);
-    let top = anchor
-      ? anchor.getBoundingClientRect().top
-      : (y ?? padding) + 8;
-
-    if (left + rect.width > window.innerWidth - padding) {
-      if (anchor) {
-        left = Math.max(
-          padding,
-          anchor.getBoundingClientRect().left - rect.width - anchorGap,
-        );
-      } else {
-        left = window.innerWidth - rect.width - padding;
-      }
-    }
-
-    if (top + rect.height > window.innerHeight - padding) {
-      top = Math.max(padding, window.innerHeight - rect.height - padding);
-    }
-
-    left = Math.max(padding, left);
-    top = Math.max(padding, top);
-    setPosition({ left, top });
-  }, [anchorRef, x, y, isListMenuOpen, name, content, dueTimeMinutes]);
-
   useEffect(() => {
-    requestAnimationFrame(() => {
-      nameInputRef.current?.focus();
-    });
-  }, []);
-
-  useEffect(() => {
-    function handlePointerDown(event: MouseEvent) {
-      const target = event.target as Node;
-      if (popoverRef.current?.contains(target)) return;
-      onClose();
-    }
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key !== "Escape") return;
@@ -171,14 +92,19 @@ export function CalendarAddTaskPopover({
       onClose();
     }
 
-    document.addEventListener("mousedown", handlePointerDown);
     document.addEventListener("keydown", handleKeyDown);
 
     return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
+      document.body.style.overflow = previousOverflow;
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [onClose, isListMenuOpen]);
+
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      nameInputRef.current?.focus();
+    });
+  }, []);
 
   useEffect(() => {
     if (!isListMenuOpen) return;
@@ -219,114 +145,152 @@ export function CalendarAddTaskPopover({
     }
   }
 
-  return (
-    <div
-      ref={popoverRef}
-      role="dialog"
-      aria-label={`Add task for ${heading}`}
-      className="calendar-add-task-popover fixed z-50 w-[300px] overflow-visible bg-white dark:bg-zinc-900"
-      style={{ left: position.left, top: position.top }}
-      onClick={(event) => event.stopPropagation()}
-    >
-      <form onSubmit={handleSubmit}>
-        <div className="border-b border-zinc-100 px-4 py-3 dark:border-zinc-800">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <p className="mt-0.5 text-sm font-medium text-zinc-700 dark:text-zinc-200">
-                {dueTimeMinutes === null || dueTimeMinutes === undefined
-                  ? formatPopoverDate(date)
-                  : heading}
-              </p>
-            </div>
+  return createPortal(
+    <div className="fixed inset-0 z-[100] overflow-y-auto px-6 py-6">
+      <button
+        type="button"
+        aria-label="Close add task dialog"
+        className="fixed inset-0 bg-zinc-900/25 backdrop-brightness-[1.1]"
+        onClick={onClose}
+      />
+
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Add task for ${dueDateLabel}${dueTimeLabel ? ` at ${dueTimeLabel}` : ""}`}
+        className="calendar-add-task-popover calendar-task-modal task-details-panel-background relative z-10 mx-auto flex flex-col overflow-hidden bg-white dark:bg-zinc-950"
+        style={{
+          width: CALENDAR_ADD_TASK_MODAL_WIDTH_PX,
+          height: CALENDAR_ADD_TASK_MODAL_HEIGHT_PX,
+        }}
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <form
+          onSubmit={handleSubmit}
+          className="flex min-h-0 flex-1 flex-col"
+        >
+          <div className="absolute right-2 top-2 z-20">
             <button
               type="button"
               aria-label="Close"
               onClick={onClose}
-              className="flex size-7 shrink-0 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+              className="flex size-8 cursor-pointer items-center justify-center rounded-full text-zinc-500 transition-colors hover:bg-zinc-200/80 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
             >
-              <LuX className="size-4" />
+              <LuX className="size-4" aria-hidden="true" />
             </button>
           </div>
-        </div>
 
-        <div className="space-y-3 px-4 py-3">
-          <input
-            ref={nameInputRef}
-            type="text"
-            value={name}
-            onChange={(event) => onNameChange(event.target.value)}
-            placeholder="Task name"
-            aria-label="Task name"
-            className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition-colors focus:border-[#4873c7] dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-50"
-          />
-
-          <textarea
-            value={content}
-            onChange={(event) => setContent(event.target.value)}
-            placeholder="Description"
-            aria-label="Task description"
-            rows={4}
-            className="w-full resize-none rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm leading-relaxed text-zinc-900 outline-none transition-colors focus:border-[#4873c7] dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-50"
-          />
-        </div>
-
-        {selectedList ? (
-          <div className="relative border-t border-zinc-100 dark:border-zinc-800">
-            <button
-              ref={listButtonRef}
-              type="button"
-              aria-label={`Choose list. Currently ${selectedList.name}`}
-              aria-haspopup="dialog"
-              aria-expanded={isListMenuOpen}
-              onClick={(event) => {
-                event.preventDefault();
-                setIsListMenuOpen((open) => !open);
-              }}
-              className="flex w-full items-center gap-2 px-4 py-2.5 text-left transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/60"
-            >
-              <BiListUl className="size-4 shrink-0 text-zinc-400 dark:text-zinc-500" />
-              <span className="truncate text-sm text-zinc-500 dark:text-zinc-400">
-                {selectedList.name}
-              </span>
-            </button>
-
-            {isListMenuOpen ? (
+          <div className="relative flex shrink-0 items-center justify-between overflow-visible px-2.5 pt-[6px] pb-[4px] pr-12">
+            <div className="flex items-center gap-3">
               <div
-                ref={listMenuRef}
-                className="absolute bottom-full left-3 z-10 mb-1"
+                aria-label={
+                  dueTimeLabel
+                    ? `Due ${dueDateLabel} at ${dueTimeLabel}`
+                    : `Due ${dueDateLabel}`
+                }
+                className="flex h-[33px] cursor-default items-center gap-[2px] rounded-full bg-[#eceef0] pl-3.5 pr-3 text-[12px] font-semibold uppercase tracking-wide text-zinc-600 dark:bg-zinc-800 dark:text-zinc-200"
               >
-                <TaskMoveToSelector
-                  lists={lists}
-                  currentListId={selectedListId}
-                  query={listQuery}
-                  onQueryChange={setListQuery}
-                  onSelectList={(listId) => {
-                    setSelectedListId(listId);
-                    setIsListMenuOpen(false);
-                    setListQuery("");
-                  }}
-                  onCancel={() => {
-                    setIsListMenuOpen(false);
-                    setListQuery("");
-                  }}
-                  showCurrentList
-                />
+                <div className="shrink-0 text-[12px] leading-none">Date</div>
+                <div
+                  className={`relative ml-px flex flex-col normal-case tracking-normal ${
+                    dueTimeLabel
+                      ? "h-[17px] items-end justify-center"
+                      : "items-center justify-center"
+                  }`}
+                >
+                  <span className="font-normal text-[#5F5F5F] text-[12px] leading-[12px] dark:text-zinc-300">
+                    {dueDateLabel}
+                  </span>
+                  {dueTimeLabel ? (
+                    <div className="pt-[2px]! font-normal text-[#9f9f9f] text-[7px] leading-[7px]">
+                      {dueTimeLabel}
+                    </div>
+                  ) : null}
+                </div>
               </div>
-            ) : null}
+            </div>
           </div>
-        ) : null}
 
-        <div className="border-t border-zinc-100 px-4 py-3 dark:border-zinc-800">
-          <button
-            type="submit"
-            disabled={!name.trim() || !selectedListId || isSubmitting}
-            className="flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-[#4873c7] text-sm font-medium text-white transition-colors enabled:hover:bg-[#3f68bd] disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <LuCheck className="size-4" aria-hidden="true" />
-            Add task
-          </button>
-        </div>
-      </form>
-    </div>
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 pb-2">
+            <input
+              ref={nameInputRef}
+              type="text"
+              value={name}
+              onChange={(event) => onNameChange(event.target.value)}
+              placeholder="Task name"
+              aria-label="Task name"
+              className="w-full shrink-0 border-0 bg-transparent py-2 text-[26px] font-bold leading-[36px] text-[#4B4B4B] outline-none placeholder:text-zinc-300 dark:text-[#F5F5F5] dark:placeholder:text-zinc-600"
+            />
+
+            <textarea
+              value={content}
+              onChange={(event) => setContent(event.target.value)}
+              placeholder="Description"
+              aria-label="Task description"
+              className="min-h-0 flex-1 resize-none border-0 bg-transparent pt-1 pb-4 text-sm leading-relaxed text-[#555555] outline-none placeholder:text-zinc-400 dark:text-zinc-300 dark:placeholder:text-zinc-600"
+            />
+          </div>
+
+          {selectedList ? (
+            <div className="relative shrink-0 border-t border-zinc-100 dark:border-zinc-800">
+              <button
+                ref={listButtonRef}
+                type="button"
+                aria-label={`Choose list. Currently ${selectedList.name}`}
+                aria-haspopup="dialog"
+                aria-expanded={isListMenuOpen}
+                onClick={(event) => {
+                  event.preventDefault();
+                  setIsListMenuOpen((open) => !open);
+                }}
+                className="flex w-full items-center gap-2 px-4 py-2.5 text-left transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/60"
+              >
+                <BiListUl className="size-4 shrink-0 text-zinc-400 dark:text-zinc-500" />
+                <span className="truncate text-sm text-zinc-500 dark:text-zinc-400">
+                  {selectedList.name}
+                </span>
+              </button>
+
+              {isListMenuOpen ? (
+                <div
+                  ref={listMenuRef}
+                  className="absolute bottom-full left-3 z-10 mb-1"
+                >
+                  <TaskMoveToSelector
+                    lists={lists}
+                    currentListId={selectedListId}
+                    query={listQuery}
+                    onQueryChange={setListQuery}
+                    onSelectList={(listId) => {
+                      setSelectedListId(listId);
+                      setIsListMenuOpen(false);
+                      setListQuery("");
+                    }}
+                    onCancel={() => {
+                      setIsListMenuOpen(false);
+                      setListQuery("");
+                    }}
+                    showCurrentList
+                  />
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          <div className="shrink-0 border-t border-zinc-100 px-4 py-3 dark:border-zinc-800">
+            <button
+              type="submit"
+              disabled={!name.trim() || !selectedListId || isSubmitting}
+              className="flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-[#4873c7] text-sm font-medium text-white transition-colors enabled:hover:bg-[#3f68bd] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <LuCheck className="size-4" aria-hidden="true" />
+              Add task
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>,
+    document.body,
   );
 }
