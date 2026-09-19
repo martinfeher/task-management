@@ -53,7 +53,7 @@ export async function PUT(request: Request) {
 
   try {
     const tasks = await prisma.task.findMany({
-      where: { listId },
+      where: { listId, deletedAt: null },
       select: {
         id: true,
         completed: true,

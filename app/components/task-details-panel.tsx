@@ -1711,6 +1711,8 @@ const TASK_DETAILS_LINE_CONTROLS_GUTTER_PX = 30;
 
 const TASK_DETAILS_EDITOR_MIN_HEIGHT_PX = 500;
 const TASK_DETAILS_EDITOR_BOTTOM_INSET_PX = 30;
+const TASK_DETAILS_EDITOR_MODAL_MAX_HEIGHT_PX = 560;
+const TASK_DETAILS_EDITOR_MODAL_MAX_HEIGHT_VH = 0.6;
 
 function getEditorReservedBelowSpacePx(
   editor: HTMLElement,
@@ -1738,6 +1740,53 @@ function getEditorReservedBelowSpacePx(
   }
 
   return reserved;
+}
+
+function getEditorMaxHeightPx(
+  editor: HTMLElement,
+  panel: HTMLElement | null,
+  isModalLayout: boolean,
+) {
+  const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+  const editorTop = editor.getBoundingClientRect().top;
+  const reservedBelow = getEditorReservedBelowSpacePx(
+    editor,
+    panel,
+    isModalLayout,
+  );
+  const viewportMax = Math.max(
+    TASK_DETAILS_EDITOR_MIN_HEIGHT_PX,
+    viewportHeight - editorTop - reservedBelow,
+  );
+
+  if (!isModalLayout) {
+    return viewportMax;
+  }
+
+  const modalCap = Math.min(
+    viewportHeight * TASK_DETAILS_EDITOR_MODAL_MAX_HEIGHT_VH,
+    TASK_DETAILS_EDITOR_MODAL_MAX_HEIGHT_PX,
+  );
+
+  return Math.max(
+    TASK_DETAILS_EDITOR_MIN_HEIGHT_PX,
+    Math.min(viewportMax, modalCap),
+  );
+}
+
+function scrollActiveLineIntoEditorView(editor: HTMLElement) {
+  const activeLine = getActiveLineElement(editor);
+  if (!activeLine) return;
+
+  const editorRect = editor.getBoundingClientRect();
+  const lineRect = activeLine.getBoundingClientRect();
+  const padding = 8;
+
+  if (lineRect.bottom > editorRect.bottom - padding) {
+    editor.scrollTop += lineRect.bottom - editorRect.bottom + padding;
+  } else if (lineRect.top < editorRect.top + padding) {
+    editor.scrollTop -= editorRect.top - lineRect.top + padding;
+  }
 }
 
 function isPointerInLineControlsGutter(clientX: number, editor: HTMLElement) {
@@ -2833,24 +2882,19 @@ export function TaskDetailsPanel({
 
     editor.style.height = "auto";
     const contentHeight = editor.scrollHeight;
-    const viewportBottom =
-      window.visualViewport?.height ?? window.innerHeight;
-    const editorTop = editor.getBoundingClientRect().top;
-    const reservedBelow = getEditorReservedBelowSpacePx(
-      editor,
-      panel,
-      isModalLayout,
-    );
-    const maxHeight = Math.max(
-      TASK_DETAILS_EDITOR_MIN_HEIGHT_PX,
-      viewportBottom - editorTop - reservedBelow,
-    );
+    const maxHeight = getEditorMaxHeightPx(editor, panel, isModalLayout);
     const nextHeight = Math.max(
       TASK_DETAILS_EDITOR_MIN_HEIGHT_PX,
       Math.min(contentHeight, maxHeight),
     );
 
     editor.style.height = `${nextHeight}px`;
+    editor.style.overflowY =
+      contentHeight > nextHeight + 1 ? "auto" : "hidden";
+
+    if (contentHeight > nextHeight + 1) {
+      scrollActiveLineIntoEditorView(editor);
+    }
   }, [isModalLayout, task]);
 
   const scheduleEditorHeightSync = useCallback(() => {
@@ -3422,9 +3466,11 @@ export function TaskDetailsPanel({
     recordHistorySnapshot();
     requestSave("immediate");
     updateLineControls();
+    scheduleEditorHeightSync();
   }, [
     recordHistorySnapshot,
     requestSave,
+    scheduleEditorHeightSync,
     syncEditorContent,
     syncTitleToTaskList,
     updateLineControls,
@@ -4981,6 +5027,7 @@ export function TaskDetailsPanel({
     recordHistorySnapshot();
     scheduleAutoSave();
     updateLineControls();
+    scheduleEditorHeightSync();
   }
 
   function handleApplySlashLink() {
@@ -5203,6 +5250,10 @@ export function TaskDetailsPanel({
       return;
     }
 
+    if (html.trim()) {
+      event.preventDefault();
+    }
+
     const htmlHasListStructure = /<(ul|ol)\b/i.test(html);
     const htmlHasFormatting = Boolean(html) && pastedHtmlHasFormatting(html);
     const htmlIsDetailLinesClipboard = isDetailLinesClipboardHtml(html);
@@ -5214,7 +5265,6 @@ export function TaskDetailsPanel({
       !htmlHasFormatting &&
       !htmlIsDetailLinesClipboard
     ) {
-      event.preventDefault();
       if (!insertPlainTextAtSelection(editor, plainText, savedPasteRange)) {
         editor.focus();
         if (savedPasteRange) {
@@ -5229,8 +5279,6 @@ export function TaskDetailsPanel({
     }
 
     if (html && plainText && pastedHtmlHasFormatting(html)) {
-      event.preventDefault();
-
       const currentTaskId = taskIdRef.current;
 
       void (async () => {
@@ -5280,7 +5328,6 @@ export function TaskDetailsPanel({
     }
 
     if (html && plainText) {
-      event.preventDefault();
       if (
         !insertHtmlAtSelection(
           editor,
@@ -5645,6 +5692,7 @@ export function TaskDetailsPanel({
     recordHistorySnapshot();
     scheduleAutoSave();
     updateLineControls();
+    scheduleEditorHeightSync();
   }
 
   function handleDragMove(event: PointerEvent) {
@@ -5864,6 +5912,7 @@ export function TaskDetailsPanel({
       recordHistorySnapshot();
       scheduleAutoSave();
       updateLineControls();
+      scheduleEditorHeightSync();
       return;
     }
 
@@ -5878,6 +5927,7 @@ export function TaskDetailsPanel({
         recordHistorySnapshot();
         scheduleAutoSave();
         updateLineControls();
+        scheduleEditorHeightSync();
         return;
       }
     }
@@ -5920,6 +5970,7 @@ export function TaskDetailsPanel({
       recordHistorySnapshot();
       scheduleAutoSave();
       updateLineControls();
+      scheduleEditorHeightSync();
       return;
     }
   }
@@ -6841,7 +6892,7 @@ export function TaskDetailsPanel({
               onKeyDown={handleEditorKeyDown}
               onKeyUp={handleEditorKeyUp}
               onScroll={updateLineControls}
-              className={`task-details-editor w-full resize-none rounded-xl pt-[13px] pl-[30px] pr-3 pb-4! text-[#555555] outline-none transition-colors dark:text-zinc-300 [&_.detail-line[data-line-type=bullet]]:pl-1 [&_.detail-line[data-line-type=checklist]]:cursor-pointer [&_.detail-line[data-line-type=checklist]]:pl-1 [&_.detail-line[data-line-type=h1]]:text-[26px] [&_.detail-line[data-line-type=h1]]:font-bold [&_.detail-line[data-line-type=h1]]:leading-[36px] [&_.detail-line[data-line-type=h1]]:text-[#4B4B4B] dark:[&_.detail-line[data-line-type=h1]]:text-[#F5F5F5] [&_.detail-line[data-line-type=h2]]:text-[23px] [&_.detail-line[data-line-type=h2]]:font-semibold [&_.detail-line[data-line-type=h2]]:leading-[30px] [&_.detail-line[data-line-type=h3]]:text-[19px] [&_.detail-line[data-line-type=h3]]:font-semibold [&_.detail-line[data-line-type=h3]]:leading-[26px] [&_.detail-line[data-line-type=numbered]]:pl-1 [&_mark]:bg-yellow-200 dark:[&_mark]:bg-yellow-300/30 [&_s]:line-through [&_strike]:line-through [&_u]:underline ${
+              className={`task-details-editor w-full resize-none rounded-xl pt-[13px] pl-[30px] pr-3 pb-4! text-[#555555] outline-none transition-colors focus:border-[#7f7f7f] dark:text-zinc-300 [&_.detail-line[data-line-type=bullet]]:pl-1 [&_.detail-line[data-line-type=checklist]]:cursor-pointer [&_.detail-line[data-line-type=checklist]]:pl-1 [&_.detail-line[data-line-type=h1]]:text-[26px] [&_.detail-line[data-line-type=h1]]:font-bold [&_.detail-line[data-line-type=h1]]:leading-[36px] [&_.detail-line[data-line-type=h1]]:text-[#4B4B4B] dark:[&_.detail-line[data-line-type=h1]]:text-[#F5F5F5] [&_.detail-line[data-line-type=h2]]:text-[23px] [&_.detail-line[data-line-type=h2]]:font-semibold [&_.detail-line[data-line-type=h2]]:leading-[30px] [&_.detail-line[data-line-type=h3]]:text-[19px] [&_.detail-line[data-line-type=h3]]:font-semibold [&_.detail-line[data-line-type=h3]]:leading-[26px] [&_.detail-line[data-line-type=numbered]]:pl-1 [&_mark]:bg-yellow-200 dark:[&_mark]:bg-yellow-300/30 [&_s]:line-through [&_strike]:line-through [&_u]:underline ${
                 isModalLayout
                   ? "min-h-0 max-h-[min(60vh,560px)] overflow-auto"
                   : "min-h-[500px] overflow-auto"

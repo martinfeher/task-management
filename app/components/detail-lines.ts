@@ -1591,8 +1591,61 @@ export function resolveBodyPasteTarget(editor: HTMLElement) {
   return { line: activeLine, range: range.cloneRange() };
 }
 
+const INLINE_PASTE_FORMAT_TAGS = new Set([
+  "B",
+  "STRONG",
+  "I",
+  "EM",
+  "U",
+  "S",
+  "STRIKE",
+  "MARK",
+]);
+
+/** Stop HTML paste from inheriting bold/italic at the collapsed caret. */
+function prepareRangeForHtmlPaste(range: Range) {
+  if (!range.collapsed) {
+    return range;
+  }
+
+  const { startContainer, startOffset } = range;
+
+  if (startContainer.nodeType === Node.TEXT_NODE) {
+    const parent = startContainer.parentElement;
+    if (!parent || !INLINE_PASTE_FORMAT_TAGS.has(parent.tagName)) {
+      return range;
+    }
+
+    const text = startContainer.textContent ?? "";
+    if (startOffset > 0 && startOffset < text.length) {
+      const trailing = text.slice(startOffset);
+      startContainer.textContent = text.slice(0, startOffset);
+      const trailingNode = document.createTextNode(trailing);
+      parent.after(trailingNode);
+    }
+
+    const next = document.createRange();
+    next.setStartAfter(parent);
+    next.collapse(true);
+    return next;
+  }
+
+  if (
+    startContainer instanceof HTMLElement &&
+    INLINE_PASTE_FORMAT_TAGS.has(startContainer.tagName)
+  ) {
+    const next = document.createRange();
+    next.setStartAfter(startContainer);
+    next.collapse(true);
+    return next;
+  }
+
+  return range;
+}
+
 function insertHtmlFragmentAtRange(range: Range, html: string) {
-  range.deleteContents();
+  const insertionRange = prepareRangeForHtmlPaste(range);
+  insertionRange.deleteContents();
 
   const temp = document.createElement("div");
   temp.innerHTML = html;
@@ -1602,8 +1655,8 @@ function insertHtmlFragmentAtRange(range: Range, html: string) {
     fragment.appendChild(temp.firstChild);
   }
 
-  range.insertNode(fragment);
-  range.collapse(false);
+  insertionRange.insertNode(fragment);
+  insertionRange.collapse(false);
 }
 
 export function insertTitleLinePaste(editor: HTMLElement, plainText: string) {
@@ -1646,6 +1699,7 @@ function insertLinePartsAtSelection(
   parts: PasteLinePart[],
   pasteId?: string,
   savedRange?: Range | null,
+  useHtmlPasteRange = false,
 ) {
   if (parts.length === 0) return false;
 
@@ -1673,7 +1727,13 @@ function insertLinePartsAtSelection(
   selection.removeAllRanges();
   selection.addRange(target.range);
 
-  const range = target.range;
+  const range = useHtmlPasteRange
+    ? prepareRangeForHtmlPaste(target.range)
+    : target.range;
+  if (useHtmlPasteRange) {
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
   const selectedLines = getFullLinesInRange(editor, range).filter(
     (line) => !isTitleLine(editor, line) && !isCodeLine(line),
   );
@@ -1861,6 +1921,7 @@ export function insertHtmlAtSelection(
     choosePasteLineParts(html, plainText),
     pasteId,
     savedRange,
+    true,
   );
 }
 

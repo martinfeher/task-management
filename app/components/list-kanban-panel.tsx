@@ -61,7 +61,7 @@ const KANBAN_TASK_SCHEDULE_COLOR_CLASS = "ptxt-task-datetime";
 const KANBAN_COLUMN_SURFACE_CLASS =
   "shadow-[0_1px_3px_rgba(15,23,42,0.06),0_2px_10px_rgba(15,23,42,0.08)] dark:shadow-[0_2px_6px_rgba(0,0,0,0.22),0_6px_20px_rgba(0,0,0,0.3)]";
 
-function KanbanTaskLabelDots({
+function KanbanTaskLabelBars({
   labels,
   className = "",
   onOpenLabels,
@@ -86,25 +86,25 @@ function KanbanTaskLabelDots({
         if (event.button !== 0) return;
         event.stopPropagation();
       }}
-      className={`absolute bottom-1.5 right-2 mr-[28px] flex cursor-pointer items-center gap-1 rounded-md border-0 bg-transparent p-0.5 transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.06] ${className}`}
+      className={`flex cursor-pointer items-center gap-1  border-0 bg-transparent p-0 transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.06] ${className}`}
     >
       {labels.map((label) => (
-        <span
+        <div
           key={label.id}
-          className="group/kanban-label-dot relative"
+          className="group/kanban-label-bar relative"
         >
-          <span
-            className="block size-[7px] rounded-full"
+          <div
+            className="block h-[3px] w-6 rounded-full!"
             style={{ backgroundColor: getLabelDotColor(label) }}
             aria-hidden="true"
           />
           <span
             role="tooltip"
-            className="add-task-date-tooltip pointer-events-none absolute bottom-[calc(100%+6px)] right-0 left-auto z-50 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity group-hover/kanban-label-dot:opacity-100 task-context-menu-tooltip-end"
+            className="add-task-date-tooltip pointer-events-none absolute bottom-[calc(100%+6px)] left-0 z-50 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity group-hover/kanban-label-bar:opacity-100"
           >
             {label.label}
           </span>
-        </span>
+        </div>
       ))}
     </button>
   );
@@ -1002,9 +1002,18 @@ export function ListKanbanPanel({
                             }
                           />
                           <div
-                            className={`min-w-0 flex-1 ${hasLabels ? "pr-5" : ""} ${checkedContentDim}`}
+                            className={`relative min-w-0 flex-1 ${checkedContentDim}`}
                             style={{ transition: dimTransition }}
                           >
+                            {hasLabels && !isCompleting ? (
+                              <KanbanTaskLabelBars
+                                labels={task.labels}
+                                className={`absolute -top-[4px] rounded-[6px] left-0 z-[1] ${checkedContentDim}`}
+                                onOpenLabels={(event) =>
+                                  openLabelMenuForTask(task, event.currentTarget)
+                                }
+                              />
+                            ) : null}
                             <span
                               className={`block truncate ${checkedTextStyle}`}
                               style={{ transitionDuration: `${checkedRowDimMs}ms` }}
@@ -1016,7 +1025,7 @@ export function ListKanbanPanel({
                               <div
                                 className={`mt-0.5 inline-flex w-fit max-w-full items-center gap-1 text-[11px] leading-none ${KANBAN_TASK_SCHEDULE_COLOR_CLASS} ${
                                   hideDueDate ? "hidden" : ""
-                                } ${hasLabels ? "pr-4" : ""}`}
+                                }`}
                               >
                                 <IoMdTime
                                   className="size-3 shrink-0"
@@ -1079,15 +1088,6 @@ export function ListKanbanPanel({
                             </div>
                           ) : null}
                         </div>
-                        {hasLabels && !isCompleting ? (
-                          <KanbanTaskLabelDots
-                            labels={task.labels}
-                            className={checkedContentDim}
-                            onOpenLabels={(event) =>
-                              openLabelMenuForTask(task, event.currentTarget)
-                            }
-                          />
-                        ) : null}
                       </article>
                     );
                   })}

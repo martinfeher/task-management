@@ -1507,7 +1507,7 @@ export function TaskDatePicker({
   return (
     <div
       data-task-date-picker-root
-      className={`relative z-50 overflow-visible bg-white ${
+      className={`relative z-50 overflow-visible bg-white border border-zinc-300 dark:border-zinc-700 ${
         className ?? "rounded-2xl border"
       }`}
       style={{
@@ -1641,7 +1641,7 @@ export function TaskDatePicker({
             </button>
           </div>
         </div>
-        <div className="max-h-[220px] overflow-y-auto pb-2">
+        <div className="max-h-[180px] overflow-y-auto pb-2">
           <MonthGrid
             monthDate={viewMonth}
             today={today}

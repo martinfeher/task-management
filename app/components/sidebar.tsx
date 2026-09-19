@@ -695,7 +695,12 @@ export function Sidebar({
 
   function getNavItemClassName(
     isSelected: boolean,
+    isTaskDropTarget = false,
   ) {
+    if (isTaskDropTarget) {
+      return `${itemClassName} sidebar-list-nav-item sidebar-list-item-drop-target bg-blue-100 ring-2 ring-inset ring-blue-400 dark:bg-blue-950/70 dark:ring-blue-500 group ${SIDEBAR_NAV_ITEM_SIZE_CLASS} ptxt-900 dark:ptxt-50`;
+    }
+
     if (isSelected) {
       return `${itemClassName} sidebar-list-nav-item sidebar-list-nav-item-selected group ${SIDEBAR_NAV_ITEM_SIZE_CLASS} font-normal ptxt-950 dark:bg-zinc-800 dark:ptxt-50`;
     }
@@ -1678,12 +1683,19 @@ export function Sidebar({
             (() => {
               const showNavAccentBorder =
                 isNavItemSelected && sidebarHoverPreview === null;
+              const isInboxTaskDropTarget =
+                item.action === "inbox" &&
+                Boolean(inboxListId) &&
+                taskDropHighlightListId === inboxListId;
 
               return (
             <div
               key={item.label}
               role="button"
               tabIndex={0}
+              {...(item.action === "inbox" && inboxListId
+                ? { "data-list-id": inboxListId }
+                : {})}
               onClick={() => {
                 if (item.action === "today") onSelectToday();
                 else if (item.action === "inbox") onSelectInbox();
@@ -1700,7 +1712,7 @@ export function Sidebar({
                 else onSelectCalendar();
                 closeDrawer();
               }}
-              className={`${getNavItemClassName(isNavItemSelected)} relative gap-[8px] px-4 rounded-r-[9px] ${
+              className={`${getNavItemClassName(isNavItemSelected, isInboxTaskDropTarget)} relative gap-[8px] px-4 rounded-r-[9px] ${
                 showNavAccentBorder
                   ? "border-l-[2px] border-l-[#dadfdf]"
                   : "border-l-[2px] border-l-transparent"
@@ -1714,19 +1726,19 @@ export function Sidebar({
                 />
               ) : item.action === "inbox" ? (
                 <LuInbox
-                  className={`size-[15px] shrink-0 ${navIconColor}`}
+                  className={`size-[18px]! shrink-0 ${navIconColor}`}
                   aria-hidden="true"
                   strokeWidth={1}
                 />
               ) : item.action === "important" ? (
                 <LuStar
-                  className={`size-[15px] shrink-0 ${navIconColor}`}
+                  className={`size-[16px] shrink-0 ${navIconColor}`}
                   aria-hidden="true"
                   strokeWidth={1}
                 />
               ) : (
                 <LuCalendarDays
-                  className={`size-[16px] shrink-0 ${navIconColor}`}
+                  className={`size-[16px] mb-[3px] shrink-0 ${navIconColor}`}
                   aria-hidden="true"
                   strokeWidth={1.2}
                 />

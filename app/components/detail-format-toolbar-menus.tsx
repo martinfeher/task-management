@@ -213,8 +213,16 @@ function rgbToHex(r: number, g: number, b: number) {
     .join("")}`;
 }
 
-/** Mix each channel 15% toward white for a brighter ring around text-color swatches. */
-function brightenHexColor(hex: string, amount = 0.15) {
+/** Mix each channel toward white for a brighter ring around text-color swatches. */
+const TEXT_COLOR_SWATCH_BORDER_BRIGHTEN = 0.7;
+const TEXT_COLOR_SWATCH_LETTER_SIZE_CLASS = "text-[15px]";
+const TEXT_COLOR_PREVIEW_FRAME_COLOR = "#B2D7eE";
+// const TEXT_COLOR_PREVIEW_FRAME_COLOR = "#ced0df";
+// const TEXT_COLOR_PREVIEW_FRAME_COLOR = "#c3c5d3";
+// const TEXT_COLOR_PREVIEW_FRAME_COLOR = "#ababb7";
+const TEXT_COLOR_GRID_COLUMNS = 6;
+
+function brightenHexColor(hex: string, amount = TEXT_COLOR_SWATCH_BORDER_BRIGHTEN) {
   const rgb = hexToRgb(hex);
   if (!rgb) return hex;
 
@@ -448,7 +456,7 @@ function TextColorSwatchButton({
   onSelect: () => void;
   onPreviewHover?: (option: DetailTextColorOption) => void;
 }) {
-  const swatchBorderColor = brightenHexColor(option.value, 0.15);
+  const swatchBorderColor = brightenHexColor(option.value);
 
   return (
     <button
@@ -456,7 +464,7 @@ function TextColorSwatchButton({
       role="menuitem"
       aria-label={option.label}
       title={option.label}
-      className={`flex size-7 items-center justify-center rounded-full border-[0.5px] bg-white cursor-pointer text-[15px] font-medium leading-none transition-transform hover:scale-110 dark:bg-zinc-900 ${
+      className={`flex size-7 items-center justify-center rounded-full border-[0.5px] bg-white cursor-pointer ${TEXT_COLOR_SWATCH_LETTER_SIZE_CLASS} font-medium leading-none transition-transform hover:scale-110 dark:bg-zinc-900 ${
         selected
           ? "ring-[1px] ring-zinc-200 ring-offset-1 dark:ring-zinc-700"
           : ""
@@ -600,7 +608,6 @@ export function DetailFormatTextColorDropdown({
               style={{
                 borderColor: brightenHexColor(
                   matchedTextColorOption?.value ?? selectedTextColor,
-                  0.15,
                 ),
               }}
             >
@@ -639,7 +646,12 @@ export function DetailFormatTextColorDropdown({
 
           <section>
             <p className={FORMAT_COLOR_MENU_SECTION_TITLE_CLASS}>Text Color</p>
-            <div className="grid grid-cols-7 gap-1.5">
+            <div
+              className="grid gap-1.5"
+              style={{
+                gridTemplateColumns: `repeat(${TEXT_COLOR_GRID_COLUMNS}, minmax(0, 1fr))`,
+              }}
+            >
               {textColorOptions.map((option) => (
                 <TextColorSwatchButton
                   key={option.value}
@@ -660,11 +672,12 @@ export function DetailFormatTextColorDropdown({
       {previewColor && previewContent
         ? createPortal(
             <div
-              className="pointer-events-none fixed z-[300] w-max max-h-[200px] max-w-[min(400px,calc(100vw-16px))] -translate-x-1/2 overflow-y-auto overflow-x-hidden whitespace-pre-wrap break-words rounded-[19px] border border-zinc-200 bg-white px-4 py-2 shadow-md dark:border-zinc-700 dark:bg-zinc-900"
+              className="pointer-events-none fixed z-[300] w-max max-h-[200px] max-w-[min(400px,calc(100vw-16px))] -translate-x-1/2 overflow-y-auto overflow-x-hidden whitespace-pre-wrap break-words rounded-[19px] border-[3px] bg-white px-4 py-2 shadow-md dark:bg-zinc-900"
               style={{
                 top: previewPosition.top,
                 left: previewPosition.left,
                 color: previewColor,
+                borderColor: TEXT_COLOR_PREVIEW_FRAME_COLOR,
                 fontFamily: previewTypography?.fontFamily,
                 fontSize: `${previewFontSize}px`,
                 lineHeight: previewTypography?.lineHeight,
