@@ -2,8 +2,8 @@
 
 import { useId, type MouseEvent, type ReactNode } from "react";
 import { BsCalendarPlus } from "react-icons/bs";
-import { ImCircleRight } from "react-icons/im";
 import { LuCalendarX2 } from "react-icons/lu";
+import { WiSunset } from "react-icons/wi";
 import {
   getNextWeekendSaturdayDate,
   getNextWeekendSaturdayDateKey,
@@ -12,8 +12,11 @@ import {
 } from "@/lib/task-due-date";
 import { TodayCalendarIcon } from "./today-calendar-icon";
 
+export type TaskContextMenuDateShortcutVariant = "full" | "compact";
+
 type TaskContextMenuDateShortcutsProps = {
   hasDueDate?: boolean;
+  variant?: TaskContextMenuDateShortcutVariant;
   onSelectDate: (dateValue: string) => void;
   onOpenCustomDatePicker: () => void;
   onClearDate?: () => void;
@@ -79,6 +82,7 @@ function DateShortcutButton({
 
 export function TaskContextMenuDateShortcuts({
   hasDueDate = false,
+  variant = "full",
   onSelectDate,
   onOpenCustomDatePicker,
   onClearDate,
@@ -87,11 +91,77 @@ export function TaskContextMenuDateShortcuts({
   const nextWeekendDay = getNextWeekendSaturdayDate().getDate();
   const tooltipBaseId = useId();
 
+  const todayButton = (
+    <DateShortcutButton
+      label="Today"
+      tooltipId={`${tooltipBaseId}-today`}
+      tooltipAlign="start"
+      onClick={(event) => {
+        event.stopPropagation();
+        onSelectDate(getTodayDateKey());
+      }}
+    >
+      <TodayCalendarIcon
+        day={todayDay}
+        strokeWidth={0.8}
+        className="text-[#8b8d92]"
+      />
+    </DateShortcutButton>
+  );
+
+  const tomorrowButton = (
+    <DateShortcutButton
+      label="Tomorrow"
+      tooltipId={`${tooltipBaseId}-tomorrow`}
+      onClick={(event) => {
+        event.stopPropagation();
+        onSelectDate(getTomorrowDateKey());
+      }}
+    >
+      <WiSunset className="text-[#adaeb2]! size-[22px]! mt-px" />
+    </DateShortcutButton>
+  );
+
+  const nextWeekendButton = (
+    <DateShortcutButton
+      label="Next weekend"
+      tooltipId={`${tooltipBaseId}-next-weekend`}
+      stacked
+      onClick={(event) => {
+        event.stopPropagation();
+        onSelectDate(getNextWeekendSaturdayDateKey());
+      }}
+    >
+      <TodayCalendarIcon
+        day={nextWeekendDay}
+        strokeWidth={0.8}
+        className="text-[#8b8d92]"
+      />
+    </DateShortcutButton>
+  );
+
+  const customDateButton = (
+    <DateShortcutButton
+      label="Custom date"
+      tooltipId={`${tooltipBaseId}-custom-date`}
+      tooltipAlign="end"
+      onClick={(event) => {
+        event.stopPropagation();
+        onOpenCustomDatePicker();
+      }}
+    >
+      <BsCalendarPlus
+        className="text-[#acafb4] size-[17px]! mt-[1px]!"
+        strokeWidth={0.5}
+      />
+    </DateShortcutButton>
+  );
+
   return (
     <div className="overflow-visible px-3 pt-[6px]">
       <div className="flex items-center justify-between">
         <div className="text-[11px] font-medium text-zinc-350 dark:text-zinc-500">
-          Date
+          Due date
         </div>
         {hasDueDate ? (
           <div className="group relative cursor-pointer">
@@ -119,60 +189,20 @@ export function TaskContextMenuDateShortcuts({
         ) : null}
       </div>
       <div className="flex min-h-8 items-center justify-between overflow-visible">
-        <DateShortcutButton
-          label="Today"
-          tooltipId={`${tooltipBaseId}-today`}
-          tooltipAlign="start"
-          onClick={(event) => {
-            event.stopPropagation();
-            onSelectDate(getTodayDateKey());
-          }}
-        >
-          <TodayCalendarIcon
-            day={todayDay}
-            strokeWidth={0.8}
-            className="text-[#8b8d92]"
-          />
-        </DateShortcutButton>
-        <DateShortcutButton
-          label="Tomorrow"
-          tooltipId={`${tooltipBaseId}-tomorrow`}
-          onClick={(event) => {
-            event.stopPropagation();
-            onSelectDate(getTomorrowDateKey());
-          }}
-        >
-          <ImCircleRight className="text-[#adaeb2]! size-[24px]! mt-px" />
-        </DateShortcutButton>
-        <DateShortcutButton
-          label="Next weekend"
-          tooltipId={`${tooltipBaseId}-next-weekend`}
-          stacked
-          onClick={(event) => {
-            event.stopPropagation();
-            onSelectDate(getNextWeekendSaturdayDateKey());
-          }}
-        >
-          <TodayCalendarIcon
-            day={nextWeekendDay}
-            strokeWidth={0.8}
-            className="text-[#8b8d92]"
-          />
-        </DateShortcutButton>
-        <DateShortcutButton
-          label="Custom date"
-          tooltipId={`${tooltipBaseId}-custom-date`}
-          tooltipAlign="end"
-          onClick={(event) => {
-            event.stopPropagation();
-            onOpenCustomDatePicker();
-          }}
-        >
-          <BsCalendarPlus
-            className="text-[#acafb4] size-[17px]! mt-[1px]!"
-            strokeWidth={0.5}
-          />
-        </DateShortcutButton>
+        {variant === "full" ? (
+          <>
+            {todayButton}
+            {tomorrowButton}
+            {nextWeekendButton}
+            {customDateButton}
+          </>
+        ) : (
+          <>
+            {customDateButton}
+            {todayButton}
+            {tomorrowButton}
+          </>
+        )}
       </div>
     </div>
   );

@@ -1373,6 +1373,7 @@ const restoredTaskSelect = {
   isNote: true,
   parentId: true,
   listId: true,
+  kanbanColumnId: true,
   tags: {
     include: {
       tag: {
@@ -1405,6 +1406,7 @@ export type DuplicateTaskResult = {
   isNote: boolean;
   parentId: string | null;
   listId: string;
+  kanbanColumnId: string | null;
   labels: { id: string; label: string; color?: string | null }[];
 };
 
@@ -1431,6 +1433,7 @@ export async function duplicateTask(
       isNote: true,
       parentId: true,
       listId: true,
+      kanbanColumnId: true,
       tags: { select: { tagId: true } },
     },
   });
@@ -1464,6 +1467,7 @@ export async function duplicateTask(
         important: existing.important,
         isNote: existing.isNote,
         parentId: existing.parentId,
+        kanbanColumnId: existing.kanbanColumnId,
         position: 0,
         completed: false,
       },
@@ -1507,6 +1511,7 @@ export async function duplicateTask(
     isNote: Boolean(duplicated.isNote),
     parentId: duplicated.parentId ?? null,
     listId: duplicated.listId,
+    kanbanColumnId: duplicated.kanbanColumnId ?? null,
     labels: getLabelsFromTaskTags(duplicated.tags),
   };
 }

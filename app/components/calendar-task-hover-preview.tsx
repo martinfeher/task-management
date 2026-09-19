@@ -24,15 +24,25 @@ import {
   getTaskPriorityShortLabel,
 } from "@/lib/task-priority";
 import {
+  taskDetailsHasContent,
+  taskDetailsToPlainText,
+} from "@/lib/task-details-content";
+import {
+  getLabelColor,
+  getLabelPillClassName,
+  getLabelPillStyle,
+} from "@/lib/label-colors";
+import {
   normalizeDueDurationMinutes,
   normalizeDueTimeMinutes,
 } from "@/lib/task-due-time";
-import { TaskLabelPills } from "./task-label-pills";
 import { useCalendarTaskColorMenu } from "./calendar-task-color-menu";
 import type { TaskListItem } from "./todo-app";
 
 const PREVIEW_WIDTH = 280;
-const PREVIEW_ESTIMATED_HEIGHT = 168;
+const PREVIEW_ESTIMATED_HEIGHT = 200;
+const PREVIEW_SUBTITLE_CLASS =
+  "text-[13px] leading-5 text-zinc-400 dark:text-zinc-500";
 const TASK_GAP = 12;
 const CURSOR_OFFSET_PX = 50;
 const POST_DRAG_HOVER_SUPPRESS_MS = 300;
@@ -117,6 +127,16 @@ function formatCalendarPreviewDate(dueDate: string | null) {
   return `${weekday}, ${formatShortDayMonth(date)}`;
 }
 
+function getTaskPreviewDescriptionLines(details: string, maxLines = 2) {
+  if (!taskDetailsHasContent(details)) return [];
+
+  return taskDetailsToPlainText(details)
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(0, maxLines);
+}
+
 function formatCalendarPreviewTimeRange(
   task: TaskListItem,
   dueTimeMinutes: number | null,
@@ -197,12 +217,28 @@ function CalendarTaskHoverPreviewCard({
   const dateLabel = formatCalendarPreviewDate(dueDate);
   const priorityLabel = getTaskPriorityShortLabel(task.priority);
   const priorityColor = getTaskPriorityColor(task.priority);
+  const descriptionLines = getTaskPreviewDescriptionLines(task.details);
 
   return (
     <div className="flex flex-col gap-2.5 px-3.5 py-3">
-      <p className="line-clamp-2 text-[15px] font-semibold leading-5 text-zinc-900 dark:text-zinc-50">
-        {task.name}
-      </p>
+      <div className="flex flex-col gap-1">
+        <p className="line-clamp-2 text-[15px] font-semibold leading-5 text-zinc-900 dark:text-zinc-50">
+          {task.name}
+        </p>
+
+        {descriptionLines.length > 0 ? (
+          <div className="flex flex-col gap-0.5">
+            {descriptionLines.map((line, index) => (
+              <p
+                key={`${index}-${line}`}
+                className={`line-clamp-1 ${PREVIEW_SUBTITLE_CLASS}`}
+              >
+                {line}
+              </p>
+            ))}
+          </div>
+        ) : null}
+      </div>
 
       <div className="flex flex-col gap-1.5">
         {timeLabel ? (
@@ -238,11 +274,22 @@ function CalendarTaskHoverPreviewCard({
       </div>
 
       {task.labels.length > 0 ? (
-        <TaskLabelPills
-          labels={task.labels}
-          className="flex-wrap"
-          truncateAtPx={null}
-        />
+        <div className="flex min-w-0 flex-wrap items-center gap-1">
+          {task.labels.map((item) => {
+            const palette = getLabelColor(item);
+
+            return (
+              <span
+                key={item.id}
+                className={`${getLabelPillClassName(palette)} inline-block max-w-full truncate`}
+                style={getLabelPillStyle(palette)}
+                title={item.label}
+              >
+                {item.label}
+              </span>
+            );
+          })}
+        </div>
       ) : null}
     </div>
   );

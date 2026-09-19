@@ -232,7 +232,7 @@ function CalendarViewTabs({
   onSidebarOpenChange: (open: boolean) => void;
 }) {
   const tabButtonClassName = (isActive: boolean) =>
-    `rounded-full px-3.5 py-1.5 text-[14px] transition-colors hover:bg-[#F1F5F9] cursor-pointer ${
+    `rounded-full px-3.5 py-1.5 text-[14px] transition-colors hover:bg-[#F2F5F7] cursor-pointer ${
       isActive
         ? "bg-[#e8F2F6] text-zinc-750 dark:bg-zinc-800 dark:text-zinc-50"
         : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
@@ -345,7 +345,7 @@ function CalendarViewTabs({
       </div>
       <div className="flex w-full items-center justify-end gap-2">
         {activeView !== "month" && sidebarOpen ? (
-          <label className="relative flex h-9 w-full max-w-[210px] items-center rounded-full border border-zinc-200 bg-[#f9f9fa] px-3 dark:border-zinc-700 dark:bg-zinc-900">
+          <label className="relative flex h-9 w-full max-w-[210px] items-center rounded-full border border-zinc-200 bg-[#fafafd] px-3 dark:border-zinc-700 dark:bg-zinc-900">
             <IoIosSearch
               className="size-4 shrink-0 text-zinc-400 dark:text-zinc-500"
               aria-hidden="true"

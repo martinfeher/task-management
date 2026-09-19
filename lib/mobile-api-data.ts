@@ -15,10 +15,18 @@ function isDueToday(dueDate: string | null) {
   );
 }
 
+export type SidebarFolderItem = {
+  id: string;
+  name: string;
+  position: number;
+};
+
 export type SidebarListItem = {
   id: string;
   name: string;
   taskCount: number;
+  folderId?: string | null;
+  position?: number;
 };
 
 export type SidebarLabelItem = {
@@ -29,6 +37,7 @@ export type SidebarLabelItem = {
 };
 
 export type SidebarApiResponse = {
+  folders: SidebarFolderItem[];
   lists: SidebarListItem[];
   labels: SidebarLabelItem[];
   counts: {
@@ -233,7 +242,7 @@ export async function getTasksApiData(query: TasksQuery): Promise<TasksApiRespon
 }
 
 export async function getSidebarApiData(): Promise<SidebarApiResponse> {
-  const { lists, labels, tasksByList } = await getTodoData();
+  const { lists, folders, labels, tasksByList } = await getTodoData();
 
   let todayCount = 0;
   let importantCount = 0;
@@ -262,10 +271,17 @@ export async function getSidebarApiData(): Promise<SidebarApiResponse> {
   }
 
   return {
+    folders: folders.map((folder) => ({
+      id: folder.id,
+      name: folder.name,
+      position: folder.position,
+    })),
     lists: lists.map((list) => ({
       id: list.id,
       name: list.name,
       taskCount: taskCountByListId[list.id] ?? 0,
+      folderId: list.folderId ?? null,
+      position: list.position ?? 0,
     })),
     labels: labels.map((label) => ({
       id: label.id,

@@ -49,7 +49,7 @@ import {
   resolveSidebarListFromPoint,
   type SidebarListDragTarget,
 } from "@/lib/sidebar-list-drag";
-import { formatShortDayMonth } from "@/lib/date-format";
+import { formatTaskDueDateLabel } from "@/lib/task-due-date";
 import { openInNewTabFromClick } from "@/lib/open-in-new-tab";
 import { buildTodoPath } from "@/lib/todo-routes";
 import type { TaskPriorityLevel } from "@/lib/task-priority";
@@ -328,37 +328,6 @@ function tryReleasePointerCapture(target: HTMLElement, pointerId: number) {
   } catch {
     // Ignore release failures during teardown.
   }
-}
-
-function startOfDay(date: Date) {
-  const next = new Date(date);
-  next.setHours(12, 0, 0, 0);
-  return next;
-}
-
-function isSameDay(a: Date, b: Date) {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
-}
-
-function formatTaskDueDateLabel(value: string | null) {
-  if (!value) return null;
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-
-  const today = startOfDay(new Date());
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const dueDay = startOfDay(date);
-
-  if (isSameDay(dueDay, today)) return "Today";
-  if (isSameDay(dueDay, tomorrow)) return "Tomorrow";
-
-  return formatShortDayMonth(date);
 }
 
 function getDueDateTimestamp(dueDate: string | null) {
@@ -2823,7 +2792,7 @@ export function TaskListPanel({
                           : ""
                       }`}
                     >
-                      <TaskSetDateIcon className="size-[19px] ptxt-400 group-hover/date-picker:ptxt-600" />
+                      <TaskSetDateIcon className="size-[19px] ptxt-400 group-hover:text-[#767984] " />
                     </button>
                     <span
                       id="add-task-calendar-tooltip"
@@ -2888,7 +2857,7 @@ export function TaskListPanel({
                           : ""
                       }`}
                     >
-                      <LiaTagSolid className="size-4 text-[#acadb2]" />
+                      <LiaTagSolid className="size-4 text-[#acadb2] hover:text-[#767984]" />
                     </button>
                     <span
                       id="add-task-label-tooltip"
@@ -2947,7 +2916,7 @@ export function TaskListPanel({
                       <TaskPriorityFlagIcon
                         level={newTaskPriority}
                         outline={newTaskPriority === null}
-                        className="size-[14px] text-[#a3a3b1]!  ptxt-400! group-hover/add-priority:ptxt-600"
+                        className="size-[14px] text-[#a3a3b1]! hover:text-[#767984]  ptxt-400!"
                       />
                     </button>
                     <span

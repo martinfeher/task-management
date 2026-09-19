@@ -89,6 +89,11 @@ import {
 } from "@/lib/calendar-view-settings";
 import { Sidebar } from "./sidebar";
 import { CalendarPanel, CalendarViewsPanel } from "./calendar-panel";
+import {
+  CalendarTaskModal,
+  getCalendarTaskSnapshot,
+} from "./calendar-task-modal";
+import { CalendarTaskModalActionsProvider } from "./calendar-task-modal-actions";
 import { CalendarShortcutModal } from "./calendar-shortcut-modal";
 import { plainTextToTaskDetails } from "./calendar-add-task-popover";
 import { TaskDetailsPanel, type TaskDetailsSaveController } from "./task-details-panel";
@@ -101,6 +106,7 @@ import {
   deleteKanbanColumn,
   getKanbanColumnsForList,
   moveKanbanTask as moveKanbanTaskInDb,
+  renameKanbanColumn,
   type KanbanColumnRecord,
 } from "@/app/actions/kanban";
 import {
@@ -2259,12 +2265,29 @@ export function TodoApp({
         labels: [],
       };
 
-      setTasksByList((current) => ({
-        ...current,
-        [selectedListId]: [newTask, ...(current[selectedListId] ?? [])],
-      }));
+      const columns = kanbanColumnsByList[selectedListId] ?? [];
+      setTasksByList((current) => {
+        const listTasks = current[selectedListId] ?? [];
+        const targetIndex = listTasks.filter(
+          (task) =>
+            !task.completed &&
+            !task.parentId &&
+            task.kanbanColumnId === columnId,
+        ).length;
+
+        return {
+          ...current,
+          [selectedListId]: rebuildKanbanListTasks(
+            [...listTasks, newTask],
+            columns,
+            newTask.id,
+            columnId,
+            targetIndex,
+          ),
+        };
+      });
     },
-    [selectedListId],
+    [kanbanColumnsByList, selectedListId],
   );
 
   const moveKanbanTask = useCallback(
@@ -2313,6 +2336,139 @@ export function TodoApp({
       }));
     },
     [selectedListId],
+  );
+
+  const renameKanbanColumnById = useCallback(
+    async (columnId: string, name: string) => {
+      if (!selectedListId) return;
+
+      const trimmedName = name.trim();
+      if (!trimmedName) return;
+
+      await renameKanbanColumn(selectedListId, columnId, trimmedName);
+      setKanbanColumnsByList((current) => ({
+        ...current,
+        [selectedListId]: (current[selectedListId] ?? []).map((column) =>
+          column.id === columnId ? { ...column, name: trimmedName } : column,
+        ),
+      }));
+    },
+    [selectedListId],
+  );
+
+  const [kanbanModalTaskId, setKanbanModalTaskId] = useState<string | null>(
+    null,
+  );
+
+  const kanbanModalTasks = useMemo(() => {
+    if (!selectedListId) return [];
+
+    const list = lists.find((item) => item.id === selectedListId);
+    return (tasksByList[selectedListId] ?? []).map((task) => ({
+      ...task,
+      listId: selectedListId,
+      listName: list?.name ?? "",
+    }));
+  }, [lists, selectedListId, tasksByList]);
+
+  const kanbanModalActions = useMemo(
+    () => ({
+      tasks: kanbanModalTasks,
+      lists,
+      labels,
+      onSetTaskPriority: setTaskPriority,
+      onToggleTaskLabel: toggleTaskLabel,
+      onLabelsChanged: refreshLabels,
+      onMoveTaskToList: moveTaskToList,
+      onDeleteTask: deleteTaskById,
+    }),
+    [
+      deleteTaskById,
+      kanbanModalTasks,
+      labels,
+      lists,
+      moveTaskToList,
+      refreshLabels,
+      setTaskPriority,
+      toggleTaskLabel,
+    ],
+  );
+
+  const kanbanModalTaskSnapshot = useMemo(
+    () =>
+      kanbanModalTaskId
+        ? getCalendarTaskSnapshot(kanbanModalTaskId, kanbanModalTasks)
+        : null,
+    [kanbanModalTaskId, kanbanModalTasks],
+  );
+
+  useEffect(() => {
+    setKanbanModalTaskId(null);
+  }, [selectedListId, showKanbanListView]);
+
+  const duplicateKanbanTaskById = useCallback(
+    async (taskId: string) => {
+      if (!selectedListId) return;
+
+      const listTasks = tasksByList[selectedListId] ?? [];
+      const source = listTasks.find((task) => task.id === taskId);
+      if (!source?.kanbanColumnId) {
+        await duplicateTaskById(taskId);
+        return;
+      }
+
+      const columnId = source.kanbanColumnId;
+      const columnTasks = listTasks.filter(
+        (task) =>
+          !task.completed &&
+          !task.parentId &&
+          task.kanbanColumnId === columnId,
+      );
+      const sourceIndex = columnTasks.findIndex((task) => task.id === taskId);
+      const targetIndex =
+        sourceIndex >= 0 ? sourceIndex + 1 : columnTasks.length;
+
+      const duplicated = await duplicateTaskInDb(taskId);
+      const newTask: Task = {
+        id: duplicated.id,
+        name: duplicated.name,
+        completed: duplicated.completed,
+        details: duplicated.details,
+        hasDetails: taskDetailsHasContent(duplicated.details),
+        dueDate: duplicated.dueDate,
+        dueTimeMinutes: duplicated.dueTimeMinutes,
+        dueDurationMinutes: duplicated.dueDurationMinutes,
+        dueTimeZone: duplicated.dueTimeZone,
+        calendarColor: duplicated.calendarColor,
+        recurrenceRule: duplicated.recurrenceRule,
+        priority: duplicated.priority,
+        pinned: duplicated.pinned,
+        important: duplicated.important,
+        isNote: duplicated.isNote,
+        parentId: duplicated.parentId,
+        kanbanColumnId: columnId,
+        labels: duplicated.labels,
+      };
+
+      setTasksByList((current) => ({
+        ...current,
+        [selectedListId]: rebuildKanbanListTasks(
+          [...(current[selectedListId] ?? []), newTask],
+          kanbanColumnsByList[selectedListId] ?? [],
+          newTask.id,
+          columnId,
+          targetIndex,
+        ),
+      }));
+
+      await moveKanbanTaskInDb(
+        selectedListId,
+        newTask.id,
+        columnId,
+        targetIndex,
+      );
+    },
+    [duplicateTaskInDb, kanbanColumnsByList, selectedListId, tasksByList],
   );
 
   async function reorderLists(payload: {
@@ -3241,6 +3397,7 @@ export function TodoApp({
       important: duplicated.important,
       isNote: duplicated.isNote,
       parentId: duplicated.parentId,
+      kanbanColumnId: duplicated.kanbanColumnId ?? null,
       labels: duplicated.labels,
     };
 
@@ -3816,23 +3973,63 @@ export function TodoApp({
             />
           </div>
         ) : showKanbanListView && selectedList ? (
-          <div
-            className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
-            onMouseEnter={commitSidebarHoverSelection}
-          >
-            <ListKanbanPanel
-              list={selectedList}
-              columns={kanbanColumnsByList[selectedList.id] ?? []}
-              tasks={tasksByList[selectedList.id] ?? []}
-              onToggleTask={toggleTask}
-              onAddColumn={addKanbanColumn}
-              onAddTask={addKanbanTask}
-              onMoveTask={moveKanbanTask}
-              onRemoveColumn={removeKanbanColumn}
-              showSidebarMenu={isCompactLayout}
-              onOpenSidebar={() => setSidebarDrawerOpen(true)}
-            />
-          </div>
+          <CalendarTaskModalActionsProvider value={kanbanModalActions}>
+            <div
+              className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+              onMouseEnter={commitSidebarHoverSelection}
+            >
+              <ListKanbanPanel
+                list={selectedList}
+                lists={lists}
+                columns={kanbanColumnsByList[selectedList.id] ?? []}
+                tasks={tasksByList[selectedList.id] ?? []}
+                completingTaskIds={completingTaskIds}
+                completingWithoutBackgroundTaskIds={
+                  completingWithoutBackgroundTaskIds
+                }
+                checkAnimatingTaskIds={checkAnimatingTaskIds}
+                onToggleTask={toggleTask}
+                onOpenTask={(taskId) => {
+                  selectTask(taskId);
+                  setKanbanModalTaskId(taskId);
+                }}
+                onSetTaskDueDate={setTaskDueDate}
+                onSetTaskDueTime={setTaskDueTime}
+                onSetTaskRecurrence={setTaskRecurrence}
+                onSetTaskPriority={setTaskPriority}
+                onToggleTaskLabel={toggleTaskLabel}
+                onLabelsChanged={refreshLabels}
+                onDuplicateTask={duplicateKanbanTaskById}
+                onDeleteTask={async (taskId) => {
+                  await deleteTaskById(taskId);
+                  setKanbanModalTaskId((current) =>
+                    current === taskId ? null : current,
+                  );
+                }}
+                onAddColumn={addKanbanColumn}
+                onAddTask={addKanbanTask}
+                onMoveTask={moveKanbanTask}
+                onRemoveColumn={removeKanbanColumn}
+                onRenameColumn={renameKanbanColumnById}
+                showSidebarMenu={isCompactLayout}
+                onOpenSidebar={() => setSidebarDrawerOpen(true)}
+              />
+            </div>
+            {kanbanModalTaskId ? (
+              <CalendarTaskModal
+                taskId={kanbanModalTaskId}
+                taskSnapshot={kanbanModalTaskSnapshot}
+                onClose={() => setKanbanModalTaskId(null)}
+                onDetailsSaved={handleDetailsSaved}
+                onTaskHasDetailsKnown={handleTaskHasDetailsKnown}
+                onTaskRenamed={handleTaskRenamed}
+                onDueDateUpdated={handleDueDateUpdated}
+                onRecurrenceUpdated={handleRecurrenceUpdated}
+                onSaveTaskRecurrence={setTaskRecurrence}
+                onToggleTask={toggleTask}
+              />
+            ) : null}
+          </CalendarTaskModalActionsProvider>
         ) : showRightPanel ? (
           <div
             ref={splitContainerRef}

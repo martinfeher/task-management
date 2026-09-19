@@ -48,6 +48,33 @@ export async function initializeKanbanBoard(listId: string) {
   return notAssignedColumn;
 }
 
+export async function renameKanbanColumn(
+  listId: string,
+  columnId: string,
+  name: string,
+) {
+  const trimmedName = name.trim();
+  if (!trimmedName) {
+    throw new Error("Column name is required");
+  }
+
+  const column = await prisma.kanbanColumn.findFirst({
+    where: { id: columnId, listId },
+    select: { id: true },
+  });
+
+  if (!column) {
+    throw new Error("Kanban column not found");
+  }
+
+  await prisma.kanbanColumn.update({
+    where: { id: columnId },
+    data: { name: trimmedName },
+  });
+
+  revalidatePath("/");
+}
+
 export async function createKanbanColumn(listId: string, name: string) {
   const trimmedName = name.trim();
   if (!trimmedName) {
@@ -91,9 +118,14 @@ export async function createKanbanTask(
   }
 
   const task = await prisma.$transaction(async (tx) => {
-    await tx.task.updateMany({
-      where: { listId, kanbanColumnId: columnId },
-      data: { position: { increment: 1 } },
+    const aggregate = await tx.task.aggregate({
+      where: {
+        listId,
+        kanbanColumnId: columnId,
+        deletedAt: null,
+        parentId: null,
+      },
+      _max: { position: true },
     });
 
     return tx.task.create({
@@ -101,7 +133,7 @@ export async function createKanbanTask(
         listId,
         kanbanColumnId: columnId,
         name: trimmedName,
-        position: 0,
+        position: (aggregate._max.position ?? -1) + 1,
         important: false,
       },
     });

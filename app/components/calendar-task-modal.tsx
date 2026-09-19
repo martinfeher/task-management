@@ -3,7 +3,6 @@
 import {
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -15,8 +14,8 @@ import {
 } from "./task-details-panel";
 import type { TaskRecurrenceRule } from "@/lib/task-recurrence";
 import {
-  computeCalendarTaskModalStyle,
-  getCalendarTaskModalWidth,
+  CALENDAR_TASK_MODAL_VIEWPORT_PADDING_PX,
+  CALENDAR_TASK_MODAL_WIDTH_PX,
   type CalendarTaskModalAnchorRect,
 } from "@/lib/calendar-task-modal-position";
 import {
@@ -69,7 +68,7 @@ type CalendarTaskModalProps = {
 export function CalendarTaskModal({
   taskId,
   taskSnapshot = null,
-  anchorRect = null,
+  anchorRect: _anchorRect = null,
   onClose,
   onDetailsSaved,
   onTaskHasDetailsKnown,
@@ -80,12 +79,10 @@ export function CalendarTaskModal({
   onToggleTask,
 }: CalendarTaskModalProps) {
   const [focusNoteAtEndRequest, setFocusNoteAtEndRequest] = useState(0);
-  const [viewportWidth, setViewportWidth] = useState<number | null>(null);
   const detailsSaveControllerRef = useRef<TaskDetailsSaveController | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const modalActions = useCalendarTaskModalActions();
   const modalTask = useCalendarTaskModalTask(taskId);
-  const isAnchored = anchorRect !== null;
 
   const registerDetailsSaveController = useCallback(
     (controller: TaskDetailsSaveController | null) => {
@@ -118,6 +115,8 @@ export function CalendarTaskModal({
                   await handleClose();
                 }
               : undefined,
+            showLabelsAfterCopyLink: true,
+            hideDelete: true,
           }
         : null,
     [handleClose, modalActions, modalTask],
@@ -145,43 +144,13 @@ export function CalendarTaskModal({
     };
   }, [handleClose]);
 
-  useLayoutEffect(() => {
-    if (!anchorRect) return;
-
-    function updateViewportWidth() {
-      setViewportWidth(window.innerWidth);
-    }
-
-    updateViewportWidth();
-    window.addEventListener("resize", updateViewportWidth);
-
-    return () => {
-      window.removeEventListener("resize", updateViewportWidth);
-    };
-  }, [anchorRect, taskId]);
-
-  const anchoredStyle = useMemo(() => {
-    if (!anchorRect) return null;
-
-    const measuredWidth = dialogRef.current?.getBoundingClientRect().width;
-    const modalWidth =
-      measuredWidth ||
-      getCalendarTaskModalWidth(viewportWidth ?? window.innerWidth);
-
-    return computeCalendarTaskModalStyle(anchorRect, modalWidth);
-  }, [anchorRect, viewportWidth, taskId]);
-
-  const dialogClassName = isAnchored
-    ? "calendar-task-modal relative z-10 flex min-w-[600px] max-w-4xl flex-col overflow-hidden overflow-y-auto bg-white dark:bg-zinc-950"
-    : "calendar-task-modal relative z-10 mx-auto flex w-full min-w-[600px] max-w-4xl flex-col overflow-hidden bg-white dark:bg-zinc-950";
+  const dialogClassName =
+    "calendar-task-modal relative z-10 flex max-h-[calc(100vh-48px)] flex-col overflow-hidden overflow-y-auto bg-white dark:bg-zinc-950";
 
   return createPortal(
     <div
-      className={
-        isAnchored
-          ? "fixed inset-0 z-[100]"
-          : "fixed inset-0 z-[100] overflow-y-auto px-6 py-6"
-      }
+      className="fixed inset-0 z-[100] flex items-center justify-center"
+      style={{ padding: CALENDAR_TASK_MODAL_VIEWPORT_PADDING_PX }}
     >
       <button
         type="button"
@@ -196,7 +165,7 @@ export function CalendarTaskModal({
         aria-modal="true"
         aria-label="Edit task"
         className={dialogClassName}
-        style={isAnchored ? anchoredStyle ?? undefined : undefined}
+        style={{ width: CALENDAR_TASK_MODAL_WIDTH_PX }}
         onMouseDown={(event) => event.stopPropagation()}
       >
         <div className="flex flex-col">
@@ -215,6 +184,7 @@ export function CalendarTaskModal({
             onToggleTask={onToggleTask}
             onClose={() => void handleClose()}
             modalFooterConfig={modalFooterConfig}
+            hideModalFormatToggle
           />
         </div>
       </div>

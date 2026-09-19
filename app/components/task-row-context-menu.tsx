@@ -8,7 +8,10 @@ import { PiListStarThin, PiNoteThin } from "react-icons/pi";
 import { RiDeleteBinLine } from "react-icons/ri";
 import { LiaTagSolid } from "react-icons/lia";
 import { LuListVideo } from "react-icons/lu";
-import { TaskContextMenuDateShortcuts } from "./task-context-menu-date-shortcuts";
+import {
+  TaskContextMenuDateShortcuts,
+  type TaskContextMenuDateShortcutVariant,
+} from "./task-context-menu-date-shortcuts";
 import { TaskListSubtaskIcon } from "./task-list-subtask-icon";
 import { TaskMoveToSelector } from "./task-move-to-selector";
 import type { Label } from "./task-label-selector";
@@ -56,6 +59,7 @@ type TaskRowContextMenuProps = {
   hasSubtaskActions: boolean;
   hasDuplicateActions: boolean;
   hasDeleteActions: boolean;
+  dateShortcutVariant?: TaskContextMenuDateShortcutVariant;
 };
 
 const menuClassName =
@@ -106,6 +110,7 @@ function MainMenuItems({
   onAddSubtask,
   onDuplicateTask,
   onDeleteTask,
+  dateShortcutVariant = "full",
 }: Pick<
   TaskRowContextMenuProps,
   | "task"
@@ -132,6 +137,7 @@ function MainMenuItems({
   | "onAddSubtask"
   | "onDuplicateTask"
   | "onDeleteTask"
+  | "dateShortcutVariant"
 > & {
   onMoveMouseEnter?: () => void;
   onMoveMouseLeave?: () => void;
@@ -158,6 +164,7 @@ function MainMenuItems({
       {hasDueDateActions ? (
         <TaskContextMenuDateShortcuts
           hasDueDate={Boolean(task.dueDate)}
+          variant={dateShortcutVariant}
           onSelectDate={(dateValue) => {
             onSetTaskDueDate(dateValue);
             onClose();
@@ -369,6 +376,7 @@ export function TaskRowContextMenu({
   hasSubtaskActions,
   hasDuplicateActions,
   hasDeleteActions,
+  dateShortcutVariant = "full",
 }: TaskRowContextMenuProps) {
   const [isMoveHoverPreviewOpen, setIsMoveHoverPreviewOpen] = useState(false);
   const moveHoverCloseTimerRef = useRef<number | null>(null);
@@ -441,6 +449,7 @@ export function TaskRowContextMenu({
     onAddSubtask,
     onDuplicateTask,
     onDeleteTask,
+    dateShortcutVariant,
   };
 
   const menu = (

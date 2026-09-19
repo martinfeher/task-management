@@ -190,15 +190,15 @@ export function EditListModal({
 
           <div>
             <p className="mb-2 text-sm text-zinc-500 dark:text-zinc-400">View</p>
-            <div className="flex gap-2 w-[260px]">
+            <div className="flex gap-2 w-[220px]">
               <button
                 type="button"
                 aria-pressed={viewMode === "stack"}
                 onClick={() => setViewMode("stack")}
-                className={`h-[35px] flex-1 rounded-md border px-3 text-sm transition-colors cursor-pointer ${
+                className={`h-[33px] flex-1 rounded-md border px-3 text-sm transition-colors cursor-pointer ${
                   viewMode === "stack"
                     ? "border-zinc-600 bg-zinc-500 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
-                    : "border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900"
+                    : "border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900"
                 }`}
               >
                 Task stack
@@ -207,10 +207,10 @@ export function EditListModal({
                 type="button"
                 aria-pressed={viewMode === "kanban"}
                 onClick={() => setViewMode("kanban")}
-                className={`h-[35px] flex-1 rounded-md border px-3 text-sm transition-colors cursor-pointer ${
+                className={`h-[33px] flex-1 rounded-md border px-3 text-sm transition-colors cursor-pointer ${
                   viewMode === "kanban"
-                    ? "border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
-                    : "border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900"
+                    ? "border-zinc-900 bg-zinc-700 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
+                    : "border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900"
                 }`}
               >
                 Kanban

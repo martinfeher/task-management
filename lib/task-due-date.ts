@@ -1,3 +1,5 @@
+import { formatShortDayMonth } from "@/lib/date-format";
+
 export function startOfLocalDay(date: Date = new Date()) {
   const next = new Date(date);
   next.setHours(12, 0, 0, 0);
@@ -47,4 +49,52 @@ export function isDueDateToday(dueDate: string | null | undefined) {
   if (Number.isNaN(date.getTime())) return false;
 
   return toDateKey(startOfLocalDay(date)) === getTodayDateKey();
+}
+
+function isSameLocalDay(a: Date, b: Date) {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+export function formatTaskDueDateLabel(value: string | null) {
+  if (!value) return null;
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+
+  const today = startOfLocalDay(new Date());
+  const tomorrow = addDays(today, 1);
+  const dueDay = startOfLocalDay(date);
+
+  if (isSameLocalDay(dueDay, today)) return "Today";
+  if (isSameLocalDay(dueDay, tomorrow)) return "Tomorrow";
+
+  return formatShortDayMonth(date);
+}
+
+function formatTaskDueWeekdayLabel(dueDate: string) {
+  const date = new Date(dueDate);
+  if (Number.isNaN(date.getTime())) return null;
+
+  return new Intl.DateTimeFormat(undefined, { weekday: "long" }).format(date);
+}
+
+export function formatTaskListScheduleSubline(
+  dueDate: string | null,
+  dueTimeLabel: string | null,
+  dueDateLabel: string | null,
+) {
+  if (dueTimeLabel) {
+    if (!dueDate || isDueDateToday(dueDate)) {
+      return dueTimeLabel;
+    }
+
+    const weekdayLabel = formatTaskDueWeekdayLabel(dueDate);
+    return weekdayLabel ? `${weekdayLabel} ${dueTimeLabel}` : dueTimeLabel;
+  }
+
+  return dueDateLabel;
 }

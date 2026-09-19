@@ -26,6 +26,7 @@ import { TaskPriorityPill } from "./task-priority-pill";
 import { PiDotsThreeBold } from "react-icons/pi";
 import { CiStickyNote } from "react-icons/ci";
 import { BiAlarm, BiCalendar, BiRevision } from "react-icons/bi";
+import { IoMdTime } from "react-icons/io";
 import { MdKeyboardArrowDown } from "react-icons/md";
 import { RiArrowDropRightLine } from "react-icons/ri";
 import { TaskListSubtaskIcon } from "./task-list-subtask-icon";
@@ -38,7 +39,7 @@ import {
   normalizeDueTimeMinutes,
 } from "@/lib/task-due-time";
 import { SUBTASK_INDENT_PX, SUBTASK_ICON_INDENT_PX } from "@/lib/task-subtasks";
-import { isDueDateToday } from "@/lib/task-due-date";
+import { formatTaskListScheduleSubline } from "@/lib/task-due-date";
 
 type TaskListTaskRowProps = {
   task: TaskListItem;
@@ -156,30 +157,6 @@ const TASK_ROW_SCHEDULE_COLOR_CLASS =
   // "ptxt-400 group-hover:text-[#8f8d93]";
 const TASK_ROW_SCHEDULE_TRANSITION_CLASS =
   "transition-colors duration-200 ease-in-out";
-
-function formatTaskDueWeekdayLabel(dueDate: string) {
-  const date = new Date(dueDate);
-  if (Number.isNaN(date.getTime())) return null;
-
-  return new Intl.DateTimeFormat(undefined, { weekday: "long" }).format(date);
-}
-
-function formatTaskListScheduleSubline(
-  dueDate: string | null,
-  dueTimeLabel: string | null,
-  dueDateLabel: string | null,
-) {
-  if (dueTimeLabel) {
-    if (!dueDate || isDueDateToday(dueDate)) {
-      return dueTimeLabel;
-    }
-
-    const weekdayLabel = formatTaskDueWeekdayLabel(dueDate);
-    return weekdayLabel ? `${weekdayLabel} ${dueTimeLabel}` : dueTimeLabel;
-  }
-
-  return dueDateLabel;
-}
 
 export function getTaskListItemDividerClass(task: {
   isNote: boolean;
@@ -629,7 +606,8 @@ export function TaskListTaskRow({
         >
           <CiStickyNote
             aria-hidden="true"
-            className="shrink-0 size-[20px] -ml-[1.5px] text-[#8d8d9c]"
+            className="shrink-0 size-[20px] -ml-[1.5px] text-[#818188]"
+            // className="shrink-0 size-[20px] -ml-[1.5px] text-[#8d8d9c]"
             style={{ transform: "scaleX(0.785)" }}
             // strokeWidth={0.01}
           />
@@ -794,7 +772,7 @@ export function TaskListTaskRow({
                   onClick={(event) => event.stopPropagation()}
                   data-task-date-picker-trigger
                 >
-                  <BiCalendar
+                  <IoMdTime
                     className="size-3 shrink-0"
                     aria-hidden="true"
                   />
@@ -805,7 +783,7 @@ export function TaskListTaskRow({
                   className={`group/schedule flex min-w-0 items-center gap-1 text-[11px] leading-none ${TASK_ROW_SCHEDULE_COLOR_CLASS} ${TASK_ROW_SCHEDULE_TRANSITION_CLASS}`}
                   style={{ transition: dimTransition }}
                 >
-                  <BiCalendar
+                  <IoMdTime
                     className="size-3 shrink-0"
                     aria-hidden="true"
                   />

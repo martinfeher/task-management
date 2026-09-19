@@ -212,6 +212,11 @@ const SIDEBAR_ROW_COUNT_STATIC_CLASS =
 const SIDEBAR_CALENDAR_SHORTCUT_CLASS =
   "pointer-events-none absolute right-[var(--sidebar-row-trailing-inset)] top-1/2 flex -translate-y-1/2 items-center gap-0.5 text-[8px] font-medium leading-none text-[#c8c8c8]";
 
+const SIDEBAR_NAV_ITEM_SIZE_CLASS =
+  "h-[36px] min-h-[36px] max-h-[36px] shrink-0";
+
+const SIDEBAR_FOLDER_ICON_SELECTED_COLOR = "#8f8fa0";
+
 const SIDEBAR_ROW_MENU_WRAPPER_CLASS =
   "absolute right-[var(--sidebar-row-trailing-inset)] top-1/2 -translate-y-1/2";
 
@@ -237,7 +242,7 @@ const completedItemClassName =
 
 function getItemClassName(isSelected: boolean, baseClassName = itemClassName) {
   const heightClass =
-    baseClassName === completedItemClassName ? "" : "h-[35px]";
+    baseClassName === completedItemClassName ? "" : SIDEBAR_NAV_ITEM_SIZE_CLASS;
 
   return `${baseClassName} ${heightClass} ${
     isSelected
@@ -660,14 +665,42 @@ export function Sidebar({
     return "sidebar-list-item";
   }
 
+  function isFolderContainingSelectedList(folderId: string) {
+    if (!selectedListId || selectedListId === suppressListSelectionHighlightId) {
+      return false;
+    }
+
+    const selectedList = orderedLists.find((list) => list.id === selectedListId);
+    if (!selectedList || selectedList.folderId !== folderId) {
+      return false;
+    }
+
+    return isListSelected(selectedListId);
+  }
+
+  function getFolderIconProps(folderId: string) {
+    if (isFolderContainingSelectedList(folderId)) {
+      return {
+        className: "size-[15px] mb-[1px] mr-1 shrink-0",
+        style: { color: SIDEBAR_FOLDER_ICON_SELECTED_COLOR },
+      };
+    }
+
+    return {
+      className:
+        "size-[15px] mb-[1px] mr-1 shrink-0 text-[#acadb7] group-hover:text-[#9191af]",
+      style: undefined,
+    };
+  }
+
   function getNavItemClassName(
     isSelected: boolean,
   ) {
     if (isSelected) {
-      return `${itemClassName} sidebar-list-nav-item sidebar-list-nav-item-selected group h-[35px] font-normal ptxt-950 dark:bg-zinc-800 dark:ptxt-50`;
+      return `${itemClassName} sidebar-list-nav-item sidebar-list-nav-item-selected group ${SIDEBAR_NAV_ITEM_SIZE_CLASS} font-normal ptxt-950 dark:bg-zinc-800 dark:ptxt-50`;
     }
 
-    return `${itemClassName} sidebar-list-nav-item group h-[35px] ptxt-900 dark:ptxt-50`;
+    return `${itemClassName} sidebar-list-nav-item group ${SIDEBAR_NAV_ITEM_SIZE_CLASS} ptxt-900 dark:ptxt-50`;
   }
 
   function closeListMenu() {
@@ -1464,6 +1497,7 @@ export function Sidebar({
   }
 
   function renderListRow(list: TodoList, nested = false) {
+    const listTitleTextClass = nested ? "text-[#676a6f] " : "ptxt-list-items";
     const isNameHovered =
       sidebarHoverPreview?.kind === "list" &&
       sidebarHoverPreview.listId === list.id;
@@ -1545,11 +1579,11 @@ export function Sidebar({
               onBlur={() => commitListNameEdit(list)}
               onKeyDown={(event) => handleListNameKeyDown(event, list)}
               aria-label={`Rename ${list.name}`}
-              className="min-w-0 w-full bg-transparent text-sm ptxt-list-items outline-none cursor-text"
+              className={`min-w-0 w-full bg-transparent text-sm ${listTitleTextClass} outline-none cursor-text`}
             />
           ) : (
             <span
-              className="block truncate text-sm ptxt-list-items"
+              className={`block truncate hover:text-zinc-700 text-sm ${listTitleTextClass}`}
               onDoubleClick={(event) => {
                 event.stopPropagation();
                 startListNameEdit(list);
@@ -1739,8 +1773,8 @@ export function Sidebar({
               }
               className={
                 item.action === "search"
-                  ? "ml-[14px] my-2 flex py-[3px] h-[35px]! w-auto bg-[#fcfbff] cursor-pointer items-center gap-2 self-stretch rounded-[7px] border border-[#e3e3e9] py-0 pl-[8px] pr-[3px] text-left text-sm ptxt-list-search transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
-                  : `${getItemClassName(isNavItemSelected)} gap-1 px-4 h-[35px]!`
+                  ? `ml-[14px] my-2 flex w-auto bg-[#fcfbff] cursor-pointer items-center gap-2 self-stretch rounded-[7px] border border-[#e3e3e9] py-0 pl-[8px] pr-[3px] text-left text-sm ptxt-list-search transition-colors hover:bg-slate-50 dark:hover:bg-zinc-800/60 ${SIDEBAR_NAV_ITEM_SIZE_CLASS}`
+                  : `${getItemClassName(isNavItemSelected)} gap-1 px-4`
               }
             >
               {item.action === "search" ? (
@@ -1756,7 +1790,7 @@ export function Sidebar({
                   aria-hidden="true"
                 >
                   <div className="flex items-center gap-px text-zinc-400/80">
-                    <MacCmdIcon className="size-[9px] shrink-0 mt-[2px]" />
+                    <MacCmdIcon className="size-[9px] shrink-0" />
                     <span className="text-[10px] font-bold leading-none text-zinc-400/80">
                       +K
                     </span>
@@ -1839,12 +1873,12 @@ export function Sidebar({
                   >
                     {isExpanded ? (
                       <BsFolder2Open
-                        className="size-[15px] mb-[1px] mr-1 shrink-0 text-[#acadb7] group-hover:text-[#9191af]"
+                        {...getFolderIconProps(folder.id)}
                         aria-hidden="true"
                       />
                     ) : (
                       <LuFolder
-                        className="size-[15px] mb-[1px] mr-1 shrink-0 text-[#acadb7] group-hover:text-[#9191af]"
+                        {...getFolderIconProps(folder.id)}
                         aria-hidden="true"
                       />
                     )}
@@ -1853,7 +1887,7 @@ export function Sidebar({
                         {folder.name}
                       </span>
                       <BiChevronDown
-                        className={`size-4 shrink-0 text-[#acadb7] mb-[1px] ml-1 transition-transform duration-200 ${
+                        className={`size-4 shrink-0 text-[#acadb7] group-hover:text-[#8f9097] mb-[1px] ml-1 transition-transform duration-200 ${
                           showChevronOpen ? "" : "-rotate-90"
                         }`}
                         aria-hidden="true"
@@ -1897,7 +1931,7 @@ export function Sidebar({
                 aria-expanded={isBottomAddMenuOpen}
                 aria-label="Add list or folder"
                 onClick={() => setIsBottomAddMenuOpen((open) => !open)}
-                className="flex ml-[2px] cursor-pointer items-center -mt-[10px] px-3 py-2 text-left text-[13px] text-[#afafaf] transition-colors hover:text-[#77797e] dark:hover:text-zinc-300"
+                className="flex ml-[2px] cursor-pointer items-center -mt-[10px] px-3 pb-2 py-[5px]! mt-[1px] text-left text-[13px] rounded-full hover:bg-[#f3f3f7] hover:border-[#e7e7e7] text-[#afafaf] hover:text-[#535569] dark:hover:text-zinc-300 transition duration-300"
               >
                 <div className="text-[15px] mr-[5px] mb-[3px] leading-none" aria-hidden="true">
                   +

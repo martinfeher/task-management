@@ -8,6 +8,7 @@ import {
   isTaskPriorityLevel,
   type TaskPriorityLevel,
 } from "@/lib/task-priority";
+import { TaskLabelPills } from "./task-label-pills";
 import { TaskLabelSelector, type Label } from "./task-label-selector";
 import { TaskMoveToSelector } from "./task-move-to-selector";
 import { TaskPriorityFlagIcon } from "./task-priority-icon";
@@ -36,6 +37,8 @@ type TaskModalFooterProps = {
     targetListId: string,
   ) => void;
   onDeleteTask?: (taskId: string) => void | Promise<void>;
+  showLabelsAfterCopyLink?: boolean;
+  hideDelete?: boolean;
 };
 
 function FooterTextButton({
@@ -72,6 +75,8 @@ export function TaskModalFooter({
   onLabelsChanged,
   onMoveTaskToList,
   onDeleteTask,
+  showLabelsAfterCopyLink = false,
+  hideDelete = false,
 }: TaskModalFooterProps) {
   const [isPriorityMenuOpen, setIsPriorityMenuOpen] = useState(false);
   const [isLabelMenuOpen, setIsLabelMenuOpen] = useState(false);
@@ -88,7 +93,9 @@ export function TaskModalFooter({
   const hasPriorityActions = Boolean(onSetTaskPriority);
   const hasLabelActions = Boolean(onToggleTaskLabel);
   const hasMoveActions = Boolean(onMoveTaskToList && listId);
-  const hasDeleteActions = Boolean(onDeleteTask);
+  const hasDeleteActions = Boolean(onDeleteTask) && !hideDelete;
+  const showLabelControlInline = hasLabelActions && !showLabelsAfterCopyLink;
+  const showLabelControlAfterCopyLink = hasLabelActions && showLabelsAfterCopyLink;
 
   const sortedLabels = useMemo(
     () =>
@@ -208,6 +215,75 @@ export function TaskModalFooter({
     closeMenus();
   }
 
+  function openLabelMenu() {
+    setIsPriorityMenuOpen(false);
+    setIsMoveMenuOpen(false);
+    setIsLabelMenuOpen((open) => !open);
+  }
+
+  const assignedLabels = useMemo(
+    () => sortedLabels.filter((item) => assignedLabelIds.includes(item.id)),
+    [assignedLabelIds, sortedLabels],
+  );
+
+  function renderLabelMenu(anchorClassName: string) {
+    if (!hasLabelActions) return null;
+
+    return (
+      <div className={`relative shrink-0 ${anchorClassName}`}>
+        {showLabelsAfterCopyLink ? (
+          assignedLabels.length > 0 ? (
+            <TaskLabelPills
+              labels={assignedLabels}
+              truncateAtPx={null}
+              className="px-1 py-0.5"
+              onClick={(event) => {
+                event.stopPropagation();
+                openLabelMenu();
+              }}
+            />
+          ) : (
+            <FooterTextButton ariaLabel="Labels" onClick={openLabelMenu}>
+              Labels
+            </FooterTextButton>
+          )
+        ) : (
+          <button
+            type="button"
+            aria-label="Label"
+            aria-haspopup="dialog"
+            aria-expanded={isLabelMenuOpen}
+            onClick={openLabelMenu}
+            className="flex h-7 cursor-pointer items-center justify-center rounded-md transition-opacity hover:opacity-80"
+          >
+            <LiaTagSolid
+              className="size-[18px]"
+              style={{ color: MODAL_FOOTER_ACTION_COLOR }}
+              aria-hidden="true"
+            />
+          </button>
+        )}
+
+        {isLabelMenuOpen ? (
+          <div className="absolute bottom-full left-0 z-50 mb-1 w-[240px] overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+            <TaskLabelSelector
+              labels={sortedLabels}
+              assignedLabelIds={assignedLabelIds}
+              query={labelQuery}
+              isSubmitting={isLabelSubmitting}
+              onQueryChange={setLabelQuery}
+              onToggleLabel={(labelId) => void handleToggleLabel(labelId)}
+              onCreateLabel={(label, color) =>
+                void handleCreateLabel(label, color)
+              }
+              onCancel={() => setIsLabelMenuOpen(false)}
+            />
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <div ref={footerRef} className="flex min-w-0 flex-1 items-center gap-4">
       {hasPriorityActions ? (
@@ -247,45 +323,7 @@ export function TaskModalFooter({
         </div>
       ) : null}
 
-      {hasLabelActions ? (
-        <div className="relative shrink-0">
-          <button
-            type="button"
-            aria-label="Label"
-            aria-haspopup="dialog"
-            aria-expanded={isLabelMenuOpen}
-            onClick={() => {
-              setIsPriorityMenuOpen(false);
-              setIsMoveMenuOpen(false);
-              setIsLabelMenuOpen((open) => !open);
-            }}
-            className="flex h-7 cursor-pointer items-center justify-center rounded-md transition-opacity hover:opacity-80"
-          >
-            <LiaTagSolid
-              className="size-[18px]"
-              style={{ color: MODAL_FOOTER_ACTION_COLOR }}
-              aria-hidden="true"
-            />
-          </button>
-
-          {isLabelMenuOpen ? (
-            <div className="absolute bottom-full left-0 z-50 mb-1 w-[240px] overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
-              <TaskLabelSelector
-                labels={sortedLabels}
-                assignedLabelIds={assignedLabelIds}
-                query={labelQuery}
-                isSubmitting={isLabelSubmitting}
-                onQueryChange={setLabelQuery}
-                onToggleLabel={(labelId) => void handleToggleLabel(labelId)}
-                onCreateLabel={(label, color) =>
-                  void handleCreateLabel(label, color)
-                }
-                onCancel={() => setIsLabelMenuOpen(false)}
-              />
-            </div>
-          ) : null}
-        </div>
-      ) : null}
+      {showLabelControlInline ? renderLabelMenu("") : null}
 
       {hasMoveActions ? (
         <div className="relative shrink-0">
@@ -318,6 +356,10 @@ export function TaskModalFooter({
       <FooterTextButton ariaLabel="Copy task link" onClick={() => void handleCopyLink()}>
         {copyLinkMessage ?? "Copy link"}
       </FooterTextButton>
+
+      {showLabelControlAfterCopyLink
+        ? renderLabelMenu("min-w-0 max-w-[min(240px,40vw)]")
+        : null}
 
       {hasDeleteActions ? (
         <FooterTextButton ariaLabel="Delete task" onClick={handleDelete}>

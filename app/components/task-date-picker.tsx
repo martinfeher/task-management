@@ -1609,7 +1609,6 @@ export function TaskDatePicker({
           );
         })}
       </div>
-
       <div className="border-t border-zinc-200 dark:border-zinc-700">
         <div className="flex items-center justify-between px-[11px] py-[6px]">
           <h4 className="text-sm font-semibold text-zinc-750 dark:text-zinc-50">
@@ -1642,7 +1641,6 @@ export function TaskDatePicker({
             </button>
           </div>
         </div>
-
         <div className="max-h-[220px] overflow-y-auto pb-2">
           <MonthGrid
             monthDate={viewMonth}
@@ -1662,7 +1660,6 @@ export function TaskDatePicker({
           />
         </div>
       </div>
-
       <div
         className="space-y-3 border-t p-3"
         style={{ borderColor: PICKER_BORDER }}
@@ -1732,7 +1729,6 @@ export function TaskDatePicker({
           }}
         />
       </div>
-
       <div
         className="flex items-center justify-between border-t px-4 py-2.5"
         style={{ borderColor: PICKER_BORDER }}

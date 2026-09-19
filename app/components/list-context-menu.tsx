@@ -4,6 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { RefObject } from "react";
 import { BiChevronRight } from "react-icons/bi";
+import { CiFolderOn } from "react-icons/ci";
+import { RiAiGenerateText, RiDeleteBinLine, RiEditLine } from "react-icons/ri";
+import { VscRename } from "react-icons/vsc";
 
 export type ListContextMenuPosition = {
   top: number;
@@ -31,7 +34,7 @@ const MENU_WIDTH = 176;
 const MENU_HEIGHT = 155;
 
 const menuItemClassName =
-  "flex h-[35px] w-full items-center px-3 text-left text-sm ptxt-900 hover:bg-zinc-100 dark:ptxt-50 dark:hover:bg-zinc-800";
+  "flex h-[35px] w-full items-center px-3 text-left text-sm text-zinc-700 hover:bg-zinc-100 dark:ptxt-50 dark:hover:bg-zinc-800";
 
 export function clampListContextMenuPosition(
   top: number,
@@ -115,21 +118,30 @@ export function ListContextMenu({
           setIsMoveSubmenuOpen(false);
         }}
       >
-        <div className="sidebar-context-menu w-36 py-1">
+        <div className="sidebar-context-menu w-[155px] pt-1.5 pb-0.5 px-1.5 z-1000">
           <button
             type="button"
             role="menuitem"
-            className={menuItemClassName}
+            className={`${menuItemClassName} group rounded-[7px] cursor-pointer gap-2.5`}
             onClick={onEdit}
           >
+            <RiEditLine
+              className="size-[18px] mb-[2px] shrink-0 text-[#b3b5b7] group-hover:text-[#9194a0]"
+              aria-hidden="true"
+            />
             Edit
           </button>
           <button
             type="button"
             role="menuitem"
-            className={menuItemClassName}
+            className={`${menuItemClassName} group rounded-[7px] cursor-pointer gap-2.5`}
             onClick={onRename}
           >
+            <RiAiGenerateText
+              className="size-[20px] mb-[2px] shrink-0 text-[#b3b5b7] group-hover:text-[#9194a0]"
+              style={{ transform: "scaleX(0.87)" }}
+              strokeWidth={0.05}
+            />
             Rename
           </button>
           {showMoveItem ? (
@@ -138,7 +150,7 @@ export function ListContextMenu({
               role="menuitem"
               aria-haspopup="menu"
               aria-expanded={isMoveSubmenuOpen}
-              className={`${menuItemClassName} group cursor-pointer justify-between ${
+              className={`${menuItemClassName} group rounded-[7px] cursor-pointer justify-between ${
                 isMoveSubmenuOpen ? "bg-zinc-100 dark:bg-zinc-800" : ""
               }`}
               onMouseEnter={openMoveSubmenu}
@@ -148,10 +160,14 @@ export function ListContextMenu({
                 openMoveSubmenu();
               }}
             >
-              <span>Move to</span>
+              <span className="flex min-w-0 items-center gap-2.5">
+                <CiFolderOn
+                  className="size-[19px]! mb-[2px] text-[#a5a5a5] group-hover:text-[#9194a0]"
+                />
+                Move to
+              </span>
               <BiChevronRight
-                className="size-4 shrink-0 text-zinc-400 group-hover:text-zinc-500"
-                aria-hidden="true"
+                className="size-4 shrink-0 mb-[2px] text-zinc-300 group-hover:text-zinc-500"
               />
             </button>
           ) : null}
@@ -159,9 +175,14 @@ export function ListContextMenu({
           <button
             type="button"
             role="menuitem"
-            className="flex h-[35px] w-full items-center px-3 text-left text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40"
+            className="flex h-[35px] group rounded-[7px] w-full items-center gap-2.5 px-3 text-left text-sm text-red-600  cursor-pointer hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40"
             onClick={onRemove}
           >
+            <RiDeleteBinLine
+              className="size-[21px]! pb-[3px]! shrink-0 text-[#ee5353] group-hover:text-[#cc5353]"
+              style={{ transform: "scaleX(0.87)" }}
+              strokeWidth={0.05}
+            />
             Remove
           </button>
         </div>

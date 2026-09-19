@@ -2,8 +2,9 @@ import type { CSSProperties } from "react";
 
 export const CALENDAR_TASK_MODAL_GAP_PX = 8;
 export const CALENDAR_TASK_MODAL_VIEWPORT_PADDING_PX = 24;
-export const CALENDAR_TASK_MODAL_MIN_WIDTH_PX = 600;
-export const CALENDAR_TASK_MODAL_MAX_WIDTH_PX = 896;
+export const CALENDAR_TASK_MODAL_WIDTH_PX = 750;
+export const CALENDAR_TASK_MODAL_MIN_WIDTH_PX = CALENDAR_TASK_MODAL_WIDTH_PX;
+export const CALENDAR_TASK_MODAL_MAX_WIDTH_PX = CALENDAR_TASK_MODAL_WIDTH_PX;
 
 export type CalendarTaskModalAnchorRect = Pick<
   DOMRect,
@@ -27,15 +28,8 @@ export function getCalendarTaskClickAnchorRect(
   };
 }
 
-export function getCalendarTaskModalWidth(viewportWidth = window.innerWidth) {
-  const padding = CALENDAR_TASK_MODAL_VIEWPORT_PADDING_PX * 2;
-  return Math.min(
-    CALENDAR_TASK_MODAL_MAX_WIDTH_PX,
-    Math.max(
-      CALENDAR_TASK_MODAL_MIN_WIDTH_PX,
-      viewportWidth - padding,
-    ),
-  );
+export function getCalendarTaskModalWidth(_viewportWidth = window.innerWidth) {
+  return CALENDAR_TASK_MODAL_WIDTH_PX;
 }
 
 export function computeCalendarTaskModalStyle(

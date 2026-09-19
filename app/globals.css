@@ -139,6 +139,13 @@
     color: var(--panel-text-label-items);
   }
 
+  .sidebar-list-nav-item {
+    flex-shrink: 0;
+    height: 35px;
+    min-height: 35px;
+    max-height: 35px;
+  }
+
   .sidebar-list-nav-item:hover:not(.sidebar-list-nav-item-selected) {
     background-color: var(--panel-list-nav-hover-background);
   }

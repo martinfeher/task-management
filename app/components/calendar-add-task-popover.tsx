@@ -146,7 +146,7 @@ export function CalendarAddTaskPopover({
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] overflow-y-auto px-6 py-6">
+    <div className="fixed inset-0 z-[100] overflow-y-auto">
       <button
         type="button"
         aria-label="Close add task dialog"
@@ -154,12 +154,13 @@ export function CalendarAddTaskPopover({
         onClick={onClose}
       />
 
+      <div className="flex min-h-full items-center justify-center px-6 py-6">
       <div
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label={`Add task for ${dueDateLabel}${dueTimeLabel ? ` at ${dueTimeLabel}` : ""}`}
-        className="calendar-add-task-popover calendar-task-modal task-details-panel-background relative z-10 mx-auto flex flex-col overflow-hidden bg-white dark:bg-zinc-950"
+        className="calendar-add-task-popover calendar-task-modal task-details-panel-background relative z-10 flex flex-col overflow-hidden bg-white dark:bg-zinc-950"
         style={{
           width: CALENDAR_ADD_TASK_MODAL_WIDTH_PX,
           height: CALENDAR_ADD_TASK_MODAL_HEIGHT_PX,
@@ -289,6 +290,7 @@ export function CalendarAddTaskPopover({
             </button>
           </div>
         </form>
+      </div>
       </div>
     </div>,
     document.body,
