@@ -27,6 +27,7 @@ import {
   getCalendarDayColumnDividerClass,
   calendarTaskItemClassName,
   getCalendarTaskItemStyle,
+  isCalendarTaskPast,
   getCalendarWeekStart,
   CALENDAR_TODAY_DATE_CIRCLE_CLASS,
   CALENDAR_GRID_SCROLL_CLASS,
@@ -186,6 +187,7 @@ export function CalendarMultiWeekView({
   onSidebarFocusDateChange,
 }: CalendarMultiWeekViewProps) {
   const [today, setToday] = useState<Date | null>(null);
+  const [now, setNow] = useState<Date | null>(null);
   const [rangeStart, setRangeStart] = useState<Date | null>(null);
   const lastSidebarJumpRequestIdRef = useRef(0);
   const [modalTaskId, setModalTaskId] = useState<string | null>(null);
@@ -215,6 +217,14 @@ export function CalendarMultiWeekView({
     const current = startOfDay(new Date());
     setToday(current);
     setRangeStart(getWeekStart(current));
+    setNow(new Date());
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setNow(new Date());
+    }, 60_000);
+    return () => window.clearInterval(timer);
   }, []);
 
   const visibleDays = useMemo(
@@ -572,6 +582,11 @@ export function CalendarMultiWeekView({
                           task.priority,
                           task.calendarColor,
                           calendarTaskDefaultColor,
+                          {
+                            past:
+                              now !== null &&
+                              isCalendarTaskPast(day, now, task),
+                          },
                         )}
                       >
                         <span className="flex min-w-0 items-center gap-0.5">

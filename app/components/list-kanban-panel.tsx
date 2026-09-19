@@ -86,7 +86,7 @@ function KanbanTaskLabelDots({
         if (event.button !== 0) return;
         event.stopPropagation();
       }}
-      className={`absolute bottom-1.5 right-2 flex cursor-pointer items-center gap-1 rounded-md border-0 bg-transparent p-0.5 transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.06] ${className}`}
+      className={`absolute bottom-1.5 right-2 mr-[28px] flex cursor-pointer items-center gap-1 rounded-md border-0 bg-transparent p-0.5 transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.06] ${className}`}
     >
       {labels.map((label) => (
         <span

@@ -1,6 +1,8 @@
 import type { CSSProperties } from "react";
 import { getCalendarTaskColorItemStyle } from "@/lib/calendar-task-colors";
 import { getCalendarTaskDefaultColor } from "@/lib/calendar-task-default-color";
+import { mixHexWithWhite } from "@/lib/sidebar-background-types";
+import { normalizeDueTimeMinutes } from "@/lib/task-due-time";
 
 export const CALENDAR_TASK_FONT_CLASS = "text-[12.5px]";
 export const CALENDAR_TASK_ITEM_CLASS = "calendar-task-item";
@@ -78,17 +80,84 @@ export function calendarTaskItemClassName(selected = false) {
   return selected ? `${base} font-medium` : base;
 }
 
+const CALENDAR_PAST_TASK_BACKGROUND_BRIGHTNESS_INCREASE = 0.18;
+const DEFAULT_CALENDAR_TASK_DURATION_MINUTES = 60;
+
+function startOfCalendarDay(date: Date): Date {
+  const normalized = new Date(date);
+  normalized.setHours(0, 0, 0, 0);
+  return normalized;
+}
+
+function withPastCalendarTaskBackgroundBrightness(background: string): string {
+  return mixHexWithWhite(background, CALENDAR_PAST_TASK_BACKGROUND_BRIGHTNESS_INCREASE);
+}
+
+export function isCalendarTimedTaskPast(
+  day: Date,
+  endMinutes: number,
+  now: Date,
+): boolean {
+  const taskDay = startOfCalendarDay(day);
+  const today = startOfCalendarDay(now);
+  if (taskDay.getTime() < today.getTime()) return true;
+  if (taskDay.getTime() > today.getTime()) return false;
+
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  return endMinutes <= currentMinutes;
+}
+
+export function isCalendarAllDayTaskPast(day: Date, now: Date): boolean {
+  const taskDay = startOfCalendarDay(day);
+  const today = startOfCalendarDay(now);
+  return taskDay.getTime() < today.getTime();
+}
+
+export function isCalendarTaskPast(
+  day: Date,
+  now: Date,
+  task: {
+    dueTimeMinutes?: number | null;
+    dueDurationMinutes?: number | null;
+  },
+): boolean {
+  const normalizedStart = normalizeDueTimeMinutes(task.dueTimeMinutes);
+  if (normalizedStart != null) {
+    const duration =
+      task.dueDurationMinutes && task.dueDurationMinutes > 0
+        ? task.dueDurationMinutes
+        : DEFAULT_CALENDAR_TASK_DURATION_MINUTES;
+    return isCalendarTimedTaskPast(day, normalizedStart + duration, now);
+  }
+
+  return isCalendarAllDayTaskPast(day, now);
+}
+
 export function getCalendarTaskItemStyle(
   _priority: number | null | undefined,
   calendarColor?: string | null,
   defaultCalendarColor?: string | null,
+  options?: { past?: boolean },
 ): CSSProperties | undefined {
-  return (
+  const style =
     getCalendarTaskColorItemStyle(calendarColor) ??
     getCalendarTaskColorItemStyle(
       defaultCalendarColor ?? getCalendarTaskDefaultColor(),
-    )
-  );
+    );
+  if (!style || !options?.past) return style;
+
+  const background =
+    typeof style.backgroundColor === "string"
+      ? style.backgroundColor
+      : undefined;
+  if (!background) return style;
+
+  const pastBackground = withPastCalendarTaskBackgroundBrightness(background);
+  return {
+    ...style,
+    backgroundColor: pastBackground,
+    ["--calendar-task-item-background" as string]: pastBackground,
+  };
 }
 
 export function calendarTaskSecondaryTextClassName() {

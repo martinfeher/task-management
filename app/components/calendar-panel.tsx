@@ -54,7 +54,7 @@ import {
   CALENDAR_TASK_DRAG_THRESHOLD_PX,
   getCalendarTaskDragSurface,
 } from "@/lib/calendar-task-drag";
-import { getCalendarShellClassName, calendarAllDayTaskClassName, getCalendarTaskItemStyle, CALENDAR_WEEKDAY_LABELS, getCalendarDayColumnDividerClass, CALENDAR_TODAY_DATE_CIRCLE_CLASS, CALENDAR_GRID_SCROLL_CLASS } from "@/lib/calendar-layout";
+import { getCalendarShellClassName, calendarAllDayTaskClassName, getCalendarTaskItemStyle, isCalendarTaskPast, CALENDAR_WEEKDAY_LABELS, getCalendarDayColumnDividerClass, CALENDAR_TODAY_DATE_CIRCLE_CLASS, CALENDAR_GRID_SCROLL_CLASS } from "@/lib/calendar-layout";
 import { useCalendarTaskDefaultColor } from "@/lib/calendar-task-default-color-settings";
 import {
   readCalendarViewSession,
@@ -448,6 +448,7 @@ export function CalendarMonthView({
   onMonthNavigationChange?: (navigation: CalendarMonthNavigation | null) => void;
 } & CalendarSidebarSyncProps) {
   const [today, setToday] = useState<Date | null>(null);
+  const [now, setNow] = useState<Date | null>(null);
   const [monthDate, setMonthDate] = useState<Date | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [modalTaskId, setModalTaskId] = useState<string | null>(null);
@@ -475,10 +476,18 @@ export function CalendarMonthView({
     useCalendarTaskDefaultColor();
 
   useEffect(() => {
-    const now = startOfDay(new Date());
-    setToday(now);
-    setMonthDate(now);
-    setSelectedDate(now);
+    const currentDay = startOfDay(new Date());
+    setToday(currentDay);
+    setMonthDate(currentDay);
+    setSelectedDate(currentDay);
+    setNow(new Date());
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setNow(new Date());
+    }, 60_000);
+    return () => window.clearInterval(timer);
   }, []);
 
   useEffect(() => {
@@ -847,6 +856,11 @@ export function CalendarMonthView({
                           task.priority,
                           task.calendarColor,
                           calendarTaskDefaultColor,
+                          {
+                            past:
+                              now !== null &&
+                              isCalendarTaskPast(day, now, task),
+                          },
                         )}
                       >
                         <CalendarTaskTitle

@@ -686,6 +686,7 @@ type CalendarTimedTaskBlockProps = {
   onToggleTask?: (taskId: string) => void;
   isCompleting?: boolean;
   isCheckAnimating?: boolean;
+  isPast?: boolean;
   toDateKey: (date: Date) => string;
 };
 
@@ -717,6 +718,7 @@ export function CalendarTimedTaskBlock({
   onToggleTask,
   isCompleting = false,
   isCheckAnimating = false,
+  isPast = false,
   toDateKey,
 }: CalendarTimedTaskBlockProps) {
   const canResize = canInteract && Boolean(onSetTaskDueTime);
@@ -744,6 +746,7 @@ export function CalendarTimedTaskBlock({
           task.priority,
           task.calendarColor,
           calendarTaskDefaultColor,
+          { past: isPast },
         ),
         opacity: isMaskedForDrop ? 0 : undefined,
       }}

@@ -62,6 +62,7 @@ import {
   calendarAllDayLabelCellClassName,
   calendarAllDayTaskClassName,
   getCalendarTaskItemStyle,
+  isCalendarTaskPast,
   CALENDAR_VIEW_SURFACE_CLASS,
   CALENDAR_VIEW_WRAPPER_CLASS,
   getCalendarAllDayRowHeightPx,
@@ -664,6 +665,11 @@ export function CalendarDayView({
                     task.priority,
                     task.calendarColor,
                     calendarTaskDefaultColor,
+                    {
+                      past:
+                        now !== null &&
+                        isCalendarTaskPast(selectedDay, now, task),
+                    },
                   ),
                   opacity: isTaskMaskedForDrop(task.id) ? 0 : undefined,
                 }}
@@ -838,6 +844,13 @@ export function CalendarDayView({
                       isCompleting={completingTaskIds?.has(task.id)}
                       isCheckAnimating={checkAnimatingTaskIds?.has(task.id)}
                       isMaskedForDrop={isTaskMaskedForDrop(task.id)}
+                      isPast={
+                        now !== null &&
+                        isCalendarTaskPast(selectedDay, now, {
+                          dueTimeMinutes: timing.dueTimeMinutes,
+                          dueDurationMinutes: timing.dueDurationMinutes,
+                        })
+                      }
                       onDropped={markTaskJustDropped}
                       onDragStart={() => {
                         closeTaskModal();
