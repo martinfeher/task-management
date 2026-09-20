@@ -43,14 +43,34 @@ export function fromDateKey(value: string) {
   return Number.isNaN(date.getTime()) ? null : startOfDay(date);
 }
 
+const FULL_MONTH_GRID_MAX_ROWS = 6;
+const FULL_MONTH_GRID_EXTRA_ROWS = 2;
+
 export function getFullMonthDays(year: number, month: number) {
   const firstDay = new Date(year, month, 1, 12, 0, 0, 0);
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const padding = (firstDay.getDay() + 6) % 7;
-  const cells: (Date | null)[] = Array.from({ length: padding }, () => null);
+  const leadingPadding = (firstDay.getDay() + 6) % 7;
+  const cells: Date[] = [];
+
+  for (let index = 0; index < leadingPadding; index += 1) {
+    cells.push(new Date(year, month, index - leadingPadding + 1, 12, 0, 0, 0));
+  }
 
   for (let day = 1; day <= daysInMonth; day += 1) {
     cells.push(new Date(year, month, day, 12, 0, 0, 0));
+  }
+
+  const minimumRows = Math.ceil(cells.length / 7);
+  const targetRows = Math.min(
+    FULL_MONTH_GRID_MAX_ROWS,
+    minimumRows + FULL_MONTH_GRID_EXTRA_ROWS,
+  );
+  const targetCellCount = targetRows * 7;
+
+  let nextMonthDay = 1;
+  while (cells.length < targetCellCount) {
+    cells.push(new Date(year, month + 1, nextMonthDay, 12, 0, 0, 0));
+    nextMonthDay += 1;
   }
 
   return cells;
@@ -165,7 +185,7 @@ export function getMonthCalendarRange(monthDate: Date): CalendarDateRange {
   const days = getFullMonthDays(
     monthDate.getFullYear(),
     monthDate.getMonth(),
-  ).filter((day): day is Date => day !== null);
+  );
 
   if (days.length === 0) {
     const fallback = startOfDay(
@@ -291,11 +311,8 @@ export function CalendarMiniMonth({
         ))}
 
         {miniMonthDays.map((day, index) => {
-          if (!day) {
-            return <div key={`mini-empty-${index}`} className="h-7" />;
-          }
-
           const dateKey = toDateKey(day);
+          const isCurrentMonth = day.getMonth() === monthDate.getMonth();
           const isSelected = isSameDay(day, selectedDate);
           const isToday = isSameDay(day, today);
           const dayTasks = tasksByDate.get(dateKey) ?? [];
@@ -342,7 +359,9 @@ export function CalendarMiniMonth({
                   className={`relative z-10 text-[12.5px] leading-none ${
                     showCircle
                       ? "font-semibold text-white"
-                      : "text-zinc-700 dark:text-zinc-200"
+                      : isCurrentMonth
+                        ? "text-zinc-700 dark:text-zinc-200"
+                        : "text-zinc-400 dark:text-zinc-500"
                   }`}
                 >
                   {day.getDate()}

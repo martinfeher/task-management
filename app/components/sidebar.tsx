@@ -18,6 +18,9 @@ import { AiFillTag } from "react-icons/ai";
 import { LuFolder, LuInbox, LuList, LuPlus, LuStar } from "react-icons/lu";
 import { PiCalendarDots, PiDotsThreeBold } from "react-icons/pi";
 import { LuCalendarDays } from "react-icons/lu";
+import { BsCalendar2 } from "react-icons/bs";
+import { IoCalendarClearOutline } from "react-icons/io5";
+
 import { useSidebarBackground } from "@/lib/sidebar-background";
 import { useImportantEnabled } from "@/lib/important-settings";
 
@@ -1720,7 +1723,7 @@ export function Sidebar({
             >
               {item.action === "today" ? (
                 <TodayCalendarIcon
-                  className={`size-[19px] -ml-[2px] shrink-0 ${navIconColor}`}
+                  className={`size-[19.5px] -ml-[2px] shrink-0 ${navIconColor}`}
                   strokeWidth={1}
                   // strokeWidth={0.875}
                 />
@@ -1737,8 +1740,8 @@ export function Sidebar({
                   strokeWidth={1}
                 />
               ) : (
-                <LuCalendarDays
-                  className={`size-[16px] mb-[3px] shrink-0 ${navIconColor}`}
+                <IoCalendarClearOutline
+                  className={`size-[16px] mb-[1px] shrink-0 ${navIconColor}`}
                   aria-hidden="true"
                   strokeWidth={1.2}
                 />
@@ -1785,7 +1788,7 @@ export function Sidebar({
               }
               className={
                 item.action === "search"
-                  ? `ml-[14px] my-2 flex w-auto bg-[#fcfbff] cursor-pointer items-center gap-2 self-stretch rounded-[7px] border border-[#e3e3e9] py-0 pl-[8px] pr-[3px] text-left text-sm ptxt-list-search transition-colors hover:bg-slate-50 dark:hover:bg-zinc-800/60 ${SIDEBAR_NAV_ITEM_SIZE_CLASS}`
+                  ? `ml-[14px] mt-2 mb-[2px] flex w-auto bg-[#fcfbff] cursor-pointer items-center gap-2 self-stretch rounded-[7px] border border-[#e3e3e9] py-0 pl-[8px] pr-[3px] text-left text-sm ptxt-list-search transition-colors hover:bg-slate-50 dark:hover:bg-zinc-800/60 ${SIDEBAR_NAV_ITEM_SIZE_CLASS}`
                   : `${getItemClassName(isNavItemSelected)} gap-1 px-4`
               }
             >
@@ -1815,7 +1818,7 @@ export function Sidebar({
           })}
           
           <div className="flex flex-col overflow-visible">
-            <div className="group/lists-header relative z-[200] flex items-center overflow-visible px-4">
+            <div className="group/lists-header relative z-[200] flex items-center overflow-visible px-4 pt-1 -mb-[2px]">
               <span className="min-w-0 flex-1 text-[11px] font-semibold uppercase tracking-[0.06em] ptxt-400 dark:ptxt-500">
                 Lists
               </span>
@@ -1899,7 +1902,7 @@ export function Sidebar({
                         {folder.name}
                       </span>
                       <BiChevronDown
-                        className={`size-4 shrink-0 text-[#acadb7] group-hover:text-[#8f9097] mb-[1px] ml-1 transition-transform duration-200 ${
+                        className={`size-4 shrink-0 ml-1 mt-[1px] text-[#c7c7ce] group-hover:text-[#a3a3aa] mb-[1px] ml-1 transition-transform duration-200 ${
                           showChevronOpen ? "" : "-rotate-90"
                         }`}
                         aria-hidden="true"
@@ -1943,7 +1946,7 @@ export function Sidebar({
                 aria-expanded={isBottomAddMenuOpen}
                 aria-label="Add list or folder"
                 onClick={() => setIsBottomAddMenuOpen((open) => !open)}
-                className="flex ml-[2px] cursor-pointer items-center -mt-[10px] px-3 pb-2 py-[5px]! mt-[1px] text-left text-[13px] rounded-full hover:bg-[#f3f3f7] hover:border-[#e7e7e7] text-[#afafaf] hover:text-[#535569] dark:hover:text-zinc-300 transition duration-300"
+                className="flex ml-[2px] cursor-pointer items-center -mt-[3px] px-3 pb-2 py-[5px]! text-left text-[13px] rounded-full hover:bg-[#f3f3f7] hover:border-[#c2c9d1]! text-[#afafaf] hover:text-[#535569] dark:hover:text-zinc-300 transition duration-300"
               >
                 <div className="text-[15px] mr-[5px] mb-[3px] leading-none" aria-hidden="true">
                   +
@@ -1993,7 +1996,7 @@ export function Sidebar({
             className="group/labels-section flex flex-col overflow-visible"
             onMouseLeave={() => onSidebarHoverEnd?.()}
           >
-            <div className="relative z-[200] flex items-center overflow-visible px-4 pb-1.5">
+            <div className="relative z-[200] flex items-center overflow-visible px-4 pb-0.5 pt-1">
               <button
                 type="button"
                 onClick={() => setIsLabelsOpen((open) => !open)}
@@ -2082,12 +2085,12 @@ export function Sidebar({
                         }}
                       >
                         <div className="group flex min-w-0 flex-1 items-center gap-1.5">
-                          <span className="inline-flex shrink-0 items-center justify-center">
+                          <div className="inline-flex shrink-0 items-center justify-center mt-[2px]">
                             <IoMdPricetag
                               className="size-[12.5px] mb-[1px] text-[#d4d4ea]"
                               aria-hidden="true"
                             />
-                          </span>
+                          </div>
                           <span className="min-w-0 flex-1 truncate pr-14 text-[14px] leading-none ptxt-label-items">
                             {item.label}
                           </span>

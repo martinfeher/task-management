@@ -392,6 +392,14 @@ body {
   border: 1px solid var(--panel-text-task-detail-textarea-border);
 }
 
+.task-details-editor ::selection {
+  background-color: #c2f1ff;
+}
+
+.task-details-editor ::-moz-selection {
+  background-color: #c2f1ff;
+}
+
 .dark .task-details-editor {
   color: #d4d4d8;
   color-scheme: dark;

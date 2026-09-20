@@ -6574,7 +6574,7 @@ export function TaskDetailsPanel({
     >
       {renderModalHeaderActions()}
       <div
-        className={`relative flex shrink-0 items-center justify-between overflow-visible px-2.5 pt-[6px] pb-[4px] ${
+        className={`relative flex shrink-0 items-center justify-between overflow-visible ml-[6px] px-2.5 pt-[6px] pb-[4px] ${
           isModalLayout
             ? isModalFormatToolbarOpen
               ? "pr-[22rem]"
@@ -6605,88 +6605,92 @@ export function TaskDetailsPanel({
             </div>
           ) : task ? (
             <>
-              <div
-                className="relative"
-                onMouseEnter={handleDateMenuMouseEnter}
-                onMouseLeave={handleDateMenuMouseLeave}
-              >
-                <button
-                  ref={dateButtonRef}
-                  type="button"
-                  aria-label={
-                    dueDateLabel
-                      ? `Due ${dueDateLabel}. Change date`
-                      : "Set task date"
-                  }
-                  aria-haspopup="dialog"
-                  aria-expanded={isDateMenuOpen}
-                  onClick={handleDateButtonClick}
-                  className={`flex cursor-pointer gap-[2px] rounded-full bg-[#eceef0] pl-3.5 pr-3 text-[12px] font-semibold uppercase tracking-wide text-zinc-600 transition-colors hover:bg-[#e0e2e5] dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700 ${
-                    isModalLayout
-                      ? "h-[33px] items-center"
-                      : dueDateLabel && dueTimeLabel
-                        ? "items-start py-[7px]"
-                        : dueDateLabel
-                          ? "h-8 items-center"
-                          : "items-center py-[7px]"
-                  }`}
-                >
+              {!task.isNote ? (
+                <>
                   <div
-                    className={
-                      dueDateLabel
-                        ? `shrink-0 text-[12px] ${
-                            dueTimeLabel ? "mb-[6px]" : ""
-                          } ${isModalLayout ? "leading-none" : "leading-[13px]"}`
-                        : undefined
-                    }
+                    className="relative"
+                    onMouseEnter={handleDateMenuMouseEnter}
+                    onMouseLeave={handleDateMenuMouseLeave}
                   >
-                    Date
-                  </div>
-             
-                  {dueDateLabel ? (
-                    <div
-                      className={`relative ml-px flex flex-col normal-case tracking-normal ${
-                        dueTimeLabel
-                          ? isModalLayout
-                            ? "h-[17px] items-end justify-center"
-                            : "mb-0 h-[17px] items-end"
-                          : "items-center justify-center"
-                      }`}
-                      title={
-                        dueTimeLabel
-                          ? `${dueDateLabel} • ${dueTimeLabel}`
-                          : dueDateLabel || undefined
+                    <button
+                      ref={dateButtonRef}
+                      type="button"
+                      aria-label={
+                        dueDateLabel
+                          ? `Due ${dueDateLabel}. Change date`
+                          : "Set task date"
                       }
+                      aria-haspopup="dialog"
+                      aria-expanded={isDateMenuOpen}
+                      onClick={handleDateButtonClick}
+                      className={`flex cursor-pointer gap-[2px] rounded-full bg-[#eceef0] pl-3.5 pr-3 text-[12px] font-semibold uppercase tracking-wide text-zinc-600 transition-colors hover:bg-[#e0e2e5] dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700 ${
+                        isModalLayout
+                          ? "h-[33px] items-center"
+                          : dueDateLabel && dueTimeLabel
+                            ? "items-start py-[7px]"
+                            : dueDateLabel
+                              ? "h-8 items-center"
+                              : "items-center py-[7px]"
+                      }`}
                     >
-                    <span 
-                        className={`font-normal text-[#5F5F5F] dark:text-zinc-300 ${
-                          isModalLayout
-                            ? "text-[12px] leading-[12px]"
-                            : "text-[13px] leading-[13px]"
-                        }`}
+                      <div
+                        className={
+                          dueDateLabel
+                            ? `shrink-0 text-[12px] ${
+                                dueTimeLabel ? "mb-[6px]" : ""
+                              } ${isModalLayout ? "leading-none" : "leading-[13px]"}`
+                            : undefined
+                        }
                       >
-                        {dueDateLabel}
-                      </span>
-                      {dueTimeLabel ? (
+                        Date
+                      </div>
+
+                      {dueDateLabel ? (
                         <div
-                          className={
-                            isModalLayout
-                              ? "font-normal text-[#9f9f9f] text-[7px] leading-[7px] pt-[2px]!"
-                              : "absolute -bottom-[5.5px] right-[2px] font-normal text-[#9f9f9f] text-[7px] leading-tight"
+                          className={`relative ml-px flex flex-col normal-case tracking-normal ${
+                            dueTimeLabel
+                              ? isModalLayout
+                                ? "h-[17px] items-end justify-center"
+                                : "mb-0 h-[17px] items-end"
+                              : "items-center justify-center"
+                          }`}
+                          title={
+                            dueTimeLabel
+                              ? `${dueDateLabel} • ${dueTimeLabel}`
+                              : dueDateLabel || undefined
                           }
                         >
-                          {dueTimeLabel}
+                          <span
+                            className={`font-normal text-[#5F5F5F] dark:text-zinc-300 ${
+                              isModalLayout
+                                ? "text-[12px] leading-[12px]"
+                                : "text-[13px] leading-[13px]"
+                            }`}
+                          >
+                            {dueDateLabel}
+                          </span>
+                          {dueTimeLabel ? (
+                            <div
+                              className={
+                                isModalLayout
+                                  ? "font-normal text-[#9f9f9f] text-[7px] leading-[7px] pt-[2px]!"
+                                  : "absolute -bottom-[5.5px] right-[2px] font-normal text-[#9f9f9f] text-[7px] leading-tight"
+                              }
+                            >
+                              {dueTimeLabel}
+                            </div>
+                          ) : null}
                         </div>
-                      ) : null}
-                    </div>
-                  ) : (
-                    <PlusIcon className="ml-1 size-3 text-[#5F5F5F]" />
-                  )}
-                </button>
+                      ) : (
+                        <PlusIcon className="ml-1 size-3 text-[#5F5F5F]" />
+                      )}
+                    </button>
 
-                {renderTaskDatePickerMenu()}
-              </div>
-              <span className="text-[#cfcfcf] ml-2">|</span>
+                    {renderTaskDatePickerMenu()}
+                  </div>
+                  <span className="text-[#cfcfcf] ml-2">|</span>
+                </>
+              ) : null}
               <div
                 ref={headerFormatActionsRef}
                 className="flex items-center overflow-visible rounded"
@@ -6758,24 +6762,6 @@ export function TaskDetailsPanel({
                     </span>
                   </div>
                 ) : null}
-                <div className="group/history relative">
-                  <button
-                    type="button"
-                    aria-label="Version history"
-                    aria-describedby="task-details-history-tooltip"
-                    onClick={() => setIsVersionHistoryOpen(true)}
-                    className="flex h-10 min-w-[2.25rem] cursor-pointer items-center justify-center px-1 text-slate-400 transition-colors rounded-full hover:bg-zinc-100 hover:text-zinc-600 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
-                  >
-                    <LuHistory className="size-[16px] text-[#b6b6b6]" />
-                  </button>
-                  <span
-                    id="task-details-history-tooltip"
-                    role="tooltip"
-                    className={`${TASK_DETAILS_TOOLTIP_CLASS} group-hover/history:opacity-100`}
-                  >
-                    Version history
-                  </span>
-                </div>
               </div>
               {task.isNote ? (
                 <>
@@ -6826,16 +6812,6 @@ export function TaskDetailsPanel({
               </div>
                 </>
               ) : null}
-              {onToggleTask && !task.completed && !task.isNote && !isModalLayout ? (
-                <button
-                  type="button"
-                  onClick={() => onToggleTask(task.id)}
-                  className="ml-1 flex cursor-pointer items-center gap-1.5 rounded-full border border-[#e6e9ec] bg-white pl-2 pr-[9px] py-[5px] text-[12px] font-normal text-[#454545] transition-colors hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
-                >
-                  <LuCheck className="size-3.5 shrink-0" aria-hidden="true" />
-                  Mark complete
-                </button>
-              ) : null}
             </>
           ) : (
             <span className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
@@ -6843,6 +6819,41 @@ export function TaskDetailsPanel({
             </span>
           )}
         </div>
+        {task ? (
+          <div className="flex shrink-0 items-center">
+            <div className="group/history relative">
+              <button
+                type="button"
+                aria-label="Version history"
+                aria-describedby="task-details-history-tooltip"
+                onClick={() => setIsVersionHistoryOpen(true)}
+                className="flex h-10 min-w-[2.25rem] cursor-pointer items-center justify-center rounded-full px-1 text-slate-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+              >
+                <LuHistory className="size-[16px] text-[#b6b6b6]" />
+              </button>
+              <span
+                id="task-details-history-tooltip"
+                role="tooltip"
+                className={`${TASK_DETAILS_TOOLTIP_CLASS} group-hover/history:opacity-100`}
+              >
+                Version history
+              </span>
+            </div>
+            {onToggleTask &&
+            !task.completed &&
+            !task.isNote &&
+            !isModalLayout ? (
+              <button
+                type="button"
+                onClick={() => onToggleTask(task.id)}
+                className="ml-1 mr-3 flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-[#e6e9ec] bg-white pl-2 pr-[9px] py-[5px] text-[12px] font-normal text-[#454545] transition-colors hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+              >
+                <LuCheck className="size-3.5 shrink-0" aria-hidden="true" />
+                Mark complete
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       {taskId && saveStatus === "loading" && !task ? (

@@ -23,8 +23,13 @@ import { TaskLabelSelector, type Label } from "./task-label-selector";
 import { TaskLabelPills } from "./task-label-pills";
 import { TaskPriorityMenu } from "./task-priority-menu";
 import { TaskPriorityPill } from "./task-priority-pill";
+import { TaskPriorityFlagIcon } from "./task-priority-icon";
 import { PiDotsThreeBold } from "react-icons/pi";
+import { LiaTagSolid } from "react-icons/lia";
 import { CiStickyNote } from "react-icons/ci";
+import { LuNotebookText } from "react-icons/lu";
+import { PiNoteLight } from "react-icons/pi";
+
 import { BiAlarm, BiCalendar, BiRevision } from "react-icons/bi";
 import { IoMdTime } from "react-icons/io";
 import { MdKeyboardArrowDown } from "react-icons/md";
@@ -384,6 +389,13 @@ export function TaskListTaskRow({
     !task.dueDate &&
     task.labels.length === 0 &&
     task.priority == null;
+  const showHoverLabelIcon =
+    !isCompleting && task.labels.length === 0 && hasLabelActions && task.priority == null;
+  const showHoverPriorityIcon =
+    !isCompleting &&
+    task.labels.length === 0 &&
+    task.priority == null &&
+    hasPriorityActions;
   const dueScheduleSubline = formatTaskListScheduleSubline(
     task.dueDate,
     dueTimeLabel,
@@ -523,7 +535,7 @@ export function TaskListTaskRow({
         ),
       );
 
-      let top = rect.bottom + TASK_PRIORITY_MENU_GAP;
+      let top = rect.top - TASK_PRIORITY_MENU_HEIGHT - TASK_PRIORITY_MENU_GAP;
       top = Math.max(
         viewportPadding,
         Math.min(
@@ -604,12 +616,11 @@ export function TaskListTaskRow({
           aria-label="Note"
           aria-describedby={`note-icon-tooltip-${task.id}`}
         >
-          <CiStickyNote
+          <PiNoteLight
             aria-hidden="true"
-            className="shrink-0 size-[20px] -ml-[1.5px] text-[#818188]"
-            // className="shrink-0 size-[20px] -ml-[1.5px] text-[#8d8d9c]"
+            className="shrink-0 size-[21px] -ml-[1.5px] text-[#b4b4bf] "
             style={{ transform: "scaleX(0.785)" }}
-            // strokeWidth={0.01}
+            strokeWidth={0.2}
           />
           <span
             id={`note-icon-tooltip-${task.id}`}
@@ -883,7 +894,7 @@ export function TaskListTaskRow({
                 <div
                   ref={taskDateMenuRef}
                   data-task-date-picker-menu
-                  className="fixed z-[100]"
+                  className="fixed ml-[2px] z-[100]"
                   style={{
                     top: datePickerPosition?.top ?? 0,
                     left: datePickerPosition?.left ?? 0,
@@ -921,6 +932,69 @@ export function TaskListTaskRow({
                 document.body,
               )
             : null}
+
+          {showHoverPriorityIcon ? (
+            <div className={`group/add-priority ml-[2px] relative ${rowActionsPointerClass}`}>
+              <button
+                ref={priorityMenuButtonRef}
+                type="button"
+                data-task-priority-trigger
+                aria-label="Set priority"
+                aria-haspopup="menu"
+                aria-expanded={isPriorityMenuOpen}
+                aria-describedby={`set-priority-tooltip-${task.id}`}
+                className="flex h-[19px] w-[19px] shrink-0 mr-1 items-center justify-center rounded-md cursor-pointer transition-colors hover:opacity-80 dark:hover:bg-zinc-800"
+                onPointerDown={(event) => {
+                  if (event.button !== 0) return;
+                  event.stopPropagation();
+                }}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onTogglePriorityMenu(task.id);
+                }}
+              >
+                <TaskPriorityFlagIcon outline className="size-[14px] text-[#b4b4c8]!" />
+              </button>
+              <span
+                id={`set-priority-tooltip-${task.id}`}
+                role="tooltip"
+                className="add-task-date-tooltip pointer-events-none absolute bottom-[calc(100%+10px)] left-1/2 z-40 -translate-x-1/2 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity group-hover/add-priority:opacity-100"
+              >
+                Priority
+              </span>
+            </div>
+          ) : null}
+
+          {showHoverLabelIcon ? (
+            <div className={`group/add-label ml-[2px] relative ${rowActionsPointerClass}`}>
+              <button
+                type="button"
+                data-task-label-trigger
+                aria-label="Add label"
+                aria-haspopup="dialog"
+                aria-expanded={isLabelMenuOpen}
+                aria-describedby={`set-label-tooltip-${task.id}`}
+                className="flex h-[19px] w-[19px] shrink-0 mr-1 items-center justify-center rounded-md cursor-pointer transition-colors hover:opacity-80 dark:hover:bg-zinc-800"
+                onPointerDown={(event) => {
+                  if (event.button !== 0) return;
+                  event.stopPropagation();
+                }}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onOpenLabelMenu(task.id);
+                }}
+              >
+                <LiaTagSolid className="size-[17px]! text-[#c1c1d8]! group-hover/add-label:text-zinc-450 dark:text-zinc-400" />
+              </button>
+              <span
+                id={`set-label-tooltip-${task.id}`}
+                role="tooltip"
+                className="add-task-date-tooltip pointer-events-none absolute bottom-[calc(100%+10px)] left-1/2 z-40 -translate-x-1/2 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity group-hover/add-label:opacity-100"
+              >
+                Add label
+              </span>
+            </div>
+          ) : null}
 
           <div
             className={`relative ${rowActionsPointerClass}`}

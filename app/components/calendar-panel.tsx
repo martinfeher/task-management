@@ -777,15 +777,6 @@ export function CalendarMonthView({
               }}
             >
             {monthDays.map((day, index) => {
-              if (!day) {
-                return (
-                  <div
-                    key={`empty-${index}`}
-                    className={`h-full border-b border-zinc-200 bg-zinc-50/50 dark:border-zinc-800 dark:bg-zinc-900/40 ${getCalendarDayColumnDividerClass(index % 7, 7)}`}
-                  />
-                );
-              }
-
               const dateKey = toDateKey(day);
               const dayTasks = tasksByDate.get(dateKey) ?? [];
               const isSelected = isFocusedMonthDay(day);
@@ -831,7 +822,16 @@ export function CalendarMonthView({
                           : "text-zinc-400"
                     }`}
                   >
-                    {day.getDate()}
+                    {!isCurrentMonth && day.getDate() === 1 ? (
+                      <>
+                        {day.getDate()}{" "}
+                        {new Intl.DateTimeFormat(undefined, {
+                          month: "short",
+                        }).format(day)}
+                      </>
+                    ) : (
+                      day.getDate()
+                    )}
                   </span>
 
                   <div className="mt-1 space-y-0.5">

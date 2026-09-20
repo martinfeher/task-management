@@ -811,7 +811,7 @@ export function TemplateOptionsDrawer() {
         aria-controls={drawerId}
         aria-label={open ? "Close template settings" : "Open template settings"}
         onClick={() => setOpen((previous) => !previous)}
-        className={`fixed top-[200px]! right-0 z-[60] flex size-8 items-center justify-center rounded-md transition-colors cursor-pointer ${
+        className={`fixed bottom-[70px]! right-0 z-[60] flex size-8 items-center justify-center rounded-md transition-colors cursor-pointer ${
           open
             ? "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
             : "text-zinc-400/80 hover:bg-zinc-100/80 hover:text-zinc-600 dark:text-zinc-500/80 dark:hover:bg-zinc-800/80 dark:hover:text-zinc-300"
