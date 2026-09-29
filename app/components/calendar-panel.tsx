@@ -54,7 +54,7 @@ import {
   CALENDAR_TASK_DRAG_THRESHOLD_PX,
   getCalendarTaskDragSurface,
 } from "@/lib/calendar-task-drag";
-import { getCalendarShellClassName, calendarAllDayTaskClassName, getCalendarTaskItemStyle, isCalendarTaskPast, CALENDAR_WEEKDAY_LABELS, getCalendarDayColumnDividerClass, CALENDAR_TODAY_DATE_CIRCLE_CLASS, CALENDAR_GRID_SCROLL_CLASS } from "@/lib/calendar-layout";
+import { getCalendarShellClassName, calendarAllDayTaskClassName, getCalendarTaskItemStyle, isCalendarTaskPast, CALENDAR_WEEKDAY_LABELS, getCalendarDayColumnDividerClass, CALENDAR_TODAY_DATE_CIRCLE_CLASS, CALENDAR_CURRENT_MONTH_DAY_NUMBER_CLASS, CALENDAR_FOLLOWING_MONTH_DAY_NUMBER_CLASS, CALENDAR_GRID_SCROLL_CLASS } from "@/lib/calendar-layout";
 import { useCalendarTaskDefaultColor } from "@/lib/calendar-task-default-color-settings";
 import {
   readCalendarViewSession,
@@ -761,7 +761,7 @@ export function CalendarMonthView({
         {CALENDAR_WEEKDAY_LABELS.map((label, dayIndex) => (
           <div
             key={label}
-            className={`px-2 text-center text-[14px] font-medium uppercase tracking-wide text-zinc-700 ${getCalendarDayColumnDividerClass(dayIndex, CALENDAR_WEEKDAY_LABELS.length)}`}
+            className={`px-2 text-center text-[14px] font-medium uppercase tracking-wide text-[#505c6e]! ${getCalendarDayColumnDividerClass(dayIndex, CALENDAR_WEEKDAY_LABELS.length)}`}
           >
             {label}
           </div>
@@ -781,7 +781,11 @@ export function CalendarMonthView({
               const dayTasks = tasksByDate.get(dateKey) ?? [];
               const isSelected = isFocusedMonthDay(day);
               const isToday = isSameDay(day, today);
-              const isCurrentMonth = day.getMonth() === monthDate.getMonth();
+              const viewMonthKey =
+                monthDate.getFullYear() * 12 + monthDate.getMonth();
+              const dayMonthKey = day.getFullYear() * 12 + day.getMonth();
+              const isCurrentMonth = dayMonthKey === viewMonthKey;
+              const isFollowingMonth = dayMonthKey > viewMonthKey;
 
               const isDropTarget =
                 dropTargetDateKey === dateKey ||
@@ -818,8 +822,10 @@ export function CalendarMonthView({
                       isToday
                         ? CALENDAR_TODAY_DATE_CIRCLE_CLASS
                         : isCurrentMonth
-                          ? "font-medium text-[#b2b6bf] dark:text-zinc-100"
-                          : "text-zinc-400"
+                          ? CALENDAR_CURRENT_MONTH_DAY_NUMBER_CLASS
+                          : isFollowingMonth
+                            ? CALENDAR_FOLLOWING_MONTH_DAY_NUMBER_CLASS
+                            : "text-zinc-400"
                     }`}
                   >
                     {!isCurrentMonth && day.getDate() === 1 ? (

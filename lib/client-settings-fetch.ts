@@ -14,6 +14,19 @@ function isAbortRelatedError(error: unknown) {
   return false;
 }
 
+function isNetworkFetchError(error: unknown) {
+  if (!(error instanceof TypeError)) {
+    return false;
+  }
+
+  const message = error.message.trim().toLowerCase();
+  return (
+    message === "failed to fetch" ||
+    message === "networkerror when attempting to fetch resource." ||
+    message === "load failed"
+  );
+}
+
 export function shouldIgnoreSettingsLoadError(
   error: unknown,
   options: { cancelled?: boolean },
@@ -22,7 +35,7 @@ export function shouldIgnoreSettingsLoadError(
     return true;
   }
 
-  return isAbortRelatedError(error);
+  return isAbortRelatedError(error) || isNetworkFetchError(error);
 }
 
 export function runSettingsLoadEffect(

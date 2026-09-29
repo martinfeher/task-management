@@ -77,23 +77,32 @@ export function setTaskListBaseColor(color: string) {
   applyTaskListBackgroundSettings({ ...current, baseColor: normalized });
 }
 
-async function fetchTaskListBackgroundSettings() {
-  const response = await fetch("/api/task-list-background", {
-    method: "GET",
-    cache: "no-store",
-  });
+async function fetchTaskListBackgroundSettings(): Promise<TaskListBackgroundSettings | null> {
+  try {
+    const response = await fetch("/api/task-list-background", {
+      method: "GET",
+      cache: "no-store",
+    });
 
-  if (!response.ok) {
-    throw new Error("Failed to load task list background settings");
+    if (!response.ok) {
+      console.warn("Failed to load task list background settings from server.");
+      return null;
+    }
+
+    const payload = await response.json();
+    const parsed = parseTaskListBackgroundSettings(payload);
+    if (!parsed) {
+      console.warn("Invalid task list background settings response from server.");
+      return null;
+    }
+
+    return parsed;
+  } catch (error) {
+    if (!shouldIgnoreSettingsLoadError(error, {})) {
+      console.warn("Failed to load task list background settings from server.");
+    }
+    return null;
   }
-
-  const payload = await response.json();
-  const parsed = parseTaskListBackgroundSettings(payload);
-  if (!parsed) {
-    throw new Error("Invalid task list background settings response");
-  }
-
-  return parsed;
 }
 
 async function persistTaskListBackgroundSettings(
@@ -151,6 +160,11 @@ export function useTaskListBackground() {
         const settings = await fetchTaskListBackgroundSettings();
         if (isCancelled()) return;
 
+        if (!settings) {
+          setSavedSettings(readTaskListBackgroundSettingsFromStorage());
+          return;
+        }
+
         applyTaskListBackgroundSettings(settings);
         setBackgroundIdState(settings.backgroundId);
         setBaseColorState(settings.baseColor);
@@ -162,8 +176,7 @@ export function useTaskListBackground() {
 
         console.warn("Failed to load task list background settings from server.");
         if (!isCancelled()) {
-          const stored = readTaskListBackgroundSettingsFromStorage();
-          setSavedSettings(stored);
+          setSavedSettings(readTaskListBackgroundSettingsFromStorage());
         }
       } finally {
         if (!isCancelled()) {

@@ -233,5 +233,12 @@ export function getCalendarDayColumnDividerClass(
 export const CALENDAR_TODAY_DATE_CIRCLE_CLASS =
   "bg-[#5363b5] text-white";
 
+/** Base month day number color (#b2b6bf) darkened by 15%. */
+export const CALENDAR_CURRENT_MONTH_DAY_NUMBER_CLASS =
+  "font-medium text-[#7a7b8d] dark:text-zinc-100";
+
+/** Outside-month day number color (#a1a1aa) brightened by 15%. */
+export const CALENDAR_FOLLOWING_MONTH_DAY_NUMBER_CLASS = "text-[#afafb7]";
+
 /** Horizontal placement for timed tasks inside a day column. */
 export const CALENDAR_TASK_TIMED_COLUMN_INSET_CLASS = "left-px right-[2%]";

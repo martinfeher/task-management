@@ -34,7 +34,6 @@ import { BiAlarm, BiCalendar, BiRevision } from "react-icons/bi";
 import { IoMdTime } from "react-icons/io";
 import { MdKeyboardArrowDown } from "react-icons/md";
 import { RiArrowDropRightLine } from "react-icons/ri";
-import { TaskListSubtaskIcon } from "./task-list-subtask-icon";
 import type { TaskListItem, TodoList } from "./todo-app";
 import type { TaskDueTime } from "@/lib/task-due-time";
 import type { TaskRecurrenceRule } from "@/lib/task-recurrence";
@@ -740,7 +739,7 @@ export function TaskListTaskRow({
                     title="Subtasks"
                     aria-describedby={`subtask-toggle-tooltip-${task.id}`}
                     className={`flex mr-[2px] h-[18px] shrink-0 cursor-pointer items-center justify-center rounded border-0 bg-transparent p-0 outline-none transition-colors${
-                      subtasksExpanded ? "-ml-0.5" : "-ml-[9px]!"
+                      subtasksExpanded ? "-ml-0.5" : "-ml-[7px]!"
                     }`}
                     style={{ transition: dimTransition }}
                     onPointerDown={(event) => {
@@ -752,7 +751,40 @@ export function TaskListTaskRow({
                       onToggleSubtasksExpanded?.();
                     }}
                   >
-                    <TaskListSubtaskIcon className="size-[13px] shrink-0 text-[#afafaf] transition-colors group-hover:text-[#767679]" />
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      aria-hidden="true"
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="block size-[11px] shrink-0 text-[#afafaf] transition-colors group-hover:text-[#767679]"
+                    >
+                      <rect
+                        x="16"
+                        y="9"
+                        width="4"
+                        height="4"
+                        rx="2"
+                        transform="rotate(90 16 9)"
+                        stroke="currentColor"
+                      />
+                      <rect
+                        x="20"
+                        y="17"
+                        width="4"
+                        height="4"
+                        rx="2"
+                        transform="rotate(90 20 17)"
+                        stroke="currentColor"
+                      />
+                      <path
+                        d="M5 4V15C5 16.8856 5 17.8284 5.58579 18.4142C6.17157 19 7.11438 19 9 19H16"
+                        stroke="currentColor"
+                      />
+                      <path
+                        d="M5 7V7C5 8.88562 5 9.82843 5.58579 10.4142C6.17157 11 7.11438 11 9 11H12"
+                        stroke="currentColor"
+                      />
+                    </svg>
                   </button>
                   <span
                     id={`subtask-toggle-tooltip-${task.id}`}

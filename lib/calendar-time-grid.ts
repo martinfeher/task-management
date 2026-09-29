@@ -216,6 +216,9 @@ export function getCalendarTimedGridScrollTop({
   currentTimeTopPx,
   preferCurrentTime = false,
   topPaddingPx = 8,
+  anchorTopPx = null,
+  anchorHeightPx = 0,
+  anchorAlignment = "start",
 }: {
   scrollContainerHeightPx: number;
   gridHeightPx: number;
@@ -223,10 +226,26 @@ export function getCalendarTimedGridScrollTop({
   currentTimeTopPx: number | null;
   preferCurrentTime?: boolean;
   topPaddingPx?: number;
+  anchorTopPx?: number | null;
+  anchorHeightPx?: number;
+  anchorAlignment?: "start" | "center" | "end";
 }) {
   let targetScrollTop = 0;
 
-  if (firstTaskTopPx !== null) {
+  if (anchorTopPx !== null) {
+    if (anchorAlignment === "end") {
+      targetScrollTop =
+        anchorTopPx + anchorHeightPx - scrollContainerHeightPx + topPaddingPx;
+    } else if (anchorAlignment === "center") {
+      targetScrollTop =
+        anchorTopPx +
+        anchorHeightPx / 2 -
+        scrollContainerHeightPx / 2;
+    } else {
+      targetScrollTop = anchorTopPx - topPaddingPx;
+    }
+    targetScrollTop = Math.max(0, targetScrollTop);
+  } else if (firstTaskTopPx !== null) {
     targetScrollTop = Math.max(0, firstTaskTopPx - topPaddingPx);
   } else if (
     preferCurrentTime &&

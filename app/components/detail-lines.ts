@@ -1175,6 +1175,19 @@ function getTrailingBodyPlaceholderLine(editor: HTMLElement) {
   return null;
 }
 
+function insertLineAfterLine(line: HTMLElement, newLine: HTMLElement) {
+  const nextSibling = line.nextElementSibling;
+  if (
+    nextSibling instanceof HTMLElement &&
+    isBodyPlaceholderLine(nextSibling)
+  ) {
+    nextSibling.before(newLine);
+    return;
+  }
+
+  line.after(newLine);
+}
+
 function removeTrailingEmptyNonListLines(editor: HTMLElement) {
   while (true) {
     const lines = getLineElements(editor);
@@ -1208,7 +1221,7 @@ export function insertTypedLineBelowLine(
     newLine.dataset.checked = "false";
   }
 
-  line.after(newLine);
+  insertLineAfterLine(line, newLine);
   if (isListBlockLine(line)) {
     copyListIndent(line, newLine);
   }
@@ -1323,6 +1336,7 @@ function splitListLineAtCursor(
   const beforeIsEmpty = isEmptySplitHtml(beforeHtml);
 
   if (afterIsEmpty && !beforeIsEmpty) {
+    normalizeNonEmptyLineInlineContent(activeLine);
     insertTypedLineBelowLine(editor, activeLine, lineType);
     renumberNumberedLines(editor);
     return;
@@ -1336,7 +1350,7 @@ function splitListLineAtCursor(
       ensureChecklistTextWrapper(newLine);
     }
     copyListIndent(activeLine, newLine);
-    activeLine.after(newLine);
+    insertLineAfterLine(activeLine, newLine);
     removeTrailingEmptyNonListLines(editor);
     contentRoot.innerHTML = "<br>";
     placeCaretInLine(newLine);
@@ -1356,7 +1370,7 @@ function splitListLineAtCursor(
     ensureChecklistTextWrapper(newLine);
   }
   copyListIndent(activeLine, newLine);
-  activeLine.after(newLine);
+  insertLineAfterLine(activeLine, newLine);
   removeTrailingEmptyNonListLines(editor);
   placeCaretInLine(newLine);
   renumberNumberedLines(editor);
@@ -2767,6 +2781,39 @@ export function clearFixedLineDimensions(line: HTMLElement) {
   line.style.removeProperty("max-height");
 }
 
+function normalizeNonEmptyLineInlineContent(line: HTMLElement) {
+  if (isCodeLine(line) || isLineEmpty(line)) return false;
+  if (line.querySelector(".detail-image-wrapper")) return false;
+
+  const root = getListLineEditableRoot(line);
+  let changed = false;
+
+  root.querySelectorAll("br").forEach((br) => {
+    br.remove();
+    changed = true;
+  });
+
+  root.querySelectorAll("div, p").forEach((element) => {
+    if (
+      element instanceof HTMLElement &&
+      !(element.textContent ?? "").replace(/\u00a0|\u200B/g, " ").trim() &&
+      !element.querySelector("img")
+    ) {
+      element.remove();
+      changed = true;
+    }
+  });
+
+  if (changed && isLineEmpty(line)) {
+    root.innerHTML = "<br>";
+    if (isChecklistLine(line)) {
+      ensureChecklistTextWrapper(line);
+    }
+  }
+
+  return changed;
+}
+
 export function stripTrailingBreakFromNonEmptyLine(line: HTMLElement) {
   if (isLineEmpty(line)) return false;
 
@@ -2793,7 +2840,7 @@ export function stripTrailingBreakFromNonEmptyLine(line: HTMLElement) {
     break;
   }
 
-  return changed;
+  return normalizeNonEmptyLineInlineContent(line) || changed;
 }
 
 export function syncLineEmptyState(editor: HTMLElement) {

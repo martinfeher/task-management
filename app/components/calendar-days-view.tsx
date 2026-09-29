@@ -58,16 +58,17 @@ import {
   type CalendarTaskDragState,
 } from "@/lib/calendar-task-drag";
 import {
-  CALENDAR_HOUR_END,
-  CALENDAR_HOUR_START,
+  CALENDAR_COLLAPSE_EARLY_END_HOUR,
   CALENDAR_TIME_SLOT_MINUTES,
   getCalendarTaskPreviewHeight,
   getMinutesFromCalendarGridY,
-  getCalendarTimedGridHeightPx,
-  getCalendarTimedGridScrollTop,
   getTopForCalendarMinutes,
   type CalendarDropSlot,
 } from "@/lib/calendar-time-grid";
+import {
+  getCalendarDesktopDisplayHours,
+  useCalendarViewportHourHeight,
+} from "@/lib/use-calendar-viewport-hour-height";
 import type { CalendarSidebarSyncProps } from "./calendar-view-sidebar-layout";
 import {
   CalendarTimedTaskBlock,
@@ -83,9 +84,7 @@ import {
   useCalendarTaskDragPreview,
 } from "./calendar-task-hover-preview";
 
-const HOUR_START = CALENDAR_HOUR_START;
-const HOUR_END = CALENDAR_HOUR_END;
-const HOUR_HEIGHT_PX = 52;
+const GRID_HOUR_START = CALENDAR_COLLAPSE_EARLY_END_HOUR;
 const GRID_TOP_OFFSET_PX = 0;
 const SELECTED_DAY_COLUMN_CLASS = "bg-[#f6f6f9]";
 const SELECTED_DAY_ROW_BORDER_CLASS =
@@ -140,18 +139,20 @@ type CalendarMultiDayViewProps = {
 function isSlotWithinTimedGrid(
   dueTimeMinutes: number | null,
   hourCount: number,
+  hourHeightPx: number,
+  hourStart: number,
 ) {
   if (dueTimeMinutes === null) return false;
 
   const top = getTopForCalendarMinutes(
     dueTimeMinutes,
-    HOUR_START,
-    HOUR_HEIGHT_PX,
+    hourStart,
+    hourHeightPx,
     GRID_TOP_OFFSET_PX,
   );
   return (
     top >= GRID_TOP_OFFSET_PX &&
-    top <= GRID_TOP_OFFSET_PX + hourCount * HOUR_HEIGHT_PX
+    top <= GRID_TOP_OFFSET_PX + hourCount * hourHeightPx
   );
 }
 
@@ -211,25 +212,6 @@ function formatRangeHeading(days: Date[]) {
   return `${monthOnly.format(first)} – ${monthYear.format(last)}`;
 }
 
-
-function getMinutesFromGridY(y: number) {
-  return getMinutesFromCalendarGridY(
-    y,
-    HOUR_START,
-    HOUR_HEIGHT_PX,
-    CALENDAR_TIME_SLOT_MINUTES,
-    GRID_TOP_OFFSET_PX,
-  );
-}
-
-function getTopForMinutes(minutes: number) {
-  return getTopForCalendarMinutes(
-    minutes,
-    HOUR_START,
-    HOUR_HEIGHT_PX,
-    GRID_TOP_OFFSET_PX,
-  );
-}
 
 export function CalendarMultiDayView({
   tasks,
@@ -308,7 +290,32 @@ export function CalendarMultiDayView({
   const newTaskPreviewRef = useRef<HTMLDivElement>(null);
   const hourColumnRef = useRef<HTMLDivElement>(null);
   const timeScrollRef = useRef<HTMLDivElement>(null);
+  const isTimedGridReady = Boolean(rangeStart && today && now);
+  const hourHeightPx = useCalendarViewportHourHeight(
+    timeScrollRef,
+    hourColumnRef,
+    isTimedGridReady,
+  );
   const [nowLineTop, setNowLineTop] = useState<number | null>(null);
+
+  function getMinutesFromGridY(y: number) {
+    return getMinutesFromCalendarGridY(
+      y,
+      GRID_HOUR_START,
+      hourHeightPx,
+      CALENDAR_TIME_SLOT_MINUTES,
+      GRID_TOP_OFFSET_PX,
+    );
+  }
+
+  function getTopForMinutes(minutes: number) {
+    return getTopForCalendarMinutes(
+      minutes,
+      GRID_HOUR_START,
+      hourHeightPx,
+      GRID_TOP_OFFSET_PX,
+    );
+  }
 
   useEffect(() => {
     const current = startOfDay(new Date());
@@ -347,14 +354,7 @@ export function CalendarMultiDayView({
     setRangeStart(startOfDay(sidebarFocusDate));
   }, [sidebarFocusDate, sidebarJumpRequestId]);
 
-  const hours = useMemo(
-    () =>
-      Array.from(
-        { length: HOUR_END - HOUR_START + 1 },
-        (_, index) => HOUR_START + index,
-      ),
-    [],
-  );
+  const hours = useMemo(() => getCalendarDesktopDisplayHours(), []);
 
   const calendarRange = useMemo(
     () => getCalendarRangeFromDays(visibleDays),
@@ -380,7 +380,7 @@ export function CalendarMultiDayView({
   const currentTimeTop =
     now === null
       ? null
-      : (now.getHours() + now.getMinutes() / 60 - HOUR_START) * HOUR_HEIGHT_PX;
+      : (now.getHours() + now.getMinutes() / 60 - GRID_HOUR_START) * hourHeightPx;
 
   const todayIndex = useMemo(
     () =>
@@ -394,7 +394,7 @@ export function CalendarMultiDayView({
     todayIndex >= 0 &&
     currentTimeTop !== null &&
     currentTimeTop >= 0 &&
-    currentTimeTop <= (HOUR_END - HOUR_START + 1) * HOUR_HEIGHT_PX;
+    currentTimeTop <= hours.length * hourHeightPx;
 
   const gridTemplateColumns = getCalendarTimedGridTemplateColumns(dayCount);
   const minGridWidth = CALENDAR_HOUR_COLUMN_WIDTH_PX + dayCount * 120;
@@ -498,7 +498,7 @@ export function CalendarMultiDayView({
 
     if (
       top < GRID_TOP_OFFSET_PX ||
-      top > GRID_TOP_OFFSET_PX + hours.length * HOUR_HEIGHT_PX
+      top > GRID_TOP_OFFSET_PX + hours.length * hourHeightPx
     ) {
       return;
     }
@@ -545,8 +545,8 @@ export function CalendarMultiDayView({
     bindCalendarTaskDrag(event, {
       task,
       sourceDateKey: toDateKey(day),
-      hourStart: HOUR_START,
-      hourHeightPx: HOUR_HEIGHT_PX,
+      hourStart: GRID_HOUR_START,
+      hourHeightPx,
       onSetTaskDueDate,
       onSetTaskDueTime,
       onSetTaskDueDateAndTime,
@@ -590,34 +590,6 @@ export function CalendarMultiDayView({
     setNowLineTop(GRID_TOP_OFFSET_PX + currentTimeTop);
   }, [showGlobalNowLine, currentTimeTop]);
 
-  useLayoutEffect(() => {
-    const scrollEl = timeScrollRef.current;
-    if (!scrollEl || !today || !now || currentTimeTop === null) return;
-
-    const includesToday = visibleDays.some((day) => isSameDay(day, today));
-    const gridHeightPx = getCalendarTimedGridHeightPx(
-      hours.length,
-      HOUR_HEIGHT_PX,
-      GRID_TOP_OFFSET_PX,
-    );
-
-    scrollEl.scrollTop = getCalendarTimedGridScrollTop({
-      scrollContainerHeightPx: scrollEl.clientHeight,
-      gridHeightPx,
-      firstTaskTopPx: null,
-      currentTimeTopPx: includesToday ? currentTimeTop : null,
-      preferCurrentTime: includesToday,
-    });
-  }, [
-    currentTimeTop,
-    dayCount,
-    hours.length,
-    now,
-    rangeStart,
-    today,
-    visibleDays,
-  ]);
-
   if (!rangeStart || !today || !now) {
     return (
       <div className="flex min-h-0 flex-1 p-4">
@@ -628,7 +600,7 @@ export function CalendarMultiDayView({
 
   const timedGridMinMinutes = getMinutesFromGridY(GRID_TOP_OFFSET_PX);
   const timedGridMaxMinutes = getMinutesFromGridY(
-    GRID_TOP_OFFSET_PX + hours.length * HOUR_HEIGHT_PX,
+    GRID_TOP_OFFSET_PX + hours.length * hourHeightPx,
   );
   const allDayRowHeightPx = getCalendarAllDayRowHeightPx(
     Math.max(
@@ -844,7 +816,7 @@ export function CalendarMultiDayView({
                 <div
                   key={hour}
                   className={calendarHourLabelCellClassName()}
-                  style={{ height: HOUR_HEIGHT_PX }}
+                  style={{ height: hourHeightPx }}
                 >
                   {shouldShowCalendarHourLabel(hour) ? (
                     <div className={calendarHourLabelClassName()}>
@@ -865,7 +837,12 @@ export function CalendarMultiDayView({
               );
               const isTimedDropTarget =
                 activeDropSlot?.dateKey === dateKey &&
-                isSlotWithinTimedGrid(activeDropSlot.dueTimeMinutes, hours.length);
+                isSlotWithinTimedGrid(
+                  activeDropSlot.dueTimeMinutes,
+                  hours.length,
+                  hourHeightPx,
+                  GRID_HOUR_START,
+                );
               const isActiveDay =
                 addTaskPopover !== null && isSameDay(day, addTaskPopover.date);
               const isActiveTimedDay =
@@ -892,7 +869,7 @@ export function CalendarMultiDayView({
                 selectedSlotTop !== null &&
                 selectedSlotTop >= GRID_TOP_OFFSET_PX &&
                 selectedSlotTop <=
-                  GRID_TOP_OFFSET_PX + hours.length * HOUR_HEIGHT_PX &&
+                  GRID_TOP_OFFSET_PX + hours.length * hourHeightPx &&
                 (isActiveTimedDay || showDragSlotMarker);
 
               return (
@@ -901,8 +878,8 @@ export function CalendarMultiDayView({
                   ref={isActiveTimedDay ? timeGridRef : undefined}
                   data-calendar-day={dateKey}
                   data-calendar-time-grid="true"
-                  data-hour-start={HOUR_START}
-                  data-hour-height={HOUR_HEIGHT_PX}
+                  data-hour-start={GRID_HOUR_START}
+                  data-hour-height={hourHeightPx}
                   data-grid-top-offset={GRID_TOP_OFFSET_PX}
                   className={`relative ${getSelectedDayColumnDividerClass(dayIndex, visibleDays, isSelectedDay)} ${
                     isTimedDropTarget
@@ -917,7 +894,7 @@ export function CalendarMultiDayView({
                     <div
                       key={hour}
                       className="relative cursor-pointer border-b border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900/40"
-                      style={{ height: HOUR_HEIGHT_PX }}
+                      style={{ height: hourHeightPx }}
                     >
                       <div className="pointer-events-none absolute inset-x-0 top-1/4 border-t border-dashed border-zinc-100 dark:border-zinc-800/80" />
                       <div className="pointer-events-none absolute inset-x-0 top-1/2 border-t border-dashed border-zinc-100 dark:border-zinc-800/80" />
@@ -930,7 +907,7 @@ export function CalendarMultiDayView({
                     const baseTop = getTopForMinutes(timing.dueTimeMinutes);
                     const height = Math.max(
                       24,
-                      (timing.dueDurationMinutes / 60) * HOUR_HEIGHT_PX,
+                      (timing.dueDurationMinutes / 60) * hourHeightPx,
                     );
                     const isDraggingTask =
                       draggingTaskPreview?.taskId === task.id;
@@ -959,7 +936,7 @@ export function CalendarMultiDayView({
                           top={sourcePlaceholderTop}
                           height={Math.max(
                             24,
-                            (sourcePlaceholderDuration / 60) * HOUR_HEIGHT_PX,
+                            (sourcePlaceholderDuration / 60) * hourHeightPx,
                           )}
                           taskName={task.name}
                           startMinutes={
@@ -985,14 +962,14 @@ export function CalendarMultiDayView({
                       dropDateKey: activeDropSlot?.dateKey,
                       dropTimeMinutes: activeDropSlot?.dueTimeMinutes,
                       dayDateKey: dateKey,
-                      hourStart: HOUR_START,
-                      hourHeightPx: HOUR_HEIGHT_PX,
+                      hourStart: GRID_HOUR_START,
+                      hourHeightPx: hourHeightPx,
                       gridTopOffsetPx: GRID_TOP_OFFSET_PX,
                     });
 
                     if (
                       top < GRID_TOP_OFFSET_PX ||
-                      top > GRID_TOP_OFFSET_PX + hours.length * HOUR_HEIGHT_PX
+                      top > GRID_TOP_OFFSET_PX + hours.length * hourHeightPx
                     ) {
                       return null;
                     }
@@ -1007,8 +984,8 @@ export function CalendarMultiDayView({
                           height={height}
                           startMinutes={timing.dueTimeMinutes}
                           durationMinutes={timing.dueDurationMinutes}
-                          hourStart={HOUR_START}
-                          hourHeightPx={HOUR_HEIGHT_PX}
+                          hourStart={GRID_HOUR_START}
+                          hourHeightPx={hourHeightPx}
                           selected={task.id === selectedTaskId}
                           canInteract={canDragTasks}
                           onTaskClick={handleCalendarTaskClick}
@@ -1061,7 +1038,7 @@ export function CalendarMultiDayView({
                           top={selectedSlotTop}
                           height={getCalendarTaskPreviewHeight(
                             dragPreviewDuration,
-                            HOUR_HEIGHT_PX,
+                            hourHeightPx,
                           )}
                           taskName={draggingTask.name}
                           startMinutes={selectedSlotMinutes}
@@ -1077,7 +1054,7 @@ export function CalendarMultiDayView({
                           top={selectedSlotTop}
                           height={getCalendarTaskPreviewHeight(
                             CALENDAR_ALL_DAY_TO_TIMED_DEFAULT_DURATION_MINUTES,
-                            HOUR_HEIGHT_PX,
+                            hourHeightPx,
                           )}
                           taskName={externalDraggingTaskName}
                           startMinutes={selectedSlotMinutes}
@@ -1092,8 +1069,8 @@ export function CalendarMultiDayView({
                           previewRef={newTaskPreviewRef}
                           slotTop={selectedSlotTop}
                           timeMinutes={selectedSlotMinutes}
-                          hourHeightPx={HOUR_HEIGHT_PX}
-                          hourStart={HOUR_START}
+                          hourHeightPx={hourHeightPx}
+                          hourStart={GRID_HOUR_START}
                           gridTopOffsetPx={GRID_TOP_OFFSET_PX}
                           gridRef={timeGridRef}
                           minMinutes={timedGridMinMinutes}

@@ -1819,7 +1819,7 @@ export function Sidebar({
           
           <div className="flex flex-col overflow-visible">
             <div className="group/lists-header relative z-[200] flex items-center overflow-visible px-4 pt-1 -mb-[2px]">
-              <span className="min-w-0 flex-1 text-[11px] font-semibold uppercase tracking-[0.06em] ptxt-400 dark:ptxt-500">
+              <span className="min-w-0 flex-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-[#bdbfc2]">
                 Lists
               </span>
               <button
@@ -2003,7 +2003,7 @@ export function Sidebar({
                 aria-expanded={isLabelsOpen}
                 className="min-w-0 flex-1 text-left cursor-pointer"
               >
-                <span className="text-[11px] font-semibold uppercase tracking-[0.06em] ptxt-400 dark:ptxt-500">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[#bdbfc2]">
                   Labels
                 </span>
               </button>

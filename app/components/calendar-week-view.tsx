@@ -49,16 +49,17 @@ import {
 import { useCalendarTaskDefaultColor } from "@/lib/calendar-task-default-color-settings";
 import type { CalendarSidebarSyncProps } from "./calendar-view-sidebar-layout";
 import {
-  CALENDAR_HOUR_START,
+  CALENDAR_COLLAPSE_EARLY_END_HOUR,
   CALENDAR_TIME_SLOT_MINUTES,
-  getCalendarDisplayHours,
   getCalendarTaskPreviewHeight,
-  getCalendarTimedGridHeightPx,
-  getCalendarTimedGridScrollTop,
   getMinutesFromCalendarGridY,
   getTopForCalendarMinutes,
   type CalendarDropSlot,
 } from "@/lib/calendar-time-grid";
+import {
+  getCalendarDesktopDisplayHours,
+  useCalendarViewportHourHeight,
+} from "@/lib/use-calendar-viewport-hour-height";
 import {
   CalendarTimedTaskBlock,
   CalendarTaskCompletionCheckbox,
@@ -83,8 +84,7 @@ import {
   type CalendarTaskDragState,
 } from "@/lib/calendar-task-drag";
 
-const BASE_HOUR_HEIGHT_PX = 52;
-const TWO_WEEK_HOUR_HEIGHT_PX = Math.round(BASE_HOUR_HEIGHT_PX * 0.6);
+const GRID_HOUR_START = CALENDAR_COLLAPSE_EARLY_END_HOUR;
 const GRID_TOP_OFFSET_PX = 0;
 const SELECTED_WEEK_DAY_COLUMN_CLASS = "bg-[#f6f6f9]";
 const SELECTED_WEEK_DAY_ROW_BORDER_CLASS =
@@ -317,6 +317,12 @@ export function CalendarWeekView({
   const newTaskPreviewRef = useRef<HTMLDivElement>(null);
   const hourColumnRef = useRef<HTMLDivElement>(null);
   const timeScrollRef = useRef<HTMLDivElement>(null);
+  const isTimedGridReady = Boolean(weekStart && today && now);
+  const hourHeightPx = useCalendarViewportHourHeight(
+    timeScrollRef,
+    hourColumnRef,
+    isTimedGridReady,
+  );
   const [nowLineTop, setNowLineTop] = useState<number | null>(null);
 
   const {
@@ -326,8 +332,6 @@ export function CalendarWeekView({
   } = useCalendarTaskDragPreview();
   const canDragTasks = Boolean(onSetTaskDueDate || onSetTaskDueTime);
   const visibleWeekCount = Math.max(1, weekCount);
-  const hourHeightPx =
-    visibleWeekCount === 2 ? TWO_WEEK_HOUR_HEIGHT_PX : BASE_HOUR_HEIGHT_PX;
 
   useEffect(() => {
     const current = startOfDay(new Date());
@@ -370,10 +374,10 @@ export function CalendarWeekView({
   );
   const visibleDays = useMemo(() => visibleWeeks.flat(), [visibleWeeks]);
 
-  const gridHourStart = CALENDAR_HOUR_START;
+  const gridHourStart = GRID_HOUR_START;
   const effectiveGridTopOffset = GRID_TOP_OFFSET_PX;
 
-  const hours = useMemo(() => getCalendarDisplayHours(false), []);
+  const hours = useMemo(() => getCalendarDesktopDisplayHours(), []);
 
   const calendarRange = useMemo(
     () => getCalendarRangeFromDays(visibleDays),
@@ -611,46 +615,6 @@ export function CalendarWeekView({
     effectiveGridTopOffset,
     showWeekNowLine,
     currentTimeTop,
-  ]);
-
-  useLayoutEffect(() => {
-    const scrollEl = timeScrollRef.current;
-    if (!scrollEl || !today || !now || !showWeekNowLine || currentTimeTop === null) {
-      return;
-    }
-
-    const todayTimedGrid = scrollEl.querySelector(
-      '[data-calendar-today-timed-grid="true"]',
-    );
-    if (!(todayTimedGrid instanceof HTMLElement)) {
-      scrollEl.scrollTop = 0;
-      return;
-    }
-
-    const gridHeightPx = getCalendarTimedGridHeightPx(
-      hours.length,
-      hourHeightPx,
-      effectiveGridTopOffset,
-    );
-    const targetScrollTop = getCalendarTimedGridScrollTop({
-      scrollContainerHeightPx: scrollEl.clientHeight,
-      gridHeightPx,
-      firstTaskTopPx: null,
-      currentTimeTopPx: currentTimeTop,
-      preferCurrentTime: true,
-    });
-
-    scrollEl.scrollTop = todayTimedGrid.offsetTop + targetScrollTop;
-  }, [
-    currentTimeTop,
-    effectiveGridTopOffset,
-    hourHeightPx,
-    hours.length,
-    now,
-    showWeekNowLine,
-    today,
-    weekStart,
-    visibleWeekCount,
   ]);
 
   if (!weekStart || !today || !now) {

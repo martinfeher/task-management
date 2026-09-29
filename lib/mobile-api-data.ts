@@ -49,6 +49,7 @@ export type SidebarApiResponse = {
 export type MobileTaskItem = {
   id: string;
   name: string;
+  isNote: boolean;
   completed: boolean;
   dueDate: string | null;
   dueTimeMinutes: number | null;
@@ -75,6 +76,7 @@ export type TasksApiResponse = {
 type TaskSource = {
   id: string;
   name: string;
+  isNote?: boolean;
   completed: boolean;
   dueDate: string | null;
   dueTimeMinutes?: number | null;
@@ -97,6 +99,7 @@ function mapToMobileTask(
   return {
     id: task.id,
     name: task.name,
+    isNote: Boolean(task.isNote),
     completed: task.completed,
     dueDate: task.dueDate,
     dueTimeMinutes: task.dueTimeMinutes ?? null,
