@@ -6973,7 +6973,7 @@ export function TaskDetailsPanel({
             : ""
         }`}
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1">
           {onBack ? (
             <button
               type="button"
@@ -7127,7 +7127,7 @@ export function TaskDetailsPanel({
                     Redo
                   </span>
               </div>
-                {showHeaderClearFormatting ? (
+                {showHeaderClearFormatting && !task.isNote ? (
                   <div className="group/clear-format relative">
                     <button
                       type="button"
@@ -7200,6 +7200,35 @@ export function TaskDetailsPanel({
                       }
                       onSelect={applyFormatFontSize}
                     />
+                    {showHeaderClearFormatting ? (
+                      <>
+                        <span className="text-[#cacaca]" aria-hidden="true">
+                          |
+                        </span>
+                        <div className="group/clear-format relative">
+                          <button
+                            type="button"
+                            aria-label="Remove formatting"
+                            aria-describedby="task-details-clear-formatting-tooltip-note"
+                            onMouseDown={(event) => {
+                              event.preventDefault();
+                              captureFormatSelectionFromEditor();
+                              clearFormatting();
+                            }}
+                            className="flex h-10 min-w-[2.25rem] cursor-pointer items-center justify-center rounded-full px-2.5 text-zinc-500 transition-colors hover:bg-zinc-200 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                          >
+                            <LuRemoveFormatting className="size-[18px]" />
+                          </button>
+                          <span
+                            id="task-details-clear-formatting-tooltip-note"
+                            role="tooltip"
+                            className={`${TASK_DETAILS_TOOLTIP_CLASS} group-hover/clear-format:opacity-100`}
+                          >
+                            Remove formatting
+                          </span>
+                        </div>
+                      </>
+                    ) : null}
               </div>
                 </>
               ) : null}

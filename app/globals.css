@@ -577,7 +577,7 @@ body {
   width: 15px;
   height: 15px;
   margin-right: 0.5rem;
-  border: 1.5px solid #b4b4b8;
+  border: 1.5px solid #C7C9CA;
   border-radius: 3px;
   vertical-align: -0.125em;
   cursor: pointer;
@@ -586,19 +586,19 @@ body {
 }
 
 .dark .task-details-editor .detail-line[data-line-type="checklist"]::before {
-  border-color: #71717a;
+  border-color: #A6A6A9;
 }
 
 .task-details-editor .detail-line[data-line-type="checklist"][data-checked="true"]::before {
-  background-color: #c4cec7;
-  border-color: #c4cec7;
+  background-color: #d0d8d2;
+  border-color: #d0d8d2;
 }
 
 .dark
   .task-details-editor
   .detail-line[data-line-type="checklist"][data-checked="true"]::before {
-  background-color: #6b9676;
-  border-color: #6b9676;
+  background-color: #89ab91;
+  border-color: #89ab91;
 }
 
 .task-details-editor .detail-line[data-line-type="checklist"][data-checked="true"] .detail-checklist-text {
