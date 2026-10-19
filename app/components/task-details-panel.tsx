@@ -6738,6 +6738,25 @@ export function TaskDetailsPanel({
           </button>
         ) : null}
 
+        <div className="group/history relative">
+          <button
+            type="button"
+            aria-label="Version history"
+            aria-describedby="task-details-history-tooltip-modal"
+            onClick={() => setIsVersionHistoryOpen(true)}
+            className="flex size-8 cursor-pointer items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-zinc-200/80 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+          >
+            <LuHistory className="size-[16px] text-[#b6b6b6]" />
+          </button>
+          <span
+            id="task-details-history-tooltip-modal"
+            role="tooltip"
+            className={`${TASK_DETAILS_TOOLTIP_CLASS} group-hover/history:opacity-100`}
+          >
+            Version history
+          </span>
+        </div>
+
         {showModalFormatToggle ? (
           <>
             <button
@@ -6946,7 +6965,7 @@ export function TaskDetailsPanel({
     >
       {renderModalHeaderActions()}
       <div
-        className={`relative flex shrink-0 h-[44px] items-center justify-between overflow-visible ml-[6px] px-2.5 pt-[5px] pb-[4px] ${
+        className={`relative flex shrink-0 h-[41px] items-center justify-between overflow-visible ml-[6px] px-2.5 pt-[5px] pb-[4px] ${
           isModalLayout
             ? isModalFormatToolbarOpen
               ? "pr-[22rem]"
@@ -6971,7 +6990,7 @@ export function TaskDetailsPanel({
               <div
                 className={`h-[30px] w-[68px] rounded-full ${TASK_DETAILS_SKELETON_BAR_CLASS}`}
               />
-              <span className="ml-2 text-[#cfcfcf]">|</span>
+              <span className="ml-2 text-[#cacaca]">|</span>
               <div className={`h-5 w-7 ${TASK_DETAILS_SKELETON_BAR_CLASS}`} />
               <div className={`h-5 w-7 ${TASK_DETAILS_SKELETON_BAR_CLASS}`} />
             </div>
@@ -7135,7 +7154,7 @@ export function TaskDetailsPanel({
               </div>
               {task.isNote ? (
                 <>
-                  <span className="text-[#cfcfcf]" aria-hidden="true">
+                  <span className="text-[#cacaca]" aria-hidden="true">
                     |
                   </span>
                   <div
@@ -7169,7 +7188,7 @@ export function TaskDetailsPanel({
                       onPreviewFamily={previewFontFamilyOnSelection}
                       onPreviewFamilyClear={clearTextColorLivePreview}
                     />
-                    <span className="text-[#cfcfcf]" aria-hidden="true">
+                    <span className="text-[#cacaca]" aria-hidden="true">
                       |
                     </span>
                     <DetailFontSizeControl
@@ -7206,24 +7225,26 @@ export function TaskDetailsPanel({
                 Mark complete
               </button>
             ) : null}
-            <div className="group/history relative mr-3">
-              <button
-                type="button"
-                aria-label="Version history"
-                aria-describedby="task-details-history-tooltip"
-                onClick={() => setIsVersionHistoryOpen(true)}
-                className="flex h-10 min-w-[2.25rem] cursor-pointer items-center justify-center rounded-full px-1 text-slate-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
-              >
-                <LuHistory className="size-[16px] text-[#b6b6b6]" />
-              </button>
-              <span
-                id="task-details-history-tooltip"
-                role="tooltip"
-                className={`${TASK_DETAILS_TOOLTIP_CLASS} group-hover/history:opacity-100`}
-              >
-                Version history
-              </span>
-            </div>
+            {!isModalLayout ? (
+              <div className="group/history relative mr-3">
+                <button
+                  type="button"
+                  aria-label="Version history"
+                  aria-describedby="task-details-history-tooltip"
+                  onClick={() => setIsVersionHistoryOpen(true)}
+                  className="flex h-10 min-w-[2.25rem] cursor-pointer items-center justify-center rounded-full px-1 text-slate-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                >
+                  <LuHistory className="size-[16px] text-[#b6b6b6]" />
+                </button>
+                <span
+                  id="task-details-history-tooltip"
+                  role="tooltip"
+                  className={`${TASK_DETAILS_TOOLTIP_CLASS} group-hover/history:opacity-100`}
+                >
+                  Version history
+                </span>
+              </div>
+            ) : null}
           </div>
         ) : null}
       </div>

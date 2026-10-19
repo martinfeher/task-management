@@ -55,7 +55,7 @@ type CalendarViewSidebarLayoutProps = {
   children: React.ReactNode;
 } & CalendarTaskEditorCallbacks;
 
-function getSidebarVisibilityClass(minViewportWidth: number) {
+export function getCalendarSidebarVisibilityClass(minViewportWidth: number) {
   if (minViewportWidth >= 1950) {
     return "hidden min-[1951px]:flex";
   }
@@ -316,7 +316,7 @@ export function CalendarViewSidebarLayout({
   const isSearching = searchQuery.trim().length > 0;
 
   const sidebarVisibilityClass = sidebarOpen
-    ? getSidebarVisibilityClass(sidebarMinViewportWidth)
+    ? getCalendarSidebarVisibilityClass(sidebarMinViewportWidth)
     : "hidden";
 
   const sidebar = sidebarOpen ? (

@@ -591,7 +591,6 @@ export function TaskListTaskRow({
     >
       {showDragHandle && depth === 0 ? (
         <span
-          aria-hidden="true"
           className={`flex size-[19px] shrink-0 cursor-move items-center justify-center ${
             hideDueDate ? "" : "group-hover:opacity-100"
           } ${checkedContentDim}`}

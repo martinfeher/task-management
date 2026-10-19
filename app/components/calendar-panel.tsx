@@ -31,6 +31,7 @@ import { getCalendarTaskKey } from "@/lib/calendar-recurring-tasks";
 import { CalendarMultiWeekView } from "./calendar-weeks-view";
 import {
   CalendarViewSidebarLayout,
+  getCalendarSidebarVisibilityClass,
   type CalendarSidebarSyncProps,
 } from "./calendar-view-sidebar-layout";
 import { CalendarWeekView } from "./calendar-week-view";
@@ -210,6 +211,7 @@ function CalendarViewTabs({
   periodLabelAction,
   headerTrailingAction,
   sidebarOpen,
+  sidebarMinViewportWidth,
   onSidebarOpenChange,
 }: {
   activeView: CalendarViewTab;
@@ -227,8 +229,12 @@ function CalendarViewTabs({
   periodLabelAction?: ReactNode;
   headerTrailingAction?: ReactNode;
   sidebarOpen: boolean;
+  sidebarMinViewportWidth: number;
   onSidebarOpenChange: (open: boolean) => void;
 }) {
+  const sidebarSearchVisibilityClass = sidebarOpen
+    ? getCalendarSidebarVisibilityClass(sidebarMinViewportWidth)
+    : "hidden";
   const tabButtonClassName = (isActive: boolean) =>
     `rounded-full px-3.5 py-1.5 text-[14px] transition-colors hover:bg-[#F2F5F7] cursor-pointer ${
       isActive
@@ -342,8 +348,10 @@ function CalendarViewTabs({
         })}
       </div>
       <div className="flex w-full items-center justify-end gap-2">
-        {activeView !== "month" && sidebarOpen ? (
-          <label className="relative flex h-9 w-full max-w-[210px] items-center rounded-full border border-zinc-200 bg-[#fafafd] px-3 dark:border-zinc-700 dark:bg-zinc-900">
+        {sidebarOpen ? (
+          <label
+            className={`relative ${sidebarSearchVisibilityClass} h-9 w-full max-w-[210px] items-center rounded-full border border-zinc-200 bg-[#fafafd] px-3 dark:border-zinc-700 dark:bg-zinc-900`}
+          >
             <IoIosSearch
               className="size-4 shrink-0 text-zinc-400 dark:text-zinc-500"
               aria-hidden="true"
@@ -1085,6 +1093,7 @@ export function CalendarViewsPanel({
   const [sidebarJumpRequestId, setSidebarJumpRequestId] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const sidebarMinViewportWidth = activeView === "week" ? 1950 : 1800;
 
   const calendarTaskModalActions = useMemo(
     () => ({
@@ -1323,6 +1332,7 @@ export function CalendarViewsPanel({
         periodLabelAction={periodLabelAction}
         headerTrailingAction={headerTrailingAction}
         sidebarOpen={sidebarOpen}
+        sidebarMinViewportWidth={sidebarMinViewportWidth}
         onSidebarOpenChange={setSidebarOpen}
       />
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">

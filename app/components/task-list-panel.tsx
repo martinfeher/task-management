@@ -36,6 +36,11 @@ import {
   AddTaskKindSwitch,
   type AddTaskKind,
 } from "./add-task-kind-switch";
+import {
+  TaskListEntityFilter,
+  taskMatchesEntityScope,
+  type TaskListEntityScope,
+} from "./task-list-entity-filter";
 import { useAddTaskNoteSwitchEnabled } from "@/lib/add-task-note-switch-settings";
 import {
   TaskRowContextMenu,
@@ -612,6 +617,7 @@ export function TaskListPanel({
   const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
   const [activeSort, setActiveSort] = useState<SortOption | null>(null);
   const [isCompletedOpen, setIsCompletedOpen] = useState(false);
+  const [entityScope, setEntityScope] = useState<TaskListEntityScope>("all");
   const [openDatePickerTaskId, setOpenDatePickerTaskId] = useState<string | null>(
     null,
   );
@@ -811,6 +817,67 @@ export function TaskListPanel({
     [orderedTasks],
   );
 
+  const showEntityFilter = useMemo(() => {
+    const candidates = [...orderedTasks, ...completedTasks];
+    if (candidates.length === 0) return false;
+    const hasNotes = candidates.some((task) => task.isNote);
+    const hasTasks = candidates.some((task) => !task.isNote);
+    return hasNotes && hasTasks;
+  }, [completedTasks, orderedTasks]);
+
+  const filterTaskByEntityScope = useCallback(
+    (task: TaskListItem) => taskMatchesEntityScope(task.isNote, entityScope),
+    [entityScope],
+  );
+
+  const filteredPinnedVisibleTasks = useMemo(
+    () =>
+      entityScope === "all"
+        ? pinnedVisibleTasks
+        : pinnedVisibleTasks.filter((task) => {
+            const resolved = tasksById.get(task.id) ?? task;
+            return filterTaskByEntityScope(resolved);
+          }),
+    [
+      entityScope,
+      filterTaskByEntityScope,
+      pinnedVisibleTasks,
+      tasksById,
+    ],
+  );
+
+  const filteredUnpinnedVisibleTasks = useMemo(
+    () =>
+      entityScope === "all"
+        ? unpinnedVisibleTasks
+        : unpinnedVisibleTasks.filter((task) => {
+            const resolved = tasksById.get(task.id) ?? task;
+            return filterTaskByEntityScope(resolved);
+          }),
+    [
+      entityScope,
+      filterTaskByEntityScope,
+      tasksById,
+      unpinnedVisibleTasks,
+    ],
+  );
+
+  const filteredListTasks = useMemo(
+    () =>
+      entityScope === "all"
+        ? listTasks
+        : listTasks.filter(filterTaskByEntityScope),
+    [entityScope, filterTaskByEntityScope, listTasks],
+  );
+
+  const filteredCompletedTasks = useMemo(
+    () =>
+      entityScope === "all"
+        ? completedTasks
+        : completedTasks.filter(filterTaskByEntityScope),
+    [completedTasks, entityScope, filterTaskByEntityScope],
+  );
+
   const hasScheduledTasks = useMemo(
     () => orderedTasks.some((task) => task.dueDate),
     [orderedTasks],
@@ -868,8 +935,15 @@ export function TaskListPanel({
     setAddTaskLabelIds(preselectedLabelId ? [preselectedLabelId] : []);
     setActiveSort(null);
     setIsCompletedOpen(false);
+    setEntityScope("all");
     finishTitleEdit();
   }, [viewResetKey, preselectedLabelId]);
+
+  useEffect(() => {
+    if (!showEntityFilter && entityScope !== "all") {
+      setEntityScope("all");
+    }
+  }, [entityScope, showEntityFilter]);
 
   useEffect(() => {
     if (panelWidth != null) return;
@@ -2306,7 +2380,9 @@ export function TaskListPanel({
     if (sourceIndex < 0) return;
 
     const visibleTasks =
-      section === "pinned" ? pinnedVisibleTasks : unpinnedVisibleTasks;
+      section === "pinned"
+        ? filteredPinnedVisibleTasks
+        : filteredUnpinnedVisibleTasks;
     const taskIds = visibleTasks.map((task) => task.id);
     const blockIds = getDragBlockIds(taskIds, sourceIndex, tasksById);
     const sourceParentId = tasksById.get(taskId)?.parentId ?? null;
@@ -2610,7 +2686,7 @@ export function TaskListPanel({
     >
       {title ? (
         <div
-          className={`flex flex-col ${
+          className={`relative flex flex-col ${
             panelWidth != null || title ? "min-h-0 flex-1" : ""
           }`}
         >
@@ -3014,11 +3090,13 @@ export function TaskListPanel({
             ref={taskListScrollRef}
             className={
               panelWidth != null || title
-                ? "list-panel-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden"
+                ? `list-panel-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden${
+                    showEntityFilter ? " pb-12" : ""
+                  }`
                 : undefined
             }
           >
-          {showAddTask && pinnedVisibleTasks.length > 0 && (
+          {showAddTask && filteredPinnedVisibleTasks.length > 0 && (
             <div className="mb-2 border-b border-zinc-200 bg-zinc-50/40 dark:border-zinc-700 dark:bg-zinc-900/40">
               <p className="px-4 pb-1 pt-2.5 text-[10px] font-semibold uppercase tracking-wide ptxt-300 dark:ptxt-400">
                 Pinned
@@ -3034,7 +3112,7 @@ export function TaskListPanel({
                     left={16 + dropIndicator.indent}
                   />
                 )}
-                {renderTaskItems(pinnedVisibleTasks, "pinned")}
+                {renderTaskItems(filteredPinnedVisibleTasks, "pinned")}
               </ul>
             </div>
           )}
@@ -3042,7 +3120,7 @@ export function TaskListPanel({
           <ul
             ref={listRef}
             className={`relative flex flex-col ${
-              showAddTask && pinnedVisibleTasks.length > 0
+              showAddTask && filteredPinnedVisibleTasks.length > 0
                 ? "border-t border-zinc-200 dark:border-zinc-700"
                 : ""
             }`}
@@ -3069,15 +3147,20 @@ export function TaskListPanel({
                         ? "No tasks with this label"
                         : "No tasks"}
               </li>
+            ) : filteredListTasks.length === 0 &&
+              filteredPinnedVisibleTasks.length === 0 ? (
+              <li className="pl-[33px] pr-4 py-3 text-sm ptxt-500 dark:ptxt-400">
+                {entityScope === "notes" ? "No notes" : "No tasks"}
+              </li>
             ) : (
               renderTaskItems(
-                canReorder ? unpinnedVisibleTasks : listTasks,
+                canReorder ? filteredUnpinnedVisibleTasks : filteredListTasks,
                 "unpinned",
               )
             )}
           </ul>
 
-          {showAddTask && listId && completedTasks.length > 0 ? (
+          {showAddTask && listId && filteredCompletedTasks.length > 0 ? (
             <div className="border-t border-zinc-200 dark:border-zinc-700">
               <button
                 type="button"
@@ -3093,13 +3176,13 @@ export function TaskListPanel({
                 />
                 <span>Completed</span>
                 <span className="text-xs ptxt-400 dark:ptxt-500">
-                  {completedTasks.length}
+                  {filteredCompletedTasks.length}
                 </span>
               </button>
 
               {isCompletedOpen ? (
                   <ul className="flex flex-col">
-                    {completedTasks.map((task) => (
+                    {filteredCompletedTasks.map((task) => (
                       <li
                         key={task.id}
                         className={`group ${getTaskListItemDividerClass(task)} flex min-h-[35px] items-center ml-[10px] py-1 pr-2 pl-[5px] cursor-pointer! ${getTaskRowLeftBorderClass(
@@ -3141,6 +3224,14 @@ export function TaskListPanel({
           ) : null}
           </div>
 
+          {showEntityFilter ? (
+            <div className="pointer-events-none absolute bottom-[10px] right-[10px] z-30">
+              <TaskListEntityFilter
+                value={entityScope}
+                onChange={setEntityScope}
+              />
+            </div>
+          ) : null}
         </div>
       ) : (
         <div className="p-4">

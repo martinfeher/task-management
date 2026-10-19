@@ -385,7 +385,7 @@ function MainMenuItems({
       ) : null}
       {hasDeleteActions ? (
         <>
-          <div role="separator" className="mx-4 border-t border-[#e4e4e4]" />
+          <div role="separator" className="mx-4 border-t border-[#cacaca]" />
           <button
             type="button"
             role="menuitem"
