@@ -395,26 +395,6 @@ export function matchDetailFontSize(fontSize: string): DetailFontSizeOption {
   return closest;
 }
 
-function getSelectionElement(editor: HTMLElement) {
-  const selection = window.getSelection();
-  if (!selection?.rangeCount || !selection.anchorNode) return null;
-  if (!editor.contains(selection.anchorNode)) return null;
-
-  let node: Node | null = selection.anchorNode;
-  if (node.nodeType === Node.TEXT_NODE) {
-    node = node.parentElement;
-  }
-
-  while (node && node !== editor) {
-    if (node instanceof HTMLElement) {
-      return node;
-    }
-    node = node.parentNode;
-  }
-
-  return null;
-}
-
 function getFontFamilyIdAtNode(
   node: Node | null,
   editor: HTMLElement,
@@ -516,6 +496,65 @@ function collectUniqueFontFamilyIdsInRange(
   return Array.from(unique);
 }
 
+function getFontSizeAtNode(
+  node: Node | null,
+  editor: HTMLElement,
+): DetailFontSizeOption {
+  if (!node) {
+    return getDefaultDetailFontSizeOption();
+  }
+
+  let current: Node | null = node;
+  if (current.nodeType === Node.TEXT_NODE) {
+    current = current.parentElement;
+  }
+
+  while (current && current !== editor) {
+    if (!(current instanceof HTMLElement)) {
+      current = current.parentNode;
+      continue;
+    }
+
+    const inlineSize = current.style.fontSize;
+    if (inlineSize) {
+      return matchDetailFontSize(inlineSize);
+    }
+
+    current = current.parentNode;
+  }
+
+  let element: Node | null = node;
+  if (element.nodeType === Node.TEXT_NODE) {
+    element = element.parentElement;
+  }
+
+  while (element && element !== editor) {
+    if (element instanceof HTMLElement) {
+      return matchDetailFontSize(window.getComputedStyle(element).fontSize);
+    }
+    element = element.parentNode;
+  }
+
+  return getDefaultDetailFontSizeOption();
+}
+
+function collectUniqueFontSizesInRange(
+  range: Range,
+  editor: HTMLElement,
+): DetailFontSizeOption[] {
+  const unique = new Set<DetailFontSizeOption>();
+
+  for (const textNode of collectTextNodesInRange(range)) {
+    if (!hasSelectedTextInRange(textNode, range)) {
+      continue;
+    }
+
+    unique.add(getFontSizeAtNode(textNode, editor));
+  }
+
+  return Array.from(unique);
+}
+
 export function getDetailSelectionFontState(
   editor: HTMLElement,
 ): DetailSelectionFontState {
@@ -528,7 +567,10 @@ export function getDetailSelectionFontState(
   }
 
   const range = selection.getRangeAt(0);
+  const anchorNode =
+    selection.focusNode ?? selection.anchorNode ?? range.startContainer;
   let familyId: DetailFontFamilyId;
+  let size: DetailFontSizeOption;
 
   if (!selection.isCollapsed && !range.collapsed) {
     const familyIds = collectUniqueFontFamilyIdsInRange(range, editor);
@@ -540,52 +582,21 @@ export function getDetailSelectionFontState(
     } else {
       familyId = getFontFamilyIdAtNode(range.startContainer, editor);
     }
+
+    const sizes = collectUniqueFontSizesInRange(range, editor);
+    if (sizes.length === 1) {
+      size = sizes[0];
+    } else if (sizes.length > 1) {
+      size = getFontSizeAtNode(anchorNode, editor);
+    } else {
+      size = getFontSizeAtNode(range.startContainer, editor);
+    }
   } else {
-    familyId = getFontFamilyIdAtNode(
-      selection.focusNode ?? selection.anchorNode ?? range.startContainer,
-      editor,
-    );
+    familyId = getFontFamilyIdAtNode(anchorNode, editor);
+    size = getFontSizeAtNode(anchorNode, editor);
   }
 
-  let node: Node | null = selection.isCollapsed
-    ? selection.focusNode ?? selection.anchorNode
-    : range.startContainer;
-
-  if (node?.nodeType === Node.TEXT_NODE) {
-    node = node.parentElement;
-  }
-
-  while (node && node !== editor) {
-    if (!(node instanceof HTMLElement)) {
-      node = node.parentNode;
-      continue;
-    }
-
-    const inlineSize = node.style.fontSize;
-
-    if (inlineSize) {
-      return {
-        familyId,
-        size: matchDetailFontSize(inlineSize),
-      };
-    }
-
-    node = node.parentNode;
-  }
-
-  const element = getSelectionElement(editor);
-  if (!element) {
-    return {
-      familyId,
-      size: getDefaultDetailFontSizeOption(),
-    };
-  }
-
-  const computed = window.getComputedStyle(element);
-  return {
-    familyId,
-    size: matchDetailFontSize(computed.fontSize),
-  };
+  return { familyId, size };
 }
 
 function canApplyDetailFont(editor: HTMLElement) {

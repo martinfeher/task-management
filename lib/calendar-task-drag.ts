@@ -20,7 +20,7 @@ import {
 import type { TaskListItem } from "@/app/components/todo-app";
 
 export const CALENDAR_TASK_DRAG_THRESHOLD_PX = 2;
-export const CALENDAR_ALL_DAY_TO_TIMED_DEFAULT_DURATION_MINUTES = 30;
+export const CALENDAR_ALL_DAY_TO_TIMED_DEFAULT_DURATION_MINUTES = 60;
 export const CALENDAR_TASK_DRAGGING_CLASS = "calendar-task-dragging";
 export const CALENDAR_TASK_DRAG_CURSOR = "move";
 // After a task is dropped onto a new slot, keep it invisible for a beat
@@ -293,12 +293,6 @@ export function bindCalendarTaskDrag(
     );
   }
 
-  try {
-    taskButton.setPointerCapture(pointerId);
-  } catch {
-    // Pointer capture is optional; document listeners still handle the drag.
-  }
-
   function clearPendingListeners() {
     document.removeEventListener("pointermove", onPointerMove);
     document.removeEventListener("pointerup", onPointerUp);
@@ -343,7 +337,9 @@ export function bindCalendarTaskDrag(
     }
 
     dragStateRef.current = null;
-    suppressTaskClickRef.current = true;
+    if (dragStarted) {
+      suppressTaskClickRef.current = true;
+    }
     onDragEnd?.(movedToDifferentSlot);
     dragSurface.classList.remove(CALENDAR_TASK_DRAGGING_CLASS);
     setDropTargetSlot(null);
@@ -361,6 +357,11 @@ export function bindCalendarTaskDrag(
 
       dragStarted = true;
       clearPendingListeners();
+      try {
+        taskButton.setPointerCapture(pointerId);
+      } catch {
+        // Pointer capture is optional; document listeners still handle the drag.
+      }
       onDragStart?.({
         clientX: moveEvent.clientX,
         clientY: moveEvent.clientY,

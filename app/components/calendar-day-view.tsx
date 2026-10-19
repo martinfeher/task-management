@@ -7,13 +7,7 @@ import { CalendarCurrentTimeLine } from "./calendar-current-time-line";
 import { CalendarNewTaskSlotPreview } from "./calendar-new-task-slot-preview";
 import { CalendarPeriodNavigation } from "./calendar-period-navigation";
 import { formatDayMonthYear } from "./calendar-mini-month";
-import {
-  CalendarTaskModal,
-  getCalendarTaskClickAnchorRect,
-  getCalendarTaskSnapshot,
-  type CalendarTaskEditorCallbacks,
-  type CalendarTaskModalAnchorRect,
-} from "./calendar-task-modal";
+import { type CalendarTaskEditorCallbacks } from "./calendar-task-modal";
 import type { TaskListItem, TodoList } from "./todo-app";
 import type { TaskDueTime } from "@/lib/task-due-time";
 import { normalizeDueTimeMinutes } from "@/lib/task-due-time";
@@ -95,6 +89,7 @@ type CalendarDayViewProps = {
   checkAnimatingTaskIds?: Set<string>;
   selectedTaskId: string | null;
   onSelectTask: (taskId: string) => void;
+  onCloseTaskEditor?: () => void;
   onToggleTask?: (taskId: string) => void;
   onSetTaskDueDate?: (taskId: string, dateValue: string | null) => void;
   onSetTaskDueTime?: (taskId: string, dueTime: TaskDueTime) => void;
@@ -156,6 +151,7 @@ export function CalendarDayView({
   checkAnimatingTaskIds,
   selectedTaskId,
   onSelectTask,
+  onCloseTaskEditor,
   onToggleTask,
   onSetTaskDueDateAndTime,
   onSetTaskDueDate,
@@ -182,13 +178,8 @@ export function CalendarDayView({
   const [now, setNow] = useState<Date | null>(null);
   const lastSidebarJumpRequestIdRef = useRef(0);
   const lastSyncedSidebarDateKeyRef = useRef<string | null>(null);
-  const [modalTaskId, setModalTaskId] = useState<string | null>(null);
-  const [modalAnchorRect, setModalAnchorRect] =
-    useState<CalendarTaskModalAnchorRect | null>(null);
-
   function closeTaskModal() {
-    setModalTaskId(null);
-    setModalAnchorRect(null);
+    onCloseTaskEditor?.();
   }
   const { defaultColor: calendarTaskDefaultColor } =
     useCalendarTaskDefaultColor();
@@ -259,11 +250,6 @@ export function CalendarDayView({
 
     return map.get(key) ?? { allDay: [], timed: [] };
   }, [tasks, selectedDay]);
-
-  const modalTaskSnapshot = useMemo(
-    () => (modalTaskId ? getCalendarTaskSnapshot(modalTaskId, tasks) : null),
-    [modalTaskId, tasks],
-  );
 
   const currentTimeTop =
     now === null
@@ -410,8 +396,6 @@ export function CalendarDayView({
 
     onSelectTask(task.id);
     closeAddTaskPopover();
-    setModalAnchorRect(getCalendarTaskClickAnchorRect(event.currentTarget));
-    setModalTaskId(task.id);
   }
 
   function handleNewTaskTimeChange(minutes: number) {
@@ -962,22 +946,6 @@ export function CalendarDayView({
           onNameChange={setDraftTaskName}
           onClose={closeAddTaskPopover}
           onAddTask={onAddCalendarTask}
-        />
-      ) : null}
-
-      {modalTaskId ? (
-        <CalendarTaskModal
-          taskId={modalTaskId}
-          taskSnapshot={modalTaskSnapshot}
-          anchorRect={modalAnchorRect}
-          onClose={closeTaskModal}
-          onDetailsSaved={onDetailsSaved}
-          onTaskHasDetailsKnown={onTaskHasDetailsKnown}
-          onTaskRenamed={onTaskRenamed}
-          onDueDateUpdated={onDueDateUpdated}
-          onRecurrenceUpdated={onRecurrenceUpdated}
-          onSaveTaskRecurrence={onSaveTaskRecurrence}
-          onToggleTask={onToggleTask}
         />
       ) : null}
     </div>

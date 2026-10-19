@@ -6,11 +6,13 @@ import {
   type TaskPriorityLevel,
 } from "@/lib/task-priority";
 import { TaskPriorityFlagIcon } from "./task-priority-icon";
+import { taskContextMenuTextColor } from "@/lib/task-context-menu-colors";
 
 type TaskPrioritySelectorProps = {
   selectedPriority: number | null;
   onSelectPriority: (priority: TaskPriorityLevel) => void;
   onClearPriority: () => void;
+  tone?: "default" | "contextMenu";
 };
 
 function TaskPrioritySelectorButton({
@@ -64,12 +66,21 @@ export function TaskPrioritySelector({
   selectedPriority,
   onSelectPriority,
   onClearPriority,
+  tone = "default",
 }: TaskPrioritySelectorProps) {
   const tooltipBaseId = useId();
+  const isContextMenuTone = tone === "contextMenu";
 
   return (
     <div className="overflow-visible px-3 pt-[2px] pb-[3px]">
-      <div className="text-[11px] font-medium text-zinc-350 dark:text-zinc-500">
+      <div
+        className={`text-[11px] mt-[2px] font-medium dark:text-zinc-500 ${
+          isContextMenuTone ? "" : "text-zinc-350"
+        }`}
+        style={
+          isContextMenuTone ? taskContextMenuTextColor("icon350") : undefined
+        }
+      >
         priority
       </div>
       <div className="flex w-full items-center justify-between">

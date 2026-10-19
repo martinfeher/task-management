@@ -149,7 +149,7 @@ export function CalendarTaskModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center"
+      className="fixed inset-0 z-[10050] flex items-center justify-center"
       style={{ padding: CALENDAR_TASK_MODAL_VIEWPORT_PADDING_PX }}
     >
       <button

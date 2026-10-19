@@ -27,7 +27,7 @@ type CalendarPeriodNavigationProps = {
 };
 
 const CALENDAR_PERIOD_NAV_ARROW_BUTTON_CLASS =
-  "flex size-6 mx-[1px] shrink-0 cursor-pointer items-center justify-center rounded-full text-gray-300 transition-colors hover:bg-zinc-150 dark:text-zinc-300 dark:hover:bg-zinc-700/80";
+  "flex size-6 mx-[1px] shrink-0 cursor-pointer items-center justify-center rounded-full text-gray-700 transition-colors hover:bg-zinc-150 hover:text-gray-800 dark:text-zinc-200 dark:hover:bg-zinc-700/80";
 
 const CALENDAR_PERIOD_NAV_TODAY_BUTTON_CLASS =
   "inline-flex px-[8px] w-auto h-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-[14px] text-gray-700 transition-colors hover:bg-zinc-150 hover:text-gray-800 dark:text-zinc-200 dark:hover:bg-zinc-700/80";
@@ -211,7 +211,7 @@ export function CalendarPeriodNavigation({
         type="button"
         aria-label={nextLabel}
         onClick={onNext}
-        className={`${CALENDAR_PERIOD_NAV_ARROW_BUTTON_CLASS} text-gray-400`}
+        className={CALENDAR_PERIOD_NAV_ARROW_BUTTON_CLASS}
       >
         <BiChevronRight className="size-5" />
       </button>

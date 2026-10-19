@@ -33,6 +33,11 @@ import { TaskLabelSelector, type Label } from "./task-label-selector";
 import { TaskPrioritySelector } from "./task-priority-selector";
 import { TaskPriorityFlagIcon } from "./task-priority-icon";
 import {
+  AddTaskKindSwitch,
+  type AddTaskKind,
+} from "./add-task-kind-switch";
+import { useAddTaskNoteSwitchEnabled } from "@/lib/add-task-note-switch-settings";
+import {
   TaskRowContextMenu,
 } from "./task-row-context-menu";
 import type { TaskListItem, TodoList, AddTaskOptions } from "./todo-app";
@@ -93,8 +98,15 @@ import { useTaskListBackground } from "@/lib/task-list-background";
 import { LiaTagSolid } from "react-icons/lia";
 
 export const TASK_LIST_PANEL_DEFAULT_WIDTH = 520;
+export const TASK_LIST_PANEL_NARROW_DEFAULT_WIDTH = 348;
 export const TASK_LIST_PANEL_AUTO_EXPAND_MAX_WIDTH = 620;
-export const TASK_LIST_PANEL_MIN_WIDTH = 350;
+export const TASK_LIST_PANEL_MIN_WIDTH = 348;
+
+export function resolveTaskListPanelDefaultWidth(isNarrowDesktop: boolean) {
+  return isNarrowDesktop
+    ? TASK_LIST_PANEL_NARROW_DEFAULT_WIDTH
+    : TASK_LIST_PANEL_DEFAULT_WIDTH;
+}
 
 const TASK_LIST_TITLE_ICON_BASE_CLASS = "mt-[1px] shrink-0";
 
@@ -104,10 +116,10 @@ function getTaskListTitleIconClassName(kind: TaskListTitleIconKind) {
   }
 
   if (kind === "today") {
-    return `${TASK_LIST_TITLE_ICON_BASE_CLASS} size-[20px] text-[#9f9fa6]!`;
+    return `${TASK_LIST_TITLE_ICON_BASE_CLASS} size-[20px] text-[#C3C3C6]!`;
   }
 
-  return `${TASK_LIST_TITLE_ICON_BASE_CLASS} size-[16px] text-[#9f9fa6]!`;
+  return `${TASK_LIST_TITLE_ICON_BASE_CLASS} size-[16px] text-[#C3C3C6]!`;
 }
 
 function measureTaskListTruncationOverflow(root: HTMLElement | null) {
@@ -408,6 +420,11 @@ type TaskListPanelProps = {
   tasks: TaskListItem[];
   completedTasks?: TaskListItem[];
   lists: TodoList[];
+  moveTargetLists?: TodoList[];
+  getTaskSourceListId?: (
+    taskId: string,
+    fallbackListId: string | null,
+  ) => string | null;
   completingTaskIds: Set<string>;
   completingWithoutBackgroundTaskIds?: Set<string>;
   checkAnimatingTaskIds?: Set<string>;
@@ -415,6 +432,7 @@ type TaskListPanelProps = {
   expanded?: boolean;
   panelWidth?: number;
   panelMaxWidth?: number;
+  defaultPanelWidth?: number;
   autoExpandMaxWidth?: number;
   onAutoExpandWidth?: (width: number) => void;
   embedded?: boolean;
@@ -492,6 +510,8 @@ export function TaskListPanel({
   tasks,
   completedTasks = [],
   lists,
+  moveTargetLists = lists,
+  getTaskSourceListId,
   completingTaskIds,
   completingWithoutBackgroundTaskIds,
   checkAnimatingTaskIds,
@@ -499,6 +519,7 @@ export function TaskListPanel({
   expanded = false,
   panelWidth,
   panelMaxWidth,
+  defaultPanelWidth = TASK_LIST_PANEL_DEFAULT_WIDTH,
   autoExpandMaxWidth = TASK_LIST_PANEL_AUTO_EXPAND_MAX_WIDTH,
   onAutoExpandWidth,
   embedded = false,
@@ -553,6 +574,8 @@ export function TaskListPanel({
   const isListCalendarToggleActive =
     (isListCalendarOpen && !listCalendarShowingDetails) || isListCalendarPreview;
   const [newTaskName, setNewTaskName] = useState("");
+  const [addTaskKind, setAddTaskKind] = useState<AddTaskKind>("task");
+  const { addTaskNoteSwitchEnabled } = useAddTaskNoteSwitchEnabled();
   const newTaskParsePreview = useMemo(() => {
     if (!newTaskName.trim()) return null;
     const parsed = parseNaturalLanguageTask(newTaskName, { lists });
@@ -850,8 +873,8 @@ export function TaskListPanel({
 
   useEffect(() => {
     if (panelWidth != null) return;
-    setEmbeddedAutoWidth(TASK_LIST_PANEL_DEFAULT_WIDTH);
-  }, [panelWidth, viewResetKey, listId, isLabelFilter]);
+    setEmbeddedAutoWidth(defaultPanelWidth);
+  }, [defaultPanelWidth, panelWidth, viewResetKey, listId, isLabelFilter]);
 
   const resolvedPanelWidth = panelWidth ?? embeddedAutoWidth;
   const resolvedPanelWidthRef = useRef(resolvedPanelWidth);
@@ -861,7 +884,7 @@ export function TaskListPanel({
     (nextWidth: number) => {
       const clampedWidth = Math.min(
         autoExpandMaxWidth,
-        Math.max(TASK_LIST_PANEL_DEFAULT_WIDTH, nextWidth),
+        Math.max(defaultPanelWidth, nextWidth),
       );
 
       if (panelWidth != null) {
@@ -873,7 +896,7 @@ export function TaskListPanel({
         clampedWidth <= currentWidth ? currentWidth : clampedWidth,
       );
     },
-    [autoExpandMaxWidth, onAutoExpandWidth, panelWidth],
+    [autoExpandMaxWidth, defaultPanelWidth, onAutoExpandWidth, panelWidth],
   );
 
   useLayoutEffect(() => {
@@ -1160,6 +1183,7 @@ export function TaskListPanel({
   function resetNewTaskForm() {
     keepAddTaskOpenRef.current = false;
     setNewTaskName("");
+    setAddTaskKind("task");
     resetNewTaskSchedule();
     resetNewTaskMetadata();
   }
@@ -1245,8 +1269,11 @@ export function TaskListPanel({
         : {}),
       ...(parsed.recurrenceRule ? { recurrenceRule: parsed.recurrenceRule } : {}),
       ...(parsed.listId ? { listId: parsed.listId } : {}),
-      ...(parsed.subtasks.length > 0 && subtasksEnabled
+      ...(parsed.subtasks.length > 0 && subtasksEnabled && addTaskKind !== "note"
         ? { subtasks: parsed.subtasks }
+        : {}),
+      ...(addTaskNoteSwitchEnabled && addTaskKind === "note"
+        ? { isNote: true }
         : {}),
     };
 
@@ -1457,7 +1484,11 @@ export function TaskListPanel({
   }
 
   function resolveTaskListId(task: TaskListItem): string | null {
-    return task.listId ?? listId ?? null;
+    const fallbackListId = task.listId ?? listId ?? null;
+    return (
+      getTaskSourceListId?.(task.id, fallbackListId) ??
+      fallbackListId
+    );
   }
 
   function initLabelMenuForTask(taskId: string) {
@@ -2373,7 +2404,7 @@ export function TaskListPanel({
           openLabelMenuTaskId={openLabelMenuTaskId}
           openMoveMenuTaskId={openMoveMenuTaskId}
           openPriorityMenuTaskId={openPriorityMenuTaskId}
-          lists={lists}
+          lists={moveTargetLists}
           currentListId={resolveTaskListId(task)}
           moveQuery={moveQuery}
           availableLabels={availableLabels}
@@ -2470,7 +2501,7 @@ export function TaskListPanel({
             <TaskRowContextMenu
               task={pointerMenuTask}
               view={pointerContextMenu.view}
-              lists={lists}
+              lists={moveTargetLists}
               currentListId={resolveTaskListId(pointerMenuTask)}
               moveQuery={moveQuery}
               availableLabels={availableLabels}
@@ -2574,7 +2605,7 @@ export function TaskListPanel({
           ? "flex min-h-0 flex-col border-r border-zinc-200 dark:border-zinc-800"
           : embedded
             ? "w-[520px] border-r border-zinc-200 dark:border-zinc-800"
-            : "w-full min-w-[350px] border-r border-zinc-200 dark:border-zinc-800"
+            : "w-full min-w-[348px] border-r border-zinc-200 dark:border-zinc-800"
       }`}
     >
       {title ? (
@@ -2584,13 +2615,13 @@ export function TaskListPanel({
           }`}
         >
           {showHeader && (
-            <header className="flex items-center justify-between gap-2 border-b border-zinc-200 py-[7px] pl-[16px]! pr-4 dark:border-zinc-800">
-              <div className="flex min-w-0 items-center gap-1.5">
+            <header className="flex items-center justify-between gap-2 border-b border-zinc-200 py-[7px] pl-[8px]! pr-4 dark:border-zinc-800">
+              <div className="flex min-w-0 items-center gap-[5px]">
                 {showSidebarMenu && onOpenSidebar ? (
                   <button
                     type="button"
                     aria-label="Open menu"
-                    className="-ml-2 flex size-9 shrink-0 items-center justify-center rounded-lg ptxt-600 hover:bg-zinc-100 dark:ptxt-300 dark:hover:bg-zinc-800 lg:hidden"
+                    className="-ml-2 mt-[3px] flex size-9 shrink-0 items-center justify-center rounded-lg ptxt-600 hover:bg-zinc-100 dark:ptxt-300 dark:hover:bg-zinc-800 lg:hidden cursor-pointer"
                     onClick={onOpenSidebar}
                   >
                     <LuMenu className="size-5" aria-hidden="true" />
@@ -2614,7 +2645,7 @@ export function TaskListPanel({
                     />
                   )
                 ) : null}
-                <h1 className="min-w-0 ml-[2px] mr-1 truncate text-[22px] font-semibold ptxt-task-list-title">
+                <h1 className="min-w-0 ml-[2px] mr-1 truncate text-[19px] font-semibold ptxt-task-list-title">
                   {title}
                 </h1>
                 {showListCalendarButton && hasScheduledTasks ? (
@@ -2667,7 +2698,7 @@ export function TaskListPanel({
                     }
                     aria-haspopup="menu"
                     aria-expanded={isSortMenuOpen}
-                    className="flex h-[27px] cursor-pointer items-center rounded-lg pl-1 pr-[6px] text-[14px] ptxt-500 transition-colors hover:ptxt-900 dark:ptxt-400 dark:hover:ptxt-100"
+                    className="flex h-[27px] cursor-pointer items-center rounded-lg pl-1 pr-[6px] text-[13px] ptxt-500 transition-colors hover:ptxt-900 dark:ptxt-400 dark:hover:ptxt-100"
                   >
                     <BiSortAlt2
                       className="size-[15px] shrink-0"
@@ -2713,7 +2744,7 @@ export function TaskListPanel({
             </header>
           )}
 
-          <div className="relative z-20 flex items-center overflow-visible pl-[12px] pr-[8px] py-2 min-h-[50px]">
+          <div className="relative z-20 flex items-center overflow-visible pl-[8px] pr-[10px] py-2 min-h-[50px]">
             {showAddTask ? (
               <div className="min-w-0 flex-1 overflow-visible">
                 <form
@@ -2733,11 +2764,22 @@ export function TaskListPanel({
                     value={newTaskName}
                     onChange={(event) => setNewTaskName(event.target.value)}
                     placeholder={
-                      title ? `New task in "${title}"` : "New task"
+                      addTaskNoteSwitchEnabled && addTaskKind === "note"
+                        ? title
+                          ? `New note in "${title}"`
+                          : "New note"
+                        : title
+                          ? `New task in "${title}"`
+                          : "New task"
                     }
-                    aria-label="Task name"
+                    aria-label={
+                      addTaskNoteSwitchEnabled && addTaskKind === "note"
+                        ? "Note title"
+                        : "Task name"
+                    }
                     title="Add task (Ctrl+Enter / Cmd+Enter)"
-                    className="add-task-input min-w-0 flex-1 bg-transparent py-1.5 text-sm ptxt-700 outline-none dark:ptxt-50"
+                    className="add-task-input min-w-0 flex-1 bg-transparent py-1.5 text-sm ptxt-700 outline-none dark:ptxt-50 placeholder:text-[14px]"
+               
                     onKeyDown={(event) => {
                       if (event.key === "Escape") {
                         event.preventDefault();
@@ -2792,7 +2834,7 @@ export function TaskListPanel({
                           : ""
                       }`}
                     >
-                      <TaskSetDateIcon className="size-[19px] ptxt-400 group-hover:text-[#767984] " />
+                      <TaskSetDateIcon className="size-[20px] ptxt-400 group-hover:text-[#767984] " />
                     </button>
                     <span
                       id="add-task-calendar-tooltip"
@@ -2942,6 +2984,13 @@ export function TaskListPanel({
                       </div>
                     ) : null}
                   </div>
+
+                  {addTaskNoteSwitchEnabled ? (
+                    <AddTaskKindSwitch
+                      value={addTaskKind}
+                      onChange={setAddTaskKind}
+                    />
+                  ) : null}
 
                   <button
                     type="submit"

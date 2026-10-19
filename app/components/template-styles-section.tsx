@@ -140,7 +140,7 @@ export function TemplateStylesSection({
         </p>
       ) : null}
 
-      <div className="max-h-36 overflow-y-auto rounded-md border border-zinc-200 dark:border-zinc-700">
+      <div className="max-h-20 overflow-y-auto rounded-md border border-zinc-200 dark:border-zinc-700">
         {templateStyles.isLoading ? (
           <p className="px-2 py-2 text-[11px] text-zinc-500 dark:text-zinc-400">
             Loading...

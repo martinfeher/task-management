@@ -57,6 +57,7 @@ import {
 } from "@/lib/task-recurrence";
 import {
   COMPACT_LAYOUT_MEDIA_QUERY,
+  NARROW_DESKTOP_TASK_LIST_MEDIA_QUERY,
   useMediaQuery,
 } from "@/lib/use-media-query";
 import type { CalendarExternalDragTarget } from "@/lib/calendar-time-grid";
@@ -78,6 +79,10 @@ import {
   type TodoRoute,
 } from "@/lib/todo-routes";
 import { getInboxListId } from "@/lib/inbox-list";
+import {
+  buildTaskMoveTargetLists,
+  resolveTaskSourceListId,
+} from "@/lib/task-move-lists";
 import { useImportantEnabled } from "@/lib/important-settings";
 import { useListPreviewEnabled } from "@/lib/list-preview-settings";
 import { useSubtasksEnabled } from "@/lib/subtasks-settings";
@@ -98,7 +103,14 @@ import { CalendarShortcutModal } from "./calendar-shortcut-modal";
 import { plainTextToTaskDetails } from "./calendar-add-task-popover";
 import { TaskDetailsPanel, type TaskDetailsSaveController } from "./task-details-panel";
 import { PanelResizeHandle } from "./panel-resize-handle";
-import { TaskListPanel, TASK_LIST_PANEL_AUTO_EXPAND_MAX_WIDTH, TASK_LIST_PANEL_DEFAULT_WIDTH, TASK_LIST_PANEL_MIN_WIDTH } from "./task-list-panel";
+import {
+  TaskListPanel,
+  TASK_LIST_PANEL_AUTO_EXPAND_MAX_WIDTH,
+  TASK_LIST_PANEL_DEFAULT_WIDTH,
+  TASK_LIST_PANEL_MIN_WIDTH,
+  TASK_LIST_PANEL_NARROW_DEFAULT_WIDTH,
+  resolveTaskListPanelDefaultWidth,
+} from "./task-list-panel";
 import { ListKanbanPanel } from "./list-kanban-panel";
 import {
   createKanbanColumn,
@@ -749,6 +761,7 @@ export type AddTaskOptions = {
   recurrenceRule?: TaskRecurrenceRule | null;
   listId?: string;
   subtasks?: string[];
+  isNote?: boolean;
 };
 
 export type SidebarHoverPreview = {
@@ -873,6 +886,11 @@ export function TodoApp({
   const [listCalendarShowingDetails, setListCalendarShowingDetails] =
     useState(false);
   const isCompactLayout = useMediaQuery(COMPACT_LAYOUT_MEDIA_QUERY);
+  const isNarrowDesktop = useMediaQuery(NARROW_DESKTOP_TASK_LIST_MEDIA_QUERY);
+  const taskListDefaultWidth = useMemo(
+    () => resolveTaskListPanelDefaultWidth(isNarrowDesktop),
+    [isNarrowDesktop],
+  );
   const [sidebarDrawerOpen, setSidebarDrawerOpen] = useState(false);
   const [listCalendarView, setListCalendarView] = useState<ListCalendarView>(
     bootState.listCalendarView,
@@ -946,7 +964,9 @@ export function TodoApp({
   const listCalendarButtonRef = useRef<HTMLButtonElement>(null);
   const listCalendarReturnTaskIdRef = useRef<string | null>(null);
   const listCalendarPreviewCloseTimerRef = useRef<number | null>(null);
-  const [taskListWidth, setTaskListWidth] = useState(TASK_LIST_PANEL_DEFAULT_WIDTH);
+  const [taskListWidth, setTaskListWidth] = useState(
+    TASK_LIST_PANEL_DEFAULT_WIDTH,
+  );
   const [hasResizedTaskList, setHasResizedTaskList] = useState(false);
   const splitContainerRef = useRef<HTMLDivElement>(null);
   const taskListWidthRef = useRef(taskListWidth);
@@ -1046,13 +1066,13 @@ export function TodoApp({
         const nextWidth = clampTaskListWidth(
           Math.min(
             TASK_LIST_PANEL_AUTO_EXPAND_MAX_WIDTH,
-            Math.max(TASK_LIST_PANEL_DEFAULT_WIDTH, width),
+            Math.max(taskListDefaultWidth, width),
           ),
         );
         return nextWidth <= currentWidth ? currentWidth : nextWidth;
       });
     },
-    [clampTaskListWidth, hasResizedTaskList],
+    [clampTaskListWidth, hasResizedTaskList, taskListDefaultWidth],
   );
 
   useEffect(() => {
@@ -1077,12 +1097,16 @@ export function TodoApp({
 
   useEffect(() => {
     if (hasResizedTaskList) return;
-    setTaskListWidth(TASK_LIST_PANEL_DEFAULT_WIDTH);
+    setTaskListWidth(clampTaskListWidth(taskListDefaultWidth));
   }, [
+    clampTaskListWidth,
     displayedListId,
     displayedLabelId,
     displayedActiveView,
     hasResizedTaskList,
+    isListCalendarOpen,
+    isNarrowDesktop,
+    taskListDefaultWidth,
   ]);
 
   const listHoverPreview =
@@ -1110,6 +1134,10 @@ export function TodoApp({
   const selectedLabel =
     labels.find((item) => item.id === selectedLabelId) ?? null;
   const inboxListId = useMemo(() => getInboxListId(lists), [lists]);
+  const taskMoveTargetLists = useMemo(
+    () => buildTaskMoveTargetLists(lists),
+    [lists],
+  );
   const taskListPanelListId =
     displayedListId ??
     (displayedActiveView === "inbox" ? inboxListId : null);
@@ -1988,6 +2016,12 @@ export function TodoApp({
   }
 
   async function selectCompletedTask(taskId: string, listId: string) {
+    listCalendarReturnTaskIdRef.current = null;
+    setIsListCalendarOpen(false);
+    setIsListCalendarPreview(false);
+    setListCalendarShowingDetails(false);
+    setCalendarExternalDropTarget(null);
+    setSidebarHoverPreview(null);
     setActiveView(null);
     setSelectedLabelId(null);
     setSelectedListId(listId);
@@ -1995,8 +2029,20 @@ export function TodoApp({
   }
 
   async function selectSearchTask(taskId: string, listId: string) {
-    setFocusNoteAtEndRequest((current) => current + 1);
     await selectCompletedTask(taskId, listId);
+
+    const task =
+      tasksByList[listId]?.find((item) => item.id === taskId) ??
+      Object.values(tasksByList)
+        .flat()
+        .find((item) => item.id === taskId) ??
+      null;
+
+    if (task?.isNote) {
+      setFocusNoteAtEndRequest((current) => current + 1);
+    } else {
+      setFocusTaskTitleRequest((current) => current + 1);
+    }
   }
 
   async function convertTaskToNote(taskId: string) {
@@ -2374,7 +2420,7 @@ export function TodoApp({
   const kanbanModalActions = useMemo(
     () => ({
       tasks: kanbanModalTasks,
-      lists,
+      lists: taskMoveTargetLists,
       labels,
       onSetTaskPriority: setTaskPriority,
       onToggleTaskLabel: toggleTaskLabel,
@@ -2386,10 +2432,10 @@ export function TodoApp({
       deleteTaskById,
       kanbanModalTasks,
       labels,
-      lists,
       moveTaskToList,
       refreshLabels,
       setTaskPriority,
+      taskMoveTargetLists,
       toggleTaskLabel,
     ],
   );
@@ -2630,7 +2676,9 @@ export function TodoApp({
           ? null
           : getTodayDateValue();
     const markImportant = displayedActiveView === "important";
-    const task = await createTask(targetListId, name.trim(), dueDateValue);
+    const task = await createTask(targetListId, name.trim(), dueDateValue, {
+      isNote: options?.isNote ?? false,
+    });
 
     if (markImportant) {
       await updateTaskImportantInDb(task.id, true);
@@ -2670,7 +2718,7 @@ export function TodoApp({
     }
 
     const createdSubtasks: Task[] = [];
-    if (subtasksEnabled && options?.subtasks?.length) {
+    if (subtasksEnabled && options?.subtasks?.length && !options?.isNote) {
       for (const subtaskName of options.subtasks) {
         const subtask = await createSubtask(task.id, subtaskName);
         createdSubtasks.push({
@@ -2710,7 +2758,7 @@ export function TodoApp({
       priority: resolvedPriority,
       pinned: false,
       important: markImportant,
-      isNote: false,
+      isNote: Boolean(options?.isNote),
       parentId: null,
       labels: resolvedLabels,
     };
@@ -3272,13 +3320,7 @@ export function TodoApp({
   }
 
   function findTaskListId(taskId: string) {
-    for (const [listId, listTasks] of Object.entries(tasksByList)) {
-      if (listTasks.some((item) => item.id === taskId)) {
-        return listId;
-      }
-    }
-
-    return null;
+    return resolveTaskSourceListId(taskId, tasksByList);
   }
 
   function getSubtaskInsertIndex(tasks: Task[], parentId: string) {
@@ -3465,9 +3507,12 @@ export function TodoApp({
     sourceListId: string,
     targetListId: string,
   ) {
-    if (sourceListId === targetListId) return;
+    const resolvedSourceListId =
+      resolveTaskSourceListId(taskId, tasksByList, sourceListId) ??
+      sourceListId;
+    if (!resolvedSourceListId || resolvedSourceListId === targetListId) return;
 
-    const sourceTasks = tasksByList[sourceListId] ?? [];
+    const sourceTasks = tasksByList[resolvedSourceListId] ?? [];
     const task = sourceTasks.find((item) => item.id === taskId);
     if (!task) return;
 
@@ -3482,7 +3527,7 @@ export function TodoApp({
       ? getNextTaskIdAfterRemove(
           getVisibleTasks(
             activeView,
-            selectedListId ?? sourceListId,
+            selectedListId ?? resolvedSourceListId,
             selectedLabelId,
             lists,
             tasksByList,
@@ -3510,7 +3555,7 @@ export function TodoApp({
 
       return {
         ...current,
-        [sourceListId]: nextSource,
+        [resolvedSourceListId]: nextSource,
         [targetListId]: nextTarget,
       };
     });
@@ -3643,15 +3688,29 @@ export function TodoApp({
         return;
       }
       closeListCalendar();
+      if (isNarrowDesktop && !hasResizedTaskList) {
+        setTaskListWidth(
+          clampTaskListWidth(TASK_LIST_PANEL_NARROW_DEFAULT_WIDTH),
+        );
+      }
       return;
     }
 
     setIsListCalendarOpen(true);
     setListCalendarShowingDetails(false);
+
+    if (isNarrowDesktop && !hasResizedTaskList) {
+      setTaskListWidth(
+        clampTaskListWidth(TASK_LIST_PANEL_NARROW_DEFAULT_WIDTH),
+      );
+    }
   }, [
     cancelListCalendarPreviewClose,
+    clampTaskListWidth,
     closeListCalendar,
+    hasResizedTaskList,
     isListCalendarOpen,
+    isNarrowDesktop,
     listCalendarShowingDetails,
     selectedListId,
   ]);
@@ -4049,6 +4108,10 @@ export function TodoApp({
                   tasks={taskListItems}
                   completedTasks={listCompletedTasks}
                   lists={lists}
+                  moveTargetLists={taskMoveTargetLists}
+                  getTaskSourceListId={(taskId, fallbackListId) =>
+                    resolveTaskSourceListId(taskId, tasksByList, fallbackListId)
+                  }
                   completingTaskIds={completingTaskIds}
                   completingWithoutBackgroundTaskIds={
                     completingWithoutBackgroundTaskIds
@@ -4056,6 +4119,7 @@ export function TodoApp({
                   checkAnimatingTaskIds={checkAnimatingTaskIds}
                   selectedTaskId={selectedTaskId}
                   panelWidth={isCompactLayout ? undefined : taskListWidth}
+                  defaultPanelWidth={taskListDefaultWidth}
                   panelMaxWidth={
                     isCompactLayout
                       ? undefined
@@ -4127,7 +4191,7 @@ export function TodoApp({
             {!isCompactLayout || compactDetailView ? (
             <div
               className={`flex min-h-0 flex-1 flex-col overflow-hidden ${
-                isCompactLayout ? "min-w-0" : "min-w-[350px]"
+                isCompactLayout ? "min-w-0" : "min-w-[348px]"
               }`}
             >
               {showListCalendarPanel ? (
@@ -4226,12 +4290,17 @@ export function TodoApp({
                 tasks={taskListItems}
                 completedTasks={listCompletedTasks}
                 lists={lists}
+                moveTargetLists={taskMoveTargetLists}
+                getTaskSourceListId={(taskId, fallbackListId) =>
+                  resolveTaskSourceListId(taskId, tasksByList, fallbackListId)
+                }
                 completingTaskIds={completingTaskIds}
                 completingWithoutBackgroundTaskIds={
                   completingWithoutBackgroundTaskIds
                 }
                 checkAnimatingTaskIds={checkAnimatingTaskIds}
                 selectedTaskId={selectedTaskId}
+                defaultPanelWidth={taskListDefaultWidth}
                 expanded={!showListCalendar}
                 showAddTask={
                   displayedListId !== null ||
@@ -4288,7 +4357,7 @@ export function TodoApp({
               />
             </div>
             {showListCalendarPanel ? (
-              <div className="flex min-h-0 min-w-[350px] flex-1 flex-col overflow-hidden">
+              <div className="flex min-h-0 min-w-[348px] flex-1 flex-col overflow-hidden">
                 <CalendarViewsPanel
                   tasks={taskListItems}
                   searchTasks={searchTasks}
@@ -4343,7 +4412,7 @@ export function TodoApp({
               </div>
             ) : null}
             {showTaskDetails ? (
-              <div className="flex min-h-0 min-w-[350px] flex-1 flex-col overflow-hidden">
+              <div className="flex min-h-0 min-w-[348px] flex-1 flex-col overflow-hidden">
                 <TaskDetailsPanel
                   taskId={selectedTaskId}
                   taskSnapshot={selectedTaskSnapshot}

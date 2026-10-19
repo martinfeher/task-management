@@ -11,6 +11,10 @@ import {
   getTomorrowDateKey,
 } from "@/lib/task-due-date";
 import { TodayCalendarIcon } from "./today-calendar-icon";
+import {
+  TASK_CONTEXT_MENU_COLORS,
+  taskContextMenuTextColor,
+} from "@/lib/task-context-menu-colors";
 
 export type TaskContextMenuDateShortcutVariant = "full" | "compact";
 
@@ -104,7 +108,7 @@ export function TaskContextMenuDateShortcuts({
       <TodayCalendarIcon
         day={todayDay}
         strokeWidth={0.8}
-        className="text-[#8b8d92]"
+        style={taskContextMenuTextColor("dateIcon")}
       />
     </DateShortcutButton>
   );
@@ -118,7 +122,10 @@ export function TaskContextMenuDateShortcuts({
         onSelectDate(getTomorrowDateKey());
       }}
     >
-      <WiSunset className="text-[#adaeb2]! size-[22px]! mt-px" />
+      <WiSunset
+        className="size-[22px]! mt-px"
+        style={taskContextMenuTextColor("sunsetIcon")}
+      />
     </DateShortcutButton>
   );
 
@@ -135,7 +142,7 @@ export function TaskContextMenuDateShortcuts({
       <TodayCalendarIcon
         day={nextWeekendDay}
         strokeWidth={0.8}
-        className="text-[#8b8d92]"
+        style={taskContextMenuTextColor("dateIcon")}
       />
     </DateShortcutButton>
   );
@@ -151,8 +158,9 @@ export function TaskContextMenuDateShortcuts({
       }}
     >
       <BsCalendarPlus
-        className="text-[#acafb4] size-[17px]! mt-[1px]!"
+        className="size-[17px]! mt-[1px]!"
         strokeWidth={0.5}
+        style={taskContextMenuTextColor("calendarPlusIcon")}
       />
     </DateShortcutButton>
   );
@@ -160,7 +168,10 @@ export function TaskContextMenuDateShortcuts({
   return (
     <div className="overflow-visible px-3 pt-[6px]">
       <div className="flex items-center justify-between">
-        <div className="text-[11px] font-medium text-zinc-350 dark:text-zinc-500">
+        <div
+          className="text-[11px] mt-[2px] font-medium dark:text-zinc-500"
+          style={taskContextMenuTextColor("icon350")}
+        >
           Due date
         </div>
         {hasDueDate ? (
@@ -169,14 +180,23 @@ export function TaskContextMenuDateShortcuts({
               type="button"
               aria-label="Clear date"
               aria-describedby={`${tooltipBaseId}-clear-date`}
-              className="flex gap-1 pr-[6px] cursor-pointer text-[11px] font-medium text-[#c8c1b6] transition-colors group-hover:text-zinc-500 dark:hover:text-zinc-300"
+              className="tcm-clear-date flex gap-1 pr-[6px] cursor-pointer text-[11px] font-medium transition-colors dark:hover:text-zinc-300"
+              style={{
+                color: TASK_CONTEXT_MENU_COLORS.clearDate,
+                ["--tcm-clear-date" as string]: TASK_CONTEXT_MENU_COLORS.clearDate,
+                ["--tcm-clear-date-hover" as string]:
+                  TASK_CONTEXT_MENU_COLORS.icon500,
+              }}
               onClick={(event) => {
                 event.stopPropagation();
                 onClearDate?.();
               }}
             >
               Clear{" "}
-              <LuCalendarX2 className="mt-[3px] size-[10px] text-[#c8c1b6] group-hover:text-zinc-500" />
+              <LuCalendarX2
+                className="tcm-icon mt-[3px] size-[10px]"
+                style={{ color: "inherit" }}
+              />
             </button>
             <span
               id={`${tooltipBaseId}-clear-date`}

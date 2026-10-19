@@ -18,6 +18,10 @@ import type { Label } from "./task-label-selector";
 import { TaskLabelSelector } from "./task-label-selector";
 import { TaskPrioritySelector } from "./task-priority-selector";
 import type { TaskListItem, TodoList } from "./todo-app";
+import {
+  TASK_CONTEXT_MENU_COLORS,
+  taskContextMenuTextColor,
+} from "@/lib/task-context-menu-colors";
 
 export type TaskRowContextMenuView = "main" | "label" | "moveTo";
 
@@ -66,10 +70,28 @@ const menuClassName =
   "overflow-visible rounded-[23px] bg-white p-[5px] shadow-[0_12px_32px_rgba(0,0,0,0.12)] dark:bg-zinc-900 dark:shadow-[0_12px_32px_rgba(0,0,0,0.32)]";
 
 const menuItemClassName =
-  "flex h-[35px] w-full items-center px-3 text-left text-sm text-zinc-900 hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800";
+  "tcm-menu-item flex h-[35px] w-full items-center px-3 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800";
 
 const deleteMenuItemClassName =
-  "flex h-[35px] w-full items-center px-3 text-left text-sm text-red-600 dark:text-red-400 dark:hover:bg-red-950/40";
+  "tcm-menu-item tcm-menu-item--delete flex h-[35px] w-full items-center px-3 text-left text-sm dark:hover:bg-red-950/40";
+
+const taskContextMenuSurfaceStyle = {
+  color: TASK_CONTEXT_MENU_COLORS.textPrimary,
+  ["--tcm-text-primary" as string]: TASK_CONTEXT_MENU_COLORS.textPrimary,
+  ["--tcm-text-secondary" as string]: TASK_CONTEXT_MENU_COLORS.textSecondary,
+  ["--tcm-icon-350" as string]: TASK_CONTEXT_MENU_COLORS.icon350,
+  ["--tcm-icon-400" as string]: TASK_CONTEXT_MENU_COLORS.icon400,
+  ["--tcm-icon-450" as string]: TASK_CONTEXT_MENU_COLORS.icon450,
+  ["--tcm-icon-500" as string]: TASK_CONTEXT_MENU_COLORS.icon500,
+  ["--tcm-icon-550" as string]: TASK_CONTEXT_MENU_COLORS.icon550,
+  ["--tcm-icon-600" as string]: TASK_CONTEXT_MENU_COLORS.icon600,
+  ["--tcm-icon-650" as string]: TASK_CONTEXT_MENU_COLORS.icon650,
+  ["--tcm-tag-icon" as string]: TASK_CONTEXT_MENU_COLORS.tagIcon,
+  ["--tcm-delete-icon" as string]: TASK_CONTEXT_MENU_COLORS.deleteIcon,
+  ["--tcm-delete-text" as string]: TASK_CONTEXT_MENU_COLORS.deleteText,
+  ["--tcm-delete-icon-hover" as string]:
+    TASK_CONTEXT_MENU_COLORS.deleteIconHover,
+} as const;
 
 const menuItemWithIconClassName =
   "flex items-center gap-2 leading-none";
@@ -147,6 +169,7 @@ function MainMenuItems({
   const prioritySelector = hasPriorityActions ? (
     <TaskPrioritySelector
       selectedPriority={task.priority}
+      tone="contextMenu"
       onSelectPriority={(priority) => {
         onSelectTaskPriority(priority);
         onClose();
@@ -199,12 +222,30 @@ function MainMenuItems({
      
             <span className={menuItemIconSlotClassName}>
               <LuListVideo
-                className="size-[19px]! mb-[1.5px] text-zinc-350 group-hover:text-zinc-400 dark:text-zinc-400"
+                className="tcm-icon size-[19px]! mb-[1.5px] dark:text-zinc-400"
+                style={{
+                  color: "var(--tcm-icon-350)",
+                  ["--tcm-icon" as string]: TASK_CONTEXT_MENU_COLORS.icon350,
+                  ["--tcm-icon-hover" as string]: TASK_CONTEXT_MENU_COLORS.icon400,
+                }}
               />
             </span>
-            <span className="text-[15px] text-zinc-800">Move to</span>
+            <span
+              className="text-[15px]"
+              style={taskContextMenuTextColor("textSecondary")}
+            >
+              Move to
+            </span>
           </span>
-          <BiChevronRight className="size-5 shrink-0 text-zinc-350 group-hover:text-zinc-400" aria-hidden />
+          <BiChevronRight
+            className="tcm-icon size-5 shrink-0"
+            style={{
+              color: "var(--tcm-icon-350)",
+              ["--tcm-icon" as string]: TASK_CONTEXT_MENU_COLORS.icon350,
+              ["--tcm-icon-hover" as string]: TASK_CONTEXT_MENU_COLORS.icon400,
+            }}
+            aria-hidden
+          />
         </button>
       ) : null}
       {hasLabelActions ? (
@@ -220,10 +261,20 @@ function MainMenuItems({
           <span className={menuItemWithIconClassName}>
             <span className={menuItemIconSlotClassName}>
               <LiaTagSolid
-                className="size-[20px]! text-[#b4b4c8]! group-hover:text-zinc-450 dark:text-zinc-400"
+                className="tcm-icon size-[20px]! dark:text-zinc-400"
+                style={{
+                  color: "var(--tcm-tag-icon)",
+                  ["--tcm-icon" as string]: TASK_CONTEXT_MENU_COLORS.tagIcon,
+                  ["--tcm-icon-hover" as string]: TASK_CONTEXT_MENU_COLORS.icon450,
+                }}
               />
             </span>
-            <span className="text-[15px] text-zinc-800">{task.labels.length > 0 ? "Labels" : "Add label"}</span>
+            <span
+              className="text-[15px]"
+              style={taskContextMenuTextColor("textSecondary")}
+            >
+              {task.labels.length > 0 ? "Labels" : "Add label"}
+            </span>
           </span>
         </button>
       ) : null}
@@ -240,7 +291,16 @@ function MainMenuItems({
         >
           <span className={menuItemWithIconClassName}>
             <span className={menuItemIconSlotClassName}>
-              <TaskListSubtaskIcon className="size-[19px]! text-zinc-400 group-hover:text-zinc-450 dark:text-zinc-400" />
+              <span
+                className="tcm-icon flex items-center justify-center dark:text-zinc-400"
+                style={{
+                  color: "var(--tcm-icon-400)",
+                  ["--tcm-icon" as string]: TASK_CONTEXT_MENU_COLORS.icon400,
+                  ["--tcm-icon-hover" as string]: TASK_CONTEXT_MENU_COLORS.icon450,
+                }}
+              >
+                <TaskListSubtaskIcon className="size-[19px]!" />
+              </span>
             </span>
             Add subtask
           </span>
@@ -260,7 +320,12 @@ function MainMenuItems({
           <span className={menuItemWithIconClassName}>
             <span className={menuItemIconSlot20ClassName}>
               <PiListStarThin
-                className="size-[20px] text-zinc-500 group-hover:text-zinc-550 dark:text-zinc-400"
+                className="tcm-icon size-[20px] dark:text-zinc-400"
+                style={{
+                  color: "var(--tcm-icon-500)",
+                  ["--tcm-icon" as string]: TASK_CONTEXT_MENU_COLORS.icon500,
+                  ["--tcm-icon-hover" as string]: TASK_CONTEXT_MENU_COLORS.icon550,
+                }}
               />
             </span>
             {task.important ? "Remove from important" : "Mark as important"}
@@ -280,8 +345,13 @@ function MainMenuItems({
           <span className={menuItemWithIconClassName}>
             <span className={menuItemIconSlotClassName}>
               <PiNoteThin
-                style={{ transform: "scaleX(0.87)" }}
-                className="size-[19px]! text-zinc-600 group-hover:text-zinc-650 dark:text-zinc-400"
+                className="tcm-icon size-[19px]! dark:text-zinc-400"
+                style={{
+                  transform: "scaleX(0.87)",
+                  color: "var(--tcm-icon-600)",
+                  ["--tcm-icon" as string]: TASK_CONTEXT_MENU_COLORS.icon600,
+                  ["--tcm-icon-hover" as string]: TASK_CONTEXT_MENU_COLORS.icon650,
+                }}
               />
             </span>
             {task.isNote ? "convert to Task" : "convert to Note"}
@@ -301,7 +371,12 @@ function MainMenuItems({
           <span className={menuItemWithIconClassName}>
             <span className={menuItemIconSlotClassName}>
               <IoDuplicateOutline
-                className="size-[15px] text-zinc-450 group-hover:text-zinc-500 dark:text-zinc-400"
+                className="tcm-icon size-[15px] dark:text-zinc-400"
+                style={{
+                  color: "var(--tcm-icon-450)",
+                  ["--tcm-icon" as string]: TASK_CONTEXT_MENU_COLORS.icon450,
+                  ["--tcm-icon-hover" as string]: TASK_CONTEXT_MENU_COLORS.icon500,
+                }}
               />
             </span>
             Duplicate
@@ -315,6 +390,7 @@ function MainMenuItems({
             type="button"
             role="menuitem"
             className={`${deleteMenuItemClassName} group -ml-[3px] cursor-pointer`}
+            style={taskContextMenuTextColor("deleteText")}
        
             onClick={(event) => {
               event.stopPropagation();
@@ -324,9 +400,15 @@ function MainMenuItems({
             <span className={menuItemWithIconClassName}>
               <span className={deleteMenuItemIconSlotClassName}>
                 <RiDeleteBinLine
-                  className="!size-[18px] ml-[3px] mb-[1px] text-[#e07142] group-hover:text-red-500 dark:text-red-400"
+                  className="tcm-icon !size-[18px] ml-[3px] mb-[1px] dark:text-red-400"
                   strokeWidth={0.2}
-                  style={{ transform: "scaleX(0.87)" }}
+                  style={{
+                    transform: "scaleX(0.87)",
+                    color: "var(--tcm-delete-icon)",
+                    ["--tcm-icon" as string]: TASK_CONTEXT_MENU_COLORS.deleteIcon,
+                    ["--tcm-icon-hover" as string]:
+                      TASK_CONTEXT_MENU_COLORS.deleteIconHover,
+                  }}
                 />
               </span>
               <span className="text-[15px]">Delete</span>
@@ -453,7 +535,10 @@ export function TaskRowContextMenu({
   };
 
   const menu = (
-    <>
+    <div
+      className="task-list-context-menu"
+      style={taskContextMenuSurfaceStyle}
+    >
       {view === "main" && !showMoveFlyout && <MainMenuItems {...mainMenuProps} />}
 
       {view === "main" && showMoveFlyout && (
@@ -475,6 +560,7 @@ export function TaskRowContextMenu({
               onSelectList={onMoveTaskToList}
               onCancel={onClose}
               autoFocus={false}
+              tone="contextMenu"
             />
           </div>
         </div>
@@ -499,6 +585,7 @@ export function TaskRowContextMenu({
               onSelectList={onMoveTaskToList}
               onCancel={onClose}
               autoFocus
+              tone="contextMenu"
             />
           </div>
         </div>
@@ -514,9 +601,10 @@ export function TaskRowContextMenu({
           onToggleLabel={onToggleLabelSelection}
           onCreateLabel={onCreateLabel}
           onCancel={onClose}
+          tone="contextMenu"
         />
       )}
-    </>
+    </div>
   );
 
   if (fixedPosition) {

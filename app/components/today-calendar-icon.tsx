@@ -1,13 +1,17 @@
+import type { CSSProperties } from "react";
+
 type TodayCalendarIconProps = {
   className?: string;
   day?: number;
   strokeWidth?: number;
+  style?: CSSProperties;
 };
 
 export function TodayCalendarIcon({
   className,
   day = new Date().getDate(),
   strokeWidth = 1.75,
+  style,
 }: TodayCalendarIconProps) {
   const dayLabel = String(day);
   const fontSize = dayLabel.length > 1 ? 7.5 : 8.5;
@@ -18,6 +22,7 @@ export function TodayCalendarIcon({
       fill="none"
       aria-hidden="true"
       className={className}
+      style={style}
     >
       <rect
         x="4"

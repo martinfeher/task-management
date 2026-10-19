@@ -37,6 +37,9 @@ const SLASH_COMMAND_MENU_ROW_HEIGHT = 36;
 const SLASH_COMMAND_MENU_SEPARATOR_HEIGHT = 9;
 const TEXT_BLOCK_OPTION_COUNT = 4;
 
+/** Fixed height for the sample editor area in the slash-command hover preview (100–120px range). */
+export const SLASH_COMMAND_PREVIEW_CONTENT_HEIGHT_PX = 110;
+
 export function getSlashCommandPreviewTopOffset(
   selectedIndex: number,
   options: Array<{ kind: "block" | "link" }>,
@@ -68,12 +71,17 @@ function PreviewEditorContent({ type }: { type: SlashCommandPreviewBlockType }) 
   switch (type) {
     case "h1":
       return (
-        <div
-          className="detail-line font-bold leading-tight text-[#4B4B4B] dark:text-[#F5F5F5]"
-          data-line-type="h1"
-        >
-          Project roadmap
-        </div>
+        <>
+          <div
+            className="detail-line font-bold leading-tight text-[#4B4B4B] dark:text-[#F5F5F5]"
+            data-line-type="h1"
+          >
+            Project roadmap
+          </div>
+          <div className="detail-line text-[#555555] dark:text-zinc-300" data-line-type="text">
+            Plan goals and milestones for the quarter.
+          </div>
+        </>
       );
     case "h2":
       return (
@@ -90,16 +98,27 @@ function PreviewEditorContent({ type }: { type: SlashCommandPreviewBlockType }) 
           <div className="detail-line pl-1 text-[#555555] dark:text-zinc-300" data-line-type="bullet">
             Altruism
           </div>
+          <div className="detail-line pl-1 text-[#555555] dark:text-zinc-300" data-line-type="bullet">
+            Craftsmanship
+          </div>
         </>
       );
     case "h3":
       return (
-        <div
-          className="detail-line font-semibold leading-tight text-[#4B4B4B] dark:text-[#F5F5F5]"
-          data-line-type="h3"
-        >
-          Key milestones
-        </div>
+        <>
+          <div
+            className="detail-line font-semibold leading-tight text-[#4B4B4B] dark:text-[#F5F5F5]"
+            data-line-type="h3"
+          >
+            Key milestones
+          </div>
+          <div className="detail-line pl-1 text-[#555555] dark:text-zinc-300" data-line-type="bullet">
+            Launch beta
+          </div>
+          <div className="detail-line pl-1 text-[#555555] dark:text-zinc-300" data-line-type="bullet">
+            Gather feedback
+          </div>
+        </>
       );
     case "bullet":
       return (
@@ -109,6 +128,9 @@ function PreviewEditorContent({ type }: { type: SlashCommandPreviewBlockType }) 
           </div>
           <div className="detail-line pl-1 text-[#555555] dark:text-zinc-300" data-line-type="bullet">
             Second item
+          </div>
+          <div className="detail-line pl-1 text-[#555555] dark:text-zinc-300" data-line-type="bullet">
+            Third item
           </div>
         </>
       );
@@ -129,6 +151,13 @@ function PreviewEditorContent({ type }: { type: SlashCommandPreviewBlockType }) 
           >
             Second item
           </div>
+          <div
+            className="detail-line pl-1 text-[#555555] dark:text-zinc-300"
+            data-line-type="numbered"
+            data-list-number="3"
+          >
+            Third item
+          </div>
         </>
       );
     case "checklist":
@@ -145,6 +174,12 @@ function PreviewEditorContent({ type }: { type: SlashCommandPreviewBlockType }) 
             data-line-type="checklist"
           >
             <span className="detail-checklist-text">Task two</span>
+          </div>
+          <div
+            className="detail-line pl-1 text-[#555555] dark:text-zinc-300"
+            data-line-type="checklist"
+          >
+            <span className="detail-checklist-text">Task three</span>
           </div>
         </>
       );
@@ -163,9 +198,12 @@ export function SlashCommandBlockPreview({
       aria-hidden="true"
       className="w-[196px] shrink-0 overflow-hidden rounded-[14px] border-1 border-slate-800 bg-slate-700 p-1.5 shadow-[0_10px_28px_rgba(0,0,0,0.22)] dark:border-zinc-600"
     >
-      <div className="rounded-[10px] bg-white px-3 py-2.5 dark:bg-zinc-950">
+      <div
+        className="box-border overflow-hidden rounded-[10px] bg-white px-3 py-2 dark:bg-zinc-950"
+        style={{ height: SLASH_COMMAND_PREVIEW_CONTENT_HEIGHT_PX }}
+      >
         <div
-          className="task-details-editor pointer-events-none text-[13px] leading-snug [&_.detail-line[data-line-type=h1]]:text-[18px] [&_.detail-line[data-line-type=h1]]:leading-[24px] [&_.detail-line[data-line-type=h2]]:text-[15px] [&_.detail-line[data-line-type=h2]]:leading-[20px] [&_.detail-line[data-line-type=h3]]:text-[14px] [&_.detail-line[data-line-type=h3]]:leading-[18px]"
+          className="task-details-editor pointer-events-none h-full overflow-hidden text-[13px] leading-snug [&_.detail-line[data-line-type=h1]]:text-[18px] [&_.detail-line[data-line-type=h1]]:leading-[22px] [&_.detail-line[data-line-type=h2]]:text-[15px] [&_.detail-line[data-line-type=h2]]:leading-[19px] [&_.detail-line[data-line-type=h3]]:text-[14px] [&_.detail-line[data-line-type=h3]]:leading-[18px] [&_.detail-line[data-line-type=bullet]]:leading-[18px] [&_.detail-line[data-line-type=numbered]]:leading-[18px] [&_.detail-line[data-line-type=checklist]]:leading-[18px]"
           data-hide-body-placeholder="true"
         >
           <PreviewEditorContent type={type} />

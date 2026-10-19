@@ -987,6 +987,7 @@ export async function createTask(
   listId: string,
   name: string,
   dueDate?: string | null,
+  options?: { isNote?: boolean },
 ) {
   const task = await prisma.$transaction(async (tx) => {
     await tx.task.updateMany({
@@ -1000,6 +1001,7 @@ export async function createTask(
         name,
         position: 0,
         important: false,
+        isNote: options?.isNote ?? false,
         dueDate: dueDate ? new Date(`${dueDate}T12:00:00`) : null,
       },
     });

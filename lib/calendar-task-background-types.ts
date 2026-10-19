@@ -31,7 +31,7 @@ export type CalendarTaskBackgroundPresentation = {
 export const DEFAULT_CALENDAR_TASK_BASE_COLOR = "#bbd8fe";
 export const DEFAULT_CALENDAR_TASK_END_COLOR = "#ffffff";
 export const DEFAULT_CALENDAR_TASK_TITLE_COLOR = "#1f1f1f";
-export const DEFAULT_CALENDAR_TASK_TIME_COLOR = "#8f8f8f";
+export const DEFAULT_CALENDAR_TASK_TIME_COLOR = "#919191";
 export const DEFAULT_CALENDAR_TASK_BACKGROUND_ID: CalendarTaskBackgroundId =
   "solid";
 

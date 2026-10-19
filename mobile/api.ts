@@ -3,13 +3,11 @@ import {
   dedupeMobileRequest,
   type MobileTask,
 } from "./mobile-session";
+import { resolveMobileApiUrl } from "./resolve-api-url";
 
 export type { MobileTask };
 
-const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000").replace(
-  /\/$/,
-  "",
-);
+const API_URL = resolveMobileApiUrl();
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, {

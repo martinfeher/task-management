@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { BiSearch } from "react-icons/bi";
 import { LuCheck, LuInbox, LuList } from "react-icons/lu";
 import type { TodoList } from "./todo-app";
+import { taskContextMenuTextColor } from "@/lib/task-context-menu-colors";
 
 type TaskMoveToSelectorProps = {
   lists: TodoList[];
@@ -14,6 +15,7 @@ type TaskMoveToSelectorProps = {
   onCancel: () => void;
   showCurrentList?: boolean;
   autoFocus?: boolean;
+  tone?: "default" | "contextMenu";
 };
 
 function getListIcon(name: string) {
@@ -33,7 +35,9 @@ export function TaskMoveToSelector({
   onCancel,
   showCurrentList = false,
   autoFocus = true,
+  tone = "default",
 }: TaskMoveToSelectorProps) {
+  const isContextMenuTone = tone === "contextMenu";
   const inputRef = useRef<HTMLInputElement>(null);
   const trimmedQuery = query.trim();
 
@@ -67,7 +71,15 @@ export function TaskMoveToSelector({
     >
       <div className="border-b border-zinc-200 px-3 py-2.5 dark:border-zinc-700">
         <div className="flex items-center gap-2">
-          <BiSearch className="size-4 shrink-0 text-zinc-400" aria-hidden="true" />
+          <BiSearch
+            className={`size-4 shrink-0 ${isContextMenuTone ? "" : "text-zinc-400"}`}
+            style={
+              isContextMenuTone
+                ? taskContextMenuTextColor("icon400")
+                : undefined
+            }
+            aria-hidden="true"
+          />
           <input
             ref={inputRef}
             type="text"
@@ -75,7 +87,16 @@ export function TaskMoveToSelector({
             onChange={(event) => onQueryChange(event.target.value)}
             placeholder="Search"
             aria-label="Search lists"
-            className="min-w-0 flex-1 bg-transparent text-sm text-zinc-900 outline-none placeholder:text-zinc-400 dark:text-zinc-50"
+            className={`min-w-0 flex-1 bg-transparent text-sm outline-none dark:text-zinc-50 ${
+              isContextMenuTone
+                ? "placeholder:text-[#acacb4]"
+                : "text-zinc-900 placeholder:text-zinc-400"
+            }`}
+            style={
+              isContextMenuTone
+                ? taskContextMenuTextColor("textPrimary")
+                : undefined
+            }
             onKeyDown={(event) => {
               if (event.key === "Escape") {
                 event.preventDefault();
@@ -88,7 +109,16 @@ export function TaskMoveToSelector({
 
       <div className="max-h-[240px] overflow-y-auto py-1">
         {filteredLists.length === 0 ? (
-          <p className="px-4 py-3 text-sm text-zinc-400 dark:text-zinc-500">
+          <p
+            className={`px-4 py-3 text-sm dark:text-zinc-500 ${
+              isContextMenuTone ? "" : "text-zinc-400"
+            }`}
+            style={
+              isContextMenuTone
+                ? taskContextMenuTextColor("icon400")
+                : undefined
+            }
+          >
             {trimmedQuery ? "No matching lists" : "No lists"}
           </p>
         ) : (
@@ -105,15 +135,29 @@ export function TaskMoveToSelector({
                 className={`flex h-[38px] w-full items-center gap-2.5 px-4 text-left text-sm transition-colors ${
                   showCurrentList && isCurrent
                     ? "cursor-default text-[#4873c7] dark:text-[#7da2ff]"
-                    : "text-zinc-800 hover:bg-zinc-50 dark:text-zinc-100 dark:hover:bg-zinc-800/70"
+                    : isContextMenuTone
+                      ? "hover:bg-zinc-50 dark:text-zinc-100 dark:hover:bg-zinc-800/70"
+                      : "text-zinc-800 hover:bg-zinc-50 dark:text-zinc-100 dark:hover:bg-zinc-800/70"
                 }`}
+                style={
+                  isContextMenuTone && !(showCurrentList && isCurrent)
+                    ? taskContextMenuTextColor("textSecondary")
+                    : undefined
+                }
               >
                 <Icon
                   className={`size-4 shrink-0 ${
                     showCurrentList && isCurrent
                       ? "text-[#4873c7] dark:text-[#7da2ff]"
-                      : "text-zinc-500 dark:text-zinc-400"
+                      : isContextMenuTone
+                        ? "dark:text-zinc-400"
+                        : "text-zinc-500 dark:text-zinc-400"
                   }`}
+                  style={
+                    isContextMenuTone && !(showCurrentList && isCurrent)
+                      ? taskContextMenuTextColor("icon500")
+                      : undefined
+                  }
                 />
                 <span className="min-w-0 flex-1 truncate">{list.name}</span>
                 {showCurrentList && isCurrent ? (

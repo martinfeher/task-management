@@ -6,13 +6,7 @@ import { CalendarTaskTitle } from "./calendar-task-title";
 import { CalendarPeriodNavigation } from "./calendar-period-navigation";
 import { CalendarCurrentTimeLine } from "./calendar-current-time-line";
 import { CalendarNewTaskSlotPreview } from "./calendar-new-task-slot-preview";
-import {
-  CalendarTaskModal,
-  getCalendarTaskClickAnchorRect,
-  getCalendarTaskSnapshot,
-  type CalendarTaskEditorCallbacks,
-  type CalendarTaskModalAnchorRect,
-} from "./calendar-task-modal";
+import { type CalendarTaskEditorCallbacks } from "./calendar-task-modal";
 import type { TaskListItem, TodoList } from "./todo-app";
 import type { TaskDueTime } from "@/lib/task-due-time";
 import { normalizeDueTimeMinutes } from "@/lib/task-due-time";
@@ -115,6 +109,7 @@ type CalendarWeekViewProps = {
   selectedTaskId: string | null;
   weekCount?: number;
   onSelectTask: (taskId: string) => void;
+  onCloseTaskEditor?: () => void;
   onToggleTask?: (taskId: string) => void;
   onSetTaskDueDate?: (taskId: string, dateValue: string | null) => void;
   onSetTaskDueTime?: (taskId: string, dueTime: TaskDueTime) => void;
@@ -254,6 +249,7 @@ export function CalendarWeekView({
   selectedTaskId,
   weekCount = 1,
   onSelectTask,
+  onCloseTaskEditor,
   onToggleTask,
   onSetTaskDueDate,
   onSetTaskDueTime,
@@ -280,13 +276,8 @@ export function CalendarWeekView({
   const [weekStart, setWeekStart] = useState<Date | null>(null);
   const [now, setNow] = useState<Date | null>(null);
   const lastSidebarJumpRequestIdRef = useRef(0);
-  const [modalTaskId, setModalTaskId] = useState<string | null>(null);
-  const [modalAnchorRect, setModalAnchorRect] =
-    useState<CalendarTaskModalAnchorRect | null>(null);
-
   function closeTaskModal() {
-    setModalTaskId(null);
-    setModalAnchorRect(null);
+    onCloseTaskEditor?.();
   }
   const { defaultColor: calendarTaskDefaultColor } =
     useCalendarTaskDefaultColor();
@@ -394,11 +385,6 @@ export function CalendarWeekView({
 
     return buildTimedTasksByDateForRange(tasks, calendarRange);
   }, [tasks, calendarRange]);
-
-  const modalTaskSnapshot = useMemo(
-    () => (modalTaskId ? getCalendarTaskSnapshot(modalTaskId, tasks) : null),
-    [modalTaskId, tasks],
-  );
 
   const currentTimeTop =
     now === null
@@ -535,8 +521,6 @@ export function CalendarWeekView({
 
     onSelectTask(task.id);
     closeAddTaskPopover();
-    setModalAnchorRect(getCalendarTaskClickAnchorRect(event.currentTarget));
-    setModalTaskId(task.id);
   }
 
   function handleNewTaskTimeChange(minutes: number) {
@@ -683,7 +667,7 @@ export function CalendarWeekView({
     <div className={CALENDAR_VIEW_WRAPPER_CLASS}>
       <div className={getCalendarShellClassName(fullWidth)}>
         <div className={CALENDAR_VIEW_SURFACE_CLASS}>
-          <div className="flex shrink-0 items-center justify-start px-3 pt-1 mb-2">
+          <div className="flex shrink-0 items-center justify-start pr-3 mb-[10px]">
             <CalendarPeriodNavigation
               onToday={goToToday}
               onPrevious={goToPreviousWeek}
@@ -1199,22 +1183,6 @@ export function CalendarWeekView({
           onNameChange={setDraftTaskName}
           onClose={closeAddTaskPopover}
           onAddTask={onAddCalendarTask}
-        />
-      ) : null}
-
-      {modalTaskId ? (
-        <CalendarTaskModal
-          taskId={modalTaskId}
-          taskSnapshot={modalTaskSnapshot}
-          anchorRect={modalAnchorRect}
-          onClose={closeTaskModal}
-          onDetailsSaved={onDetailsSaved}
-          onTaskHasDetailsKnown={onTaskHasDetailsKnown}
-          onTaskRenamed={onTaskRenamed}
-          onDueDateUpdated={onDueDateUpdated}
-          onRecurrenceUpdated={onRecurrenceUpdated}
-          onSaveTaskRecurrence={onSaveTaskRecurrence}
-          onToggleTask={onToggleTask}
         />
       ) : null}
     </div>

@@ -17,6 +17,8 @@ type DetailFontFamilyControlProps = {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   onSelect: (familyId: DetailFontFamilyId) => void;
+  onPreviewFamily?: (familyId: DetailFontFamilyId) => void;
+  onPreviewFamilyClear?: () => void;
 };
 
 const menuPanelClassName =
@@ -34,6 +36,8 @@ export function DetailFontFamilyControl({
   open = false,
   onOpenChange,
   onSelect,
+  onPreviewFamily,
+  onPreviewFamilyClear,
 }: DetailFontFamilyControlProps) {
   const closeTimerRef = useRef<number | null>(null);
   const fontOptions = getFormatToolbarFontFamilyOptions();
@@ -109,6 +113,7 @@ export function DetailFontFamilyControl({
             role="listbox"
             aria-label="Font family"
             className={`${menuPanelClassName} min-w-[168px] max-h-64 overflow-y-auto`}
+            onMouseLeave={() => onPreviewFamilyClear?.()}
           >
             {fontOptions.map((option) => (
               <button
@@ -123,6 +128,7 @@ export function DetailFontFamilyControl({
                 }`}
                 style={option.value ? { fontFamily: option.value } : undefined}
                 onMouseDown={(event) => event.preventDefault()}
+                onMouseEnter={() => onPreviewFamily?.(option.id)}
                 onClick={() => onSelect(option.id)}
               >
                 {option.label}

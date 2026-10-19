@@ -19,6 +19,7 @@ import {
   uploadTaskImage,
   type MobileTask,
 } from "./api";
+import { formatMobileApiConnectionHint } from "./resolve-api-url";
 import {
   getMobileLoadInFlight,
   readMobileListSnapshot,
@@ -141,10 +142,12 @@ export default function App() {
   }
 
   if (error && !initialLoadDoneRef.current) {
+    const apiUrl = getApiUrl();
     return (
       <SafeAreaView style={styles.container}>
         <Text style={styles.error}>Error: {error}</Text>
-        <Text style={styles.meta}>API: {getApiUrl()}</Text>
+        <Text style={styles.meta}>API: {apiUrl}</Text>
+        <Text style={styles.hint}>{formatMobileApiConnectionHint(apiUrl)}</Text>
         <Pressable style={styles.button} onPress={() => void load({ force: true })}>
           <Text style={styles.buttonText}>Retry</Text>
         </Pressable>
@@ -280,4 +283,5 @@ const styles = StyleSheet.create({
   },
   buttonSecondaryText: { color: "#334155", fontWeight: "600" },
   error: { color: "#b91c1c", marginBottom: 12 },
+  hint: { fontSize: 13, color: "#475569", lineHeight: 18, marginBottom: 12 },
 });

@@ -692,7 +692,7 @@ export function SearchModal({
 
   return (
     <div
-      className={`search-modal-overlay fixed inset-0 z-50 flex items-start justify-center p-4 pt-[8vh] ${
+      className={`search-modal-overlay fixed inset-0 z-10000 flex items-start justify-center p-4 pt-[8vh] ${
         isMounted ? "is-visible" : ""
       }`}
       style={revealStyle}
@@ -805,7 +805,8 @@ export function SearchModal({
                             role="option"
                             aria-selected={index === activeIndex}
                             onMouseEnter={() => setActiveIndex(index)}
-                            className={`group flex min-h-11 cursor-pointer! items-center gap-3 border-b border-zinc-100 px-4 transition-[filter] duration-150 dark:border-zinc-800 ${
+                            onClick={(event) => selectTask(task, event)}
+                            className={`group flex min-h-11 cursor-pointer items-center gap-3 border-b border-zinc-100 px-4 transition-[filter] duration-150 dark:border-zinc-800 ${
                               task.completed && !unblurCompleted
                                 ? "blur-[1px]"
                                 : ""
@@ -844,11 +845,7 @@ export function SearchModal({
                                     : `Mark ${task.name} complete`
                               }
                             />
-                            <button
-                              type="button"
-                              onClick={(event) => selectTask(task, event)}
-                              className="min-w-0 flex-1 py-2.5 text-left"
-                            >
+                            <div className="min-w-0 flex-1 cursor-pointer py-2.5 text-left">
                               <span
                                 className={`block truncate text-sm ${
                                   task.completed
@@ -861,7 +858,7 @@ export function SearchModal({
                               <span className="block truncate text-xs text-zinc-400 dark:text-zinc-500">
                                 {task.listName}
                               </span>
-                            </button>
+                            </div>
                           </li>
                         </Fragment>
                       );

@@ -1,18 +1,20 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, Fragment } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  Fragment,
+} from "react";
 import { CalendarAddTaskPopover } from "./calendar-add-task-popover";
 import { CalendarTaskTitle } from "./calendar-task-title";
 import { CalendarPeriodNavigation } from "./calendar-period-navigation";
 import { CalendarCurrentTimeLine } from "./calendar-current-time-line";
 import { CalendarNewTaskSlotPreview } from "./calendar-new-task-slot-preview";
-import {
-  CalendarTaskModal,
-  getCalendarTaskClickAnchorRect,
-  getCalendarTaskSnapshot,
-  type CalendarTaskEditorCallbacks,
-  type CalendarTaskModalAnchorRect,
-} from "./calendar-task-modal";
+import { type CalendarTaskEditorCallbacks } from "./calendar-task-modal";
 import type { TaskListItem, TodoList } from "./todo-app";
 import type { TaskDueTime } from "@/lib/task-due-time";
 import { normalizeDueTimeMinutes } from "@/lib/task-due-time";
@@ -67,6 +69,7 @@ import {
 } from "@/lib/calendar-time-grid";
 import {
   getCalendarDesktopDisplayHours,
+  useCalendarDaysQuarterHourGridLines,
   useCalendarViewportHourHeight,
 } from "@/lib/use-calendar-viewport-hour-height";
 import type { CalendarSidebarSyncProps } from "./calendar-view-sidebar-layout";
@@ -109,6 +112,7 @@ type CalendarMultiDayViewProps = {
   selectedTaskId: string | null;
   dayCount: number;
   onSelectTask: (taskId: string) => void;
+  onCloseTaskEditor?: () => void;
   onToggleTask: (taskId: string) => void;
   completingTaskIds?: Set<string>;
   checkAnimatingTaskIds?: Set<string>;
@@ -134,6 +138,8 @@ type CalendarMultiDayViewProps = {
   externalDraggingTaskId?: string | null;
   externalDraggingTaskName?: string | null;
   onPeriodLabelChange?: (label: string) => void;
+  visibleRangeStart?: Date | null;
+  onVisibleRangeStartChange?: (date: Date) => void;
 } & CalendarSidebarSyncProps;
 
 function isSlotWithinTimedGrid(
@@ -219,6 +225,7 @@ export function CalendarMultiDayView({
   selectedTaskId,
   dayCount,
   onSelectTask,
+  onCloseTaskEditor,
   onToggleTask,
   completingTaskIds,
   checkAnimatingTaskIds,
@@ -239,6 +246,8 @@ export function CalendarMultiDayView({
   externalDraggingTaskId = null,
   externalDraggingTaskName = null,
   onPeriodLabelChange,
+  visibleRangeStart: controlledVisibleRangeStart,
+  onVisibleRangeStartChange,
   sidebarFocusDate,
   sidebarJumpRequestId,
   onSidebarFocusDateChange,
@@ -246,16 +255,28 @@ export function CalendarMultiDayView({
   const { defaultColor: calendarTaskDefaultColor } =
     useCalendarTaskDefaultColor();
   const [today, setToday] = useState<Date | null>(null);
-  const [rangeStart, setRangeStart] = useState<Date | null>(null);
+  const [internalRangeStart, setInternalRangeStart] = useState<Date | null>(
+    null,
+  );
   const [now, setNow] = useState<Date | null>(null);
   const lastSidebarJumpRequestIdRef = useRef(0);
-  const [modalTaskId, setModalTaskId] = useState<string | null>(null);
-  const [modalAnchorRect, setModalAnchorRect] =
-    useState<CalendarTaskModalAnchorRect | null>(null);
+  const isRangeControlled = controlledVisibleRangeStart !== undefined;
+  const rangeStart = isRangeControlled
+    ? controlledVisibleRangeStart
+    : internalRangeStart;
 
+  const setVisibleRangeStart = useCallback(
+    (date: Date) => {
+      const normalized = startOfDay(date);
+      onVisibleRangeStartChange?.(normalized);
+      if (!isRangeControlled) {
+        setInternalRangeStart(normalized);
+      }
+    },
+    [isRangeControlled, onVisibleRangeStartChange],
+  );
   function closeTaskModal() {
-    setModalTaskId(null);
-    setModalAnchorRect(null);
+    onCloseTaskEditor?.();
   }
   const [addTaskPopover, setAddTaskPopover] = useState<{
     date: Date;
@@ -296,6 +317,7 @@ export function CalendarMultiDayView({
     hourColumnRef,
     isTimedGridReady,
   );
+  const showQuarterHourGridLines = useCalendarDaysQuarterHourGridLines();
   const [nowLineTop, setNowLineTop] = useState<number | null>(null);
 
   function getMinutesFromGridY(y: number) {
@@ -320,9 +342,11 @@ export function CalendarMultiDayView({
   useEffect(() => {
     const current = startOfDay(new Date());
     setToday(current);
-    setRangeStart(current);
     setNow(new Date());
-  }, []);
+    if (!isRangeControlled && internalRangeStart === null) {
+      setInternalRangeStart(current);
+    }
+  }, [internalRangeStart, isRangeControlled]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -351,8 +375,8 @@ export function CalendarMultiDayView({
     }
 
     lastSidebarJumpRequestIdRef.current = sidebarJumpRequestId;
-    setRangeStart(startOfDay(sidebarFocusDate));
-  }, [sidebarFocusDate, sidebarJumpRequestId]);
+    setVisibleRangeStart(startOfDay(sidebarFocusDate));
+  }, [sidebarFocusDate, sidebarJumpRequestId, setVisibleRangeStart]);
 
   const hours = useMemo(() => getCalendarDesktopDisplayHours(), []);
 
@@ -371,11 +395,6 @@ export function CalendarMultiDayView({
 
     return buildTimedTasksByDateForRange(tasks, calendarRange);
   }, [tasks, calendarRange]);
-
-  const modalTaskSnapshot = useMemo(
-    () => (modalTaskId ? getCalendarTaskSnapshot(modalTaskId, tasks) : null),
-    [modalTaskId, tasks],
-  );
 
   const currentTimeTop =
     now === null
@@ -416,7 +435,7 @@ export function CalendarMultiDayView({
         rangeStart.getDate() - 1,
       ),
     );
-    setRangeStart(nextRangeStart);
+    setVisibleRangeStart(nextRangeStart);
     syncSidebarFocusToVisibleRange(nextRangeStart);
   }
 
@@ -429,13 +448,13 @@ export function CalendarMultiDayView({
         rangeStart.getDate() + 1,
       ),
     );
-    setRangeStart(nextRangeStart);
+    setVisibleRangeStart(nextRangeStart);
     syncSidebarFocusToVisibleRange(nextRangeStart);
   }
 
   function goToToday() {
     const current = startOfDay(new Date());
-    setRangeStart(current);
+    setVisibleRangeStart(current);
     onSidebarFocusDateChange?.(current);
   }
 
@@ -462,6 +481,11 @@ export function CalendarMultiDayView({
     event: React.MouseEvent<HTMLElement>,
     day: Date,
   ) {
+    if (suppressTaskClickRef.current) {
+      suppressTaskClickRef.current = false;
+      return;
+    }
+
     handleDaySelect(day);
     closeTaskModal();
 
@@ -525,8 +549,6 @@ export function CalendarMultiDayView({
 
     onSelectTask(task.id);
     closeAddTaskPopover();
-    setModalAnchorRect(getCalendarTaskClickAnchorRect(event.currentTarget));
-    setModalTaskId(task.id);
   }
 
   function handleSetDropTargetSlot(slot: CalendarDropSlot | null) {
@@ -896,9 +918,13 @@ export function CalendarMultiDayView({
                       className="relative cursor-pointer border-b border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900/40"
                       style={{ height: hourHeightPx }}
                     >
-                      <div className="pointer-events-none absolute inset-x-0 top-1/4 border-t border-dashed border-zinc-100 dark:border-zinc-800/80" />
+                      {showQuarterHourGridLines ? (
+                        <div className="pointer-events-none absolute inset-x-0 top-1/4 border-t border-dashed border-zinc-100 dark:border-zinc-800/80" />
+                      ) : null}
                       <div className="pointer-events-none absolute inset-x-0 top-1/2 border-t border-dashed border-zinc-100 dark:border-zinc-800/80" />
-                      <div className="pointer-events-none absolute inset-x-0 top-3/4 border-t border-dashed border-zinc-100 dark:border-zinc-800/80" />
+                      {showQuarterHourGridLines ? (
+                        <div className="pointer-events-none absolute inset-x-0 top-3/4 border-t border-dashed border-zinc-100 dark:border-zinc-800/80" />
+                      ) : null}
                     </div>
                   ))}
 
@@ -1127,22 +1153,6 @@ export function CalendarMultiDayView({
           onNameChange={setDraftTaskName}
           onClose={closeAddTaskPopover}
           onAddTask={onAddCalendarTask}
-        />
-      ) : null}
-
-      {modalTaskId ? (
-        <CalendarTaskModal
-          taskId={modalTaskId}
-          taskSnapshot={modalTaskSnapshot}
-          anchorRect={modalAnchorRect}
-          onClose={closeTaskModal}
-          onDetailsSaved={onDetailsSaved}
-          onTaskHasDetailsKnown={onTaskHasDetailsKnown}
-          onTaskRenamed={onTaskRenamed}
-          onDueDateUpdated={onDueDateUpdated}
-          onRecurrenceUpdated={onRecurrenceUpdated}
-          onSaveTaskRecurrence={onSaveTaskRecurrence}
-          onToggleTask={onToggleTask}
         />
       ) : null}
     </div>

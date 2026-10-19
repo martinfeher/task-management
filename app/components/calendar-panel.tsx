@@ -10,10 +10,8 @@ import {
 import { CalendarAddTaskPopover } from "./calendar-add-task-popover";
 import {
   CalendarTaskModal,
-  getCalendarTaskClickAnchorRect,
   getCalendarTaskSnapshot,
   type CalendarTaskEditorCallbacks,
-  type CalendarTaskModalAnchorRect,
 } from "./calendar-task-modal";
 import { CalendarTaskModalActionsProvider } from "./calendar-task-modal-actions";
 import { CalendarDayView } from "./calendar-day-view";
@@ -239,11 +237,11 @@ function CalendarViewTabs({
     }`;
 
   return (
-    <div className={`relative z-40 ${activeView === "month" ? "mb-[26px]" : "mb-2"} grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-4 pl-4 pt-3`}>
+    <div className={`relative z-40 ${activeView === "month" ? "mb-[26px]" : "mb-1"} grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-4 pl-2 pt-0`}>
       {periodLabel ? (
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-2">
-            <h2 className="truncate text-lg text-zinc-700 dark:text-zinc-50 text-[25px]">
+            <h2 className="truncate text-lg text-zinc-700 dark:text-zinc-50 text-[23px]">
               <span className="font-semibold">{periodLabel}</span>
               {periodLabelSuffix ? (
                 <span className="font-normal"> {periodLabelSuffix}</span>
@@ -399,6 +397,7 @@ export function CalendarMonthView({
   checkAnimatingTaskIds,
   selectedTaskId,
   onSelectTask,
+  onCloseTaskEditor,
   onToggleTask,
   onSetTaskDueDate,
   onSetTaskDueTime,
@@ -426,6 +425,7 @@ export function CalendarMonthView({
   checkAnimatingTaskIds?: Set<string>;
   selectedTaskId: string | null;
   onSelectTask: (taskId: string) => void;
+  onCloseTaskEditor?: () => void;
   onToggleTask: (taskId: string) => void;
   onSetTaskDueDate?: (taskId: string, dateValue: string | null) => void;
   onSetTaskDueTime?: (taskId: string, dueTime: TaskDueTime) => void;
@@ -451,13 +451,9 @@ export function CalendarMonthView({
   const [now, setNow] = useState<Date | null>(null);
   const [monthDate, setMonthDate] = useState<Date | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [modalTaskId, setModalTaskId] = useState<string | null>(null);
-  const [modalAnchorRect, setModalAnchorRect] =
-    useState<CalendarTaskModalAnchorRect | null>(null);
 
   function closeTaskModal() {
-    setModalTaskId(null);
-    setModalAnchorRect(null);
+    onCloseTaskEditor?.();
   }
   const [addTaskPopover, setAddTaskPopover] = useState<{
     date: Date;
@@ -522,11 +518,6 @@ export function CalendarMonthView({
     return getFullMonthDays(monthDate.getFullYear(), monthDate.getMonth());
   }, [monthDate]);
   const monthRowCount = Math.max(1, Math.ceil(monthDays.length / 7));
-
-  const modalTaskSnapshot = useMemo(
-    () => (modalTaskId ? getCalendarTaskSnapshot(modalTaskId, tasks) : null),
-    [modalTaskId, tasks],
-  );
 
   function syncSidebarFocusForMonth(nextMonthDate: Date) {
     if (!onSidebarFocusDateChange) return;
@@ -623,8 +614,6 @@ export function CalendarMonthView({
     setSelectedDate(day);
     onSelectTask(task.id);
     closeAddTaskPopover();
-    setModalAnchorRect(getCalendarTaskClickAnchorRect(event.currentTarget));
-    setModalTaskId(task.id);
   }
 
   function handleCalendarTaskPointerDown(
@@ -677,7 +666,9 @@ export function CalendarMonthView({
 
       dragStateRef.current = null;
       setDropTargetDateKey(null);
-      suppressTaskClickRef.current = true;
+      if (dragStarted) {
+        suppressTaskClickRef.current = true;
+      }
       endDragPreview?.();
     }
 
@@ -807,18 +798,18 @@ export function CalendarMonthView({
                       handleDaySelect(day);
                     }
                   }}
-                  className={`h-full cursor-pointer border-b border-zinc-200 p-2 text-left transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900/60 ${getCalendarDayColumnDividerClass(index % 7, 7)} ${
+                  className={`flex h-full min-h-0 cursor-pointer flex-col border-b border-zinc-200 p-[2px] text-left transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900/60 ${getCalendarDayColumnDividerClass(index % 7, 7)} ${
                     isDropTarget
                       ? "bg-blue-50 ring-1 ring-inset ring-blue-400 dark:bg-blue-950/30 dark:ring-blue-500"
                       : isActiveDay
                         ? "bg-blue-50 ring-1 ring-inset ring-[#4873c7] dark:bg-blue-950/30 dark:ring-[#7da2ff]"
                         : isSelected
-                          ? "bg-zinc-100 ring-1 ring-inset ring-zinc-300 dark:bg-zinc-900 dark:ring-zinc-600"
+                          ? "bg-zinc-100 ring-[1px] ring-inset ring-zinc-300 dark:bg-zinc-900 dark:ring-zinc-600"
                           : "bg-white dark:bg-zinc-950"
                   }`}
                 >
                   <span
-                    className={`inline-flex size-7 items-center justify-center rounded-full text-sm ${
+                    className={`inline-flex size-7 shrink-0 items-center justify-center rounded-full text-sm ${
                       isToday
                         ? CALENDAR_TODAY_DATE_CIRCLE_CLASS
                         : isCurrentMonth
@@ -840,8 +831,8 @@ export function CalendarMonthView({
                     )}
                   </span>
 
-                  <div className="mt-1 space-y-0.5">
-                    {dayTasks.slice(0, isActiveDay ? 2 : 3).map((task) => (
+                  <div className="mt-1 min-h-0 flex-1 space-y-0.5 overflow-y-auto">
+                    {dayTasks.map((task) => (
                       <CalendarTaskHoverButton
                         key={getCalendarTaskKey(task)}
                         task={task}
@@ -891,16 +882,6 @@ export function CalendarMonthView({
                         {draftTaskName.trim() || ""}
                       </div>
                     ) : null}
-                    {!isActiveDay && dayTasks.length > 3 && (
-                      <span className="block px-1 text-[11px] text-zinc-400">
-                        +{dayTasks.length - 3} more
-                      </span>
-                    )}
-                    {isActiveDay && dayTasks.length > 2 && (
-                      <span className="block px-1 text-[11px] text-zinc-400">
-                        +{dayTasks.length - 2} more
-                      </span>
-                    )}
                   </div>
                 </div>
               );
@@ -920,22 +901,6 @@ export function CalendarMonthView({
           onNameChange={setDraftTaskName}
           onClose={closeAddTaskPopover}
           onAddTask={onAddCalendarTask}
-        />
-      ) : null}
-
-      {modalTaskId ? (
-        <CalendarTaskModal
-          taskId={modalTaskId}
-          taskSnapshot={modalTaskSnapshot}
-          anchorRect={modalAnchorRect}
-          onClose={closeTaskModal}
-          onDetailsSaved={onDetailsSaved}
-          onTaskHasDetailsKnown={onTaskHasDetailsKnown}
-          onTaskRenamed={onTaskRenamed}
-          onDueDateUpdated={onDueDateUpdated}
-          onRecurrenceUpdated={onRecurrenceUpdated}
-          onSaveTaskRecurrence={onSaveTaskRecurrence}
-          onToggleTask={onToggleTask}
         />
       ) : null}
     </div>
@@ -1114,6 +1079,9 @@ export function CalendarViewsPanel({
   const [sidebarFocusDate, setSidebarFocusDate] = useState(() =>
     startOfDay(new Date()),
   );
+  const [daysViewRangeStart, setDaysViewRangeStart] = useState<Date | null>(
+    null,
+  );
   const [sidebarJumpRequestId, setSidebarJumpRequestId] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -1139,6 +1107,26 @@ export function CalendarViewsPanel({
       onMoveTaskToList,
       onDeleteTask,
     ],
+  );
+  const [taskEditorModalId, setTaskEditorModalId] = useState<string | null>(
+    null,
+  );
+  const closeTaskEditorModal = useCallback(() => {
+    setTaskEditorModalId(null);
+  }, []);
+  const handleCalendarSelectTask = useCallback(
+    (taskId: string) => {
+      onSelectTask(taskId);
+      setTaskEditorModalId(taskId);
+    },
+    [onSelectTask],
+  );
+  const taskEditorModalSnapshot = useMemo(
+    () =>
+      taskEditorModalId
+        ? getCalendarTaskSnapshot(taskEditorModalId, tasks)
+        : null,
+    [taskEditorModalId, tasks],
   );
 
   const calendarSearchTasks = useMemo(() => {
@@ -1229,9 +1217,9 @@ export function CalendarViewsPanel({
         }
       }
 
-      onSelectTask(task.id);
+      handleCalendarSelectTask(task.id);
     },
-    [handleSidebarFocusDateChange, onSelectTask],
+    [handleCalendarSelectTask, handleSidebarFocusDateChange],
   );
 
   function handleSidebarSelectDate(date: Date) {
@@ -1244,6 +1232,11 @@ export function CalendarViewsPanel({
     handleSidebarFocusDateChange(today);
     setSidebarJumpRequestId((requestId) => requestId + 1);
   }, [handleSidebarFocusDateChange]);
+
+  useEffect(() => {
+    if (activeView !== "days") return;
+    setDaysViewRangeStart((current) => current ?? startOfDay(new Date()));
+  }, [activeView]);
 
   function goToPreviousSidebarMonth() {
     setSidebarMonthDate((previous) =>
@@ -1313,7 +1306,7 @@ export function CalendarViewsPanel({
       cursorOffsetPx={50}
     >
     <CalendarTaskModalActionsProvider value={calendarTaskModalActions}>
-    <div className="calendar-panel flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden">
+    <div className="calendar-panel p-3 2xl:p-4 flex min-h-0 min-w-0 w-full flex-1 flex-col z-2000! overflow-hidden">
       <CalendarViewTabs
         activeView={activeView}
         multiDayCount={multiDayCount}
@@ -1344,7 +1337,8 @@ export function CalendarViewsPanel({
             }
             checkAnimatingTaskIds={checkAnimatingTaskIds}
             selectedTaskId={selectedTaskId}
-            onSelectTask={onSelectTask}
+            onSelectTask={handleCalendarSelectTask}
+            onCloseTaskEditor={closeTaskEditorModal}
             onToggleTask={onToggleTask}
             onSetTaskDueDate={onSetTaskDueDate}
             onSetTaskDueTime={onSetTaskDueTime}
@@ -1371,7 +1365,8 @@ export function CalendarViewsPanel({
             completingTaskIds={completingTaskIds}
             checkAnimatingTaskIds={checkAnimatingTaskIds}
             selectedTaskId={selectedTaskId}
-            onSelectTask={onSelectTask}
+            onSelectTask={handleCalendarSelectTask}
+            onCloseTaskEditor={closeTaskEditorModal}
             onToggleTask={onToggleTask}
             onSetTaskDueDate={onSetTaskDueDate}
             onSetTaskDueTime={onSetTaskDueTime}
@@ -1402,7 +1397,8 @@ export function CalendarViewsPanel({
             completingTaskIds={completingTaskIds}
             checkAnimatingTaskIds={checkAnimatingTaskIds}
             selectedTaskId={selectedTaskId}
-            onSelectTask={onSelectTask}
+            onSelectTask={handleCalendarSelectTask}
+            onCloseTaskEditor={closeTaskEditorModal}
             onToggleTask={onToggleTask}
             onSetTaskDueDate={onSetTaskDueDate}
             onSetTaskDueTime={onSetTaskDueTime}
@@ -1430,7 +1426,8 @@ export function CalendarViewsPanel({
             lists={lists}
             selectedTaskId={selectedTaskId}
             dayCount={multiDayCount}
-            onSelectTask={onSelectTask}
+            onSelectTask={handleCalendarSelectTask}
+            onCloseTaskEditor={closeTaskEditorModal}
             onToggleTask={onToggleTask}
             completingTaskIds={completingTaskIds}
             checkAnimatingTaskIds={checkAnimatingTaskIds}
@@ -1451,6 +1448,8 @@ export function CalendarViewsPanel({
             externalDraggingTaskId={externalDraggingTaskId}
             externalDraggingTaskName={externalDraggingTaskName}
             onPeriodLabelChange={handlePeriodLabelChange}
+            visibleRangeStart={daysViewRangeStart}
+            onVisibleRangeStartChange={setDaysViewRangeStart}
             {...sidebarSyncProps}
           />,
         )
@@ -1464,7 +1463,8 @@ export function CalendarViewsPanel({
               checkAnimatingTaskIds={checkAnimatingTaskIds}
               selectedTaskId={selectedTaskId}
               weekCount={2}
-              onSelectTask={onSelectTask}
+              onSelectTask={handleCalendarSelectTask}
+              onCloseTaskEditor={closeTaskEditorModal}
               onToggleTask={onToggleTask}
               onSetTaskDueDate={onSetTaskDueDate}
               onSetTaskDueTime={onSetTaskDueTime}
@@ -1491,7 +1491,8 @@ export function CalendarViewsPanel({
               lists={lists}
               selectedTaskId={selectedTaskId}
               weekCount={multiWeekCount}
-              onSelectTask={onSelectTask}
+              onSelectTask={handleCalendarSelectTask}
+              onCloseTaskEditor={closeTaskEditorModal}
               onToggleTask={onToggleTask}
               onSetTaskDueDate={onSetTaskDueDate}
               onSetTaskDueTime={onSetTaskDueTime}
@@ -1515,6 +1516,21 @@ export function CalendarViewsPanel({
       )}
       </div>
     </div>
+
+      {taskEditorModalId ? (
+        <CalendarTaskModal
+          taskId={taskEditorModalId}
+          taskSnapshot={taskEditorModalSnapshot}
+          onClose={closeTaskEditorModal}
+          onDetailsSaved={onDetailsSaved}
+          onTaskHasDetailsKnown={onTaskHasDetailsKnown}
+          onTaskRenamed={onTaskRenamed}
+          onDueDateUpdated={onDueDateUpdated}
+          onRecurrenceUpdated={onRecurrenceUpdated}
+          onSaveTaskRecurrence={onSaveTaskRecurrence}
+          onToggleTask={onToggleTask}
+        />
+      ) : null}
     </CalendarTaskModalActionsProvider>
     </CalendarTaskHoverPreviewProvider>
     </CalendarTaskColorMenuProvider>

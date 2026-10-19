@@ -43,7 +43,7 @@ export function getCalendarWeekdayLabel(
   return labels[getCalendarMondayFirstDayIndex(date)];
 }
 
-export const CALENDAR_ALL_DAY_ROW_HEIGHT_PX = 47;
+export const CALENDAR_ALL_DAY_ROW_HEIGHT_PX = 54;
 export const CALENDAR_ALL_DAY_ROW_MIN_HEIGHT_PX = CALENDAR_ALL_DAY_ROW_HEIGHT_PX;
 export const CALENDAR_ALL_DAY_ROW_MAX_HEIGHT_PX = CALENDAR_ALL_DAY_ROW_HEIGHT_PX;
 export const CALENDAR_HOUR_COLUMN_WIDTH_PX = 49;
@@ -187,6 +187,9 @@ export const CALENDAR_DAYS_ALLDAY_STICKY_CLASS =
   "sticky z-20 bg-white dark:bg-zinc-950";
 export const CALENDAR_GRID_SCROLL_CLASS =
   "calendar-grid-scroll min-h-0 flex-1 overflow-auto mb-[40px]";
+
+export const KANBAN_BOARD_SCROLL_CLASS =
+  "kanban-board-scroll min-h-0 min-w-0 w-full flex-1 overflow-x-auto overflow-y-hidden";
 export const CALENDAR_TIMED_GRID_SCROLL_CLASS = CALENDAR_GRID_SCROLL_CLASS;
 
 export const CALENDAR_DAY_COLUMN_DIVIDER_CLASS =

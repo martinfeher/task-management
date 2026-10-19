@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --hostname 0.0.0.0",
     "predev": "prisma migrate deploy && prisma generate",
     "build": "prisma migrate deploy && prisma generate && next build",
     "analyze": "ANALYZE=true next build --webpack",
@@ -26,7 +26,9 @@
     "mobile:android": "npm run android --prefix mobile",
     "expo:start": "bash scripts/expo-mobile.sh",
     "expo:ios": "bash scripts/expo-mobile.sh --ios",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "android": "expo run:android",
+    "ios": "expo run:ios"
   },
   "dependencies": {
     "@heroui/react": "^3.2.2",
@@ -44,7 +46,8 @@
     "pg": "^8.23.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "react-icons": "^5.7.0"
+    "react-icons": "^5.7.0",
+    "react-native": "0.81.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

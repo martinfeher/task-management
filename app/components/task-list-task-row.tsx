@@ -617,7 +617,7 @@ export function TaskListTaskRow({
         >
           <PiNoteLight
             aria-hidden="true"
-            className="shrink-0 size-[21px] -ml-[1.5px] text-[#b4b4bf] "
+            className="task-list-note-icon shrink-0 size-[21px] -ml-[1.5px]"
             style={{ transform: "scaleX(0.785)" }}
             strokeWidth={0.2}
           />

@@ -325,7 +325,7 @@ export function CalendarTimedTaskContent({
           : "min-w-0 flex-1 items-start"
       }`}
     >
-      <div className="flex min-w-0 flex-1 flex-col justify-start overflow-hidden">
+      <div className="flex min-w-0 flex-1 mr-[2px] mb-px flex-col justify-start overflow-hidden">
         <span
           className={`flex min-w-0 gap-0.5 ${
             isSingleLineOnly ? "items-center" : "items-start"
@@ -828,7 +828,7 @@ export function CalendarTimedTaskBlock({
             );
           }}
           className={`flex h-full flex-col justify-start overflow-hidden py-0.5 text-left leading-tight ${CALENDAR_TASK_FONT_CLASS} ${
-            canInteract ? "cursor-move touch-none" : ""
+            canInteract ? "cursor-pointer touch-none" : "cursor-pointer"
           }`}
           style={{
             paddingTop: contentPaddingTop,

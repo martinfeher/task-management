@@ -4,6 +4,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { LuX } from "react-icons/lu";
 import { useImportantEnabled } from "@/lib/important-settings";
 import { useListPreviewEnabled } from "@/lib/list-preview-settings";
+import { useAddTaskNoteSwitchEnabled } from "@/lib/add-task-note-switch-settings";
 import { useSubtasksEnabled } from "@/lib/subtasks-settings";
 import {
   TASK_EDITOR_FONT_SIZE_MAX_PX,
@@ -88,6 +89,8 @@ function SettingsToggle({
 function GeneralSettingsContent() {
   const { importantEnabled, setImportantEnabled } = useImportantEnabled();
   const { listPreviewEnabled, setListPreviewEnabled } = useListPreviewEnabled();
+  const { addTaskNoteSwitchEnabled, setAddTaskNoteSwitchEnabled } =
+    useAddTaskNoteSwitchEnabled();
 
   return (
     <div className="space-y-4">
@@ -108,6 +111,11 @@ function GeneralSettingsContent() {
         label="List preview"
         checked={listPreviewEnabled}
         onChange={setListPreviewEnabled}
+      />
+      <SettingsToggle
+        label="Task and note switch"
+        checked={addTaskNoteSwitchEnabled}
+        onChange={setAddTaskNoteSwitchEnabled}
       />
     </div>
   );
@@ -369,7 +377,7 @@ export function SettingsModal({
 
   return (
     <div
-      className={`search-modal-overlay fixed inset-0 z-50 flex items-start justify-center p-4 pt-[8vh] ${
+      className={`search-modal-overlay fixed inset-0 z-10000 flex items-start justify-center p-4 pt-[8vh] ${
         isMounted ? "is-visible" : ""
       }`}
       style={revealStyle}

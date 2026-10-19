@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useState, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useState, type RefObject } from "react";
 import {
   CALENDAR_COLLAPSE_EARLY_END_HOUR,
   CALENDAR_HOUR_END,
@@ -16,6 +16,29 @@ export const CALENDAR_FALLBACK_HOUR_HEIGHT_PX = 52;
 export const CALENDAR_MIN_HOUR_HEIGHT_PX = 28;
 export const CALENDAR_MAX_HOUR_HEIGHT_PX = 120;
 const CALENDAR_DESKTOP_MIN_WIDTH_PX = 1024;
+
+/** Below this viewport height, Days view shows 30-minute grid lines only. */
+export const CALENDAR_DAYS_QUARTER_HOUR_LINES_MIN_HEIGHT_PX = 1200;
+
+export function useCalendarDaysQuarterHourGridLines() {
+  const [showQuarterHourLines, setShowQuarterHourLines] = useState(true);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia(
+      `(min-height: ${CALENDAR_DAYS_QUARTER_HOUR_LINES_MIN_HEIGHT_PX}px)`,
+    );
+
+    const update = () => {
+      setShowQuarterHourLines(mediaQuery.matches);
+    };
+
+    update();
+    mediaQuery.addEventListener("change", update);
+    return () => mediaQuery.removeEventListener("change", update);
+  }, []);
+
+  return showQuarterHourLines;
+}
 
 export function getCalendarDesktopDisplayHours() {
   return getCalendarDisplayHours(true);

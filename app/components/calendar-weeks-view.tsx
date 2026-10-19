@@ -4,13 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarAddTaskPopover } from "./calendar-add-task-popover";
 import { CalendarTaskPriorityFlag } from "./calendar-task-title";
 import { CalendarPeriodNavigation } from "./calendar-period-navigation";
-import {
-  CalendarTaskModal,
-  getCalendarTaskClickAnchorRect,
-  getCalendarTaskSnapshot,
-  type CalendarTaskEditorCallbacks,
-  type CalendarTaskModalAnchorRect,
-} from "./calendar-task-modal";
+import { type CalendarTaskEditorCallbacks } from "./calendar-task-modal";
 import type { TaskListItem, TodoList } from "./todo-app";
 import type { TaskDueTime } from "@/lib/task-due-time";
 import { resolveCalendarDayFromPoint } from "@/lib/calendar-drag";
@@ -50,6 +44,7 @@ type CalendarMultiWeekViewProps = {
   selectedTaskId: string | null;
   weekCount: number;
   onSelectTask: (taskId: string) => void;
+  onCloseTaskEditor?: () => void;
   onToggleTask?: (taskId: string) => void;
   onSetTaskDueDate?: (taskId: string, dateValue: string | null) => void;
   onSetTaskDueTime?: (taskId: string, dueTime: TaskDueTime) => void;
@@ -169,6 +164,7 @@ export function CalendarMultiWeekView({
   selectedTaskId,
   weekCount,
   onSelectTask,
+  onCloseTaskEditor,
   onToggleTask,
   onSetTaskDueDate,
   onDetailsSaved,
@@ -190,13 +186,8 @@ export function CalendarMultiWeekView({
   const [now, setNow] = useState<Date | null>(null);
   const [rangeStart, setRangeStart] = useState<Date | null>(null);
   const lastSidebarJumpRequestIdRef = useRef(0);
-  const [modalTaskId, setModalTaskId] = useState<string | null>(null);
-  const [modalAnchorRect, setModalAnchorRect] =
-    useState<CalendarTaskModalAnchorRect | null>(null);
-
   function closeTaskModal() {
-    setModalTaskId(null);
-    setModalAnchorRect(null);
+    onCloseTaskEditor?.();
   }
   const [addTaskPopover, setAddTaskPopover] = useState<{
     date: Date;
@@ -263,11 +254,6 @@ export function CalendarMultiWeekView({
 
     return buildTasksByDateForRange(tasks, calendarRange);
   }, [tasks, calendarRange]);
-
-  const modalTaskSnapshot = useMemo(
-    () => (modalTaskId ? getCalendarTaskSnapshot(modalTaskId, tasks) : null),
-    [modalTaskId, tasks],
-  );
 
   function syncSidebarFocusToVisibleRange(start: Date) {
     if (!today || !onSidebarFocusDateChange) return;
@@ -362,8 +348,6 @@ export function CalendarMultiWeekView({
 
     onSelectTask(task.id);
     closeAddTaskPopover();
-    setModalAnchorRect(getCalendarTaskClickAnchorRect(event.currentTarget));
-    setModalTaskId(task.id);
   }
 
   function handleCalendarTaskPointerDown(
@@ -412,7 +396,9 @@ export function CalendarMultiWeekView({
 
       dragStateRef.current = null;
       setDropTargetDateKey(null);
-      suppressTaskClickRef.current = true;
+      if (dragStarted) {
+        suppressTaskClickRef.current = true;
+      }
       endDragPreview?.();
     }
 
@@ -620,22 +606,6 @@ export function CalendarMultiWeekView({
           onNameChange={setDraftTaskName}
           onClose={closeAddTaskPopover}
           onAddTask={onAddCalendarTask}
-        />
-      ) : null}
-
-      {modalTaskId ? (
-        <CalendarTaskModal
-          taskId={modalTaskId}
-          taskSnapshot={modalTaskSnapshot}
-          anchorRect={modalAnchorRect}
-          onClose={closeTaskModal}
-          onDetailsSaved={onDetailsSaved}
-          onTaskHasDetailsKnown={onTaskHasDetailsKnown}
-          onTaskRenamed={onTaskRenamed}
-          onDueDateUpdated={onDueDateUpdated}
-          onRecurrenceUpdated={onRecurrenceUpdated}
-          onSaveTaskRecurrence={onSaveTaskRecurrence}
-          onToggleTask={onToggleTask}
         />
       ) : null}
     </div>

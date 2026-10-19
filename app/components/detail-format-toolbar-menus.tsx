@@ -1,6 +1,8 @@
 "use client";
 
 import {
+  createContext,
+  useContext,
   useEffect,
   useRef,
   useState,
@@ -94,8 +96,54 @@ const FORMAT_TOOLBAR_OVERFLOW_MENU_TRIGGER_CLASS =
 const FORMAT_TOOLBAR_OVERFLOW_MENU_ITEM_CLASS =
   "flex w-full items-center gap-2 px-[10.8px] py-1.5 text-left text-sm text-zinc-900 transition-colors hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800";
 
+/** Where the format toolbar sits relative to the text selection. */
+export type FormatToolbarAnchorPlacement = "above" | "below";
+
+const FormatToolbarAnchorPlacementContext =
+  createContext<FormatToolbarAnchorPlacement>("below");
+
+export function FormatToolbarAnchorPlacementProvider({
+  placement,
+  children,
+}: {
+  placement: FormatToolbarAnchorPlacement;
+  children: ReactNode;
+}) {
+  return (
+    <FormatToolbarAnchorPlacementContext.Provider value={placement}>
+      {children}
+    </FormatToolbarAnchorPlacementContext.Provider>
+  );
+}
+
+function useFormatToolbarAnchorPlacement() {
+  return useContext(FormatToolbarAnchorPlacementContext);
+}
+
+const FORMAT_TOOLBAR_TOOLTIP_BASE_CLASS =
+  "add-task-date-tooltip pointer-events-none absolute left-1/2 z-50 -translate-x-1/2 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity";
+
+function getFormatToolbarTooltipPositionClass(
+  placement: FormatToolbarAnchorPlacement,
+) {
+  if (placement === "above") {
+    return `${FORMAT_TOOLBAR_TOOLTIP_BASE_CLASS} bottom-[calc(100%+6px)]`;
+  }
+
+  return `${FORMAT_TOOLBAR_TOOLTIP_BASE_CLASS} add-task-date-tooltip-below top-[calc(100%+6px)]`;
+}
+
+function getFormatToolbarDropdownAnchorClass(
+  placement: FormatToolbarAnchorPlacement,
+) {
+  return placement === "above"
+    ? "absolute bottom-full z-10 pb-1"
+    : "absolute top-full z-10 pt-1";
+}
+
+/** @deprecated Use placement-aware tooltips via FormatToolbarAnchorPlacementProvider */
 export const FORMAT_TOOLBAR_TOOLTIP_CLASS =
-  "add-task-date-tooltip add-task-date-tooltip-below pointer-events-none absolute top-[calc(100%+6px)] left-1/2 z-50 -translate-x-1/2 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity";
+  getFormatToolbarTooltipPositionClass("below");
 
 export const FORMAT_TOOLBAR_TOOLTIP_SHORTCUT_CLASS =
   "format-toolbar-tooltip-shortcut mt-0.5 block text-[10px] font-normal leading-none";
@@ -123,13 +171,15 @@ export function FormatToolbarTooltipWrap({
   shortcut,
   children,
 }: FormatToolbarTooltipWrapProps) {
+  const placement = useFormatToolbarAnchorPlacement();
+
   return (
     <div className="group/format-tooltip relative">
       {children}
       <span
         id={tooltipId}
         role="tooltip"
-        className={`${FORMAT_TOOLBAR_TOOLTIP_CLASS} ${
+        className={`${getFormatToolbarTooltipPositionClass(placement)} ${
           shortcut ? "py-2 text-center" : ""
         } ${hideTooltip ? "" : "group-hover/format-tooltip:opacity-100"}`}
       >
@@ -346,6 +396,7 @@ function FormatToolbarDropdownShell({
   trigger,
   children,
 }: DropdownShellProps) {
+  const placement = useFormatToolbarAnchorPlacement();
   const closeTimerRef = useRef<number | null>(null);
 
   function clearCloseTimer() {
@@ -397,7 +448,7 @@ function FormatToolbarDropdownShell({
 
         {open ? (
           <div
-            className={`absolute top-full z-10 pt-1 ${
+            className={`${getFormatToolbarDropdownAnchorClass(placement)} ${
               align === "right"
                 ? "right-0"
                 : align === "center"
@@ -519,6 +570,8 @@ type DetailFormatTextColorDropdownProps = {
   selectedTextColor: string;
   textColorOptions: readonly DetailTextColorOption[];
   onSelectTextColor: (color: string) => void;
+  onPreviewTextColorChange?: (color: string) => void;
+  onPreviewTextColorClear?: () => void;
   recentColors?: RecentFormatColor[];
   previewText?: string;
   previewTypography?: TextColorPreviewTypography;
@@ -530,10 +583,13 @@ export function DetailFormatTextColorDropdown({
   selectedTextColor,
   textColorOptions,
   onSelectTextColor,
+  onPreviewTextColorChange,
+  onPreviewTextColorClear,
   recentColors = [],
   previewText,
   previewTypography,
 }: DetailFormatTextColorDropdownProps) {
+  const placement = useFormatToolbarAnchorPlacement();
   const menuRef = useRef<HTMLDivElement>(null);
   const [previewColor, setPreviewColor] = useState<string | null>(null);
   const [previewPosition, setPreviewPosition] = useState({ top: 0, left: 0 });
@@ -551,12 +607,15 @@ export function DetailFormatTextColorDropdown({
     if (!rect) return;
 
     setPreviewPosition({
-      top: rect.bottom + 8,
+      top:
+        placement === "above" ? rect.top - 8 : rect.bottom + 8,
       left: rect.left + rect.width / 2,
     });
   }
 
   function handlePreviewHover(option: DetailTextColorOption) {
+    onPreviewTextColorChange?.(option.value);
+
     if (!previewContent) return;
 
     updatePreviewPosition();
@@ -564,6 +623,7 @@ export function DetailFormatTextColorDropdown({
   }
 
   function clearPreview() {
+    onPreviewTextColorClear?.();
     setPreviewColor(null);
   }
 
@@ -672,7 +732,9 @@ export function DetailFormatTextColorDropdown({
       {previewColor && previewContent
         ? createPortal(
             <div
-              className="pointer-events-none fixed z-[300] w-max max-h-[200px] max-w-[min(400px,calc(100vw-16px))] -translate-x-1/2 overflow-y-auto overflow-x-hidden whitespace-pre-wrap break-words rounded-[19px] border-[3px] bg-white px-4 py-2 shadow-md dark:bg-zinc-900"
+              className={`pointer-events-none fixed z-[300] w-max max-h-[200px] max-w-[min(400px,calc(100vw-16px))] -translate-x-1/2 overflow-y-auto overflow-x-hidden whitespace-pre-wrap break-words rounded-[19px] border-[3px] bg-white px-4 py-2 shadow-md dark:bg-zinc-900 ${
+                placement === "above" ? "-translate-y-full" : ""
+              }`}
               style={{
                 top: previewPosition.top,
                 left: previewPosition.left,
@@ -908,6 +970,8 @@ type DetailFormatFontFamilyDropdownProps = {
   onOpenChange: (open: boolean) => void;
   familyId: DetailFontFamilyId;
   onSelectFamily: (familyId: DetailFontFamilyId) => void;
+  onPreviewFamily?: (familyId: DetailFontFamilyId) => void;
+  onPreviewFamilyClear?: () => void;
 };
 
 export function DetailFormatFontFamilyDropdown({
@@ -915,6 +979,8 @@ export function DetailFormatFontFamilyDropdown({
   onOpenChange,
   familyId,
   onSelectFamily,
+  onPreviewFamily,
+  onPreviewFamilyClear,
 }: DetailFormatFontFamilyDropdownProps) {
   const formatToolbarFontOptions = getFormatToolbarFontFamilyOptions();
   const familyLabel = getDetailFontFamilyLabel(familyId);
@@ -946,6 +1012,7 @@ export function DetailFormatFontFamilyDropdown({
         </>
       }
     >
+      <div onMouseLeave={() => onPreviewFamilyClear?.()}>
       {formatToolbarFontOptions.map((option) => (
         <button
           key={option.id}
@@ -958,6 +1025,7 @@ export function DetailFormatFontFamilyDropdown({
           }`}
           style={option.value ? { fontFamily: option.value } : undefined}
           onMouseDown={(event) => event.preventDefault()}
+          onMouseEnter={() => onPreviewFamily?.(option.id)}
           onClick={() => {
             onSelectFamily(option.id);
             onOpenChange(false);
@@ -966,6 +1034,7 @@ export function DetailFormatFontFamilyDropdown({
           {option.label}
         </button>
       ))}
+      </div>
     </FormatToolbarDropdownShell>
   );
 }

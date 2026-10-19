@@ -1,7 +1,12 @@
 import type { CSSProperties } from "react";
 import { CALENDAR_HOUR_COLUMN_WIDTH_PX } from "@/lib/calendar-layout";
 
-const CALENDAR_NOW_ACCENT = "#34a853";
+const CALENDAR_NOW_LINE_COLOR = "#9d9d9d";
+const CALENDAR_NOW_LINE_STYLE: CSSProperties = {
+  backgroundColor: CALENDAR_NOW_LINE_COLOR,
+  opacity: 0.5,
+};
+const CALENDAR_NOW_LABEL_BG = "#BBBBBB";
 
 export function formatCalendarCurrentTimeLabel(date: Date) {
   return new Intl.DateTimeFormat(undefined, {
@@ -54,13 +59,9 @@ export function CalendarCurrentTimeLine({
             className={
               showAccentColumns
                 ? "rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums leading-none text-white"
-                : "rounded-[6px] bg-zinc-200 px-[7px] py-1 text-[11px] font-semibold tabular-nums leading-none text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300"
+                : "rounded-[6px] px-[7px] py-1 text-[11px] font-semibold tabular-nums leading-none text-white"
             }
-            style={
-              showAccentColumns
-                ? { backgroundColor: CALENDAR_NOW_ACCENT }
-                : undefined
-            }
+            style={{ backgroundColor: CALENDAR_NOW_LABEL_BG }}
           >
             {formatCalendarCurrentTimeLabel(now)}
           </span>
@@ -84,25 +85,19 @@ export function CalendarCurrentTimeLine({
                     <span
                       aria-hidden="true"
                       className="absolute left-0 size-2 -translate-x-1/2 rounded-full"
-                      style={{ backgroundColor: CALENDAR_NOW_ACCENT }}
+                      style={CALENDAR_NOW_LINE_STYLE}
                     />
-                    <div
-                      className="h-0.5 min-w-0 flex-1"
-                      style={{ backgroundColor: CALENDAR_NOW_ACCENT }}
-                    />
+                    <div className="h-px min-w-0 flex-1" style={CALENDAR_NOW_LINE_STYLE} />
                   </>
                 ) : (
-                  <div
-                    className="h-px w-full opacity-25"
-                    style={{ backgroundColor: CALENDAR_NOW_ACCENT }}
-                  />
+                  <div className="h-px w-full" style={CALENDAR_NOW_LINE_STYLE} />
                 )}
               </div>
             );
           })}
         </div>
       ) : (
-        <div className="h-px min-w-0 flex-1 bg-zinc-300 opacity-50 dark:bg-zinc-600" />
+        <div className="h-px min-w-0 flex-1" style={CALENDAR_NOW_LINE_STYLE} />
       )}
     </div>
   );

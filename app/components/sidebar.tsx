@@ -1651,7 +1651,7 @@ export function Sidebar({
         <nav
           ref={listPanelScrollRef}
           data-has-vertical-scroll={hasVerticalScroll ? "true" : undefined}
-          className="list-panel-scroll flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto"
+          className="list-panel-scroll list-panel-scroll--sidebar-leading flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto"
         >
           {visibleNavItems.map((item) => {
             const isNavItemSelected =
@@ -1788,7 +1788,7 @@ export function Sidebar({
               }
               className={
                 item.action === "search"
-                  ? `ml-[14px] mt-2 mb-[2px] flex w-auto bg-[#fcfbff] cursor-pointer items-center gap-2 self-stretch rounded-[7px] border border-[#e3e3e9] py-0 pl-[8px] pr-[3px] text-left text-sm ptxt-list-search transition-colors hover:bg-slate-50 dark:hover:bg-zinc-800/60 ${SIDEBAR_NAV_ITEM_SIZE_CLASS}`
+                  ? `ml-[14px] mt-2 mb-[4px] flex w-auto bg-[#fcfbff] cursor-pointer items-center gap-2 self-stretch rounded-[7px] border border-[#e3e3e9] py-0 pl-[8px] pr-[3px] text-left text-sm ptxt-list-search transition-colors hover:bg-slate-50 dark:hover:bg-zinc-800/60 ${SIDEBAR_NAV_ITEM_SIZE_CLASS}`
                   : `${getItemClassName(isNavItemSelected)} gap-1 px-4`
               }
             >
@@ -1818,7 +1818,7 @@ export function Sidebar({
           })}
           
           <div className="flex flex-col overflow-visible">
-            <div className="group/lists-header relative z-[200] flex items-center overflow-visible px-4 pt-1 -mb-[2px]">
+            <div className="group/lists-header relative z-10 flex items-center overflow-visible px-4 pt-1 -mb-[2px]">
               <span className="min-w-0 flex-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-[#bdbfc2]">
                 Lists
               </span>
@@ -1880,7 +1880,7 @@ export function Sidebar({
                         left: event.clientX,
                       });
                     }}
-                    className={`group relative ml-[11px] mb-1 flex h-[34px] cursor-pointer items-center rounded-md pr-3 pl-1.5 transition-[background-color] duration-200 hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 ${
+                    className={`group/folder relative ml-[11px] mb-1 flex h-[34px] cursor-pointer items-center rounded-md pr-3 pl-1.5 transition-[background-color] duration-200 hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 ${
                       isListDragOver
                         ? "bg-zinc-200/70 ring-2 ring-inset ring-blue-400 dark:bg-zinc-800/70 dark:ring-blue-500"
                         : ""
@@ -1901,12 +1901,20 @@ export function Sidebar({
                       <span className="min-w-0 truncate text-left text-sm ptxt-list-items">
                         {folder.name}
                       </span>
-                      <BiChevronDown
-                        className={`size-4 shrink-0 ml-1 mt-[1px] text-[#c7c7ce] group-hover:text-[#a3a3aa] mb-[1px] ml-1 transition-transform duration-200 ${
-                          showChevronOpen ? "" : "-rotate-90"
-                        }`}
-                        aria-hidden="true"
-                      />
+                      <span className="relative ml-1 mt-[1px] mb-[1px] shrink-0">
+                        <BiChevronDown
+                          className={`size-4 text-[#c7c7ce] group-hover/folder:text-[#a3a3aa] transition-transform duration-200 ${
+                            showChevronOpen ? "" : "-rotate-90"
+                          }`}
+                          aria-hidden="true"
+                        />
+                        <span
+                          role="tooltip"
+                          className="add-task-date-tooltip pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-[200] -translate-x-1/2 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity group-hover/folder:opacity-100"
+                        >
+                          {isExpanded ? "Fold" : "Unfold"}
+                        </span>
+                      </span>
                     </div>
                     <div className={SIDEBAR_ROW_MENU_WRAPPER_CLASS}>
                       <button
@@ -1954,8 +1962,7 @@ export function Sidebar({
                 Add
               </button>
               {isBottomAddMenuOpen ? (
-                <div className="absolute left-full top-1/2 z-[1000] flex -translate-y-1/2 items-stretch -ml-4">
-                  <div className="w-3 shrink-0" aria-hidden="true" />
+                <div className="absolute bottom-full left-0 z-[1000] mb-1.5">
                   <div
                     role="menu"
                     aria-label="Add list or folder"
@@ -2151,7 +2158,7 @@ export function Sidebar({
                   No completed tasks
                 </p>
               ) : (
-                <div className="list-panel-scroll max-h-[280px] overflow-x-hidden overflow-y-auto py-1">
+                <div className="list-panel-scroll list-panel-scroll--sidebar-leading max-h-[280px] overflow-x-hidden overflow-y-auto py-1">
                   {completedTasks.map((task) => (
                     <button
                       key={task.id}

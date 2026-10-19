@@ -6,7 +6,9 @@ import { BiChevronDown, BiChevronRight } from "react-icons/bi";
 import {
   clearSubtasksExpanded,
   getSavedSubtasksExpanded,
+  resolveCompletedSubtasksExpandedState,
   resolveSubtasksExpandedState,
+  saveCompletedSubtasksExpanded,
   saveSubtasksExpanded,
 } from "@/lib/task-subtasks";
 import { TaskCompletionCheckbox } from "./task-completion-checkbox";
@@ -77,6 +79,9 @@ export function TaskDetailsSubtasksSection({
   const [isExpanded, setIsExpanded] = useState(() =>
     resolveSubtasksExpandedState(taskId, subtasks.length),
   );
+  const [isCompletedExpanded, setIsCompletedExpanded] = useState(() =>
+    resolveCompletedSubtasksExpandedState(taskId),
+  );
   const [editingSubtaskId, setEditingSubtaskId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
   const [isAdding, setIsAdding] = useState(false);
@@ -102,6 +107,7 @@ export function TaskDetailsSubtasksSection({
   useEffect(() => {
     previousSubtaskCountRef.current = subtasks.length;
     setIsExpanded(resolveSubtasksExpandedState(taskId, subtasks.length));
+    setIsCompletedExpanded(resolveCompletedSubtasksExpandedState(taskId));
   }, [taskId]);
 
   useEffect(() => {
@@ -150,6 +156,14 @@ export function TaskDetailsSubtasksSection({
     setIsExpanded((current) => {
       const next = !current;
       saveSubtasksExpanded(taskId, next);
+      return next;
+    });
+  }
+
+  function handleToggleCompletedExpanded() {
+    setIsCompletedExpanded((current) => {
+      const next = !current;
+      saveCompletedSubtasksExpanded(taskId, next);
       return next;
     });
   }
@@ -323,7 +337,7 @@ export function TaskDetailsSubtasksSection({
         onContextMenu={(event) => openSubtaskContextMenu(event, subtask.id)}
       >
         <div
-          className={`flex items-center gap-2.5 ml-1 ${
+          className={`ml-[21px] flex items-center gap-2.5 ${
             subtask.completed ? "py-1.5" : "py-2.5"
           }`}
         >
@@ -440,7 +454,7 @@ export function TaskDetailsSubtasksSection({
           {activeSubtasks.map(renderSubtaskRow)}
 
           <div
-            className={`ml-[20px] ${
+            className={`ml-[22px] ${
               completedSubtasks.length > 0
                 ? "border-b border-zinc-200/70 dark:border-zinc-700"
                 : ""
@@ -450,12 +464,34 @@ export function TaskDetailsSubtasksSection({
           </div>
 
           {completedSubtasks.length > 0 ? (
-            <div className="pt-3 pb-1 pl-1 text-[12px] font-medium text-zinc-400 dark:text-zinc-500">
-              Completed
-            </div>
+            <>
+              <button
+                type="button"
+                className="ml-[3px] flex w-full items-center gap-1 pb-1 pl-[20px] pt-3 text-left"
+                onClick={handleToggleCompletedExpanded}
+                aria-expanded={isCompletedExpanded}
+              >
+                {isCompletedExpanded ? (
+                  <BiChevronDown
+                    className="size-3.5 shrink-0 text-zinc-400 cursor-pointer"
+                  />
+                ) : (
+                  <BiChevronRight
+                    className="size-3.5 shrink-0 text-zinc-400 cursor-pointer"
+                  />
+                )}
+                <span className="text-[12px] font-medium text-zinc-400 dark:text-zinc-500 cursor-pointer">
+                  Completed
+                </span>
+                <span className="text-[11px] text-zinc-400 dark:text-zinc-500">
+                  {completedSubtasks.length}
+                </span>
+              </button>
+              {isCompletedExpanded
+                ? completedSubtasks.map(renderSubtaskRow)
+                : null}
+            </>
           ) : null}
-
-          {completedSubtasks.map(renderSubtaskRow)}
         </div>
       ) : null}
         </>

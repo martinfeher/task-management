@@ -11,6 +11,7 @@ import {
   LABEL_PRESET_COLORS,
   normalizeLabelColorHex,
 } from "@/lib/label-colors";
+import { taskContextMenuTextColor } from "@/lib/task-context-menu-colors";
 
 export type Label = {
   id: string;
@@ -28,6 +29,7 @@ type TaskLabelSelectorProps = {
   onToggleLabel: (labelId: string) => void;
   onCreateLabel: (label: string, color: string) => void;
   onCancel: () => void;
+  tone?: "default" | "contextMenu";
 };
 
 function hasExactLabelMatch(labels: Label[], query: string) {
@@ -114,7 +116,9 @@ export function TaskLabelSelector({
   onToggleLabel,
   onCreateLabel,
   onCancel,
+  tone = "default",
 }: TaskLabelSelectorProps) {
+  const isContextMenuTone = tone === "contextMenu";
   const inputRef = useRef<HTMLInputElement>(null);
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const trimmedQuery = query.trim();
@@ -275,7 +279,17 @@ export function TaskLabelSelector({
               onChange={setCreateLabelColor}
             />
           ) : (
-            <BiSearch className="size-4 shrink-0 text-[#6f6f6f]" aria-hidden="true" />
+            <BiSearch
+              className={`size-4 shrink-0 ${
+                isContextMenuTone ? "" : "text-[#6f6f6f]"
+              }`}
+              style={
+                isContextMenuTone
+                  ? taskContextMenuTextColor("searchIcon")
+                  : undefined
+              }
+              aria-hidden="true"
+            />
           )}
           <input
             ref={inputRef}
@@ -287,7 +301,16 @@ export function TaskLabelSelector({
             }}
             placeholder="Type in a label"
             aria-label="Type in a label"
-            className="min-w-0 flex-1 bg-transparent text-sm text-zinc-900 outline-none placeholder:text-zinc-400 dark:text-zinc-50"
+            className={`min-w-0 flex-1 bg-transparent text-sm outline-none dark:text-zinc-50 ${
+              isContextMenuTone
+                ? "placeholder:text-[#acacb4]"
+                : "text-zinc-900 placeholder:text-zinc-400"
+            }`}
+            style={
+              isContextMenuTone
+                ? taskContextMenuTextColor("textPrimary")
+                : undefined
+            }
             onKeyDown={(event) => {
               if (event.key === "ArrowDown") {
                 if (navigableItems.length > 0) {
@@ -334,7 +357,16 @@ export function TaskLabelSelector({
         }
       >
         {navigableItems.length === 0 && !showCreateLabel ? (
-          <p className="px-4 py-3 text-sm text-zinc-400 dark:text-zinc-500">
+          <p
+            className={`px-4 py-3 text-sm dark:text-zinc-500 ${
+              isContextMenuTone ? "" : "text-zinc-400"
+            }`}
+            style={
+              isContextMenuTone
+                ? taskContextMenuTextColor("icon400")
+                : undefined
+            }
+          >
             {trimmedQuery ? "No matching labels" : "No labels yet"}
           </p>
         ) : (
@@ -357,10 +389,26 @@ export function TaskLabelSelector({
                   onClick={handleCreateLabel}
                   className={getNavigableItemClassName(
                     isActive,
-                    "flex min-h-[38px] w-full items-center gap-2.5 px-4 py-2 text-left text-sm text-zinc-800 transition-colors disabled:opacity-50 dark:text-zinc-100",
+                    `flex min-h-[38px] w-full items-center gap-2.5 px-4 py-2 text-left text-sm transition-colors disabled:opacity-50 dark:text-zinc-100 ${
+                      isContextMenuTone ? "" : "text-zinc-800"
+                    }`,
                   )}
+                  style={
+                    isContextMenuTone
+                      ? taskContextMenuTextColor("textSecondary")
+                      : undefined
+                  }
                 >
-                  <span className="relative flex size-4 shrink-0 items-center justify-center text-zinc-500 dark:text-zinc-400">
+                  <span
+                    className={`relative flex size-4 shrink-0 items-center justify-center dark:text-zinc-400 ${
+                      isContextMenuTone ? "" : "text-zinc-500"
+                    }`}
+                    style={
+                      isContextMenuTone
+                        ? taskContextMenuTextColor("icon500")
+                        : undefined
+                    }
+                  >
                     <IoPricetagsOutline className="size-4" />
                     <LuPlus className="absolute -right-1 -top-1 size-2.5 rounded-full bg-white dark:bg-zinc-900" />
                   </span>
@@ -396,13 +444,17 @@ export function TaskLabelSelector({
                             ? ""
                             : "hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
                         }`
-                      : "text-zinc-800 dark:text-zinc-100"
+                      : isContextMenuTone
+                        ? "dark:text-zinc-100"
+                        : "text-zinc-800 dark:text-zinc-100"
                   }`,
                 )}
                 style={
                   isAssigned && !palette.textClass
                     ? { color: palette.text }
-                    : undefined
+                    : isContextMenuTone && !isAssigned
+                      ? taskContextMenuTextColor("textSecondary")
+                      : undefined
                 }
               >
                 <span

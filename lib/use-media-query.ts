@@ -1,20 +1,34 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 
 export const COMPACT_LAYOUT_MEDIA_QUERY = "(max-width: 1023px)";
+export const NARROW_DESKTOP_TASK_LIST_MEDIA_QUERY = "(max-width: 1699px)";
+
+function subscribeToMediaQuery(query: string, onStoreChange: () => void) {
+  const mediaQuery = window.matchMedia(query);
+  mediaQuery.addEventListener("change", onStoreChange);
+  return () => mediaQuery.removeEventListener("change", onStoreChange);
+}
+
+function getMediaQuerySnapshot(query: string) {
+  return window.matchMedia(query).matches;
+}
+
+function getMediaQueryServerSnapshot() {
+  return false;
+}
 
 export function useMediaQuery(query: string) {
-  const [matches, setMatches] = useState(false);
+  const subscribe = useCallback(
+    (onStoreChange: () => void) =>
+      subscribeToMediaQuery(query, onStoreChange),
+    [query],
+  );
 
-  useEffect(() => {
-    const mediaQuery = window.matchMedia(query);
-    const update = () => setMatches(mediaQuery.matches);
-
-    update();
-    mediaQuery.addEventListener("change", update);
-    return () => mediaQuery.removeEventListener("change", update);
-  }, [query]);
-
-  return matches;
+  return useSyncExternalStore(
+    subscribe,
+    () => getMediaQuerySnapshot(query),
+    getMediaQueryServerSnapshot,
+  );
 }

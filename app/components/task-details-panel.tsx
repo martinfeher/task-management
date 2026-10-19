@@ -84,6 +84,8 @@ import {
   enterFromTitleLine,
   removeLeadingEmptyBodyLineOnBackspace,
   syncEditorBodyPlaceholderVisibility,
+  flattenNestedDetailLines,
+  stripTrailingBreakFromNonEmptyLine,
   syncLineEmptyState,
   toggleChecklistLine,
 } from "./detail-lines";
@@ -148,6 +150,7 @@ import {
   DetailFormatFontSizeDropdown,
   DetailFormatListDropdown,
   DetailFormatOverflowMenu,
+  FormatToolbarAnchorPlacementProvider,
   FormatToolbarTooltipWrap,
   getFormatToolbarShortcut,
   FORMAT_TOOLBAR_ICON_COLOR,
@@ -309,7 +312,7 @@ type AddBlockMenuState = {
 };
 
 const FORMAT_TOOLBAR_SURFACE_CLASS =
-  "format-toolbar-popover-surface overflow-visible rounded-[19px] border border-zinc-200/70 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.12)] dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-[0_8px_24px_rgba(0,0,0,0.32)]";
+  "format-toolbar-popover-surface overflow-visible rounded-[30px] border border-zinc-200/70 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.12)] dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-[0_8px_24px_rgba(0,0,0,0.32)]";
 
 function getFormatToolbarPopoverClass(formatMenu: FormatMenuState) {
   const placement = formatMenu.placement === "below" ? "below" : "above";
@@ -324,7 +327,7 @@ const TASK_DETAILS_BLOCK_MENU_CLASS =
 const TASK_DETAILS_BLOCK_MENU_ITEM_CLASS =
   "flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-900 hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800";
 
-const FORMAT_TOOLBAR_ROW_CLASS = "flex items-center gap-0.5 px-1.5 py-1";
+const FORMAT_TOOLBAR_ROW_CLASS = "flex items-center gap-0.5 px-2 py-1";
 
 const FORMAT_TOOLBAR_TEXT_BUTTON_CLASS =
   `flex h-8 min-w-8 items-center justify-center rounded-[9px] px-2 cursor-pointer text-[16px] ${FORMAT_TOOLBAR_ICON_COLOR} transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800`;
@@ -1125,6 +1128,111 @@ function restoreEditorSelectionRange(range: Range) {
   selection.addRange(range);
 }
 
+function createTextColorPreviewMarker(kind: "start" | "end") {
+  const marker = document.createElement("span");
+  marker.dataset.textColorPreview = kind;
+  marker.contentEditable = "false";
+  marker.setAttribute("aria-hidden", "true");
+  marker.style.display = "inline";
+  marker.style.fontSize = "0";
+  marker.style.lineHeight = "0";
+  marker.style.width = "0";
+  marker.style.height = "0";
+  marker.style.overflow = "hidden";
+  marker.style.verticalAlign = "baseline";
+  marker.style.pointerEvents = "none";
+  marker.style.opacity = "0";
+  marker.style.userSelect = "none";
+  marker.style.padding = "0";
+  marker.style.margin = "0";
+  marker.style.border = "0";
+  return marker;
+}
+
+function applyForeColorToRange(range: Range, color: string) {
+  if (range.collapsed) return null;
+
+  const wrapper = document.createElement("span");
+  wrapper.style.color = color;
+  wrapper.appendChild(range.extractContents());
+  range.insertNode(wrapper);
+
+  const nextRange = document.createRange();
+  nextRange.selectNodeContents(wrapper);
+
+  const selection = window.getSelection();
+  if (selection) {
+    selection.removeAllRanges();
+    selection.addRange(nextRange);
+  }
+
+  return nextRange;
+}
+
+function detailLineHasNoVisibleText(line: HTMLElement) {
+  const clone = line.cloneNode(true) as HTMLElement;
+  clone
+    .querySelectorAll("[data-text-color-preview]")
+    .forEach((marker) => marker.remove());
+  return (
+    !(clone.textContent ?? "").replace(/\u00a0|\u200B/g, " ").trim() &&
+    !clone.querySelector(".detail-image-wrapper")
+  );
+}
+
+function normalizeTextColorPreviewEditorStructure(editor: HTMLElement) {
+  flattenNestedDetailLines(editor);
+
+  editor
+    .querySelectorAll('[data-text-color-preview="start"]')
+    .forEach((marker) => {
+      const line = marker.closest(".detail-line");
+      if (!(line instanceof HTMLElement)) return;
+
+      let previous = line.previousElementSibling;
+      while (
+        previous instanceof HTMLElement &&
+        previous.classList.contains("detail-line") &&
+        detailLineHasNoVisibleText(previous)
+      ) {
+        const toRemove = previous;
+        previous = previous.previousElementSibling;
+        toRemove.remove();
+      }
+    });
+
+  const lines = new Set<HTMLElement>();
+  editor.querySelectorAll("[data-text-color-preview]").forEach((marker) => {
+    const line = marker.closest(".detail-line");
+    if (line instanceof HTMLElement) {
+      lines.add(line);
+    }
+  });
+
+  lines.forEach((line) => {
+    stripTrailingBreakFromNonEmptyLine(line);
+  });
+}
+
+function getTextColorPreviewContentRange(editor: HTMLElement) {
+  const startMarker = editor.querySelector('[data-text-color-preview="start"]');
+  const endMarker = editor.querySelector('[data-text-color-preview="end"]');
+  if (!(startMarker instanceof HTMLElement && endMarker instanceof HTMLElement)) {
+    return null;
+  }
+
+  const range = document.createRange();
+  range.setStartAfter(startMarker);
+  range.setEndBefore(endMarker);
+  return range;
+}
+
+function removeTextColorPreviewMarkers(editor: HTMLElement) {
+  editor
+    .querySelectorAll("[data-text-color-preview]")
+    .forEach((marker) => marker.remove());
+}
+
 function getCaretRangeFromPoint(clientX: number, clientY: number): Range | null {
   try {
     if (typeof document.caretRangeFromPoint === "function") {
@@ -1189,6 +1297,76 @@ function editorSelectionIsWithinTitleLine(editor: HTMLElement) {
   }
 
   return rangeIsWithinTitleLine(editor, selection.getRangeAt(0));
+}
+
+function editorSelectionSpansTitleAndBody(
+  editor: HTMLElement,
+  range: Range,
+) {
+  if (range.collapsed) return false;
+
+  let includesTitle = false;
+  let includesBody = false;
+
+  for (const line of getLineElements(editor)) {
+    try {
+      if (!range.intersectsNode(line)) continue;
+    } catch {
+      continue;
+    }
+
+    if (isTitleLine(editor, line)) {
+      includesTitle = true;
+    } else {
+      includesBody = true;
+    }
+
+    if (includesTitle && includesBody) return true;
+  }
+
+  return false;
+}
+
+function clampEditorSelectionToTitleOrBody(editor: HTMLElement) {
+  const selection = window.getSelection();
+  if (
+    !selection?.rangeCount ||
+    selection.isCollapsed ||
+    !selection.anchorNode ||
+    !editor.contains(selection.anchorNode)
+  ) {
+    return;
+  }
+
+  const range = selection.getRangeAt(0);
+  if (!editorSelectionSpansTitleAndBody(editor, range)) return;
+
+  const anchorLine = getDetailLineFromNode(selection.anchorNode, editor);
+  const titleLine = getLineElements(editor)[0];
+  if (!anchorLine || !titleLine || !isTitleLine(editor, titleLine)) return;
+
+  const titleRange = document.createRange();
+  titleRange.selectNodeContents(titleLine);
+
+  const nextRange = range.cloneRange();
+
+  if (isTitleLine(editor, anchorLine)) {
+    if (nextRange.compareBoundaryPoints(Range.START_TO_START, titleRange) < 0) {
+      nextRange.setStart(titleRange.startContainer, titleRange.startOffset);
+    }
+    if (nextRange.compareBoundaryPoints(Range.END_TO_END, titleRange) > 0) {
+      nextRange.setEnd(titleRange.endContainer, titleRange.endOffset);
+    }
+  } else if (nextRange.compareBoundaryPoints(Range.START_TO_START, titleRange) <= 0) {
+    nextRange.setStart(titleRange.endContainer, titleRange.endOffset);
+  }
+
+  try {
+    selection.removeAllRanges();
+    selection.addRange(nextRange);
+  } catch {
+    // Ignore invalid ranges after DOM mutations.
+  }
 }
 
 function isMultiClickMouseEvent(event: Pick<MouseEvent, "detail">) {
@@ -1617,11 +1795,58 @@ function getFormatableSelectedLines(editor: HTMLElement, range: Range) {
   );
 }
 
+function getFormatMenuSelectionBounds(
+  range: Range,
+  selectedLines: HTMLElement[],
+) {
+  const rects = Array.from(range.getClientRects()).filter(
+    (rect) => rect.width > 0 && rect.height > 0,
+  );
+
+  if (rects.length > 0) {
+    return {
+      left: Math.min(...rects.map((rect) => rect.left)),
+      right: Math.max(...rects.map((rect) => rect.right)),
+      top: Math.min(...rects.map((rect) => rect.top)),
+      bottom: Math.max(...rects.map((rect) => rect.bottom)),
+    };
+  }
+
+  const fallback = range.getBoundingClientRect();
+  if (fallback.width > 0 || fallback.height > 0) {
+    return {
+      left: fallback.left,
+      right: fallback.right,
+      top: fallback.top,
+      bottom: fallback.bottom,
+    };
+  }
+
+  if (selectedLines.length > 0) {
+    const lineRects = selectedLines.map((line) => line.getBoundingClientRect());
+    return {
+      left: Math.min(...lineRects.map((rect) => rect.left)),
+      right: Math.max(...lineRects.map((rect) => rect.right)),
+      top: Math.min(...lineRects.map((rect) => rect.top)),
+      bottom: Math.max(...lineRects.map((rect) => rect.bottom)),
+    };
+  }
+
+  return {
+    left: fallback.left,
+    right: fallback.right,
+    top: fallback.top,
+    bottom: fallback.bottom,
+  };
+}
+
 function getFormatMenuPositionFromRange(range: Range, editor: HTMLElement) {
   const selectedLines = getLineElements(editor).filter((line) =>
     range.intersectsNode(line),
   );
   const formatableSelectedLines = getFormatableSelectedLines(editor, range);
+  const selectionBounds = getFormatMenuSelectionBounds(range, selectedLines);
+  const alignLeft = true;
 
   if (
     formatableSelectedLines.length >
@@ -1629,10 +1854,9 @@ function getFormatMenuPositionFromRange(range: Range, editor: HTMLElement) {
   ) {
     const firstLine = formatableSelectedLines[0];
     const firstRect = firstLine.getBoundingClientRect();
-    const alignLeft = formatableSelectedLines.length > 2;
 
     return {
-      x: alignLeft ? firstRect.left : firstRect.left + firstRect.width / 2,
+      x: selectionBounds.left,
       y:
         firstRect.bottom +
         FORMAT_MENU_BELOW_FIRST_SELECTED_LINE_GAP -
@@ -1644,63 +1868,30 @@ function getFormatMenuPositionFromRange(range: Range, editor: HTMLElement) {
     };
   }
 
-  const alignLeft = selectedLines.length > 2;
-  const rects = Array.from(range.getClientRects()).filter(
-    (rect) => rect.width > 0 && rect.height > 0,
-  );
-
-  const top =
-    rects.length > 0
-      ? Math.min(...rects.map((rect) => rect.top))
-      : range.getBoundingClientRect().top;
-
-  let left: number;
-  let right: number;
-
-  if (alignLeft && selectedLines.length > 0) {
-    left = Math.min(
-      ...selectedLines.map((line) => line.getBoundingClientRect().left),
-    );
-    right = Math.max(
-      ...selectedLines.map((line) => line.getBoundingClientRect().right),
-    );
-  } else if (rects.length > 0) {
-    left = Math.min(...rects.map((rect) => rect.left));
-    right = Math.max(...rects.map((rect) => rect.right));
-  } else {
-    const fallback = range.getBoundingClientRect();
-    left = fallback.left;
-    right = fallback.right;
-  }
-
-  const anchorBottom =
-    rects.length > 0
-      ? Math.max(...rects.map((rect) => rect.bottom))
-      : range.getBoundingClientRect().bottom;
   const shouldPlaceBelow = shouldPlaceFormatMenuBelowTitle(
     editor,
     range,
     selectedLines,
-    top,
+    selectionBounds.top,
   );
 
   if (shouldPlaceBelow) {
     return {
-      x: alignLeft ? left : left + (right - left) / 2,
-      y: anchorBottom + FORMAT_MENU_BELOW_SELECTION_GAP,
+      x: selectionBounds.left,
+      y: selectionBounds.bottom + FORMAT_MENU_BELOW_SELECTION_GAP,
       alignLeft,
       placement: "below" as const,
-      anchorBottom,
+      anchorBottom: selectionBounds.bottom,
       preferBelow: true,
     };
   }
 
   return {
-    x: alignLeft ? left : left + (right - left) / 2,
-    y: top - FORMAT_MENU_ABOVE_SELECTION_GAP,
+    x: selectionBounds.left,
+    y: selectionBounds.top - FORMAT_MENU_ABOVE_SELECTION_GAP,
     alignLeft,
     placement: "above" as const,
-    anchorBottom,
+    anchorBottom: selectionBounds.bottom,
   };
 }
 
@@ -1975,6 +2166,8 @@ export function TaskDetailsPanel({
   const linkTextInputRef = useRef<HTMLInputElement>(null);
   const savedLinkSelectionRef = useRef<Range | null>(null);
   const savedFormatSelectionRef = useRef<Range | null>(null);
+  const textColorPreviewBaselineRef = useRef<DocumentFragment | null>(null);
+  const textColorPreviewMarkersPlacedRef = useRef(false);
   const savedFormatLineIdsRef = useRef<string[]>([]);
   const openFormatDropdownRef = useRef<FormatToolbarDropdown | null>(null);
   openFormatDropdownRef.current = openFormatDropdown;
@@ -2999,7 +3192,14 @@ export function TaskDetailsPanel({
     }, debounceMs);
   }, [normalizeEditorAfterInput]);
 
+  const clearTextColorLivePreviewRef = useRef<
+    ((options?: { keepContent?: boolean }) => void) | null
+  >(null);
+
   const closeFormatDropdowns = useCallback(() => {
+    if (openFormatDropdownRef.current === "textColor") {
+      clearTextColorLivePreviewRef.current?.();
+    }
     setOpenFormatDropdown(null);
     setOpenHeaderFormatDropdown(null);
   }, []);
@@ -3114,6 +3314,136 @@ export function TaskDetailsPanel({
     }
   }, [rememberFormatSelection]);
 
+  const clearTextColorLivePreview = useCallback(
+    (options?: { keepContent?: boolean }) => {
+      const editor = editorRef.current;
+      if (!editor || !textColorPreviewMarkersPlacedRef.current) {
+        textColorPreviewBaselineRef.current = null;
+        textColorPreviewMarkersPlacedRef.current = false;
+        return;
+      }
+
+      const contentRange = getTextColorPreviewContentRange(editor);
+      if (!contentRange) {
+        removeTextColorPreviewMarkers(editor);
+        textColorPreviewBaselineRef.current = null;
+        textColorPreviewMarkersPlacedRef.current = false;
+        return;
+      }
+
+      if (!options?.keepContent && textColorPreviewBaselineRef.current) {
+        contentRange.deleteContents();
+        contentRange.insertNode(
+          textColorPreviewBaselineRef.current.cloneNode(true),
+        );
+        normalizeTextColorPreviewEditorStructure(editor);
+      }
+
+      const selectionRange = contentRange.cloneRange();
+      removeTextColorPreviewMarkers(editor);
+      textColorPreviewBaselineRef.current = null;
+      textColorPreviewMarkersPlacedRef.current = false;
+
+      try {
+        rememberFormatSelection(editor, selectionRange);
+        restoreEditorSelectionRange(selectionRange);
+      } catch {
+        captureFormatSelectionFromEditor();
+      }
+    },
+    [captureFormatSelectionFromEditor, rememberFormatSelection],
+  );
+
+  const ensureTextColorPreviewSetup = useCallback(() => {
+    const editor = editorRef.current;
+    const savedRange = savedFormatSelectionRef.current?.cloneRange();
+    if (!editor || !savedRange || savedRange.collapsed) return null;
+
+    if (textColorPreviewMarkersPlacedRef.current) {
+      return getTextColorPreviewContentRange(editor);
+    }
+
+    const startMarker = createTextColorPreviewMarker("start");
+    const endMarker = createTextColorPreviewMarker("end");
+    const endInsertRange = savedRange.cloneRange();
+    endInsertRange.collapse(false);
+    endInsertRange.insertNode(endMarker);
+    const startInsertRange = savedRange.cloneRange();
+    startInsertRange.collapse(true);
+    startInsertRange.insertNode(startMarker);
+    normalizeTextColorPreviewEditorStructure(editor);
+
+    textColorPreviewMarkersPlacedRef.current = true;
+    const contentRange = getTextColorPreviewContentRange(editor);
+    if (!contentRange) return null;
+
+    textColorPreviewBaselineRef.current = contentRange.cloneContents();
+    rememberFormatSelection(editor, contentRange);
+    return contentRange;
+  }, [rememberFormatSelection]);
+
+  const previewTextColorOnSelection = useCallback(
+    (color: string) => {
+      const editor = editorRef.current;
+      if (!editor) return;
+
+      const contentRange = ensureTextColorPreviewSetup();
+      if (!contentRange || !textColorPreviewBaselineRef.current) return;
+
+      contentRange.deleteContents();
+      contentRange.insertNode(
+        textColorPreviewBaselineRef.current.cloneNode(true),
+      );
+      normalizeTextColorPreviewEditorStructure(editor);
+
+      const previewRange = getTextColorPreviewContentRange(editor);
+      if (!previewRange || previewRange.collapsed) return;
+
+      const resolvedColor = resolveTextColorOption(color);
+      const coloredRange = applyForeColorToRange(
+        previewRange.cloneRange(),
+        resolvedColor,
+      );
+      if (coloredRange) {
+        rememberFormatSelection(editor, coloredRange);
+      }
+    },
+    [ensureTextColorPreviewSetup, rememberFormatSelection],
+  );
+
+  const previewFontFamilyOnSelection = useCallback(
+    (familyId: DetailFontFamilyId) => {
+      const editor = editorRef.current;
+      if (!editor) return;
+
+      const contentRange = ensureTextColorPreviewSetup();
+      if (!contentRange || !textColorPreviewBaselineRef.current) return;
+
+      contentRange.deleteContents();
+      contentRange.insertNode(
+        textColorPreviewBaselineRef.current.cloneNode(true),
+      );
+      normalizeTextColorPreviewEditorStructure(editor);
+
+      const previewRange = getTextColorPreviewContentRange(editor);
+      if (!previewRange || previewRange.collapsed) return;
+
+      if (
+        applyDetailFontFamily(
+          editor,
+          familyId,
+          previewRange.cloneRange(),
+        )
+      ) {
+        const styledRange = getTextColorPreviewContentRange(editor);
+        if (styledRange) {
+          rememberFormatSelection(editor, styledRange);
+        }
+      }
+    },
+    [ensureTextColorPreviewSetup, rememberFormatSelection],
+  );
+
   const setFormatDropdownOpen = useCallback(
     (dropdown: FormatToolbarDropdown, open: boolean) => {
       if (open) {
@@ -3132,10 +3462,16 @@ export function TaskDetailsPanel({
         return;
       }
 
+      if (dropdown === "textColor" || dropdown === "fontFamily") {
+        clearTextColorLivePreview();
+      }
+
       setOpenFormatDropdown((current) => (current === dropdown ? null : current));
     },
-    [captureFormatSelectionFromEditor],
+    [captureFormatSelectionFromEditor, clearTextColorLivePreview],
   );
+
+  clearTextColorLivePreviewRef.current = clearTextColorLivePreview;
 
   const syncFormatMenuSelectionState = useCallback(() => {
     const editor = editorRef.current;
@@ -3233,22 +3569,33 @@ export function TaskDetailsPanel({
           clearSavedSelection: false,
           preserveToolbarDropdowns: true,
         });
+        captureFormatSelectionFromEditor();
         syncFormatMenuFontState();
+      } else if (dropdown === "family") {
+        clearTextColorLivePreview();
       }
       setOpenHeaderFormatDropdown(open ? dropdown : null);
     },
-    [closeFormatMenu, syncFormatMenuFontState],
+    [
+      captureFormatSelectionFromEditor,
+      clearTextColorLivePreview,
+      closeFormatMenu,
+      syncFormatMenuFontState,
+    ],
   );
 
   const setModalFormatDropdownOpen = useCallback(
     (dropdown: HeaderFormatDropdown, open: boolean) => {
       if (open) {
+        captureFormatSelectionFromEditor();
         syncFormatMenuFontState();
         setOpenFormatDropdown(null);
+      } else if (dropdown === "family") {
+        clearTextColorLivePreview();
       }
       setOpenModalFormatDropdown(open ? dropdown : null);
     },
-    [syncFormatMenuFontState],
+    [captureFormatSelectionFromEditor, clearTextColorLivePreview, syncFormatMenuFontState],
   );
 
   const handleModalFormatToggle = useCallback(() => {
@@ -3321,6 +3668,8 @@ export function TaskDetailsPanel({
       const editor = editorRef.current;
       if (!editor) return;
 
+      clearTextColorLivePreview({ keepContent: true });
+
       const savedRange = savedFormatSelectionRef.current?.cloneRange() ?? null;
       if (
         savedRange &&
@@ -3352,6 +3701,7 @@ export function TaskDetailsPanel({
     },
     [
       captureFormatSelectionFromEditor,
+      clearTextColorLivePreview,
       closeFormatDropdowns,
       handleDetailFontApplied,
       rememberFormatSelection,
@@ -3576,6 +3926,9 @@ export function TaskDetailsPanel({
       const hasPendingSelection = editorHasLiveExtendedTextSelection(editor);
       const titleSelection =
         hasPendingSelection && editorSelectionIsWithinTitleLine(editor);
+      if (hasPendingSelection) {
+        syncFormatMenuSelectionState();
+      }
       syncHeaderClearFormattingState();
       closeFormatMenu({
         clearSavedSelection: !hasPendingSelection || titleSelection,
@@ -3872,6 +4225,8 @@ export function TaskDetailsPanel({
       const activeLine = getActiveLineElement(editor);
       if (isCodeLine(activeLine)) return;
 
+      clearTextColorLivePreview({ keepContent: true });
+
       captureFormatSelectionFromEditor();
       const savedRange = savedFormatSelectionRef.current?.cloneRange() ?? null;
 
@@ -3917,6 +4272,7 @@ export function TaskDetailsPanel({
     },
     [
       captureFormatSelectionFromEditor,
+      clearTextColorLivePreview,
       closeFormatMenu,
       recordHistorySnapshot,
       scheduleAutoSave,
@@ -4725,6 +5081,9 @@ export function TaskDetailsPanel({
             placeCaretInLine(pendingLine);
           }
         }
+        if (editor) {
+          clampEditorSelectionToTitleOrBody(editor);
+        }
         return;
       }
 
@@ -4739,6 +5098,8 @@ export function TaskDetailsPanel({
             editor.contains(selection.focusNode)));
 
       if (selectionInEditor) {
+        clampEditorSelectionToTitleOrBody(editor);
+
         if (!editorHasLiveExtendedTextSelection(editor)) {
           syncEditorLineEmptyState(editor);
         }
@@ -4765,6 +5126,8 @@ export function TaskDetailsPanel({
         if (liveRange) {
           rememberFormatSelection(editor, liveRange);
         }
+
+        syncFormatMenuSelectionState();
       }
 
       if (!formatMenuRef.current?.contains(document.activeElement)) {
@@ -4797,7 +5160,14 @@ export function TaskDetailsPanel({
       document.removeEventListener("mousedown", handleClickOutside, true);
       document.removeEventListener("selectionchange", handleSelectionChange);
     };
-  }, [closeFormatMenu, rememberFormatSelection, requestSave, scheduleFormatMenuReveal, scheduleLineControlsUpdate]);
+  }, [
+    closeFormatMenu,
+    rememberFormatSelection,
+    requestSave,
+    scheduleFormatMenuReveal,
+    scheduleLineControlsUpdate,
+    syncFormatMenuSelectionState,
+  ]);
 
   useLayoutEffect(() => {
     if (!formatMenu || !formatMenuRef.current) return;
@@ -6468,6 +6838,8 @@ export function TaskDetailsPanel({
                     setModalFormatDropdownOpen("family", open)
                   }
                   onSelect={applyFormatFontFamily}
+                  onPreviewFamily={previewFontFamilyOnSelection}
+                  onPreviewFamilyClear={clearTextColorLivePreview}
                 />
                 <DetailFontSizeControl
                   formatToolbar
@@ -6574,7 +6946,7 @@ export function TaskDetailsPanel({
     >
       {renderModalHeaderActions()}
       <div
-        className={`relative flex shrink-0 items-center justify-between overflow-visible ml-[6px] px-2.5 pt-[6px] pb-[4px] ${
+        className={`relative flex shrink-0 h-[44px] items-center justify-between overflow-visible ml-[6px] px-2.5 pt-[5px] pb-[4px] ${
           isModalLayout
             ? isModalFormatToolbarOpen
               ? "pr-[22rem]"
@@ -6674,7 +7046,7 @@ export function TaskDetailsPanel({
                               className={
                                 isModalLayout
                                   ? "font-normal text-[#9f9f9f] text-[7px] leading-[7px] pt-[2px]!"
-                                  : "absolute -bottom-[5.5px] right-[2px] font-normal text-[#9f9f9f] text-[7px] leading-tight"
+                                  : "absolute -bottom-[6.5px] right-[2px] font-normal text-[#9f9f9f] text-[8px] leading-tight border border-[#e6e6e6]"
                               }
                             >
                               {dueTimeLabel}
@@ -6698,15 +7070,13 @@ export function TaskDetailsPanel({
                 <div className="group/undo relative">
                 <button
                   type="button"
-                  aria-label="Undo"
-                    aria-describedby="task-details-undo-tooltip"
-                  disabled={!canUndo}
                   onClick={handleUndo}
-                    className={`flex h-10 rounded-full min-w-[2.25rem] items-center justify-center px-2.5 text-zinc-500 transition-colors hover:bg-zinc-200 hover:text-zinc-800 disabled:pointer-events-none dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 ${
+                    className={`flex h-[34px] items-center justify-center rounded-full px-[5px] text-slate-450 transition-colors hover:bg-zinc-200 hover:text-zinc-550 disabled:pointer-events-none dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 cursor-pointer ${
                     canUndo ? "cursor-pointer" : "cursor-not-allowed"
                   } disabled:opacity-40`}
                 >
-                  <BiUndo className="size-[21px]" />
+                  <BiUndo className="size-[21px]" strokeWidth={0.05} />
+             
                 </button>
                   <span
                     id="task-details-undo-tooltip"
@@ -6724,7 +7094,7 @@ export function TaskDetailsPanel({
                     aria-describedby="task-details-redo-tooltip"
                   disabled={!canRedo}
                   onClick={handleRedo}
-                    className={`flex h-7 min-w-[2.25rem] items-center justify-center px-2.5 text-zinc-500 transition-colors hover:bg-zinc-200 hover:text-zinc-800 disabled:pointer-events-none dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 ${
+                    className={`flex h-[34px] min-w-[2.25rem] items-center justify-center rounded-full px-[7px] text-zinc-500 transition-colors hover:bg-zinc-200 hover:text-zinc-800 disabled:pointer-events-none dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 ${
                     canRedo ? "cursor-pointer" : "cursor-not-allowed"
                   } disabled:opacity-40`}
                 >
@@ -6796,6 +7166,8 @@ export function TaskDetailsPanel({
                         setHeaderFormatDropdownOpen("family", open)
                       }
                       onSelect={applyFormatFontFamily}
+                      onPreviewFamily={previewFontFamilyOnSelection}
+                      onPreviewFamilyClear={clearTextColorLivePreview}
                     />
                     <span className="text-[#cfcfcf]" aria-hidden="true">
                       |
@@ -6821,7 +7193,20 @@ export function TaskDetailsPanel({
         </div>
         {task ? (
           <div className="flex shrink-0 items-center">
-            <div className="group/history relative">
+            {onToggleTask &&
+            !task.completed &&
+            !task.isNote &&
+            !isModalLayout ? (
+              <button
+                type="button"
+                onClick={() => onToggleTask(task.id)}
+                className="mr-1 ml-3 flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-[#e6e9ec] bg-white pl-2 pr-[9px] py-[5px] text-[12px] font-normal text-[#454545] transition-colors hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+              >
+                <LuCheck className="size-3.5 shrink-0" aria-hidden="true" />
+                Mark complete
+              </button>
+            ) : null}
+            <div className="group/history relative mr-3">
               <button
                 type="button"
                 aria-label="Version history"
@@ -6839,19 +7224,6 @@ export function TaskDetailsPanel({
                 Version history
               </span>
             </div>
-            {onToggleTask &&
-            !task.completed &&
-            !task.isNote &&
-            !isModalLayout ? (
-              <button
-                type="button"
-                onClick={() => onToggleTask(task.id)}
-                className="ml-1 mr-3 flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-[#e6e9ec] bg-white pl-2 pr-[9px] py-[5px] text-[12px] font-normal text-[#454545] transition-colors hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
-              >
-                <LuCheck className="size-3.5 shrink-0" aria-hidden="true" />
-                Mark complete
-              </button>
-            ) : null}
           </div>
         ) : null}
       </div>
@@ -6903,7 +7275,7 @@ export function TaskDetailsPanel({
               onKeyDown={handleEditorKeyDown}
               onKeyUp={handleEditorKeyUp}
               onScroll={updateLineControls}
-              className={`task-details-editor w-full resize-none rounded-xl pt-[13px] pl-[30px] pr-3 pb-4! text-[#555555] outline-none transition-colors focus:border-[#7f7f7f] dark:text-zinc-300 [&_.detail-line[data-line-type=bullet]]:pl-1 [&_.detail-line[data-line-type=checklist]]:cursor-pointer [&_.detail-line[data-line-type=checklist]]:pl-1 [&_.detail-line[data-line-type=h1]]:text-[26px] [&_.detail-line[data-line-type=h1]]:font-bold [&_.detail-line[data-line-type=h1]]:leading-[36px] [&_.detail-line[data-line-type=h1]]:text-[#4B4B4B] dark:[&_.detail-line[data-line-type=h1]]:text-[#F5F5F5] [&_.detail-line[data-line-type=h2]]:text-[23px] [&_.detail-line[data-line-type=h2]]:font-semibold [&_.detail-line[data-line-type=h2]]:leading-[30px] [&_.detail-line[data-line-type=h3]]:text-[19px] [&_.detail-line[data-line-type=h3]]:font-semibold [&_.detail-line[data-line-type=h3]]:leading-[26px] [&_.detail-line[data-line-type=numbered]]:pl-1 [&_mark]:bg-yellow-200 dark:[&_mark]:bg-yellow-300/30 [&_s]:line-through [&_strike]:line-through [&_u]:underline ${
+              className={`task-details-editor w-full resize-none rounded-xl pt-[8px] pl-[25px] pr-3 pb-4! text-[#555555] outline-none transition-colors focus:border-[#7f7f7f] dark:text-zinc-300 [&_.detail-line[data-line-type=bullet]]:pl-1 [&_.detail-line[data-line-type=checklist]]:cursor-pointer [&_.detail-line[data-line-type=checklist]]:pl-1 [&_.detail-line[data-line-type=h1]]:text-[26px] [&_.detail-line[data-line-type=h1]]:font-bold [&_.detail-line[data-line-type=h1]]:leading-[36px] [&_.detail-line[data-line-type=h1]]:text-[#4B4B4B] dark:[&_.detail-line[data-line-type=h1]]:text-[#F5F5F5] [&_.detail-line[data-line-type=h2]]:text-[23px] [&_.detail-line[data-line-type=h2]]:font-semibold [&_.detail-line[data-line-type=h2]]:leading-[30px] [&_.detail-line[data-line-type=h3]]:text-[19px] [&_.detail-line[data-line-type=h3]]:font-semibold [&_.detail-line[data-line-type=h3]]:leading-[26px] [&_.detail-line[data-line-type=numbered]]:pl-1 [&_mark]:bg-yellow-200 dark:[&_mark]:bg-yellow-300/30 [&_s]:line-through [&_strike]:line-through [&_u]:underline ${
                 isModalLayout
                   ? "min-h-0 max-h-[min(60vh,560px)] overflow-auto"
                   : "min-h-[500px] overflow-auto"
@@ -6938,7 +7310,7 @@ export function TaskDetailsPanel({
                           (slashCommandMenu?.lineId === lineId &&
                             slashCommandMenu.fromContextMenu)
                         }
-                        className="pointer-events-auto flex size-[19px] cursor-grab items-center justify-center rounded rounded-lg px-[1px] py-[3px] text-zinc-350 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+                        className="pointer-events-auto flex size-[19px] cursor-pointer items-center justify-center rounded rounded-lg px-[1px] py-[3px] text-zinc-350 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
                       onMouseDown={(event) => event.preventDefault()}
                       onClick={(event) => handlePlusClick(event, lineId)}
                     >
@@ -7108,6 +7480,9 @@ export function TaskDetailsPanel({
           className={getFormatToolbarPopoverClass(formatMenu)}
           style={{ left: formatMenu.x, top: formatMenu.y }}
         >
+          <FormatToolbarAnchorPlacementProvider
+            placement={formatMenu.placement === "below" ? "below" : "above"}
+          >
           <div
             className={FORMAT_TOOLBAR_SURFACE_CLASS}
             onMouseDownCapture={(event) => {
@@ -7238,6 +7613,8 @@ export function TaskDetailsPanel({
                   selectedTextColor={formatMenuInlineFormats.textColor}
                   textColorOptions={TEXT_COLOR_OPTIONS}
                   onSelectTextColor={applyTextColor}
+                  onPreviewTextColorChange={previewTextColorOnSelection}
+                  onPreviewTextColorClear={clearTextColorLivePreview}
                   recentColors={recentFormatColors}
                   previewText={getFormatSelectionPreviewText(
                     savedFormatSelectionRef.current,
@@ -7295,6 +7672,8 @@ export function TaskDetailsPanel({
                   }}
                   familyId={formatMenuFontFamily}
                   onSelectFamily={applyFormatFontFamily}
+                  onPreviewFamily={previewFontFamilyOnSelection}
+                  onPreviewFamilyClear={clearTextColorLivePreview}
                 />
 
                 <DetailFormatFontSizeDropdown
@@ -7367,6 +7746,7 @@ export function TaskDetailsPanel({
             </>
           )}
           </div>
+          </FormatToolbarAnchorPlacementProvider>
         </div>
       )}
 

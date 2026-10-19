@@ -1,4 +1,6 @@
 export const SUBTASKS_EXPANDED_SESSION_KEY = "todolist.subtasks-expanded-by-task";
+export const SUBTASKS_COMPLETED_EXPANDED_SESSION_KEY =
+  "todolist.subtasks-completed-expanded-by-task";
 
 export type TaskWithParent = {
   id: string;
@@ -114,6 +116,51 @@ export function resolveSubtasksExpandedState(
   const saved = savedByTaskId[taskId];
   if (saved !== undefined) return saved;
   return subtaskCount > 0;
+}
+
+function readCompletedSubtasksExpandedByTask() {
+  if (typeof window === "undefined") return {} as Record<string, boolean>;
+
+  try {
+    const raw = window.sessionStorage.getItem(
+      SUBTASKS_COMPLETED_EXPANDED_SESSION_KEY,
+    );
+    if (!raw) return {};
+
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null) return {};
+
+    return Object.fromEntries(
+      Object.entries(parsed).filter(
+        (entry): entry is [string, boolean] => typeof entry[1] === "boolean",
+      ),
+    );
+  } catch {
+    return {};
+  }
+}
+
+export function getSavedCompletedSubtasksExpanded(taskId: string) {
+  return readCompletedSubtasksExpandedByTask()[taskId];
+}
+
+export function saveCompletedSubtasksExpanded(taskId: string, expanded: boolean) {
+  if (typeof window === "undefined") return;
+
+  const next = {
+    ...readCompletedSubtasksExpandedByTask(),
+    [taskId]: expanded,
+  };
+  window.sessionStorage.setItem(
+    SUBTASKS_COMPLETED_EXPANDED_SESSION_KEY,
+    JSON.stringify(next),
+  );
+}
+
+export function resolveCompletedSubtasksExpandedState(taskId: string) {
+  const saved = getSavedCompletedSubtasksExpanded(taskId);
+  if (saved !== undefined) return saved;
+  return false;
 }
 
 export function appendSubtasksForVisibleParents<

@@ -5,12 +5,20 @@ Minimal Expo client for the Todo/Calendar REST API.
 ## Setup
 
 ```bash
-cd mobile
-npm install
-cp .env.example .env
-# Set EXPO_PUBLIC_API_URL to your server (e.g. http://192.168.1.10:3000 for device testing)
+# Terminal 1 — web API (listens on all interfaces for phones on the same Wi‑Fi)
+npm run dev
+
+# Terminal 2 — Expo (from repo root; sets LAN API URL when possible)
+npm run expo:start
+```
+
+Or from `mobile/` after `npm install` and `cp .env.example .env`:
+
+```bash
 npm start
 ```
+
+For a **physical device**, set `EXPO_PUBLIC_API_URL` in `mobile/.env` to your computer's LAN IP (e.g. `http://192.168.1.10:3000`). In dev, the app also tries to infer that host from the Metro bundler when you use `localhost` in `.env`.
 
 ## Features (v1 shell)
 

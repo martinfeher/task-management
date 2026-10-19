@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-export const INITIAL_TASK_EDITOR_FONT_SIZE_PX = 17;
+export const INITIAL_TASK_EDITOR_FONT_SIZE_PX = 15;
 export const TASK_EDITOR_FONT_SIZE_MIN_PX = 5;
 export const TASK_EDITOR_FONT_SIZE_MAX_PX = 70;
 

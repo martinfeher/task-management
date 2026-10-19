@@ -16,6 +16,7 @@ import { IoMdTime } from "react-icons/io";
 import { LuList, LuPlus, LuX } from "react-icons/lu";
 import { PiDotsThreeBold } from "react-icons/pi";
 import type { KanbanColumnRecord } from "@/app/actions/kanban";
+import { KANBAN_BOARD_SCROLL_CLASS } from "@/lib/calendar-layout";
 import { createLabel, getLabels } from "@/app/actions/todo";
 import { getLabelDotColor } from "@/lib/label-colors";
 import { getListColor } from "@/lib/list-colors";
@@ -820,8 +821,8 @@ export function ListKanbanPanel({
         </h1>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden">
-        <div className="flex h-full min-w-max items-start gap-3 px-4 py-4">
+      <div className={KANBAN_BOARD_SCROLL_CLASS}>
+        <div className="flex h-full w-max shrink-0 items-start gap-3 px-4 py-4">
           {columns.map((column) => {
             const columnTasks = tasksByColumnId.get(column.id) ?? [];
             const isAddingTaskHere = addingTask?.columnId === column.id;
@@ -831,7 +832,7 @@ export function ListKanbanPanel({
               <section
                 key={column.id}
                 data-kanban-column-id={column.id}
-                className={`flex w-[280px] shrink-0 flex-col rounded-[20px] border border-zinc-100 bg-white dark:border-zinc-700/80 dark:bg-zinc-900 ${KANBAN_COLUMN_SURFACE_CLASS}`}
+                className={`flex h-full min-w-[280px] w-[280px] shrink-0 flex-col rounded-[20px] border border-zinc-100 bg-white dark:border-zinc-700/80 dark:bg-zinc-900 ${KANBAN_COLUMN_SURFACE_CLASS}`}
               >
                 <div className="flex items-start gap-1 border-b border-zinc-100 px-3 py-2.5 dark:border-zinc-800">
                   <div className="min-w-0 flex-1">

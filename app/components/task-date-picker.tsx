@@ -61,7 +61,7 @@ type TaskDatePickerProps = {
   className?: string;
 };
 
-const TASK_DATE_PICKER_WIDTH = 280;
+const TASK_DATE_PICKER_WIDTH = 270;
 const TASK_DATE_PICKER_GAP = 4;
 
 export { TASK_DATE_PICKER_WIDTH, TASK_DATE_PICKER_GAP };
