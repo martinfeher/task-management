@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 type RenameListModalProps = {
   open: boolean;
@@ -75,11 +76,11 @@ export function RenameListModal({
     onConfirm(name.trim());
   }
 
-  if (!isMounted) return null;
+  if (!isMounted || typeof document === "undefined") return null;
 
-  return (
+  return createPortal(
     <div
-      className={`list-modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4 ${
+      className={`list-modal-overlay fixed inset-0 z-10000 flex items-center justify-center p-4 ${
         isEntered ? "is-entered" : ""
       }`}
       onMouseDown={(event) => {
@@ -127,6 +128,7 @@ export function RenameListModal({
           </button>
         </div>
       </form>
-    </div>
+    </div>,
+    document.body,
   );
 }

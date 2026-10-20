@@ -34,7 +34,33 @@ type LineType = "text" | "h2" | "h3" | "bullet" | "numbered" | "checklist" | "co
 
 // Matches the editor's own default styling (app/components/task-details-panel.tsx,
 // app/components/detail-fonts.ts) — treated as noise, not user-applied formatting.
-const DEFAULT_TEXT_COLORS = new Set(["#555555", "rgb(85, 85, 85)"]);
+const DEFAULT_TEXT_COLOR_HEX = new Set(["#555555", "#b4b4b4"]);
+
+function inlineTextColorToHex(color: string): string | null {
+  const trimmed = color.trim();
+  if (trimmed.startsWith("#")) {
+    return trimmed.toLowerCase();
+  }
+
+  const match = trimmed.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if (!match) return null;
+
+  const [r, g, b] = match.slice(1, 4).map((value) => Number(value));
+  return `#${[r, g, b]
+    .map((value) => value.toString(16).padStart(2, "0"))
+    .join("")}`;
+}
+
+function isDefaultTextColor(color: string) {
+  const lowered = color.trim().toLowerCase();
+  const compact = lowered.replace(/\s/g, "");
+  if (compact === "rgb(85,85,85)" || compact === "rgb(180,180,180)") {
+    return true;
+  }
+
+  const hex = inlineTextColorToHex(color);
+  return hex ? DEFAULT_TEXT_COLOR_HEX.has(hex) : false;
+}
 const NOISE_BACKGROUND_COLORS = new Set([
   "rgb(255, 255, 255)",
   "#ffffff",
@@ -110,7 +136,7 @@ function applySpanStyle(el: ParsedElement, acc: MarkAcc): MarkAcc {
   const next: MarkAcc = { ...acc };
 
   const color = style.color?.trim();
-  if (color && !DEFAULT_TEXT_COLORS.has(color.toLowerCase())) {
+  if (color && !isDefaultTextColor(color)) {
     next.color = color;
   }
 

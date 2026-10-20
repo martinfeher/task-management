@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { LuChevronDown, LuList } from "react-icons/lu";
 import {
   DEFAULT_LIST_COLOR,
@@ -107,11 +108,11 @@ export function EditListModal({
     });
   }
 
-  if (!isMounted || !list) return null;
+  if (!isMounted || !list || typeof document === "undefined") return null;
 
-  return (
+  return createPortal(
     <div
-      className={`list-modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4 ${
+      className={`list-modal-overlay fixed inset-0 z-10000 flex items-center justify-center p-4 ${
         isEntered ? "is-entered" : ""
       }`}
       onMouseDown={(event) => {
@@ -283,6 +284,7 @@ export function EditListModal({
           </button>
         </div>
       </form>
-    </div>
+    </div>,
+    document.body,
   );
 }

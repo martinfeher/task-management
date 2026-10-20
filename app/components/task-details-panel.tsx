@@ -59,7 +59,7 @@ import {
   serializeEditorSelectionForClipboard,
   shouldPreferPlainTextPaste,
   isChecklistLine,
-  isChecklistToggleClick,
+  shouldToggleChecklistLine,
   isCodeLine,
   isListBlockLine,
   isDetailLineEmpty,
@@ -2303,7 +2303,9 @@ export function TaskDetailsPanel({
 
     const before = normalizeDetails(editor.innerHTML);
     syncLineEmptyState(editor);
-    syncEditorBodyPlaceholderVisibility(editor);
+    syncEditorBodyPlaceholderVisibility(editor, {
+      hoveredLine: hoveredLineRef.current,
+    });
     const after = normalizeDetails(editor.innerHTML);
     if (before !== after) {
       detailsRef.current = after;
@@ -5928,6 +5930,14 @@ export function TaskDetailsPanel({
       return;
     }
 
+    const checklistLine = getDetailLineFromNode(event.target as Node, editor);
+    if (
+      checklistLine &&
+      shouldToggleChecklistLine(checklistLine, event.clientX, event.target)
+    ) {
+      event.preventDefault();
+    }
+
     beginEditorPointerInteraction();
 
     const isMultiClick = isMultiClickMouseEvent(event);
@@ -5987,7 +5997,10 @@ export function TaskDetailsPanel({
     if (
       isListBlockLine(line) &&
       isEmptyEditableBodyLine(editor, line) &&
-      !(isChecklistLine(line) && isChecklistToggleClick(line, event.clientX)) &&
+      !(
+        isChecklistLine(line) &&
+        shouldToggleChecklistLine(line, event.clientX, event.target)
+      ) &&
       !event.shiftKey &&
       !isMultiClick
     ) {
@@ -6465,8 +6478,7 @@ export function TaskDetailsPanel({
     const clickedLine = (event.target as HTMLElement).closest(".detail-line");
     if (
       clickedLine instanceof HTMLElement &&
-      isChecklistLine(clickedLine) &&
-      isChecklistToggleClick(clickedLine, event.clientX)
+      shouldToggleChecklistLine(clickedLine, event.clientX, event.target)
     ) {
       event.preventDefault();
       toggleChecklistLine(clickedLine);
@@ -6965,7 +6977,7 @@ export function TaskDetailsPanel({
     >
       {renderModalHeaderActions()}
       <div
-        className={`relative flex shrink-0 h-[41px] items-center justify-between overflow-visible ml-[6px] px-2.5 pt-[5px] pb-[4px] ${
+        className={`relative flex shrink-0 h-[45px] items-center justify-between overflow-visible ml-[6px] px-2.5 pt-[12px] pb-[10px] ${
           isModalLayout
             ? isModalFormatToolbarOpen
               ? "pr-[22rem]"

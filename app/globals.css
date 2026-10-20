@@ -589,6 +589,10 @@ body {
   border-color: #A6A6A9;
 }
 
+.task-details-editor .detail-line[data-line-type="checklist"] .detail-checklist-text {
+  color: #646464;
+}
+
 .task-details-editor .detail-line[data-line-type="checklist"][data-checked="true"]::before {
   background-color: #d0d8d2;
   border-color: #d0d8d2;
@@ -603,14 +607,14 @@ body {
 
 .task-details-editor .detail-line[data-line-type="checklist"][data-checked="true"] .detail-checklist-text {
   text-decoration: line-through;
-  color: rgb(85 85 85 / 0.6);
+  color: rgb(87 87 87 / 0.6);
 }
 
 .dark
   .task-details-editor
   .detail-line[data-line-type="checklist"][data-checked="true"]
   .detail-checklist-text {
-  color: rgb(212 212 216 / 0.6);
+  color: rgb(87 87 87 / 0.6);
 }
 
 .task-details-editor

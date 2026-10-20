@@ -36,7 +36,10 @@ import {
   normalizeDueDurationMinutes,
   normalizeDueTimeMinutes,
 } from "@/lib/task-due-time";
-import { useCalendarTaskColorMenu } from "./calendar-task-color-menu";
+import {
+  CALENDAR_TASK_ID_DATA_ATTR,
+  useCalendarTaskColorMenu,
+} from "./calendar-task-color-menu";
 import type { TaskListItem } from "./todo-app";
 
 const PREVIEW_WIDTH = 280;
@@ -558,15 +561,17 @@ export function CalendarTaskHoverButton({
   ...props
 }: { task: TaskListItem } & ButtonHTMLAttributes<HTMLButtonElement>) {
   const hoverHandlers = useCalendarTaskHoverPreview(task);
-  const colorMenuHandlers = useCalendarTaskColorMenu(task);
+  const colorMenuHandlers = useCalendarTaskColorMenu(task, {
+    onBeforeOpen: () => hoverHandlers.onMouseLeave?.(),
+  });
 
   return (
     <button
       type="button"
+      {...{ [CALENDAR_TASK_ID_DATA_ATTR]: task.id }}
       {...props}
       {...hoverHandlers}
       onContextMenu={(event) => {
-        hoverHandlers.onMouseLeave?.();
         colorMenuHandlers.onContextMenu?.(event);
         onContextMenu?.(event);
       }}

@@ -25,7 +25,10 @@ import {
 import { calendarTaskItemClassName, calendarTaskSecondaryTextClassName, CALENDAR_TASK_FONT_CLASS, CALENDAR_TASK_TIMED_COLUMN_INSET_CLASS, getCalendarTaskItemStyle } from "@/lib/calendar-layout";
 import { useCalendarTaskDefaultColor } from "@/lib/calendar-task-default-color-settings";
 import { useCalendarTaskDragPreview, useCalendarTaskHoverPreview } from "./calendar-task-hover-preview";
-import { useCalendarTaskColorMenu } from "./calendar-task-color-menu";
+import {
+  CALENDAR_TASK_ID_DATA_ATTR,
+  useCalendarTaskColorMenu,
+} from "./calendar-task-color-menu";
 import { CalendarTaskPriorityFlag } from "./calendar-task-title";
 import { TaskCompletionCheckbox } from "./task-completion-checkbox";
 import type { TaskListItem } from "./todo-app";
@@ -727,7 +730,9 @@ export function CalendarTimedTaskBlock({
   const { defaultColor: calendarTaskDefaultColor } =
     useCalendarTaskDefaultColor();
   const hoverHandlers = useCalendarTaskHoverPreview(task);
-  const colorMenuHandlers = useCalendarTaskColorMenu(task);
+  const colorMenuHandlers = useCalendarTaskColorMenu(task, {
+    onBeforeOpen: () => hoverHandlers.onMouseLeave?.(),
+  });
   const {
     startDragPreview,
     updateDragPreview,
@@ -738,6 +743,7 @@ export function CalendarTimedTaskBlock({
     <div
       {...hoverHandlers}
       data-calendar-timed-task-block="true"
+      {...{ [CALENDAR_TASK_ID_DATA_ATTR]: task.id }}
       className={`calendar-timed-task-block absolute ${CALENDAR_TASK_TIMED_COLUMN_INSET_CLASS} z-10 rounded-[10px] ${calendarTaskItemClassName(selected)}`}
       style={{
         top,
@@ -750,10 +756,7 @@ export function CalendarTimedTaskBlock({
         ),
         opacity: isMaskedForDrop ? 0 : undefined,
       }}
-      onContextMenu={(event) => {
-        hoverHandlers.onMouseLeave?.();
-        colorMenuHandlers.onContextMenu?.(event);
-      }}
+      onContextMenu={colorMenuHandlers.onContextMenu}
     >
       {canResize ? (
         <div
@@ -782,6 +785,7 @@ export function CalendarTimedTaskBlock({
         <div
           role="button"
           tabIndex={0}
+          onContextMenu={colorMenuHandlers.onContextMenu}
           onClick={(event) => {
             event.stopPropagation();
             onTaskClick(event, task);

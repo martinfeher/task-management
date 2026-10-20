@@ -1962,7 +1962,7 @@ export function Sidebar({
                 Add
               </button>
               {isBottomAddMenuOpen ? (
-                <div className="absolute bottom-full left-0 z-[1000] mb-1.5">
+                <div className="absolute bottom-full left-0 z-[1000] pb-2">
                   <div
                     role="menu"
                     aria-label="Add list or folder"

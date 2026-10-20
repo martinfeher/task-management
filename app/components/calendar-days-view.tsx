@@ -86,6 +86,7 @@ import {
   CalendarTaskHoverButton,
   useCalendarTaskDragPreview,
 } from "./calendar-task-hover-preview";
+import { useCalendarTaskColorMenuCaptureHandler } from "./calendar-task-color-menu";
 
 const GRID_HOUR_START = CALENDAR_COLLAPSE_EARLY_END_HOUR;
 const GRID_TOP_OFFSET_PX = 0;
@@ -306,6 +307,8 @@ export function CalendarMultiDayView({
     updateDragPreview,
     endDragPreview,
   } = useCalendarTaskDragPreview();
+  const handleCalendarTaskContextMenuCapture =
+    useCalendarTaskColorMenuCaptureHandler(tasks);
   const canDragTasks = Boolean(onSetTaskDueDate || onSetTaskDueTime);
   const timeGridRef = useRef<HTMLDivElement>(null);
   const newTaskPreviewRef = useRef<HTMLDivElement>(null);
@@ -662,7 +665,10 @@ export function CalendarMultiDayView({
   );
 
   return (
-    <div className={CALENDAR_VIEW_WRAPPER_CLASS}>
+    <div
+      className={CALENDAR_VIEW_WRAPPER_CLASS}
+      onContextMenuCapture={handleCalendarTaskContextMenuCapture}
+    >
       <div className={getCalendarShellClassName(fullWidth)}>
         <div className={CALENDAR_VIEW_SURFACE_CLASS}>
           <div className="flex shrink-0 items-center justify-start px-3 mb-[10px]">

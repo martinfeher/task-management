@@ -164,19 +164,19 @@ function PreviewEditorContent({ type }: { type: SlashCommandPreviewBlockType }) 
       return (
         <>
           <div
-            className="detail-line pl-1 text-[#555555] dark:text-zinc-300"
+            className="detail-line pl-1 text-[#7f7f7f] dark:text-zinc-300"
             data-line-type="checklist"
           >
             <span className="detail-checklist-text">Task one</span>
           </div>
           <div
-            className="detail-line pl-1 text-[#555555] dark:text-zinc-300"
+            className="detail-line pl-1 text-[#7f7f7f] dark:text-zinc-300"
             data-line-type="checklist"
           >
             <span className="detail-checklist-text">Task two</span>
           </div>
           <div
-            className="detail-line pl-1 text-[#555555] dark:text-zinc-300"
+            className="detail-line pl-1 text-[#7f7f7f] dark:text-zinc-300"
             data-line-type="checklist"
           >
             <span className="detail-checklist-text">Task three</span>

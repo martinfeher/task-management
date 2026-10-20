@@ -674,6 +674,51 @@ export function isChecklistLine(line: HTMLElement | null) {
 
 const CHECKLIST_TEXT_CLASS = "detail-checklist-text";
 
+const CHECKLIST_NOISE_INLINE_TEXT_COLORS = new Set([
+  "#555555",
+  "#b4b4b4",
+  "#79799d",
+  "#575757",
+]);
+
+function normalizeInlineColorKey(color: string) {
+  return color.trim().toLowerCase().replace(/\s/g, "");
+}
+
+function inlineTextColorToHex(color: string): string | null {
+  const trimmed = color.trim();
+  if (trimmed.startsWith("#")) {
+    return normalizeInlineColorKey(trimmed);
+  }
+
+  const match = trimmed.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if (!match) return null;
+
+  const [r, g, b] = match.slice(1, 4).map((value) => Number(value));
+  return `#${[r, g, b]
+    .map((value) => value.toString(16).padStart(2, "0"))
+    .join("")}`;
+}
+
+function isChecklistNoiseInlineTextColor(color: string) {
+  const hex = inlineTextColorToHex(color);
+  return hex ? CHECKLIST_NOISE_INLINE_TEXT_COLORS.has(hex) : false;
+}
+
+function stripChecklistTextColorNoise(wrapper: HTMLElement) {
+  wrapper.querySelectorAll("[style]").forEach((node) => {
+    if (!(node instanceof HTMLElement)) return;
+
+    const inlineColor = node.style.getPropertyValue("color");
+    if (!inlineColor || !isChecklistNoiseInlineTextColor(inlineColor)) return;
+
+    node.style.removeProperty("color");
+    if (!node.style.cssText.trim()) {
+      node.removeAttribute("style");
+    }
+  });
+}
+
 function ensureChecklistTextWrapper(line: HTMLElement) {
   if (!isChecklistLine(line)) return;
 
@@ -709,6 +754,10 @@ function normalizeChecklistLine(line: HTMLElement) {
   if (!isChecklistLine(line)) return false;
 
   ensureChecklistTextWrapper(line);
+  const wrapper = line.querySelector(`:scope > .${CHECKLIST_TEXT_CLASS}`);
+  if (wrapper instanceof HTMLElement) {
+    stripChecklistTextColorNoise(wrapper);
+  }
   return true;
 }
 
@@ -732,6 +781,37 @@ export function isChecklistToggleClick(line: HTMLElement, clientX: number) {
 
   const rect = line.getBoundingClientRect();
   return clientX - rect.left <= CHECKLIST_TOGGLE_WIDTH_PX;
+}
+
+function isChecklistTextPointerTarget(
+  line: HTMLElement,
+  target: EventTarget | null,
+) {
+  if (!target || !(target instanceof Node)) return false;
+
+  const wrapper = line.querySelector(`:scope > .${CHECKLIST_TEXT_CLASS}`);
+  if (!(wrapper instanceof HTMLElement) || !wrapper.contains(target)) {
+    return false;
+  }
+
+  if (target instanceof HTMLElement && target.closest("a")) {
+    return false;
+  }
+
+  return true;
+}
+
+export function shouldToggleChecklistLine(
+  line: HTMLElement,
+  clientX: number,
+  target: EventTarget | null,
+) {
+  if (!isChecklistLine(line)) return false;
+
+  return (
+    isChecklistToggleClick(line, clientX) ||
+    isChecklistTextPointerTarget(line, target)
+  );
 }
 
 export function normalizeCodeLine(line: HTMLElement) {
@@ -2263,6 +2343,26 @@ export function isEmptyEditableBodyLine(
   return isLineEmpty(line);
 }
 
+export function isEmptyBodyLineBetweenContent(
+  editor: HTMLElement,
+  line: HTMLElement | null | undefined,
+) {
+  if (!isEmptyEditableBodyLine(editor, line) || !line) return false;
+
+  const lines = getLineElements(editor);
+  const index = lines.indexOf(line);
+  if (index <= 0) return false;
+
+  const hasContentBefore = lines
+    .slice(0, index)
+    .some((candidate) => isBodyLineWithContent(candidate));
+  const hasContentAfter = lines
+    .slice(index + 1)
+    .some((candidate) => isBodyLineWithContent(candidate));
+
+  return hasContentBefore && hasContentAfter;
+}
+
 export function getDetailLineFromNode(node: Node | null, editor: HTMLElement) {
   let current: Node | null = node;
 
@@ -2889,7 +2989,10 @@ export function syncLineEmptyState(editor: HTMLElement) {
   });
 }
 
-export function syncEditorBodyPlaceholderVisibility(editor: HTMLElement) {
+export function syncEditorBodyPlaceholderVisibility(
+  editor: HTMLElement,
+  options?: { hoveredLine?: HTMLElement | null },
+) {
   for (const line of getLineElements(editor)) {
     delete line.dataset.showBodyPlaceholder;
   }
@@ -2904,22 +3007,28 @@ export function syncEditorBodyPlaceholderVisibility(editor: HTMLElement) {
     ((selection?.anchorNode != null && editor.contains(selection.anchorNode)) ||
       (selection?.focusNode != null && editor.contains(selection.focusNode)));
 
-  if (!editorHasFocus || !selectionInEditor) {
-    delete editor.dataset.hideBodyPlaceholder;
-    return;
-  }
+  const hoveredLine = options?.hoveredLine ?? null;
 
-  const activeLine = getActiveLineElement(editor);
-  if (activeLine && isEmptyEditableBodyLine(editor, activeLine)) {
-    activeLine.dataset.showBodyPlaceholder = "true";
-    delete editor.dataset.hideBodyPlaceholder;
-    return;
-  }
+  if (editorHasFocus && selectionInEditor) {
+    const activeLine = getActiveLineElement(editor);
+    if (activeLine && isEmptyEditableBodyLine(editor, activeLine)) {
+      activeLine.dataset.showBodyPlaceholder = "true";
+    }
 
-  if (activeLine && !isLineEmpty(activeLine)) {
-    editor.dataset.hideBodyPlaceholder = "true";
+    if (activeLine && !isLineEmpty(activeLine)) {
+      editor.dataset.hideBodyPlaceholder = "true";
+    } else {
+      delete editor.dataset.hideBodyPlaceholder;
+    }
   } else {
     delete editor.dataset.hideBodyPlaceholder;
+  }
+
+  if (
+    hoveredLine &&
+    isEmptyBodyLineBetweenContent(editor, hoveredLine)
+  ) {
+    hoveredLine.dataset.showBodyPlaceholder = "true";
   }
 }
 
