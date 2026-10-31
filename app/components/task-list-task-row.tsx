@@ -139,7 +139,7 @@ type TaskListTaskRowProps = {
   showSubtaskCollapseToggle?: boolean;
 };
 
-const TASK_LABEL_SELECTOR_WIDTH = 280;
+const TASK_LABEL_SELECTOR_WIDTH = 220;
 const TASK_LABEL_SELECTOR_GAP = 4;
 const TASK_LABEL_SELECTOR_MAX_HEIGHT = 360;
 const TASK_PRIORITY_MENU_WIDTH = 196;
@@ -365,7 +365,8 @@ export function TaskListTaskRow({
   const scheduleAnchorRef = useRef<HTMLButtonElement>(null);
   const rowMenuButtonRef = useRef<HTMLButtonElement>(null);
   const priorityMenuButtonRef = useRef<HTMLButtonElement>(null);
-  const labelMenuAnchorRef = useRef<HTMLDivElement>(null);
+  const labelPillsAnchorRef = useRef<HTMLSpanElement>(null);
+  const labelHoverTriggerRef = useRef<HTMLButtonElement>(null);
   const [datePickerPosition, setDatePickerPosition] = useState<{
     top: number;
     left: number;
@@ -473,7 +474,8 @@ export function TaskListTaskRow({
     if (!isLabelMenuOpen) return;
 
     function updateLabelMenuPosition() {
-      const anchor = labelMenuAnchorRef.current;
+      const anchor =
+        labelPillsAnchorRef.current ?? labelHoverTriggerRef.current;
       if (!anchor) return;
 
       const rect = anchor.getBoundingClientRect();
@@ -848,11 +850,11 @@ export function TaskListTaskRow({
 
       {!hideDueDate ? (
       <div
-        ref={labelMenuAnchorRef}
         className="relative ml-auto flex min-h-[19px] shrink-0 self-center items-center justify-end gap-1.5 pl-2"
       >
         {task.labels.length > 0 || task.priority != null ? (
           <span
+            ref={labelPillsAnchorRef}
             className={`relative z-10 flex min-w-0 max-w-[180px] -translate-x-[20px] items-center gap-1 ${checkedContentDim}`}
             style={{ transition: dimTransition }}
           >
@@ -999,6 +1001,7 @@ export function TaskListTaskRow({
           {showHoverLabelIcon ? (
             <div className={`group/add-label ml-[2px] relative ${rowActionsPointerClass}`}>
               <button
+                ref={labelHoverTriggerRef}
                 type="button"
                 data-task-label-trigger
                 aria-label="Add label"

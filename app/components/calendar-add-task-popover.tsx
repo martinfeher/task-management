@@ -2,8 +2,10 @@
 
 import {
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
+  type CSSProperties,
   type RefObject,
 } from "react";
 import { createPortal } from "react-dom";
@@ -19,6 +21,67 @@ export { plainTextToTaskDetails };
 
 export const CALENDAR_ADD_TASK_MODAL_WIDTH_PX = 350;
 export const CALENDAR_ADD_TASK_MODAL_HEIGHT_PX = 420;
+
+const ADD_TASK_POPOVER_VIEWPORT_PADDING_PX = 24;
+const ADD_TASK_POPOVER_ANCHOR_GAP_PX = 8;
+
+function clampAddTaskPopoverPosition(left: number, top: number) {
+  if (typeof window === "undefined") {
+    return { left, top };
+  }
+
+  return {
+    left: Math.min(
+      Math.max(ADD_TASK_POPOVER_VIEWPORT_PADDING_PX, left),
+      window.innerWidth -
+        CALENDAR_ADD_TASK_MODAL_WIDTH_PX -
+        ADD_TASK_POPOVER_VIEWPORT_PADDING_PX,
+    ),
+    top: Math.min(
+      Math.max(ADD_TASK_POPOVER_VIEWPORT_PADDING_PX, top),
+      window.innerHeight -
+        CALENDAR_ADD_TASK_MODAL_HEIGHT_PX -
+        ADD_TASK_POPOVER_VIEWPORT_PADDING_PX,
+    ),
+  };
+}
+
+function getAddTaskPopoverStyleFromAnchor(anchor: DOMRect): CSSProperties {
+  const anchorCenterY = anchor.top + anchor.height / 2;
+  const placeAbove = anchorCenterY > window.innerHeight / 2;
+  let left =
+    anchor.left + anchor.width / 2 - CALENDAR_ADD_TASK_MODAL_WIDTH_PX / 2;
+
+  if (placeAbove) {
+    const top = anchor.top - ADD_TASK_POPOVER_ANCHOR_GAP_PX - CALENDAR_ADD_TASK_MODAL_HEIGHT_PX;
+    return {
+      position: "fixed",
+      ...clampAddTaskPopoverPosition(left, top),
+      width: CALENDAR_ADD_TASK_MODAL_WIDTH_PX,
+      height: CALENDAR_ADD_TASK_MODAL_HEIGHT_PX,
+    };
+  }
+
+  const top = anchor.bottom + ADD_TASK_POPOVER_ANCHOR_GAP_PX;
+  return {
+    position: "fixed",
+    ...clampAddTaskPopoverPosition(left, top),
+    width: CALENDAR_ADD_TASK_MODAL_WIDTH_PX,
+    height: CALENDAR_ADD_TASK_MODAL_HEIGHT_PX,
+  };
+}
+
+function getAddTaskPopoverStyleFromPoint(x: number, y: number): CSSProperties {
+  const left = x - CALENDAR_ADD_TASK_MODAL_WIDTH_PX / 2;
+  const top = y + ADD_TASK_POPOVER_ANCHOR_GAP_PX;
+
+  return {
+    position: "fixed",
+    ...clampAddTaskPopoverPosition(left, top),
+    width: CALENDAR_ADD_TASK_MODAL_WIDTH_PX,
+    height: CALENDAR_ADD_TASK_MODAL_HEIGHT_PX,
+  };
+}
 
 type CalendarAddTaskPopoverProps = {
   date: Date;
@@ -52,12 +115,16 @@ export function CalendarAddTaskPopover({
   dueTimeMinutes = null,
   lists,
   defaultListId,
+  x,
+  y,
+  anchorRef,
   name,
   onNameChange,
   onClose,
   onAddTask,
 }: CalendarAddTaskPopoverProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
+  const [dialogStyle, setDialogStyle] = useState<CSSProperties | null>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const listButtonRef = useRef<HTMLButtonElement>(null);
   const listMenuRef = useRef<HTMLDivElement>(null);
@@ -106,6 +173,42 @@ export function CalendarAddTaskPopover({
     });
   }, []);
 
+  useLayoutEffect(() => {
+    function updatePosition() {
+      if (anchorRef?.current) {
+        setDialogStyle(
+          getAddTaskPopoverStyleFromAnchor(
+            anchorRef.current.getBoundingClientRect(),
+          ),
+        );
+        return;
+      }
+
+      if (x !== undefined && y !== undefined) {
+        setDialogStyle(getAddTaskPopoverStyleFromPoint(x, y));
+        return;
+      }
+
+      setDialogStyle(null);
+    }
+
+    updatePosition();
+
+    let frame = 0;
+    if (anchorRef && !anchorRef.current) {
+      frame = window.requestAnimationFrame(updatePosition);
+    }
+
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [anchorRef, x, y, dueTimeMinutes]);
+
   useEffect(() => {
     if (!isListMenuOpen) return;
 
@@ -145,16 +248,7 @@ export function CalendarAddTaskPopover({
     }
   }
 
-  return createPortal(
-    <div className="fixed inset-0 z-[100] overflow-y-auto">
-      <button
-        type="button"
-        aria-label="Close add task dialog"
-        className="fixed inset-0 bg-zinc-900/25 backdrop-brightness-[1.1]"
-        onClick={onClose}
-      />
-
-      <div className="flex min-h-full items-center justify-center px-6 py-6">
+  const dialogPanel = (
       <div
         ref={dialogRef}
         role="dialog"
@@ -164,6 +258,7 @@ export function CalendarAddTaskPopover({
         style={{
           width: CALENDAR_ADD_TASK_MODAL_WIDTH_PX,
           height: CALENDAR_ADD_TASK_MODAL_HEIGHT_PX,
+          ...dialogStyle,
         }}
         onMouseDown={(event) => event.stopPropagation()}
       >
@@ -291,7 +386,24 @@ export function CalendarAddTaskPopover({
           </div>
         </form>
       </div>
-      </div>
+  );
+
+  return createPortal(
+    <div className="fixed inset-0 z-[10050] overflow-y-auto">
+      <button
+        type="button"
+        aria-label="Close add task dialog"
+        className="fixed inset-0 bg-zinc-900/25 backdrop-brightness-[1.1]"
+        onClick={onClose}
+      />
+
+      {dialogStyle ? (
+        dialogPanel
+      ) : (
+        <div className="flex min-h-full items-center justify-center px-6 py-6">
+          {dialogPanel}
+        </div>
+      )}
     </div>,
     document.body,
   );
