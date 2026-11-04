@@ -1954,7 +1954,8 @@ export function Sidebar({
                 aria-expanded={isBottomAddMenuOpen}
                 aria-label="Add list or folder"
                 onClick={() => setIsBottomAddMenuOpen((open) => !open)}
-                className="flex ml-[2px] cursor-pointer items-center -mt-[3px] px-3 pb-2 py-[5px]! text-left text-[13px] rounded-full hover:bg-[#f3f3f7] hover:border-[#c2c9d1]! text-[#afafaf] hover:text-[#535569] dark:hover:text-zinc-300 transition duration-300"
+                // className="flex ml-[2px] cursor-pointer items-center -mt-[3px] px-[10px]! pb-2 py-[4px]! text-left text-[13px] rounded-full bg-[#b8b8ce] hover:bg-[#d2d2dc] hover:border-[#c2c9d1]! text-white hover:text-[#535569] dark:hover:text-slate-300 transition duration-300"
+                className="flex ml-[2px] cursor-pointer items-center -mt-[3px] px-3 pb-2 py-[5px]! text-left text-[13px] rounded-full bg-[#e6e6ed] hover:bg-[#d8d8df] hover:border-[#c2c9d1]! text-[#87899a] hover:text-[#535569] dark:hover:text-slate-300 transition duration-300"
               >
                 <div className="text-[15px] mr-[5px] mb-[3px] leading-none" aria-hidden="true">
                   +

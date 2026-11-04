@@ -265,7 +265,7 @@ export function TaskModalFooter({
         )}
 
         {isLabelMenuOpen ? (
-          <div className="absolute bottom-full left-0 z-50 mb-1 w-[240px] overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+          <div className="absolute bottom-full left-0 z-50 mb-1 w-fit">
             <TaskLabelSelector
               labels={sortedLabels}
               assignedLabelIds={assignedLabelIds}

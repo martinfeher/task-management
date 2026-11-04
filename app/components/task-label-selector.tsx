@@ -349,7 +349,7 @@ export function TaskLabelSelector({
       </div>
 
       <div
-        className="max-h-[220px] overflow-y-auto py-1"
+        className="max-h-[220px] overflow-y-auto py-1 pr-1 [scrollbar-gutter:stable]"
         role="listbox"
         aria-label="Labels"
         aria-activedescendant={

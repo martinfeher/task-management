@@ -279,17 +279,21 @@ export function splitBlockLinesOnBreaks(editor: HTMLElement) {
       continue;
     }
 
-    const parts = htmlToLineParts(line.innerHTML);
-    if (parts.length <= 1) continue;
-
-    if (isListBlockLine(line) && isLineEmpty(line)) {
-      line.innerHTML = "<br>";
-      if (isChecklistLine(line)) {
-        ensureChecklistTextWrapper(line);
+    if (isListBlockLine(line)) {
+      if (isLineEmpty(line)) {
+        line.innerHTML = "<br>";
+        if (isChecklistLine(line)) {
+          ensureChecklistTextWrapper(line);
+        }
+        changed = true;
       }
-      changed = true;
+      // List items manage Enter/split explicitly; breaking on <br> here creates
+      // extra blank rows between checklist/bullet/numbered items.
       continue;
     }
+
+    const parts = htmlToLineParts(line.innerHTML);
+    if (parts.length <= 1) continue;
 
     const lineType = (line.dataset.lineType as LineBlockType | undefined) ?? "text";
     line.innerHTML = parts[0];
@@ -1211,6 +1215,7 @@ export function insertLineBeforeBodyPlaceholder(
 
   if (lineType === "checklist") {
     newLine.dataset.checked = "false";
+    ensureChecklistTextWrapper(newLine);
   }
 
   placeholderLine.before(newLine);
@@ -1317,6 +1322,7 @@ export function insertTypedLineBelowLine(
 
   if (type === "checklist") {
     newLine.dataset.checked = "false";
+    ensureChecklistTextWrapper(newLine);
   }
 
   insertLineAfterLine(line, newLine);
@@ -2831,6 +2837,13 @@ export function flattenNestedDetailLines(editor: HTMLElement) {
 
     for (const nestedLine of nestedLines) {
       stripLineTransientState(nestedLine);
+      if (
+        isLineEmpty(nestedLine) &&
+        !nestedLine.querySelector(".detail-image-wrapper")
+      ) {
+        nestedLine.remove();
+        continue;
+      }
       containerLine.before(nestedLine);
     }
 

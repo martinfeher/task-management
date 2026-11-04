@@ -312,7 +312,7 @@ type AddBlockMenuState = {
 };
 
 const FORMAT_TOOLBAR_SURFACE_CLASS =
-  "format-toolbar-popover-surface overflow-visible rounded-[30px] border border-zinc-200/70 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.12)] dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-[0_8px_24px_rgba(0,0,0,0.32)]";
+  "format-toolbar-popover-surface overflow-visible rounded-[30px] border border-zinc-200/70 bg-white/89 shadow-[0_8px_24px_rgba(15,23,42,0.12)] backdrop-blur-[1px] dark:border-zinc-700 dark:bg-zinc-900/89 dark:shadow-[0_8px_24px_rgba(0,0,0,0.32)]";
 
 function getFormatToolbarPopoverClass(formatMenu: FormatMenuState) {
   const placement = formatMenu.placement === "below" ? "below" : "above";
@@ -1149,26 +1149,6 @@ function createTextColorPreviewMarker(kind: "start" | "end") {
   return marker;
 }
 
-function applyForeColorToRange(range: Range, color: string) {
-  if (range.collapsed) return null;
-
-  const wrapper = document.createElement("span");
-  wrapper.style.color = color;
-  wrapper.appendChild(range.extractContents());
-  range.insertNode(wrapper);
-
-  const nextRange = document.createRange();
-  nextRange.selectNodeContents(wrapper);
-
-  const selection = window.getSelection();
-  if (selection) {
-    selection.removeAllRanges();
-    selection.addRange(nextRange);
-  }
-
-  return nextRange;
-}
-
 function detailLineHasNoVisibleText(line: HTMLElement) {
   const clone = line.cloneNode(true) as HTMLElement;
   clone
@@ -1180,9 +1160,104 @@ function detailLineHasNoVisibleText(line: HTMLElement) {
   );
 }
 
-function normalizeTextColorPreviewEditorStructure(editor: HTMLElement) {
-  flattenNestedDetailLines(editor);
+function removeEmptyDetailLinesWithinIndexRange(
+  editor: HTMLElement,
+  startIdx: number,
+  endIdx: number,
+) {
+  if (startIdx >= endIdx) return;
 
+  const lines = getLineElements(editor);
+  for (let index = endIdx; index > startIdx; index -= 1) {
+    const line = lines[index];
+    if (
+      !line ||
+      isTitleLine(editor, line) ||
+      isCodeLine(line) ||
+      line.querySelector(".detail-image-wrapper") ||
+      !detailLineHasNoVisibleText(line)
+    ) {
+      continue;
+    }
+
+    line.remove();
+    lines.splice(index, 1);
+  }
+}
+
+function removeEmptyDetailLinesWithinMarkerBounds(editor: HTMLElement) {
+  const startMarker = editor.querySelector('[data-text-color-preview="start"]');
+  const endMarker = editor.querySelector('[data-text-color-preview="end"]');
+  if (!(startMarker instanceof HTMLElement && endMarker instanceof HTMLElement)) {
+    return;
+  }
+
+  const startLine = startMarker.closest(".detail-line");
+  const endLine = endMarker.closest(".detail-line");
+  if (!(startLine instanceof HTMLElement && endLine instanceof HTMLElement)) {
+    return;
+  }
+
+  const lines = getLineElements(editor);
+  let startIdx = lines.indexOf(startLine);
+  let endIdx = lines.indexOf(endLine);
+  if (startIdx === -1 || endIdx === -1) return;
+
+  if (startIdx > endIdx) {
+    [startIdx, endIdx] = [endIdx, startIdx];
+  }
+
+  removeEmptyDetailLinesWithinIndexRange(editor, startIdx, endIdx);
+}
+
+function removeEmptyDetailLineBeforeFirstFormatLine(
+  editor: HTMLElement,
+  lineIds: string[],
+) {
+  const lines = getLineElements(editor);
+  const indices = lineIds
+    .map((lineId) => lines.findIndex((line) => line.dataset.lineId === lineId))
+    .filter((index) => index > 0);
+
+  if (indices.length === 0) return;
+
+  const firstIdx = Math.min(...indices);
+  const previousLine = lines[firstIdx - 1];
+  if (
+    !previousLine ||
+    isTitleLine(editor, previousLine) ||
+    isCodeLine(previousLine) ||
+    previousLine.querySelector(".detail-image-wrapper") ||
+    !detailLineHasNoVisibleText(previousLine)
+  ) {
+    return;
+  }
+
+  previousLine.remove();
+}
+
+function removeEmptyDetailLinesAmongSavedFormatLines(
+  editor: HTMLElement,
+  lineIds: string[],
+) {
+  if (lineIds.length < 2) return;
+
+  const lines = getLineElements(editor);
+  const indices = lineIds
+    .map((lineId) => lines.findIndex((line) => line.dataset.lineId === lineId))
+    .filter((index) => index > 0)
+    .sort((a, b) => a - b);
+
+  if (indices.length < 2) return;
+
+  removeEmptyDetailLinesWithinIndexRange(
+    editor,
+    indices[0],
+    indices[indices.length - 1],
+  );
+}
+
+function normalizeTextColorPreviewEditorStructure(editor: HTMLElement) {
   editor
     .querySelectorAll('[data-text-color-preview="start"]')
     .forEach((marker) => {
@@ -1200,6 +1275,8 @@ function normalizeTextColorPreviewEditorStructure(editor: HTMLElement) {
         toRemove.remove();
       }
     });
+
+  removeEmptyDetailLinesWithinMarkerBounds(editor);
 
   const lines = new Set<HTMLElement>();
   editor.querySelectorAll("[data-text-color-preview]").forEach((marker) => {
@@ -3339,6 +3416,8 @@ export function TaskDetailsPanel({
           textColorPreviewBaselineRef.current.cloneNode(true),
         );
         normalizeTextColorPreviewEditorStructure(editor);
+      } else {
+        removeEmptyDetailLinesWithinMarkerBounds(editor);
       }
 
       const selectionRange = contentRange.cloneRange();
@@ -3384,34 +3463,10 @@ export function TaskDetailsPanel({
     return contentRange;
   }, [rememberFormatSelection]);
 
-  const previewTextColorOnSelection = useCallback(
-    (color: string) => {
-      const editor = editorRef.current;
-      if (!editor) return;
-
-      const contentRange = ensureTextColorPreviewSetup();
-      if (!contentRange || !textColorPreviewBaselineRef.current) return;
-
-      contentRange.deleteContents();
-      contentRange.insertNode(
-        textColorPreviewBaselineRef.current.cloneNode(true),
-      );
-      normalizeTextColorPreviewEditorStructure(editor);
-
-      const previewRange = getTextColorPreviewContentRange(editor);
-      if (!previewRange || previewRange.collapsed) return;
-
-      const resolvedColor = resolveTextColorOption(color);
-      const coloredRange = applyForeColorToRange(
-        previewRange.cloneRange(),
-        resolvedColor,
-      );
-      if (coloredRange) {
-        rememberFormatSelection(editor, coloredRange);
-      }
-    },
-    [ensureTextColorPreviewSetup, rememberFormatSelection],
-  );
+  const previewTextColorOnSelection = useCallback((_color: string) => {
+    // Swatch hover uses the floating tooltip preview. In-editor marker preview
+    // rewrote multiline selections and left blank lines above/below the range.
+  }, []);
 
   const previewFontFamilyOnSelection = useCallback(
     (familyId: DetailFontFamilyId) => {
@@ -4243,6 +4298,15 @@ export function TaskDetailsPanel({
       const resolvedColor = resolveTextColorOption(color);
       document.execCommand("styleWithCSS", false, "true");
       document.execCommand("foreColor", false, resolvedColor);
+      removeEmptyDetailLineBeforeFirstFormatLine(
+        editor,
+        savedFormatLineIdsRef.current,
+      );
+      removeEmptyDetailLinesAmongSavedFormatLines(
+        editor,
+        savedFormatLineIdsRef.current,
+      );
+      syncEditorLineEmptyState(editor);
       syncEditorContent();
       recordHistorySnapshot();
       scheduleAutoSave();
@@ -7026,7 +7090,7 @@ export function TaskDetailsPanel({
                       aria-haspopup="dialog"
                       aria-expanded={isDateMenuOpen}
                       onClick={handleDateButtonClick}
-                      className={`flex cursor-pointer gap-[2px] rounded-full bg-[#eceef0] pl-3.5 pr-3 text-[12px] font-semibold uppercase tracking-wide text-zinc-600 transition-colors hover:bg-[#e0e2e5] dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700 ${
+                      className={`flex cursor-pointer gap-[2px] rounded-full bg-[#e9ecef] pl-3.5 pr-3 text-[12px] font-semibold uppercase tracking-wide text-zinc-600 transition-colors hover:bg-[#e0e2e5] dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700 ${
                         isModalLayout
                           ? "h-[33px] items-center"
                           : dueDateLabel && dueTimeLabel

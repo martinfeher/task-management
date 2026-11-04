@@ -243,7 +243,7 @@ function CalendarViewTabs({
     }`;
 
   return (
-    <div className={`relative z-40 ${activeView === "month" ? "mb-[26px]" : "mb-1"} grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-4 pl-2 pt-0`}>
+    <div className={`relative z-40 ${activeView === "month" ? "mb-[26px]" : "mb-1"} grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-4 pl-3 pt-0`}>
       {periodLabel ? (
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-2">
@@ -1315,7 +1315,7 @@ export function CalendarViewsPanel({
       cursorOffsetPx={50}
     >
     <CalendarTaskModalActionsProvider value={calendarTaskModalActions}>
-    <div className="calendar-panel p-3 2xl:p-4 flex min-h-0 min-w-0 w-full flex-1 flex-col z-2000! overflow-hidden">
+    <div className="calendar-panel pt-2 pb-3 flex min-h-0 min-w-0 w-full flex-1 flex-col z-2000! overflow-hidden">
       <CalendarViewTabs
         activeView={activeView}
         multiDayCount={multiDayCount}

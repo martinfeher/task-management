@@ -322,7 +322,7 @@ export function CalendarTimedTaskContent({
 
   return (
     <div
-      className={`flex min-h-0 w-full gap-1 ${
+      className={`flex min-h-0 w-full gap-1 boarder boarder-[#a5a5a5] ${
         isSingleLineOnly
           ? "calendar-task-row--single-line shrink-0 items-center"
           : "min-w-0 flex-1 items-start"

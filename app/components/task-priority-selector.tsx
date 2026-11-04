@@ -44,7 +44,7 @@ function TaskPrioritySelectorButton({
         aria-label={label}
         aria-describedby={tooltipId}
         aria-pressed={isSelected}
-        className={`flex size-8 items-center justify-center rounded-full transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer ${
+        className={`flex w-8 h-8 items-center justify-center rounded-full transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer ${
           isSelected ? "bg-zinc-100 dark:bg-zinc-800" : ""
         }`}
         onClick={onClick}

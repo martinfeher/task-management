@@ -33,6 +33,7 @@ import {
 } from "@/lib/tooltip-settings";
 import { TemplateHexColorPicker } from "./template-hex-color-picker";
 import { TemplateStylesSection } from "./template-styles-section";
+import { TemplateDataBackupSection } from "./template-data-backup-section";
 import {
   areTemplateSettingsSnapshotsEqual,
   cloneTemplateSettingsSnapshot,
@@ -774,6 +775,7 @@ export function TemplateOptionsDrawer() {
             </div>
           </section>
 
+          <TemplateDataBackupSection />
         </div>
 
         <div className="shrink-0 border-t border-zinc-200 px-3 py-3 dark:border-zinc-800">

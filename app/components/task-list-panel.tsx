@@ -878,6 +878,33 @@ export function TaskListPanel({
     [completedTasks, entityScope, filterTaskByEntityScope],
   );
 
+  const keyboardNavigableTasks = useMemo(() => {
+    const items: TaskListItem[] = [];
+
+    if (showAddTask && filteredPinnedVisibleTasks.length > 0) {
+      for (const task of filteredPinnedVisibleTasks) {
+        items.push(tasksById.get(task.id) ?? task);
+      }
+    }
+
+    const unpinnedItems = canReorder
+      ? filteredUnpinnedVisibleTasks
+      : filteredListTasks.map((task) => ({ ...task, depth: 0 }));
+
+    for (const task of unpinnedItems) {
+      items.push(tasksById.get(task.id) ?? task);
+    }
+
+    return items;
+  }, [
+    canReorder,
+    filteredListTasks,
+    filteredPinnedVisibleTasks,
+    filteredUnpinnedVisibleTasks,
+    showAddTask,
+    tasksById,
+  ]);
+
   const hasScheduledTasks = useMemo(
     () => orderedTasks.some((task) => task.dueDate),
     [orderedTasks],
@@ -1507,6 +1534,39 @@ export function TaskListPanel({
     finishTitleEdit();
   }
 
+  function scrollTaskRowIntoView(taskId: string) {
+    requestAnimationFrame(() => {
+      const row = taskListScrollRef.current?.querySelector(
+        `[data-task-id="${CSS.escape(taskId)}"]`,
+      );
+      row?.scrollIntoView({ block: "nearest" });
+    });
+  }
+
+  function navigateTitleEditByArrow(task: TaskListItem, direction: "up" | "down") {
+    const currentIndex = keyboardNavigableTasks.findIndex(
+      (item) => item.id === task.id,
+    );
+    if (currentIndex === -1) return;
+
+    const nextIndex =
+      direction === "down" ? currentIndex + 1 : currentIndex - 1;
+    if (nextIndex < 0 || nextIndex >= keyboardNavigableTasks.length) {
+      return;
+    }
+
+    commitTitleEdit(task);
+
+    const nextTask = keyboardNavigableTasks[nextIndex];
+    startTitleEdit(nextTask);
+
+    const selectTaskForNavigation = isListCalendarOpen
+      ? onSelectTask
+      : (onSelectTaskImmediate ?? onSelectTaskQuiet ?? onSelectTask);
+    selectTaskForNavigation(nextTask.id);
+    scrollTaskRowIntoView(nextTask.id);
+  }
+
   function handleTitleKeyDown(
     event: React.KeyboardEvent<HTMLInputElement>,
     task: TaskListItem,
@@ -1520,6 +1580,21 @@ export function TaskListPanel({
     if (event.key === "Escape") {
       event.preventDefault();
       cancelTitleEdit(task);
+      return;
+    }
+
+    if (
+      (event.key === "ArrowDown" || event.key === "ArrowUp") &&
+      !event.altKey &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.shiftKey
+    ) {
+      event.preventDefault();
+      navigateTitleEditByArrow(
+        task,
+        event.key === "ArrowDown" ? "down" : "up",
+      );
       return;
     }
 
@@ -2985,7 +3060,7 @@ export function TaskListPanel({
                       label
                     </span>
                     {isAddTaskLabelMenuOpen ? (
-                      <div className="absolute right-0 top-full z-[100] mt-1 w-[240px] overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+                      <div className="absolute right-0 top-full z-[100] mt-1 w-fit">
                         <TaskLabelSelector
                           labels={addTaskAvailableLabels}
                           assignedLabelIds={addTaskLabelIds}
@@ -3045,7 +3120,7 @@ export function TaskListPanel({
                       priority
                     </span>
                     {isAddTaskPriorityMenuOpen ? (
-                      <div className="absolute right-0 top-full z-[100] mt-1 w-[220px] overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+                      <div className="absolute right-0 top-full z-[100] mt-1 w-[180px] pb-[4px] overflow-hidden rounded-[19px] border border-zinc-200 bg-white shadow-[0_7px_17px_rgba(0,0,0,0.06)] dark:border-zinc-700 dark:bg-zinc-900">
                         <TaskPrioritySelector
                           selectedPriority={newTaskPriority}
                           onSelectPriority={(priority) => {

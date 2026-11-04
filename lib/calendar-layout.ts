@@ -182,7 +182,7 @@ export const CALENDAR_WEEK_ALLDAY_STICKY_CLASS =
 /** Sticky offset for all-day rows sitting below day headers in multi-day view. */
 export const CALENDAR_DAYS_HEADER_HEIGHT_PX = 60;
 export const CALENDAR_DAYS_HEADER_STICKY_CLASS =
-  "sticky top-0 z-30 bg-white dark:bg-zinc-950 mt-4";
+  "sticky top-0 z-30 bg-[#efefef] dark:bg-zinc-950 mt-4";
 export const CALENDAR_DAYS_ALLDAY_STICKY_CLASS =
   "sticky z-20 bg-white dark:bg-zinc-950";
 export const CALENDAR_GRID_SCROLL_CLASS =
