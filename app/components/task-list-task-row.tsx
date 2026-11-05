@@ -142,6 +142,57 @@ type TaskListTaskRowProps = {
 const TASK_LABEL_SELECTOR_WIDTH = 220;
 const TASK_LABEL_SELECTOR_GAP = 4;
 const TASK_LABEL_SELECTOR_MAX_HEIGHT = 360;
+
+function computeTaskLabelSelectorPosition(rect: DOMRect) {
+  const viewportPadding = 8;
+  let left = rect.left;
+  let top = rect.bottom + TASK_LABEL_SELECTOR_GAP;
+
+  left = Math.max(
+    viewportPadding,
+    Math.min(
+      left,
+      window.innerWidth - TASK_LABEL_SELECTOR_WIDTH - viewportPadding,
+    ),
+  );
+
+  if (
+    top + TASK_LABEL_SELECTOR_MAX_HEIGHT >
+    window.innerHeight - viewportPadding
+  ) {
+    const aboveTop =
+      rect.top - TASK_LABEL_SELECTOR_GAP - TASK_LABEL_SELECTOR_MAX_HEIGHT;
+    if (aboveTop >= viewportPadding) {
+      top = aboveTop;
+    } else {
+      top = Math.max(
+        viewportPadding,
+        Math.min(
+          top,
+          window.innerHeight -
+            TASK_LABEL_SELECTOR_MAX_HEIGHT -
+            viewportPadding,
+        ),
+      );
+    }
+  }
+
+  return { top, left };
+}
+
+function resolveClickedLabelPillAnchor(
+  event: React.MouseEvent<HTMLButtonElement>,
+): HTMLElement {
+  const pill = (event.target as HTMLElement).closest("[data-label-pill]");
+  if (
+    pill instanceof HTMLElement &&
+    event.currentTarget.contains(pill)
+  ) {
+    return pill;
+  }
+
+  return event.currentTarget;
+}
 const TASK_PRIORITY_MENU_WIDTH = 196;
 const TASK_PRIORITY_MENU_HEIGHT = 72;
 const TASK_PRIORITY_MENU_GAP = 4;
@@ -367,6 +418,7 @@ export function TaskListTaskRow({
   const priorityMenuButtonRef = useRef<HTMLButtonElement>(null);
   const labelPillsAnchorRef = useRef<HTMLSpanElement>(null);
   const labelHoverTriggerRef = useRef<HTMLButtonElement>(null);
+  const labelMenuAnchorRef = useRef<HTMLElement | null>(null);
   const [datePickerPosition, setDatePickerPosition] = useState<{
     top: number;
     left: number;
@@ -475,37 +527,14 @@ export function TaskListTaskRow({
 
     function updateLabelMenuPosition() {
       const anchor =
-        labelPillsAnchorRef.current ?? labelHoverTriggerRef.current;
+        labelMenuAnchorRef.current ??
+        labelPillsAnchorRef.current ??
+        labelHoverTriggerRef.current;
       if (!anchor) return;
 
-      const rect = anchor.getBoundingClientRect();
-      const viewportPadding = 8;
-      let left = rect.right + TASK_LABEL_SELECTOR_GAP;
-      let top = rect.top;
-
-      if (
-        left + TASK_LABEL_SELECTOR_WIDTH >
-        window.innerWidth - viewportPadding
-      ) {
-        left = rect.left - TASK_LABEL_SELECTOR_WIDTH - TASK_LABEL_SELECTOR_GAP;
-      }
-
-      left = Math.max(
-        viewportPadding,
-        Math.min(
-          left,
-          window.innerWidth - TASK_LABEL_SELECTOR_WIDTH - viewportPadding,
-        ),
+      setLabelMenuPosition(
+        computeTaskLabelSelectorPosition(anchor.getBoundingClientRect()),
       );
-      top = Math.max(
-        viewportPadding,
-        Math.min(
-          top,
-          window.innerHeight - TASK_LABEL_SELECTOR_MAX_HEIGHT - viewportPadding,
-        ),
-      );
-
-      setLabelMenuPosition({ top, left });
     }
 
     updateLabelMenuPosition();
@@ -516,6 +545,11 @@ export function TaskListTaskRow({
       window.removeEventListener("resize", updateLabelMenuPosition);
       window.removeEventListener("scroll", updateLabelMenuPosition, true);
     };
+  }, [isLabelMenuOpen]);
+
+  useLayoutEffect(() => {
+    if (isLabelMenuOpen) return;
+    labelMenuAnchorRef.current = null;
   }, [isLabelMenuOpen]);
 
   useLayoutEffect(() => {
@@ -866,6 +900,8 @@ export function TaskListTaskRow({
                   hasLabelActions
                     ? (event) => {
                         event.stopPropagation();
+                        labelMenuAnchorRef.current =
+                          resolveClickedLabelPillAnchor(event);
                         onOpenLabelMenu(task.id);
                       }
                     : undefined
@@ -1015,6 +1051,7 @@ export function TaskListTaskRow({
                 }}
                 onClick={(event) => {
                   event.stopPropagation();
+                  labelMenuAnchorRef.current = event.currentTarget;
                   onOpenLabelMenu(task.id);
                 }}
               >

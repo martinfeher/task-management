@@ -2235,6 +2235,9 @@ export function TaskDetailsPanel({
   const editorWrapperRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
   const editorHeightFrameRef = useRef<number | null>(null);
+  const pendingEditorHeightSyncOptionsRef = useRef<{
+    scrollActiveLineIntoView?: boolean;
+  } | null>(null);
   const formatMenuRef = useRef<HTMLDivElement>(null);
   const headerFormatControlsRef = useRef<HTMLDivElement>(null);
   const headerFormatActionsRef = useRef<HTMLDivElement>(null);
@@ -3147,38 +3150,64 @@ export function TaskDetailsPanel({
     }, LINE_CONTROLS_DEBOUNCE_MS);
   }, [updateLineControls]);
 
-  const syncEditorHeight = useCallback(() => {
-    const editor = editorRef.current;
-    const panel = panelRef.current;
-    if (!editor || !task) return;
+  const syncEditorHeight = useCallback(
+    (options?: { scrollActiveLineIntoView?: boolean }) => {
+      const editor = editorRef.current;
+      const panel = panelRef.current;
+      if (!editor || !task) return;
 
-    editor.style.height = "auto";
-    const contentHeight = editor.scrollHeight;
-    const maxHeight = getEditorMaxHeightPx(editor, panel, isModalLayout);
-    const nextHeight = Math.max(
-      TASK_DETAILS_EDITOR_MIN_HEIGHT_PX,
-      Math.min(contentHeight, maxHeight),
-    );
+      const scrollTopBefore = editor.scrollTop;
 
-    editor.style.height = `${nextHeight}px`;
-    editor.style.overflowY =
-      contentHeight > nextHeight + 1 ? "auto" : "hidden";
+      editor.style.height = "auto";
+      const contentHeight = editor.scrollHeight;
+      const maxHeight = getEditorMaxHeightPx(editor, panel, isModalLayout);
+      const nextHeight = Math.max(
+        TASK_DETAILS_EDITOR_MIN_HEIGHT_PX,
+        Math.min(contentHeight, maxHeight),
+      );
 
-    if (contentHeight > nextHeight + 1) {
-      scrollActiveLineIntoEditorView(editor);
-    }
-  }, [isModalLayout, task]);
+      editor.style.height = `${nextHeight}px`;
+      const isScrollable = contentHeight > nextHeight + 1;
+      editor.style.overflowY = isScrollable ? "auto" : "hidden";
 
-  const scheduleEditorHeightSync = useCallback(() => {
-    if (editorHeightFrameRef.current !== null) {
-      window.cancelAnimationFrame(editorHeightFrameRef.current);
-    }
+      if (isScrollable) {
+        const maxScrollTop = Math.max(0, contentHeight - nextHeight);
+        editor.scrollTop = Math.min(scrollTopBefore, maxScrollTop);
 
-    editorHeightFrameRef.current = window.requestAnimationFrame(() => {
-      editorHeightFrameRef.current = null;
-      syncEditorHeight();
-    });
-  }, [syncEditorHeight]);
+        if (
+          options?.scrollActiveLineIntoView &&
+          document.activeElement === editor
+        ) {
+          scrollActiveLineIntoEditorView(editor);
+        }
+      } else {
+        editor.scrollTop = 0;
+      }
+    },
+    [isModalLayout, task],
+  );
+
+  const scheduleEditorHeightSync = useCallback(
+    (options?: { scrollActiveLineIntoView?: boolean }) => {
+      if (options?.scrollActiveLineIntoView) {
+        pendingEditorHeightSyncOptionsRef.current = {
+          scrollActiveLineIntoView: true,
+        };
+      }
+
+      if (editorHeightFrameRef.current !== null) {
+        window.cancelAnimationFrame(editorHeightFrameRef.current);
+      }
+
+      editorHeightFrameRef.current = window.requestAnimationFrame(() => {
+        editorHeightFrameRef.current = null;
+        const pendingOptions = pendingEditorHeightSyncOptionsRef.current;
+        pendingEditorHeightSyncOptionsRef.current = null;
+        syncEditorHeight(pendingOptions ?? undefined);
+      });
+    },
+    [syncEditorHeight],
+  );
 
   function beginEditorPointerInteraction() {
     isEditorPointerDownRef.current = true;
@@ -3801,7 +3830,7 @@ export function TaskDetailsPanel({
     const editor = editorRef.current;
     if (!editor) return;
 
-      editor.focus();
+      editor.focus({ preventScroll: true });
 
       const savedRange = savedFormatSelectionRef.current;
       const selection = window.getSelection();
@@ -4090,7 +4119,7 @@ export function TaskDetailsPanel({
       const activeLine = getActiveLineElement(editor);
       if (isCodeLine(activeLine)) return;
 
-      editor.focus();
+      editor.focus({ preventScroll: true });
 
       if (command === "highlight") {
         applyHighlight(editor, DEFAULT_HIGHLIGHT_COLOR);
@@ -4287,7 +4316,7 @@ export function TaskDetailsPanel({
       captureFormatSelectionFromEditor();
       const savedRange = savedFormatSelectionRef.current?.cloneRange() ?? null;
 
-      editor.focus();
+      editor.focus({ preventScroll: true });
       if (
         savedRange &&
         editor.contains(savedRange.commonAncestorContainer)
@@ -4357,7 +4386,7 @@ export function TaskDetailsPanel({
       captureFormatSelectionFromEditor();
       const savedRange = savedFormatSelectionRef.current?.cloneRange() ?? null;
 
-      editor.focus();
+      editor.focus({ preventScroll: true });
       if (
         savedRange &&
         editor.contains(savedRange.commonAncestorContainer)
@@ -5535,7 +5564,7 @@ export function TaskDetailsPanel({
       rememberPendingLocalSave();
     }
 
-    scheduleEditorHeightSync();
+    scheduleEditorHeightSync({ scrollActiveLineIntoView: true });
     scheduleInputNormalization();
     updateSlashCommandMenu();
   }
@@ -7041,7 +7070,7 @@ export function TaskDetailsPanel({
     >
       {renderModalHeaderActions()}
       <div
-        className={`relative flex shrink-0 h-[45px] items-center justify-between overflow-visible ml-[6px] px-2.5 pt-[12px] pb-[10px] ${
+        className={`relative flex shrink-0 h-[41px] items-center justify-between overflow-visible ml-[6px] px-2.5 pt-[12px] pb-[10px] ${
           isModalLayout
             ? isModalFormatToolbarOpen
               ? "pr-[22rem]"

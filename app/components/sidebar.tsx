@@ -15,7 +15,14 @@ import { IoMdPricetag } from "react-icons/io";
 
 import { AiFillTag } from "react-icons/ai";
 
-import { LuFolder, LuInbox, LuList, LuPlus, LuStar } from "react-icons/lu";
+import {
+  LuFolder,
+  LuInbox,
+  LuKeyboard,
+  LuList,
+  LuPlus,
+  LuStar,
+} from "react-icons/lu";
 import { PiCalendarDots, PiDotsThreeBold } from "react-icons/pi";
 import { LuCalendarDays } from "react-icons/lu";
 import { BsCalendar2 } from "react-icons/bs";
@@ -75,6 +82,14 @@ const SearchModal = dynamic(
 
 const SettingsModal = dynamic(
   () => import("./settings-modal").then((module) => module.SettingsModal),
+  { ssr: false },
+);
+
+const KeyboardShortcutsModal = dynamic(
+  () =>
+    import("./keyboard-shortcuts-modal").then(
+      (module) => module.KeyboardShortcutsModal,
+    ),
   { ssr: false },
 );
 
@@ -340,6 +355,12 @@ export function Sidebar({
     x: number;
     y: number;
   } | null>(null);
+  const [isKeyboardShortcutsOpen, setIsKeyboardShortcutsOpen] = useState(false);
+  const [keyboardShortcutsRevealOrigin, setKeyboardShortcutsRevealOrigin] =
+    useState<{
+      x: number;
+      y: number;
+    } | null>(null);
   const [isArchiveOpen, setIsArchiveOpen] = useState(false);
   const [archiveRevealOrigin, setArchiveRevealOrigin] = useState<{
     x: number;
@@ -512,6 +533,11 @@ export function Sidebar({
   function openSettingsModal(origin: { x: number; y: number }) {
     setSettingsRevealOrigin(origin);
     setIsSettingsOpen(true);
+  }
+
+  function openKeyboardShortcutsModal(origin: { x: number; y: number }) {
+    setKeyboardShortcutsRevealOrigin(origin);
+    setIsKeyboardShortcutsOpen(true);
   }
 
   function openArchiveModal(origin: { x: number; y: number }) {
@@ -1944,7 +1970,7 @@ export function Sidebar({
             })}
             <div
               ref={bottomAddMenuRef}
-              className="relative ml-[3px] w-fit"
+              className="relative ml-[3px] w-fit mt-1"
               onMouseEnter={() => setIsBottomAddMenuOpen(true)}
               onMouseLeave={() => setIsBottomAddMenuOpen(false)}
             >
@@ -2225,20 +2251,36 @@ export function Sidebar({
                 </span>
               </button>
             </div>
-            <button
-              type="button"
-              aria-label="Open settings"
-              onClick={(event) => {
-                openSettingsModal({
-                  x: event.clientX,
-                  y: event.clientY,
-                });
-                closeDrawer();
-              }}
-              className="flex size-8 items-center justify-center rounded-full ptxt-400 transition-colors hover:bg-zinc-200/60 hover:ptxt-900 dark:hover:bg-zinc-800/60 dark:hover:ptxt-50 cursor-pointer"
-            >
-              <FiSettings className="size-[18px]" aria-hidden="true" />
-            </button>
+            <div className="flex items-center gap-0.5">
+              <button
+                type="button"
+                aria-label="Keyboard shortcuts"
+                onClick={(event) => {
+                  openKeyboardShortcutsModal({
+                    x: event.clientX,
+                    y: event.clientY,
+                  });
+                  closeDrawer();
+                }}
+                className="flex size-8 items-center justify-center rounded-full ptxt-400 transition-colors hover:bg-zinc-200/60 hover:ptxt-900 dark:hover:bg-zinc-800/60 dark:hover:ptxt-50 cursor-pointer"
+              >
+                <LuKeyboard className="size-[18px]" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                aria-label="Open settings"
+                onClick={(event) => {
+                  openSettingsModal({
+                    x: event.clientX,
+                    y: event.clientY,
+                  });
+                  closeDrawer();
+                }}
+                className="flex size-8 items-center justify-center rounded-full ptxt-400 transition-colors hover:bg-zinc-200/60 hover:ptxt-900 dark:hover:bg-zinc-800/60 dark:hover:ptxt-50 cursor-pointer"
+              >
+                <FiSettings className="size-[18px]" aria-hidden="true" />
+              </button>
+            </div>
           </div>
         </div>
       </aside>
@@ -2261,6 +2303,12 @@ export function Sidebar({
         open={isSettingsOpen}
         revealOrigin={settingsRevealOrigin}
         onClose={() => setIsSettingsOpen(false)}
+      />
+
+      <KeyboardShortcutsModal
+        open={isKeyboardShortcutsOpen}
+        revealOrigin={keyboardShortcutsRevealOrigin}
+        onClose={() => setIsKeyboardShortcutsOpen(false)}
       />
 
       <ArchiveModal

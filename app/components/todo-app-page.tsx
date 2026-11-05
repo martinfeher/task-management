@@ -1,4 +1,4 @@
-import { TodoApp } from "./todo-app";
+import { TodoAppClientShell } from "./todo-app-client-shell";
 import { getTodoData } from "@/lib/todo-data";
 import type { TodoRoute } from "@/lib/todo-routes";
 
@@ -11,7 +11,7 @@ export async function TodoAppPage({ initialRoute }: TodoAppPageProps) {
     await getTodoData();
 
   return (
-    <TodoApp
+    <TodoAppClientShell
       initialLists={lists}
       initialFolders={folders}
       initialLabels={labels}

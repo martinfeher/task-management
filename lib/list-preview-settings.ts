@@ -24,11 +24,11 @@ export function setListPreviewEnabled(enabled: boolean) {
 }
 
 export function useListPreviewEnabled() {
-  const [listPreviewEnabled, setListPreviewEnabledState] = useState(true);
+  const [listPreviewEnabled, setListPreviewEnabledState] = useState(() =>
+    readListPreviewEnabledFromStorage(),
+  );
 
   useEffect(() => {
-    setListPreviewEnabledState(readListPreviewEnabledFromStorage());
-
     function handleChange(event: Event) {
       const customEvent = event as CustomEvent<boolean>;
       if (typeof customEvent.detail === "boolean") {

@@ -36,6 +36,7 @@ export function TaskLabelPills({
         return (
           <span
             key={item.id}
+            data-label-pill
             className={`${getLabelPillClassName(palette)} ${
               truncateAtPx != null ? "inline-block" : ""
             }`}

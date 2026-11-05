@@ -72,17 +72,7 @@ export function TaskPrioritySelector({
   const isContextMenuTone = tone === "contextMenu";
 
   return (
-    <div className="overflow-visible px-3 pt-[2px] pb-[3px]">
-      <div
-        className={`text-[11px] mt-[2px] font-medium dark:text-zinc-500 ${
-          isContextMenuTone ? "" : "text-zinc-350"
-        }`}
-        style={
-          isContextMenuTone ? taskContextMenuTextColor("icon350") : undefined
-        }
-      >
-        priority
-      </div>
+    <div className="overflow-visible px-3 pt-[4px] pb-[3px]">
       <div className="flex w-full items-center justify-between">
         {TASK_PRIORITY_OPTIONS.map((option, index) => {
           const isSelected = selectedPriority === option.level;

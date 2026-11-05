@@ -135,7 +135,7 @@ export function CalendarShortcutModal({
                 type="button"
                 aria-label="Close calendar"
                 onClick={handleClose}
-                className="flex size-8 shrink-0 items-center justify-center rounded-full text-zinc-500 transition-colors hover:bg-[#e8e8e8] hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                className="flex -mt-[10px] size-8 shrink-0 items-center justify-center rounded-full text-zinc-500 transition-colors hover:bg-[#e8e8e8] hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
               >
                 <LuX className="size-4" />
               </button>

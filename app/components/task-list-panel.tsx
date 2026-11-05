@@ -2766,7 +2766,7 @@ export function TaskListPanel({
           }`}
         >
           {showHeader && (
-            <header className="flex items-center justify-between gap-2 border-b border-zinc-200 py-[7px] pl-[8px]! pr-4 dark:border-zinc-800">
+            <header className="flex items-center justify-between gap-2 border-b border-zinc-200 py-[6px] pl-[8px]! pr-4 dark:border-zinc-800">
               <div className="flex min-w-0 items-center gap-[5px]">
                 {showSidebarMenu && onOpenSidebar ? (
                   <button
@@ -2835,7 +2835,7 @@ export function TaskListPanel({
               <div className="flex shrink-0 items-center gap-1">
               {showSortButton && orderedTasks.length >= 2 ? (
                 <div
-                  className="relative flex shrink-0 items-center rounded-[6px] bg-[#fbfbfc] border border-[#e7e7eb]"
+                  className="relative flex shrink-0 items-center rounded-[6px] bg-[#fbfbfc] border border-[#e7e7eb] shadow-[0_7px_17px_rgba(0,0,0,0.06)]"
                   ref={sortMenuRef}
                   onMouseEnter={() => setIsSortMenuOpen(true)}
                   onMouseLeave={() => setIsSortMenuOpen(false)}
@@ -2895,9 +2895,9 @@ export function TaskListPanel({
             </header>
           )}
 
-          <div className="relative z-20 flex items-center overflow-visible pl-[8px] pr-[10px] py-2 min-h-[50px]">
+          <div className="relative z-20 flex flex-col overflow-visible pl-[8px] pr-[10px] pt-2 pb-[5px] min-h-[50px]">
             {showAddTask ? (
-              <div className="min-w-0 flex-1 overflow-visible">
+              <div className="min-w-0 w-full flex-1 overflow-visible">
                 <form
                   ref={addTaskFormRef}
                   onSubmit={handleSubmit}
@@ -2905,7 +2905,7 @@ export function TaskListPanel({
                     if (event.animationName !== "add-task-form-reset") return;
                     setIsAddTaskFormResetting(false);
                   }}
-                  className={`add-task-form add-task-form-enter flex min-w-0 w-full items-center rounded-[9px] border border-[#dfe3ea] bg-[#f8f9fb] py-1 pl-3 pr-1.5 dark:border-zinc-600 dark:bg-zinc-900 ${
+                  className={`add-task-form add-task-form-enter flex min-w-0 w-full items-center rounded-[9px] border border-[#dfe3ea] bg-[#f8f9fb] py-[3px] pl-3 pr-1.5 dark:border-zinc-600 dark:bg-zinc-900 ${
                     isAddTaskFormResetting ? "add-task-form-reset" : ""
                   }`}
                 >
@@ -2997,7 +2997,7 @@ export function TaskListPanel({
                     {isAddTaskDatePickerOpen ? (
                       <div
                         ref={addTaskDatePickerRef}
-                        className="absolute right-0 top-full z-[100] mt-1"
+                        className="absolute left-1/2 top-full z-[100] mt-1 -translate-x-1/2"
                         onKeyDown={(event) => {
                           if (event.key !== "Escape") return;
                           event.stopPropagation();
@@ -3060,7 +3060,7 @@ export function TaskListPanel({
                       label
                     </span>
                     {isAddTaskLabelMenuOpen ? (
-                      <div className="absolute right-0 top-full z-[100] mt-1 w-fit">
+                      <div className="absolute left-1/2 top-full z-[100] mt-1 w-fit -translate-x-1/2">
                         <TaskLabelSelector
                           labels={addTaskAvailableLabels}
                           assignedLabelIds={addTaskLabelIds}
@@ -3120,7 +3120,7 @@ export function TaskListPanel({
                       priority
                     </span>
                     {isAddTaskPriorityMenuOpen ? (
-                      <div className="absolute right-0 top-full z-[100] mt-1 w-[180px] pb-[4px] overflow-hidden rounded-[19px] border border-zinc-200 bg-white shadow-[0_7px_17px_rgba(0,0,0,0.06)] dark:border-zinc-700 dark:bg-zinc-900">
+                      <div className="absolute left-1/2 top-full z-[100] mt-1 w-[180px] -translate-x-1/2 pb-[4px] overflow-hidden rounded-[19px] border border-zinc-200 bg-white shadow-[0_7px_17px_rgba(0,0,0,0.06)] dark:border-zinc-700 dark:bg-zinc-900">
                         <TaskPrioritySelector
                           selectedPriority={newTaskPriority}
                           onSelectPriority={(priority) => {
@@ -3152,11 +3152,27 @@ export function TaskListPanel({
                     Add
                   </button>
                 </form>
+                {showEntityFilter ? (
+                  <div className="mt-[2px] flex">
+                    <TaskListEntityFilter
+                      value={entityScope}
+                      onChange={setEntityScope}
+                    />
+                  </div>
+                ) : null}
                 {newTaskParsePreview ? (
                   <p className="mt-1 px-1 text-[11px] ptxt-400 dark:ptxt-500">
                     {newTaskParsePreview}
                   </p>
                 ) : null}
+              </div>
+            ) : null}
+            {showEntityFilter && !showAddTask ? (
+              <div className="flex justify-end">
+                <TaskListEntityFilter
+                  value={entityScope}
+                  onChange={setEntityScope}
+                />
               </div>
             ) : null}
           </div>
@@ -3165,9 +3181,7 @@ export function TaskListPanel({
             ref={taskListScrollRef}
             className={
               panelWidth != null || title
-                ? `list-panel-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden${
-                    showEntityFilter ? " pb-12" : ""
-                  }`
+                ? "list-panel-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden"
                 : undefined
             }
           >
@@ -3298,15 +3312,6 @@ export function TaskListPanel({
             </div>
           ) : null}
           </div>
-
-          {showEntityFilter ? (
-            <div className="pointer-events-none absolute bottom-[10px] right-[10px] z-30">
-              <TaskListEntityFilter
-                value={entityScope}
-                onChange={setEntityScope}
-              />
-            </div>
-          ) : null}
         </div>
       ) : (
         <div className="p-4">

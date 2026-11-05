@@ -24,11 +24,11 @@ export function setSubtasksEnabled(enabled: boolean) {
 }
 
 export function useSubtasksEnabled() {
-  const [subtasksEnabled, setSubtasksEnabledState] = useState(false);
+  const [subtasksEnabled, setSubtasksEnabledState] = useState(() =>
+    readSubtasksEnabledFromStorage(),
+  );
 
   useEffect(() => {
-    setSubtasksEnabledState(readSubtasksEnabledFromStorage());
-
     function handleChange(event: Event) {
       const customEvent = event as CustomEvent<boolean>;
       if (typeof customEvent.detail === "boolean") {

@@ -25,11 +25,9 @@ export function setAddTaskNoteSwitchEnabled(enabled: boolean) {
 
 export function useAddTaskNoteSwitchEnabled() {
   const [addTaskNoteSwitchEnabled, setAddTaskNoteSwitchEnabledState] =
-    useState(true);
+    useState(() => readAddTaskNoteSwitchEnabledFromStorage());
 
   useEffect(() => {
-    setAddTaskNoteSwitchEnabledState(readAddTaskNoteSwitchEnabledFromStorage());
-
     function handleChange(event: Event) {
       const customEvent = event as CustomEvent<boolean>;
       if (typeof customEvent.detail === "boolean") {

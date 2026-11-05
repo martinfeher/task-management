@@ -34,6 +34,7 @@ import {
   getCalendarSidebarVisibilityClass,
   type CalendarSidebarSyncProps,
 } from "./calendar-view-sidebar-layout";
+import { useListCalendarOverlapLayout } from "./list-calendar-overlap-shell";
 import { CalendarWeekView } from "./calendar-week-view";
 import {
   CalendarTaskHoverButton,
@@ -232,6 +233,7 @@ function CalendarViewTabs({
   sidebarMinViewportWidth: number;
   onSidebarOpenChange: (open: boolean) => void;
 }) {
+  const listCalendarOverlap = useListCalendarOverlapLayout();
   const sidebarSearchVisibilityClass = sidebarOpen
     ? getCalendarSidebarVisibilityClass(sidebarMinViewportWidth)
     : "hidden";
@@ -242,39 +244,69 @@ function CalendarViewTabs({
         : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
     }`;
 
+  const listCalendarLayoutToggle =
+    listCalendarOverlap?.canToggleLayout ? (
+      <button
+        type="button"
+        aria-label={
+          listCalendarOverlap.isOverlapLayout
+            ? "Move calendar to default layout"
+            : "Dock calendar over task list"
+        }
+        title={
+          listCalendarOverlap.isOverlapLayout
+            ? "Default calendar layout"
+            : "Dock calendar over task list"
+        }
+        onClick={listCalendarOverlap.toggleLayout}
+        className="flex size-7 shrink-0 items-center justify-center rounded-full text-zinc-600 transition-colors bg-slate-100 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800 cursor-pointer"
+      >
+        {listCalendarOverlap.isOverlapLayout ? (
+          <BiChevronRight className="size-5" aria-hidden="true" />
+        ) : (
+          <BiChevronLeft className="size-5" aria-hidden="true" />
+        )}
+      </button>
+    ) : null;
+
   return (
-    <div className={`relative z-40 ${activeView === "month" ? "mb-[26px]" : "mb-1"} grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-4 pl-3 pt-0`}>
-      {periodLabel ? (
+    <div className={`relative z-40 ${activeView === "month" ? "mb-[26px]" : "mb-1"} grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-4 pl-2 pt-0`}>
+      {periodLabel || listCalendarLayoutToggle ? (
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-2">
-            <h2 className="truncate text-lg text-zinc-700 dark:text-zinc-50 text-[23px]">
-              <span className="font-semibold">{periodLabel}</span>
-              {periodLabelSuffix ? (
-                <span className="font-normal"> {periodLabelSuffix}</span>
-              ) : null}
-            </h2>
-            {periodLabelAction ? (
-              <div className="ml-[10px] shrink-0">{periodLabelAction}</div>
-            ) : null}
-            {activeView === "month" && monthNavigation ? (
-              <div className="flex shrink-0 items-center gap-1">
-                <button
-                  type="button"
-                  aria-label="Previous month"
-                  onClick={monthNavigation.goToPreviousMonth}
-                  className="flex size-8 items-center justify-center rounded-md text-zinc-600 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                >
-                  <BiChevronLeft className="size-5" />
-                </button>
-                <button
-                  type="button"
-                  aria-label="Next month"
-                  onClick={monthNavigation.goToNextMonth}
-                  className="flex size-8 items-center justify-center rounded-md text-zinc-600 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                >
-                  <BiChevronRight className="size-5" />
-                </button>
-              </div>
+            {listCalendarLayoutToggle}
+            {periodLabel ? (
+              <>
+                <h2 className="truncate text-lg text-zinc-700 dark:text-zinc-50 text-[23px]">
+                  <span className="font-semibold">{periodLabel}</span>
+                  {periodLabelSuffix ? (
+                    <span className="font-normal"> {periodLabelSuffix}</span>
+                  ) : null}
+                </h2>
+                {periodLabelAction ? (
+                  <div className="ml-[10px] shrink-0">{periodLabelAction}</div>
+                ) : null}
+                {activeView === "month" && monthNavigation ? (
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button
+                      type="button"
+                      aria-label="Previous month"
+                      onClick={monthNavigation.goToPreviousMonth}
+                      className="flex size-8 items-center justify-center rounded-md text-zinc-600 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                    >
+                      <BiChevronLeft className="size-5" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Next month"
+                      onClick={monthNavigation.goToNextMonth}
+                      className="flex size-8 items-center justify-center rounded-md text-zinc-600 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                    >
+                      <BiChevronRight className="size-5" />
+                    </button>
+                  </div>
+                ) : null}
+              </>
             ) : null}
           </div>
           {periodSubLabel ? (

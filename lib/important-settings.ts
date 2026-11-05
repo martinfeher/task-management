@@ -24,11 +24,11 @@ export function setImportantEnabled(enabled: boolean) {
 }
 
 export function useImportantEnabled() {
-  const [importantEnabled, setImportantEnabledState] = useState(true);
+  const [importantEnabled, setImportantEnabledState] = useState(() =>
+    readImportantEnabledFromStorage(),
+  );
 
   useEffect(() => {
-    setImportantEnabledState(readImportantEnabledFromStorage());
-
     function handleChange(event: Event) {
       const customEvent = event as CustomEvent<boolean>;
       if (typeof customEvent.detail === "boolean") {
