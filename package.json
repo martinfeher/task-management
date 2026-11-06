@@ -17,6 +17,8 @@
     "db:check": "tsx scripts/check-db-connection.ts",
     "db:setup": "prisma migrate deploy && prisma generate && tsx scripts/check-db-connection.ts",
     "db:migrate-data": "tsx scripts/migrate-sqlite-to-postgres.ts",
+    "claim:legacy-data": "tsx scripts/claim-legacy-data.ts",
+    "diagnose:legacy-data": "tsx scripts/diagnose-legacy-data.ts",
     "verify:api": "tsx scripts/verify-mobile-api.ts",
     "verify:template-styles-db": "tsx scripts/verify-template-styles-db.ts",
     "qa:gate": "tsx scripts/qa-gate-web.ts",
@@ -38,10 +40,11 @@
     "@prisma/adapter-pg": "^7.9.1",
     "@prisma/client": "^7.8.0",
     "archiver": "^8.0.0",
-    "fflate": "^0.8.2",
+    "better-auth": "^1.7.18",
     "better-sqlite3": "^12.11.1",
     "expo": "~54.0.35",
     "expo-blur": "~14.1.5",
+    "fflate": "^0.8.2",
     "lucide-react": "^0.575.0",
     "next": "16.2.10",
     "node-html-parser": "^9.0.2",
@@ -49,7 +52,8 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-icons": "^5.7.0",
-    "react-native": "0.81.5"
+    "react-native": "0.81.5",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

@@ -10,39 +10,45 @@ import {
   type TemplateStyleRecord,
 } from "@/lib/template-style-types";
 
-export async function getActiveTemplateStyleId(): Promise<string | null> {
+export async function getActiveTemplateStyleId(
+  userId: string,
+): Promise<string | null> {
   const setting = await prisma.appSetting.findUnique({
-    where: { key: ACTIVE_TEMPLATE_STYLE_KEY },
+    where: { userId_key: { userId, key: ACTIVE_TEMPLATE_STYLE_KEY } },
     select: { value: true },
   });
 
   return setting?.value || null;
 }
 
-export async function setActiveTemplateStyleId(id: string | null) {
+export async function setActiveTemplateStyleId(
+  userId: string,
+  id: string | null,
+) {
   if (!id) {
     await prisma.appSetting.deleteMany({
-      where: { key: ACTIVE_TEMPLATE_STYLE_KEY },
+      where: { userId, key: ACTIVE_TEMPLATE_STYLE_KEY },
     });
     return;
   }
 
   await prisma.appSetting.upsert({
-    where: { key: ACTIVE_TEMPLATE_STYLE_KEY },
-    create: { key: ACTIVE_TEMPLATE_STYLE_KEY, value: id },
+    where: { userId_key: { userId, key: ACTIVE_TEMPLATE_STYLE_KEY } },
+    create: { userId, key: ACTIVE_TEMPLATE_STYLE_KEY, value: id },
     update: { value: id },
   });
 }
 
-export async function listTemplateStyles(): Promise<{
+export async function listTemplateStyles(userId: string): Promise<{
   styles: TemplateStyleRecord[];
   activeStyleId: string | null;
 }> {
   const [records, activeStyleId] = await Promise.all([
     prisma.templateStyle.findMany({
+      where: { userId },
       orderBy: [{ updatedAt: "desc" }, { name: "asc" }],
     }),
-    getActiveTemplateStyleId(),
+    getActiveTemplateStyleId(userId),
   ]);
 
   const styles = records
@@ -52,13 +58,18 @@ export async function listTemplateStyles(): Promise<{
   return { styles, activeStyleId };
 }
 
-export async function getTemplateStyleById(id: string) {
-  const record = await prisma.templateStyle.findUnique({ where: { id } });
+export async function getTemplateStyleById(id: string, userId: string) {
+  const record = await prisma.templateStyle.findFirst({
+    where: { id, userId },
+  });
   if (!record) return null;
   return serializeTemplateStyleRecord(record);
 }
 
-export async function createTemplateStyle(input: TemplateStyleInput) {
+export async function createTemplateStyle(
+  input: TemplateStyleInput,
+  userId: string,
+) {
   const normalized = normalizeTemplateStyleInput(input);
   if (!normalized) {
     throw new Error("Invalid template style input");
@@ -70,6 +81,7 @@ export async function createTemplateStyle(input: TemplateStyleInput) {
     data: {
       name: normalized.name,
       settingsJson: normalized.settings as Prisma.InputJsonValue,
+      userId,
       ...legacy,
     },
   });
@@ -82,10 +94,22 @@ export async function createTemplateStyle(input: TemplateStyleInput) {
   return style;
 }
 
-export async function updateTemplateStyle(id: string, input: TemplateStyleInput) {
+export async function updateTemplateStyle(
+  id: string,
+  input: TemplateStyleInput,
+  userId: string,
+) {
   const normalized = normalizeTemplateStyleInput(input);
   if (!normalized) {
     throw new Error("Invalid template style input");
+  }
+
+  const existing = await prisma.templateStyle.findFirst({
+    where: { id, userId },
+    select: { id: true },
+  });
+  if (!existing) {
+    throw new Error("Template style not found");
   }
 
   const legacy = templateStyleLegacyColumns(normalized.settings);
@@ -107,23 +131,38 @@ export async function updateTemplateStyle(id: string, input: TemplateStyleInput)
   return style;
 }
 
-export async function deleteTemplateStyle(id: string) {
-  const activeStyleId = await getActiveTemplateStyleId();
+export async function deleteTemplateStyle(id: string, userId: string) {
+  const existing = await prisma.templateStyle.findFirst({
+    where: { id, userId },
+    select: { id: true },
+  });
+  if (!existing) {
+    throw new Error("Template style not found");
+  }
+
+  const activeStyleId = await getActiveTemplateStyleId(userId);
   await prisma.templateStyle.delete({ where: { id } });
 
   if (activeStyleId === id) {
-    await setActiveTemplateStyleId(null);
+    await setActiveTemplateStyleId(userId, null);
   }
 }
 
-export async function copyTemplateStyle(id: string, name?: string) {
-  const source = await getTemplateStyleById(id);
+export async function copyTemplateStyle(
+  id: string,
+  userId: string,
+  name?: string,
+) {
+  const source = await getTemplateStyleById(id, userId);
   if (!source) {
     throw new Error("Template style not found");
   }
 
-  return createTemplateStyle({
-    name: name?.trim() ? name : getCopyTemplateName(source.name),
-    settings: source.settings,
-  });
+  return createTemplateStyle(
+    {
+      name: name?.trim() ? name : getCopyTemplateName(source.name),
+      settings: source.settings,
+    },
+    userId,
+  );
 }

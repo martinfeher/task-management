@@ -1,12 +1,17 @@
 import { getSidebarApiData } from "@/lib/mobile-api-data";
 import { jsonWithCors, optionsWithCors } from "@/lib/api-cors";
 import { createTodoList } from "@/app/actions/todo";
+import { requireUser, UnauthorizedError } from "@/lib/require-user";
 
 export async function GET() {
   try {
-    const data = await getSidebarApiData();
+    const { id: userId } = await requireUser();
+    const data = await getSidebarApiData(userId);
     return jsonWithCors(data);
   } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return jsonWithCors({ error: "Not signed in" }, { status: 401 });
+    }
     console.error("Failed to load lists for mobile API:", error);
     return jsonWithCors({ error: "Failed to load lists" }, { status: 500 });
   }
@@ -32,6 +37,9 @@ export async function POST(request: Request) {
       { status: 201 },
     );
   } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return jsonWithCors({ error: "Not signed in" }, { status: 401 });
+    }
     const message =
       error instanceof Error ? error.message : "Failed to create list";
     return jsonWithCors({ error: message }, { status: 500 });

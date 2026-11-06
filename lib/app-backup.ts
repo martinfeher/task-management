@@ -12,10 +12,13 @@ function createZipArchive(options?: { zlib?: { level?: number } }): Archiver {
   return new ZipArchive(options);
 }
 
-export const APP_BACKUP_FORMAT_VERSION = 1;
+export const APP_BACKUP_FORMAT_VERSION = 2;
 export const APP_BACKUP_MANIFEST_NAME = "manifest.json";
 export const APP_BACKUP_DATABASE_NAME = "database.json";
 export const APP_BACKUP_UPLOADS_PREFIX = "uploads/";
+
+/** Guard against decompression bombs in uploaded backup zips. */
+const MAX_BACKUP_UNCOMPRESSED_BYTES = 1024 * 1024 * 1024; // 1 GB
 
 const UPLOAD_TASKS_DIR = path.join(process.cwd(), "uploads", "tasks");
 const UPLOAD_AUDIO_DIR = path.join(process.cwd(), "uploads", "task-audio");
@@ -24,6 +27,8 @@ export type AppBackupManifest = {
   formatVersion: number;
   exportedAt: string;
   app: "todolistWeb";
+  /** The account this backup belongs to; restore only ever targets this same user. */
+  ownerUserId: string;
 };
 
 export type AppBackupDatabase = {
@@ -50,7 +55,10 @@ export type AppBackupDatabase = {
   templateStyles: Awaited<ReturnType<typeof prisma.templateStyle.findMany>>;
 };
 
-export async function loadAppBackupDatabase(): Promise<AppBackupDatabase> {
+/** Loads only the data owned by `userId` — backups never span users. */
+export async function loadAppBackupDatabase(
+  userId: string,
+): Promise<AppBackupDatabase> {
   const [
     listFolders,
     todoLists,
@@ -66,19 +74,19 @@ export async function loadAppBackupDatabase(): Promise<AppBackupDatabase> {
     tooltipTemplateSettings,
     templateStyles,
   ] = await Promise.all([
-    prisma.listFolder.findMany(),
-    prisma.todoList.findMany(),
-    prisma.kanbanColumn.findMany(),
-    prisma.task.findMany(),
-    prisma.taskVersion.findMany(),
-    prisma.tag.findMany(),
-    prisma.taskTag.findMany(),
-    prisma.appSetting.findMany(),
-    prisma.sidebarTemplateSetting.findMany(),
-    prisma.taskListTemplateSetting.findMany(),
-    prisma.calendarTaskTemplateSetting.findMany(),
-    prisma.tooltipTemplateSetting.findMany(),
-    prisma.templateStyle.findMany(),
+    prisma.listFolder.findMany({ where: { userId } }),
+    prisma.todoList.findMany({ where: { userId } }),
+    prisma.kanbanColumn.findMany({ where: { list: { userId } } }),
+    prisma.task.findMany({ where: { userId } }),
+    prisma.taskVersion.findMany({ where: { task: { userId } } }),
+    prisma.tag.findMany({ where: { userId } }),
+    prisma.taskTag.findMany({ where: { task: { userId } } }),
+    prisma.appSetting.findMany({ where: { userId } }),
+    prisma.sidebarTemplateSetting.findMany({ where: { userId } }),
+    prisma.taskListTemplateSetting.findMany({ where: { userId } }),
+    prisma.calendarTaskTemplateSetting.findMany({ where: { userId } }),
+    prisma.tooltipTemplateSetting.findMany({ where: { userId } }),
+    prisma.templateStyle.findMany({ where: { userId } }),
   ]);
 
   return {
@@ -98,34 +106,56 @@ export async function loadAppBackupDatabase(): Promise<AppBackupDatabase> {
   };
 }
 
-async function collectUploadFiles(baseDir: string, zipPrefix: string) {
+async function collectUploadFiles(
+  baseDir: string,
+  zipPrefix: string,
+  allowedDirNames?: Set<string>,
+) {
   const entries: { archivePath: string; absolutePath: string }[] = [];
 
-  async function walk(relativeDir: string) {
-    const absoluteDir = path.join(baseDir, relativeDir);
-    if (!existsSync(absoluteDir)) return;
+  if (!existsSync(baseDir)) return entries;
 
-    const names = await readdir(absoluteDir);
-    for (const name of names) {
-      const rel = relativeDir ? path.join(relativeDir, name) : name;
-      const absolutePath = path.join(baseDir, rel);
-      const info = await stat(absolutePath);
-      if (info.isDirectory()) {
-        await walk(rel);
-        continue;
+  const topLevelNames = await readdir(baseDir);
+  for (const name of topLevelNames) {
+    if (allowedDirNames && !allowedDirNames.has(name)) continue;
+
+    const absoluteTop = path.join(baseDir, name);
+    const info = await stat(absoluteTop);
+    if (!info.isDirectory()) continue;
+
+    async function walk(relativeDir: string) {
+      const absoluteDir = path.join(baseDir, relativeDir);
+      const names = await readdir(absoluteDir);
+      for (const entryName of names) {
+        const rel = path.join(relativeDir, entryName);
+        const absolutePath = path.join(baseDir, rel);
+        const entryInfo = await stat(absolutePath);
+        if (entryInfo.isDirectory()) {
+          await walk(rel);
+          continue;
+        }
+        entries.push({
+          archivePath: `${zipPrefix}${rel.split(path.sep).join("/")}`,
+          absolutePath,
+        });
       }
-      entries.push({
-        archivePath: `${zipPrefix}${rel.split(path.sep).join("/")}`,
-        absolutePath,
-      });
     }
+
+    await walk(name);
   }
 
-  await walk("");
   return entries;
 }
 
-export function createBackupZipStream() {
+async function getOwnedTaskIds(userId: string) {
+  const tasks = await prisma.task.findMany({
+    where: { userId },
+    select: { id: true },
+  });
+  return new Set(tasks.map((task) => task.id));
+}
+
+export function createBackupZipStream(userId: string) {
   const archive = createZipArchive({ zlib: { level: 6 } });
   const output = new PassThrough();
   archive.pipe(output);
@@ -136,8 +166,10 @@ export function createBackupZipStream() {
         formatVersion: APP_BACKUP_FORMAT_VERSION,
         exportedAt: new Date().toISOString(),
         app: "todolistWeb",
+        ownerUserId: userId,
       };
-      const database = await loadAppBackupDatabase();
+      const database = await loadAppBackupDatabase(userId);
+      const ownedTaskIds = new Set(database.tasks.map((task) => task.id));
 
       archive.append(JSON.stringify(manifest, null, 2), {
         name: APP_BACKUP_MANIFEST_NAME,
@@ -150,10 +182,12 @@ export function createBackupZipStream() {
         ...(await collectUploadFiles(
           UPLOAD_TASKS_DIR,
           `${APP_BACKUP_UPLOADS_PREFIX}tasks/`,
+          ownedTaskIds,
         )),
         ...(await collectUploadFiles(
           UPLOAD_AUDIO_DIR,
           `${APP_BACKUP_UPLOADS_PREFIX}task-audio/`,
+          ownedTaskIds,
         )),
       ];
 
@@ -229,96 +263,130 @@ function parseBackupDatabaseJson(text: string): AppBackupDatabase {
   return raw as AppBackupDatabase;
 }
 
-async function restoreDatabasePayload(payload: AppBackupDatabase) {
+/** Strips any `userId`/`id` collisions and reassigns every row to `userId`. */
+function reownRows<T extends Record<string, unknown>>(
+  rows: T[],
+  userId: string,
+): T[] {
+  return rows.map((row) =>
+    "userId" in row ? { ...row, userId } : row,
+  );
+}
+
+/**
+ * Replaces `userId`'s own data with the payload's data. Only ever touches
+ * rows this user owns — other users' rows are never read, deleted, or
+ * written. Every restored row is force-reassigned to `userId` regardless of
+ * what the backup file claims, so a crafted backup cannot plant data under
+ * someone else's account.
+ */
+async function restoreDatabasePayloadForUser(
+  payload: AppBackupDatabase,
+  userId: string,
+) {
   await prisma.$transaction(async (tx) => {
-    await tx.$executeRawUnsafe(`
-      TRUNCATE
-        "TaskTag",
-        "TaskVersion",
-        "Task",
-        "KanbanColumn",
-        "TodoList",
-        "ListFolder",
-        "Tag",
-        "AppSetting",
-        "SidebarTemplateSetting",
-        "TaskListTemplateSetting",
-        "CalendarTaskTemplateSetting",
-        "TooltipTemplateSetting",
-        "TemplateStyle"
-      RESTART IDENTITY CASCADE
-    `);
+    // Delete this user's existing rows in FK-safe (children-first) order.
+    await tx.taskTag.deleteMany({ where: { task: { userId } } });
+    await tx.taskVersion.deleteMany({ where: { task: { userId } } });
+    await tx.task.deleteMany({ where: { userId } });
+    await tx.kanbanColumn.deleteMany({ where: { list: { userId } } });
+    await tx.todoList.deleteMany({ where: { userId } });
+    await tx.listFolder.deleteMany({ where: { userId } });
+    await tx.tag.deleteMany({ where: { userId } });
+    await tx.appSetting.deleteMany({ where: { userId } });
+    await tx.sidebarTemplateSetting.deleteMany({ where: { userId } });
+    await tx.taskListTemplateSetting.deleteMany({ where: { userId } });
+    await tx.calendarTaskTemplateSetting.deleteMany({ where: { userId } });
+    await tx.tooltipTemplateSetting.deleteMany({ where: { userId } });
+    await tx.templateStyle.deleteMany({ where: { userId } });
 
-    await tx.$executeRawUnsafe(`SET session_replication_role = 'replica'`);
+    // Recreate in FK-safe (parents-first) order, reassigned to this user.
+    const listFolders = reownRows(payload.listFolders, userId);
+    if (listFolders.length > 0) {
+      await tx.listFolder.createMany({ data: listFolders });
+    }
 
-    try {
-      if (payload.listFolders.length > 0) {
-        await tx.listFolder.createMany({ data: payload.listFolders });
-      }
+    const todoLists = reownRows(payload.todoLists, userId);
+    if (todoLists.length > 0) {
+      await tx.todoList.createMany({ data: todoLists });
+    }
 
-      if (payload.todoLists.length > 0) {
-        await tx.todoList.createMany({ data: payload.todoLists });
-      }
+    if (payload.kanbanColumns.length > 0) {
+      await tx.kanbanColumn.createMany({ data: payload.kanbanColumns });
+    }
 
-      if (payload.kanbanColumns.length > 0) {
-        await tx.kanbanColumn.createMany({ data: payload.kanbanColumns });
-      }
+    const tags = reownRows(payload.tags, userId);
+    if (tags.length > 0) {
+      await tx.tag.createMany({ data: tags });
+    }
 
-      if (payload.tags.length > 0) {
-        await tx.tag.createMany({ data: payload.tags });
-      }
+    const tasks = reownRows(payload.tasks, userId);
+    if (tasks.length > 0) {
+      await tx.task.createMany({
+        data: tasks as Prisma.TaskCreateManyInput[],
+      });
+    }
 
-      if (payload.tasks.length > 0) {
-        await tx.task.createMany({
-          data: payload.tasks as Prisma.TaskCreateManyInput[],
-        });
-      }
+    if (payload.taskTags.length > 0) {
+      await tx.taskTag.createMany({ data: payload.taskTags });
+    }
 
-      if (payload.taskTags.length > 0) {
-        await tx.taskTag.createMany({ data: payload.taskTags });
-      }
+    if (payload.taskVersions.length > 0) {
+      await tx.taskVersion.createMany({
+        data: payload.taskVersions as Prisma.TaskVersionCreateManyInput[],
+      });
+    }
 
-      if (payload.taskVersions.length > 0) {
-        await tx.taskVersion.createMany({
-          data: payload.taskVersions as Prisma.TaskVersionCreateManyInput[],
-        });
-      }
+    const appSettings = reownRows(payload.appSettings, userId);
+    if (appSettings.length > 0) {
+      await tx.appSetting.createMany({ data: appSettings });
+    }
 
-      if (payload.appSettings.length > 0) {
-        await tx.appSetting.createMany({ data: payload.appSettings });
-      }
+    const sidebarTemplateSettings = reownRows(
+      payload.sidebarTemplateSettings,
+      userId,
+    );
+    if (sidebarTemplateSettings.length > 0) {
+      await tx.sidebarTemplateSetting.createMany({
+        data: sidebarTemplateSettings,
+      });
+    }
 
-      if (payload.sidebarTemplateSettings.length > 0) {
-        await tx.sidebarTemplateSetting.createMany({
-          data: payload.sidebarTemplateSettings,
-        });
-      }
+    const taskListTemplateSettings = reownRows(
+      payload.taskListTemplateSettings,
+      userId,
+    );
+    if (taskListTemplateSettings.length > 0) {
+      await tx.taskListTemplateSetting.createMany({
+        data: taskListTemplateSettings,
+      });
+    }
 
-      if (payload.taskListTemplateSettings.length > 0) {
-        await tx.taskListTemplateSetting.createMany({
-          data: payload.taskListTemplateSettings,
-        });
-      }
+    const calendarTaskTemplateSettings = reownRows(
+      payload.calendarTaskTemplateSettings,
+      userId,
+    );
+    if (calendarTaskTemplateSettings.length > 0) {
+      await tx.calendarTaskTemplateSetting.createMany({
+        data: calendarTaskTemplateSettings,
+      });
+    }
 
-      if (payload.calendarTaskTemplateSettings.length > 0) {
-        await tx.calendarTaskTemplateSetting.createMany({
-          data: payload.calendarTaskTemplateSettings,
-        });
-      }
+    const tooltipTemplateSettings = reownRows(
+      payload.tooltipTemplateSettings,
+      userId,
+    );
+    if (tooltipTemplateSettings.length > 0) {
+      await tx.tooltipTemplateSetting.createMany({
+        data: tooltipTemplateSettings,
+      });
+    }
 
-      if (payload.tooltipTemplateSettings.length > 0) {
-        await tx.tooltipTemplateSetting.createMany({
-          data: payload.tooltipTemplateSettings,
-        });
-      }
-
-      if (payload.templateStyles.length > 0) {
-        await tx.templateStyle.createMany({
-          data: payload.templateStyles as Prisma.TemplateStyleCreateManyInput[],
-        });
-      }
-    } finally {
-      await tx.$executeRawUnsafe(`SET session_replication_role = 'origin'`);
+    const templateStyles = reownRows(payload.templateStyles, userId);
+    if (templateStyles.length > 0) {
+      await tx.templateStyle.createMany({
+        data: templateStyles as Prisma.TemplateStyleCreateManyInput[],
+      });
     }
   });
 }
@@ -340,7 +408,17 @@ function normalizeZipEntryPath(entryPath: string) {
 }
 
 function unzipBackupBuffer(buffer: Buffer) {
-  return unzipSync(new Uint8Array(buffer));
+  const entries = unzipSync(new Uint8Array(buffer));
+
+  let totalBytes = 0;
+  for (const data of Object.values(entries)) {
+    totalBytes += data.byteLength;
+    if (totalBytes > MAX_BACKUP_UNCOMPRESSED_BYTES) {
+      throw new Error("Backup archive is too large once decompressed");
+    }
+  }
+
+  return entries;
 }
 
 function findZipEntry(
@@ -354,13 +432,19 @@ function findZipEntry(
   return entryKey ? entries[entryKey] : null;
 }
 
-async function replaceUploadsFromZipEntries(
+/**
+ * Replaces this user's own uploaded files only. Other users' files under
+ * `uploads/tasks/<taskId>/` and `uploads/task-audio/<taskId>/` are left
+ * untouched since this never deletes/writes outside `ownedTaskIds`.
+ */
+async function replaceOwnedUploadsFromZipEntries(
   entries: Record<string, Uint8Array>,
+  ownedTaskIds: Set<string>,
 ) {
-  await rm(UPLOAD_TASKS_DIR, { recursive: true, force: true });
-  await rm(UPLOAD_AUDIO_DIR, { recursive: true, force: true });
-  await mkdir(UPLOAD_TASKS_DIR, { recursive: true });
-  await mkdir(UPLOAD_AUDIO_DIR, { recursive: true });
+  for (const taskId of ownedTaskIds) {
+    await rm(path.join(UPLOAD_TASKS_DIR, taskId), { recursive: true, force: true });
+    await rm(path.join(UPLOAD_AUDIO_DIR, taskId), { recursive: true, force: true });
+  }
 
   for (const [entryPath, data] of Object.entries(entries)) {
     const normalized = normalizeZipEntryPath(entryPath);
@@ -369,6 +453,11 @@ async function replaceUploadsFromZipEntries(
 
     const safePath = assertSafeBackupEntryPath(normalized);
     const relative = safePath.slice(APP_BACKUP_UPLOADS_PREFIX.length);
+    const [, taskId] = relative.split("/");
+
+    // Only restore files under this user's own task ids.
+    if (!taskId || !ownedTaskIds.has(taskId)) continue;
+
     const targetPath = path.join(
       process.cwd(),
       APP_BACKUP_UPLOADS_PREFIX,
@@ -380,7 +469,10 @@ async function replaceUploadsFromZipEntries(
   }
 }
 
-export async function restoreAppBackupFromZipBuffer(buffer: Buffer) {
+export async function restoreAppBackupFromZipBuffer(
+  buffer: Buffer,
+  userId: string,
+) {
   const entries = unzipBackupBuffer(buffer);
 
   const manifestBytes = findZipEntry(entries, APP_BACKUP_MANIFEST_NAME);
@@ -406,12 +498,13 @@ export async function restoreAppBackupFromZipBuffer(buffer: Buffer) {
 
   const database = parseBackupDatabaseJson(strFromU8(databaseBytes));
 
-  await restoreDatabasePayload(database);
-  await replaceUploadsFromZipEntries(entries);
+  await restoreDatabasePayloadForUser(database, userId);
+  const ownedTaskIds = await getOwnedTaskIds(userId);
+  await replaceOwnedUploadsFromZipEntries(entries, ownedTaskIds);
 }
 
 /** Write backup zip to disk (used by scripts/tests). */
-export async function writeBackupZipToFile(outputPath: string) {
+export async function writeBackupZipToFile(outputPath: string, userId: string) {
   const archive = createZipArchive({ zlib: { level: 6 } });
   const stream = createWriteStream(outputPath);
   archive.pipe(stream);
@@ -420,8 +513,10 @@ export async function writeBackupZipToFile(outputPath: string) {
     formatVersion: APP_BACKUP_FORMAT_VERSION,
     exportedAt: new Date().toISOString(),
     app: "todolistWeb",
+    ownerUserId: userId,
   };
-  const database = await loadAppBackupDatabase();
+  const database = await loadAppBackupDatabase(userId);
+  const ownedTaskIds = new Set(database.tasks.map((task) => task.id));
 
   archive.append(JSON.stringify(manifest, null, 2), {
     name: APP_BACKUP_MANIFEST_NAME,
@@ -434,10 +529,12 @@ export async function writeBackupZipToFile(outputPath: string) {
     ...(await collectUploadFiles(
       UPLOAD_TASKS_DIR,
       `${APP_BACKUP_UPLOADS_PREFIX}tasks/`,
+      ownedTaskIds,
     )),
     ...(await collectUploadFiles(
       UPLOAD_AUDIO_DIR,
       `${APP_BACKUP_UPLOADS_PREFIX}task-audio/`,
+      ownedTaskIds,
     )),
   ];
 
@@ -449,7 +546,7 @@ export async function writeBackupZipToFile(outputPath: string) {
   await finished(stream);
 }
 
-export async function readBackupZipFile(filePath: string) {
+export async function readBackupZipFile(filePath: string, userId: string) {
   const buffer = await readFile(filePath);
-  await restoreAppBackupFromZipBuffer(buffer);
+  await restoreAppBackupFromZipBuffer(buffer, userId);
 }

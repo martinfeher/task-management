@@ -3831,10 +3831,8 @@ export function TodoApp({
   const showListCalendar = isListCalendarOpen || isListCalendarPreview;
   const showListCalendarPanel =
     showListCalendar && !(isListCalendarOpen && listCalendarShowingDetails);
-  const listCalendarMonthOverlapEnabled =
-    showListCalendarPanel &&
-    listCalendarPanelView === "month" &&
-    !isCompactLayout;
+  /** List-calendar dock-over-task-list (chevron + 40px gap); all views, not only month */
+  const listCalendarOverlapEnabled = showListCalendarPanel && !isCompactLayout;
   const showRightPanel =
     selectedTaskId !== null || showListCalendar || useFixedWidthTaskListPanel;
   const showTaskDetails =
@@ -4201,7 +4199,7 @@ export function TodoApp({
             >
               {showListCalendarPanel ? (
                 <ListCalendarOverlapShell
-                  enabled={listCalendarMonthOverlapEnabled}
+                  enabled={listCalendarOverlapEnabled}
                   taskListPanelRef={taskListPanelRef}
                 >
                   <CalendarViewsPanel
@@ -4370,7 +4368,7 @@ export function TodoApp({
             </div>
             {showListCalendarPanel ? (
               <ListCalendarOverlapShell
-                enabled={listCalendarMonthOverlapEnabled}
+                enabled={listCalendarOverlapEnabled}
                 taskListPanelRef={taskListPanelRef}
               >
                 <CalendarViewsPanel

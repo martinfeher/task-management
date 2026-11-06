@@ -8,9 +8,11 @@ import {
 
 export const PANEL_TEXT_COLORS_SETTING_KEY = "panel.textColors";
 
-export async function getPanelTextColorsSettings(): Promise<PanelTextColorsSettings> {
+export async function getPanelTextColorsSettings(
+  userId: string,
+): Promise<PanelTextColorsSettings> {
   const setting = await prisma.appSetting.findUnique({
-    where: { key: PANEL_TEXT_COLORS_SETTING_KEY },
+    where: { userId_key: { userId, key: PANEL_TEXT_COLORS_SETTING_KEY } },
     select: { value: true },
   });
 
@@ -27,13 +29,15 @@ export async function getPanelTextColorsSettings(): Promise<PanelTextColorsSetti
 }
 
 export async function setPanelTextColorsSettings(
+  userId: string,
   settings: PanelTextColorsSettings,
 ) {
   const normalized = normalizePanelTextColorsSettings(settings);
 
   await prisma.appSetting.upsert({
-    where: { key: PANEL_TEXT_COLORS_SETTING_KEY },
+    where: { userId_key: { userId, key: PANEL_TEXT_COLORS_SETTING_KEY } },
     create: {
+      userId,
       key: PANEL_TEXT_COLORS_SETTING_KEY,
       value: JSON.stringify(normalized),
     },

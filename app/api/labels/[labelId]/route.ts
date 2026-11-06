@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { jsonWithCors, optionsWithCors } from "@/lib/api-cors";
 import { LABEL_CATEGORY } from "@/lib/task-tags";
 import { deleteLabel, renameLabel, updateLabelColor } from "@/app/actions/todo";
+import { requireUser, UnauthorizedError } from "@/lib/require-user";
 
 type RouteContext = {
   params: Promise<{ labelId: string }>;
@@ -24,8 +25,15 @@ export async function PATCH(request: Request, context: RouteContext) {
     return jsonWithCors({ error: "label or color is required" }, { status: 400 });
   }
 
+  let userId: string;
+  try {
+    ({ id: userId } = await requireUser());
+  } catch {
+    return jsonWithCors({ error: "Not signed in" }, { status: 401 });
+  }
+
   const existing = await prisma.tag.findFirst({
-    where: { id: labelId, category: LABEL_CATEGORY },
+    where: { id: labelId, category: LABEL_CATEGORY, userId },
     select: { id: true },
   });
 
@@ -51,7 +59,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     const existingLabel = await prisma.tag.findFirst({
-      where: { id: labelId, category: LABEL_CATEGORY },
+      where: { id: labelId, category: LABEL_CATEGORY, userId },
       select: { id: true, label: true, color: true },
     });
 
@@ -61,6 +69,9 @@ export async function PATCH(request: Request, context: RouteContext) {
       color: existingLabel!.color,
     });
   } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return jsonWithCors({ error: "Not signed in" }, { status: 401 });
+    }
     const message =
       error instanceof Error ? error.message : "Failed to rename label";
     return jsonWithCors({ error: message }, { status: 500 });
@@ -70,8 +81,15 @@ export async function PATCH(request: Request, context: RouteContext) {
 export async function DELETE(_request: Request, context: RouteContext) {
   const { labelId } = await context.params;
 
+  let userId: string;
+  try {
+    ({ id: userId } = await requireUser());
+  } catch {
+    return jsonWithCors({ error: "Not signed in" }, { status: 401 });
+  }
+
   const existing = await prisma.tag.findFirst({
-    where: { id: labelId, category: LABEL_CATEGORY },
+    where: { id: labelId, category: LABEL_CATEGORY, userId },
     select: { id: true },
   });
 
@@ -83,6 +101,9 @@ export async function DELETE(_request: Request, context: RouteContext) {
     await deleteLabel(labelId);
     return jsonWithCors({ id: labelId });
   } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return jsonWithCors({ error: "Not signed in" }, { status: 401 });
+    }
     const message =
       error instanceof Error ? error.message : "Failed to delete label";
     return jsonWithCors({ error: message }, { status: 500 });

@@ -1,17 +1,19 @@
 import { prisma } from "@/lib/prisma";
 import { jsonWithCors, optionsWithCors } from "@/lib/api-cors";
-import { seedIfEmpty } from "@/lib/todo-data";
 import { taskDetailsHasContent } from "@/lib/task-details-content";
+import { requireUser, UnauthorizedError } from "@/lib/require-user";
 
 export async function GET() {
   try {
-    await seedIfEmpty();
+    const { id: userId } = await requireUser();
 
     const lists = await prisma.todoList.findMany({
+      where: { userId },
       select: {
         id: true,
         name: true,
         tasks: {
+          where: { userId },
           orderBy: [{ position: "asc" }, { createdAt: "asc" }],
           select: {
             id: true,
@@ -46,6 +48,9 @@ export async function GET() {
 
     return jsonWithCors({ tasks });
   } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return jsonWithCors({ error: "Not signed in" }, { status: 401 });
+    }
     console.error("Failed to load search tasks:", error);
     return jsonWithCors({ error: "Failed to load search tasks" }, { status: 500 });
   }

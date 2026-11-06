@@ -5,11 +5,11 @@ import {
   type SidebarBackgroundSettings,
 } from "@/lib/sidebar-background-types";
 
-export const SIDEBAR_TEMPLATE_SETTING_ID = "default";
-
-export async function getSidebarBackgroundSettings(): Promise<SidebarBackgroundSettings> {
+export async function getSidebarBackgroundSettings(
+  userId: string,
+): Promise<SidebarBackgroundSettings> {
   const setting = await prisma.sidebarTemplateSetting.findUnique({
-    where: { id: SIDEBAR_TEMPLATE_SETTING_ID },
+    where: { userId },
     select: {
       backgroundId: true,
       baseColor: true,
@@ -24,14 +24,15 @@ export async function getSidebarBackgroundSettings(): Promise<SidebarBackgroundS
 }
 
 export async function setSidebarBackgroundSettings(
+  userId: string,
   settings: SidebarBackgroundSettings,
 ) {
   const normalized = normalizeSidebarBackgroundSettings(settings);
 
   await prisma.sidebarTemplateSetting.upsert({
-    where: { id: SIDEBAR_TEMPLATE_SETTING_ID },
+    where: { userId },
     create: {
-      id: SIDEBAR_TEMPLATE_SETTING_ID,
+      userId,
       backgroundId: normalized.backgroundId,
       baseColor: normalized.baseColor,
     },

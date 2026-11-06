@@ -4,6 +4,7 @@ import {
   deleteTodoList,
   renameTodoList,
 } from "@/app/actions/todo";
+import { requireUser, UnauthorizedError } from "@/lib/require-user";
 
 type RouteContext = {
   params: Promise<{ listId: string }>;
@@ -24,8 +25,15 @@ export async function PATCH(request: Request, context: RouteContext) {
     return jsonWithCors({ error: "name is required" }, { status: 400 });
   }
 
-  const existing = await prisma.todoList.findUnique({
-    where: { id: listId },
+  let userId: string;
+  try {
+    ({ id: userId } = await requireUser());
+  } catch {
+    return jsonWithCors({ error: "Not signed in" }, { status: 401 });
+  }
+
+  const existing = await prisma.todoList.findFirst({
+    where: { id: listId, userId },
     select: { id: true },
   });
 
@@ -37,6 +45,9 @@ export async function PATCH(request: Request, context: RouteContext) {
     const list = await renameTodoList(listId, name);
     return jsonWithCors({ id: list.id, name: list.name });
   } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return jsonWithCors({ error: "Not signed in" }, { status: 401 });
+    }
     const message =
       error instanceof Error ? error.message : "Failed to rename list";
     return jsonWithCors({ error: message }, { status: 500 });
@@ -46,8 +57,15 @@ export async function PATCH(request: Request, context: RouteContext) {
 export async function DELETE(_request: Request, context: RouteContext) {
   const { listId } = await context.params;
 
-  const existing = await prisma.todoList.findUnique({
-    where: { id: listId },
+  let userId: string;
+  try {
+    ({ id: userId } = await requireUser());
+  } catch {
+    return jsonWithCors({ error: "Not signed in" }, { status: 401 });
+  }
+
+  const existing = await prisma.todoList.findFirst({
+    where: { id: listId, userId },
     select: { id: true },
   });
 
@@ -59,6 +77,9 @@ export async function DELETE(_request: Request, context: RouteContext) {
     await deleteTodoList(listId);
     return jsonWithCors({ id: listId });
   } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return jsonWithCors({ error: "Not signed in" }, { status: 401 });
+    }
     const message =
       error instanceof Error ? error.message : "Failed to delete list";
     return jsonWithCors({ error: message }, { status: 500 });

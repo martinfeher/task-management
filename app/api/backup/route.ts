@@ -1,29 +1,38 @@
-import { API_CORS_HEADERS } from "@/lib/api-cors";
+import { resolveCorsHeaders } from "@/lib/api-cors";
 import {
   createBackupZipStream,
   getBackupDownloadFilename,
 } from "@/lib/app-backup";
+import { requireUser, UnauthorizedError } from "@/lib/require-user";
 
 export const runtime = "nodejs";
 
 export async function GET() {
+  const corsHeaders = await resolveCorsHeaders();
   try {
+    const { id: userId } = await requireUser();
     const filename = getBackupDownloadFilename();
-    const body = createBackupZipStream();
+    const body = createBackupZipStream(userId);
 
     return new Response(body, {
       headers: {
-        ...API_CORS_HEADERS,
+        ...corsHeaders,
         "Content-Type": "application/zip",
         "Content-Disposition": `attachment; filename="${filename}"`,
         "Cache-Control": "no-store",
       },
     });
   } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return Response.json(
+        { error: "Not signed in" },
+        { status: 401, headers: corsHeaders },
+      );
+    }
     console.error("Failed to create backup:", error);
     return Response.json(
       { error: "Failed to create backup" },
-      { status: 500, headers: API_CORS_HEADERS },
+      { status: 500, headers: corsHeaders },
     );
   }
 }
@@ -31,6 +40,6 @@ export async function GET() {
 export async function OPTIONS() {
   return new Response(null, {
     status: 204,
-    headers: API_CORS_HEADERS,
+    headers: await resolveCorsHeaders(),
   });
 }

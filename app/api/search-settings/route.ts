@@ -3,12 +3,17 @@ import {
   getLastSearchQuery,
   setLastSearchQuery,
 } from "@/lib/search-settings";
+import { requireUser, UnauthorizedError } from "@/lib/require-user";
 
 export async function GET() {
   try {
-    const query = await getLastSearchQuery();
+    const { id: userId } = await requireUser();
+    const query = await getLastSearchQuery(userId);
     return jsonWithCors({ query });
   } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return jsonWithCors({ error: "Not signed in" }, { status: 401 });
+    }
     console.error("Failed to load last search query:", error);
     return jsonWithCors(
       { error: "Failed to load last search query" },
@@ -37,9 +42,13 @@ export async function PUT(request: Request) {
   const { query } = body as { query: string };
 
   try {
-    await setLastSearchQuery(query);
+    const { id: userId } = await requireUser();
+    await setLastSearchQuery(userId, query);
     return jsonWithCors({ ok: true });
   } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return jsonWithCors({ error: "Not signed in" }, { status: 401 });
+    }
     console.error("Failed to save last search query:", error);
     return jsonWithCors(
       { error: "Failed to save last search query" },

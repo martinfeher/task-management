@@ -15,6 +15,7 @@ import {
 import { LABEL_CATEGORY, getPriorityFromTaskTags } from "@/lib/task-tags";
 import { normalizeDueTimeZone } from "@/lib/task-due-time";
 import type { TaskRecurrenceRule } from "@/lib/task-recurrence";
+import { requireUser, UnauthorizedError } from "@/lib/require-user";
 
 function parseTasksQuery(searchParams: URLSearchParams): TasksQuery | null {
   const view = searchParams.get("view");
@@ -57,32 +58,38 @@ const listTasksLogState = {
   countSinceLog: 0,
 };
 
-async function getListTasksApiData(listId: string) {
-  const cached = listTasksResponseCache.get(listId);
+async function getListTasksApiData(listId: string, userId: string) {
+  // Cache key MUST include userId: this cache is a security boundary, not
+  // just a performance optimization. getTasksApiData() checks list ownership
+  // internally, but a cache hit would otherwise skip that check entirely and
+  // could leak one user's task list to another user requesting the same id.
+  const cacheKey = `${userId}:${listId}`;
+
+  const cached = listTasksResponseCache.get(cacheKey);
   if (cached && Date.now() - cached.fetchedAt < LIST_TASKS_RESPONSE_CACHE_MS) {
     return cached.body;
   }
 
-  const inFlight = listTasksInFlight.get(listId);
+  const inFlight = listTasksInFlight.get(cacheKey);
   if (inFlight) {
     return inFlight;
   }
 
-  const promise = getTasksApiData({ view: "list", listId })
+  const promise = getTasksApiData({ view: "list", listId }, userId)
     .then((body) => {
-      listTasksResponseCache.set(listId, {
+      listTasksResponseCache.set(cacheKey, {
         body,
         fetchedAt: Date.now(),
       });
       return body;
     })
     .finally(() => {
-      if (listTasksInFlight.get(listId) === promise) {
-        listTasksInFlight.delete(listId);
+      if (listTasksInFlight.get(cacheKey) === promise) {
+        listTasksInFlight.delete(cacheKey);
       }
     });
 
-  listTasksInFlight.set(listId, promise);
+  listTasksInFlight.set(cacheKey, promise);
   return promise;
 }
 
@@ -125,12 +132,16 @@ export async function GET(request: Request) {
   }
 
   try {
+    const { id: userId } = await requireUser();
     const data =
       query.view === "list"
-        ? await getListTasksApiData(query.listId)
-        : await getTasksApiData(query);
+        ? await getListTasksApiData(query.listId, userId)
+        : await getTasksApiData(query, userId);
     return jsonWithCors(data);
   } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return jsonWithCors({ error: "Not signed in" }, { status: 401 });
+    }
     const message = error instanceof Error ? error.message : "Failed to load tasks";
     const status = message.endsWith("not found") ? 404 : 500;
     console.error("Failed to load tasks for mobile API:", error);
@@ -177,6 +188,13 @@ export async function POST(request: Request) {
     return jsonWithCors({ error: "name is required" }, { status: 400 });
   }
 
+  let userId: string;
+  try {
+    ({ id: userId } = await requireUser());
+  } catch {
+    return jsonWithCors({ error: "Not signed in" }, { status: 401 });
+  }
+
   if (parentId) {
     try {
       const subtask = await createSubtask(parentId, name);
@@ -205,8 +223,8 @@ export async function POST(request: Request) {
         },
         include: { tag: { select: { id: true, label: true } } },
       });
-      const list = await prisma.todoList.findUnique({
-        where: { id: subtask.listId },
+      const list = await prisma.todoList.findFirst({
+        where: { id: subtask.listId, userId },
         select: { id: true, name: true },
       });
       revalidatePath("/");
@@ -231,6 +249,9 @@ export async function POST(request: Request) {
         { status: 201 },
       );
     } catch (error) {
+      if (error instanceof UnauthorizedError) {
+        return jsonWithCors({ error: "Not signed in" }, { status: 401 });
+      }
       const message =
         error instanceof Error ? error.message : "Failed to create subtask";
       return jsonWithCors({ error: message }, { status: 400 });
@@ -241,8 +262,8 @@ export async function POST(request: Request) {
     return jsonWithCors({ error: "listId is required" }, { status: 400 });
   }
 
-  const list = await prisma.todoList.findUnique({
-    where: { id: listId },
+  const list = await prisma.todoList.findFirst({
+    where: { id: listId, userId },
     select: { id: true, name: true },
   });
 
@@ -293,8 +314,8 @@ export async function POST(request: Request) {
       },
     });
 
-    const taskRecord = await prisma.task.findUnique({
-      where: { id: task.id },
+    const taskRecord = await prisma.task.findFirst({
+      where: { id: task.id, userId },
       select: {
         id: true,
         name: true,
@@ -343,6 +364,9 @@ export async function POST(request: Request) {
       { status: 201 },
     );
   } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return jsonWithCors({ error: "Not signed in" }, { status: 401 });
+    }
     const message = error instanceof Error ? error.message : "Failed to create task";
     console.error("Failed to create task for mobile API:", error);
     return jsonWithCors({ error: message }, { status: 500 });

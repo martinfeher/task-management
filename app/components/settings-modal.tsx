@@ -1,11 +1,21 @@
 "use client";
 
 import { useEffect, useState, type CSSProperties } from "react";
-import { LuX } from "react-icons/lu";
+import { useRouter } from "next/navigation";
+import {
+  LuCalendarDays,
+  LuLogOut,
+  LuMail,
+  LuShieldCheck,
+  LuTriangleAlert,
+  LuX,
+} from "react-icons/lu";
+import { authClient, useSession } from "@/lib/auth-client";
 import { useImportantEnabled } from "@/lib/important-settings";
 import { useListPreviewEnabled } from "@/lib/list-preview-settings";
 import { useAddTaskNoteSwitchEnabled } from "@/lib/add-task-note-switch-settings";
 import { useSubtasksEnabled } from "@/lib/subtasks-settings";
+import { ConfirmModal } from "./confirm-modal";
 import {
   TASK_EDITOR_FONT_SIZE_MAX_PX,
   TASK_EDITOR_FONT_SIZE_MIN_PX,
@@ -16,15 +26,18 @@ import {
 } from "@/lib/task-editor-defaults-settings";
 import { useCalendarTaskDefaultColor } from "@/lib/calendar-task-default-color-settings";
 
-type SettingsSection = "general" | "tasks" | "labels" | "calendar";
+export type SettingsSection = "account" | "general" | "tasks" | "labels" | "calendar";
 
 type SettingsModalProps = {
   open: boolean;
   revealOrigin?: { x: number; y: number } | null;
+  /** Which sidebar opens when the modal opens (e.g. from profile menu). */
+  initialSection?: SettingsSection;
   onClose: () => void;
 };
 
 const SETTINGS_SECTIONS: { id: SettingsSection; label: string }[] = [
+  { id: "account", label: "Account" },
   { id: "general", label: "General" },
   { id: "tasks", label: "Tasks" },
   { id: "labels", label: "Labels" },
@@ -82,6 +95,186 @@ function SettingsToggle({
           }`}
         />
       </button>
+    </div>
+  );
+}
+
+function getAccountInitials(name: string | undefined, email: string | undefined) {
+  const source = name?.trim() || email?.trim() || "";
+  const parts = source.split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
+  return (parts[0]![0] + parts[parts.length - 1]![0]).toUpperCase();
+}
+
+function formatMemberSince(value: unknown) {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(String(value));
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
+function AccountSettingsContent() {
+  const router = useRouter();
+  const { data: session, isPending } = useSession();
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const user = session?.user;
+  const memberSince = formatMemberSince(
+    (user as { createdAt?: unknown } | undefined)?.createdAt,
+  );
+
+  async function handleSignOut() {
+    if (isSigningOut) return;
+    setIsSigningOut(true);
+    try {
+      await authClient.signOut();
+      router.push("/login");
+      router.refresh();
+    } finally {
+      setIsSigningOut(false);
+    }
+  }
+
+  async function handleDeleteAccount() {
+    if (isDeleting) return;
+    setIsDeleting(true);
+    setDeleteError(null);
+
+    try {
+      const response = await fetch("/api/account", { method: "DELETE" });
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        throw new Error(payload?.error ?? "Failed to delete account");
+      }
+
+      await authClient.signOut();
+      router.push("/login");
+      router.refresh();
+    } catch (error) {
+      setIsDeleteOpen(false);
+      setIsDeleting(false);
+      setDeleteError(
+        error instanceof Error ? error.message : "Failed to delete account",
+      );
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="space-y-1">
+        <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+          Account
+        </h3>
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          Manage your profile and session.
+        </p>
+      </div>
+
+      {isPending ? (
+        <div className="h-16 animate-pulse rounded-lg bg-zinc-100 dark:bg-zinc-800" />
+      ) : user ? (
+        <>
+          <div className="flex items-center gap-3 rounded-lg border border-zinc-200 p-3 dark:border-zinc-700">
+            {user.image ? (
+              <img
+                src={user.image}
+                alt=""
+                referrerPolicy="no-referrer"
+                className="size-11 shrink-0 rounded-full object-cover"
+              />
+            ) : (
+              <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-zinc-200 text-sm font-semibold text-zinc-700 dark:bg-zinc-700 dark:text-zinc-200">
+                {getAccountInitials(user.name, user.email)}
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[12px] font-semibold text-zinc-900 dark:text-zinc-50">
+                {user.name}
+              </p>
+              <p className="flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">
+                <LuMail className="size-3 shrink-0" aria-hidden="true" />
+                <span className="truncate">{user.email}</span>
+              </p>
+            </div>
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+              <LuShieldCheck className="size-3" aria-hidden="true" />
+              Google
+            </span>
+          </div>
+
+          {memberSince ? (
+            <p className="flex items-center gap-1.5 px-1 text-xs text-zinc-500 dark:text-zinc-400">
+              <LuCalendarDays className="size-3.5 shrink-0" aria-hidden="true" />
+              Member since {memberSince}
+            </p>
+          ) : null}
+
+          <div className="space-y-2 rounded-lg border border-zinc-200 p-3 dark:border-zinc-700">
+            <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+              Session
+            </p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              Sign out of Todolist on this device.
+            </p>
+            <button
+              type="button"
+              onClick={() => void handleSignOut()}
+              disabled={isSigningOut}
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-800 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+            >
+              <LuLogOut className="size-4 shrink-0" aria-hidden="true" />
+              {isSigningOut ? "Signing out…" : "Sign out"}
+            </button>
+          </div>
+
+          <div className="space-y-2 rounded-lg border border-red-200 bg-red-50/40 p-3 dark:border-red-900/50 dark:bg-red-950/10">
+            <p className="text-xs text-red-600/80 dark:text-red-300/70">
+              Permanently delete your account and all of your lists, tasks,
+              labels, and settings. This cannot be undone.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setDeleteError(null);
+                setIsDeleteOpen(true);
+              }}
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-800 transition-colors hover:bg-red-100 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200 dark:hover:bg-red-950/60"
+            >
+              Delete account
+            </button>
+            {deleteError ? (
+              <p className="text-xs text-red-600 dark:text-red-400">
+                {deleteError}
+              </p>
+            ) : null}
+          </div>
+        </>
+      ) : (
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          You&apos;re not signed in.
+        </p>
+      )}
+
+      <ConfirmModal
+        open={isDeleteOpen}
+        title="Delete account"
+        message="This permanently deletes your account and all of your lists, tasks, labels, and settings. This cannot be undone."
+        confirmLabel={isDeleting ? "Deleting…" : "Delete account"}
+        onConfirm={() => void handleDeleteAccount()}
+        onCancel={() => {
+          if (!isDeleting) setIsDeleteOpen(false);
+        }}
+      />
     </div>
   );
 }
@@ -308,6 +501,8 @@ function TasksSettingsContent() {
 
 function SettingsSectionContent({ section }: { section: SettingsSection }) {
   switch (section) {
+    case "account":
+      return <AccountSettingsContent />;
     case "general":
       return <GeneralSettingsContent />;
     case "tasks":
@@ -331,15 +526,16 @@ function SettingsSectionContent({ section }: { section: SettingsSection }) {
 export function SettingsModal({
   open,
   revealOrigin = null,
+  initialSection = "account",
   onClose,
 }: SettingsModalProps) {
   const [isMounted, setIsMounted] = useState(open);
   const [isEntered, setIsEntered] = useState(false);
-  const [activeSection, setActiveSection] = useState<SettingsSection>("general");
+  const [activeSection, setActiveSection] =
+    useState<SettingsSection>(initialSection);
 
   useEffect(() => {
     if (open) {
-      setActiveSection("general");
       setIsMounted(true);
       const frame = window.requestAnimationFrame(() => {
         window.requestAnimationFrame(() => {
@@ -419,20 +615,28 @@ export function SettingsModal({
               aria-label="Settings sections"
               className="flex w-[20%] shrink-0 flex-col gap-0.5 overflow-y-auto border-r border-zinc-200 px-2 py-3 dark:border-zinc-800"
             >
-              {SETTINGS_SECTIONS.map((section) => (
-                <button
-                  key={section.id}
-                  type="button"
-                  aria-current={
-                    activeSection === section.id ? "page" : undefined
-                  }
-                  onClick={() => setActiveSection(section.id)}
-                  className={getSettingsSectionNavClassName(
-                    activeSection === section.id,
-                  )}
-                >
-                  {section.label}
-                </button>
+              {SETTINGS_SECTIONS.map((section, index) => (
+                <div key={section.id} className="contents">
+                  {index === 1 ? (
+                    <div
+                      role="separator"
+                      aria-hidden="true"
+                      className="my-1.5 h-px shrink-0 bg-zinc-200 dark:bg-zinc-700"
+                    />
+                  ) : null}
+                  <button
+                    type="button"
+                    aria-current={
+                      activeSection === section.id ? "page" : undefined
+                    }
+                    onClick={() => setActiveSection(section.id)}
+                    className={getSettingsSectionNavClassName(
+                      activeSection === section.id,
+                    )}
+                  >
+                    {section.label}
+                  </button>
+                </div>
               ))}
             </nav>
 

@@ -5,6 +5,7 @@ import {
   extractReferencedImageFilenames,
 } from "@/lib/task-image-storage";
 import { getAllTaskVersionDetailsHtml } from "@/lib/task-versions";
+import { requireUser } from "@/lib/require-user";
 
 type RouteContext = {
   params: Promise<{ taskId: string; filename: string }>;
@@ -39,8 +40,15 @@ async function isTaskImageReferenced(taskId: string, filename: string) {
 export async function DELETE(_request: Request, context: RouteContext) {
   const { taskId, filename } = await context.params;
 
-  const task = await prisma.task.findUnique({
-    where: { id: taskId },
+  let userId: string;
+  try {
+    ({ id: userId } = await requireUser());
+  } catch {
+    return jsonWithCors({ error: "Not signed in" }, { status: 401 });
+  }
+
+  const task = await prisma.task.findFirst({
+    where: { id: taskId, userId },
     select: { id: true },
   });
 

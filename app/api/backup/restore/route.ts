@@ -1,5 +1,6 @@
 import { jsonWithCors, optionsWithCors } from "@/lib/api-cors";
 import { restoreAppBackupFromZipBuffer } from "@/lib/app-backup";
+import { requireUser, UnauthorizedError } from "@/lib/require-user";
 
 export const runtime = "nodejs";
 
@@ -16,6 +17,7 @@ function getMaxBackupBytes() {
 
 export async function POST(request: Request) {
   try {
+    const { id: userId } = await requireUser();
     const formData = await request.formData();
     const file = formData.get("file");
 
@@ -41,10 +43,13 @@ export async function POST(request: Request) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    await restoreAppBackupFromZipBuffer(buffer);
+    await restoreAppBackupFromZipBuffer(buffer, userId);
 
     return jsonWithCors({ ok: true });
   } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return jsonWithCors({ error: "Not signed in" }, { status: 401 });
+    }
     console.error("Failed to restore backup:", error);
     const message =
       error instanceof Error ? error.message : "Failed to restore backup";

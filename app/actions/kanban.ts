@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { requireUser } from "@/lib/require-user";
 
 export type KanbanColumnRecord = {
   id: string;
@@ -12,7 +13,21 @@ export type KanbanColumnRecord = {
 
 const NOT_ASSIGNED_COLUMN_NAME = "Not assigned";
 
+/** Throws if `listId` doesn't exist or doesn't belong to `userId`. */
+async function requireOwnedList(listId: string, userId: string) {
+  const list = await prisma.todoList.findFirst({
+    where: { id: listId, userId },
+    select: { id: true },
+  });
+  if (!list) {
+    throw new Error("List not found");
+  }
+}
+
 export async function initializeKanbanBoard(listId: string) {
+  const { id: userId } = await requireUser();
+  await requireOwnedList(listId, userId);
+
   const existingColumns = await prisma.kanbanColumn.findMany({
     where: { listId },
     orderBy: [{ position: "asc" }, { createdAt: "asc" }],
@@ -35,6 +50,7 @@ export async function initializeKanbanBoard(listId: string) {
   await prisma.task.updateMany({
     where: {
       listId,
+      userId,
       deletedAt: null,
       parentId: null,
       kanbanColumnId: null,
@@ -53,6 +69,9 @@ export async function renameKanbanColumn(
   columnId: string,
   name: string,
 ) {
+  const { id: userId } = await requireUser();
+  await requireOwnedList(listId, userId);
+
   const trimmedName = name.trim();
   if (!trimmedName) {
     throw new Error("Column name is required");
@@ -76,6 +95,9 @@ export async function renameKanbanColumn(
 }
 
 export async function createKanbanColumn(listId: string, name: string) {
+  const { id: userId } = await requireUser();
+  await requireOwnedList(listId, userId);
+
   const trimmedName = name.trim();
   if (!trimmedName) {
     throw new Error("Column name is required");
@@ -103,6 +125,9 @@ export async function createKanbanTask(
   columnId: string,
   name: string,
 ) {
+  const { id: userId } = await requireUser();
+  await requireOwnedList(listId, userId);
+
   const trimmedName = name.trim();
   if (!trimmedName) {
     throw new Error("Task name is required");
@@ -135,6 +160,7 @@ export async function createKanbanTask(
         name: trimmedName,
         position: (aggregate._max.position ?? -1) + 1,
         important: false,
+        userId,
       },
     });
   });
@@ -144,6 +170,9 @@ export async function createKanbanTask(
 }
 
 export async function getKanbanColumnsForList(listId: string) {
+  const { id: userId } = await requireUser();
+  await requireOwnedList(listId, userId);
+
   return prisma.kanbanColumn.findMany({
     where: { listId },
     orderBy: [{ position: "asc" }, { createdAt: "asc" }],
@@ -188,8 +217,11 @@ export async function moveKanbanTask(
   targetColumnId: string,
   insertIndex: number,
 ) {
+  const { id: userId } = await requireUser();
+  await requireOwnedList(listId, userId);
+
   const task = await prisma.task.findFirst({
-    where: { id: taskId, listId, deletedAt: null, parentId: null },
+    where: { id: taskId, listId, userId, deletedAt: null, parentId: null },
     select: { id: true, kanbanColumnId: true },
   });
 
@@ -246,6 +278,9 @@ export async function moveKanbanTask(
 }
 
 export async function deleteKanbanColumn(listId: string, columnId: string) {
+  const { id: userId } = await requireUser();
+  await requireOwnedList(listId, userId);
+
   const column = await prisma.kanbanColumn.findFirst({
     where: { id: columnId, listId },
     select: { id: true, name: true },

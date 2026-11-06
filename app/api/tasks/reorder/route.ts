@@ -6,6 +6,7 @@ import {
 } from "@/app/components/task-reorder";
 import { jsonWithCors, optionsWithCors } from "@/lib/api-cors";
 import { prisma } from "@/lib/prisma";
+import { requireUser } from "@/lib/require-user";
 
 type ReorderBody = {
   listId?: string;
@@ -42,8 +43,15 @@ export async function PUT(request: Request) {
     return jsonWithCors({ error: "taskIds is required" }, { status: 400 });
   }
 
-  const list = await prisma.todoList.findUnique({
-    where: { id: listId },
+  let userId: string;
+  try {
+    ({ id: userId } = await requireUser());
+  } catch {
+    return jsonWithCors({ error: "Not signed in" }, { status: 401 });
+  }
+
+  const list = await prisma.todoList.findFirst({
+    where: { id: listId, userId },
     select: { id: true },
   });
 
@@ -53,7 +61,7 @@ export async function PUT(request: Request) {
 
   try {
     const tasks = await prisma.task.findMany({
-      where: { listId, deletedAt: null },
+      where: { listId, userId, deletedAt: null },
       select: {
         id: true,
         completed: true,

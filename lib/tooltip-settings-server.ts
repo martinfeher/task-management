@@ -5,11 +5,11 @@ import {
   type TooltipSettings,
 } from "@/lib/tooltip-settings-types";
 
-export const TOOLTIP_TEMPLATE_SETTING_ID = "default";
-
-export async function getTooltipSettings(): Promise<TooltipSettings> {
+export async function getTooltipSettings(
+  userId: string,
+): Promise<TooltipSettings> {
   const setting = await prisma.tooltipTemplateSetting.findUnique({
-    where: { id: TOOLTIP_TEMPLATE_SETTING_ID },
+    where: { userId },
     select: {
       backgroundColor: true,
       textColor: true,
@@ -24,13 +24,16 @@ export async function getTooltipSettings(): Promise<TooltipSettings> {
   return normalizeTooltipSettings(setting);
 }
 
-export async function setTooltipSettings(settings: TooltipSettings) {
+export async function setTooltipSettings(
+  userId: string,
+  settings: TooltipSettings,
+) {
   const normalized = normalizeTooltipSettings(settings);
 
   await prisma.tooltipTemplateSetting.upsert({
-    where: { id: TOOLTIP_TEMPLATE_SETTING_ID },
+    where: { userId },
     create: {
-      id: TOOLTIP_TEMPLATE_SETTING_ID,
+      userId,
       backgroundColor: normalized.backgroundColor,
       textColor: normalized.textColor,
       cornerRadiusPx: normalized.cornerRadiusPx,

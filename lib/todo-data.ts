@@ -8,72 +8,78 @@ import {
 } from "@/lib/task-tags";
 import { normalizeDueTimeZone } from "@/lib/task-due-time";
 
-async function ensurePriorityTags() {
-  await Promise.all(
-    PRIORITY_TAGS.map((tag) =>
-      prisma.tag.upsert({
-        where: { slug: tag.slug },
-        create: {
-          id: `tag-${tag.slug}`,
-          slug: tag.slug,
-          label: tag.label,
-          category: PRIORITY_TAG_CATEGORY,
-          level: tag.level,
-        },
-        update: {
-          label: tag.label,
-          level: tag.level,
-        },
-      }),
-    ),
-  );
-}
+/**
+ * Creates this user's priority tags (high/medium/low, etc.) if they don't
+ * already have them. Runs per-user (not globally) since `Tag.slug` is no
+ * longer unique across users — each user gets their own set of rows.
+ */
+async function ensurePriorityTags(userId: string) {
+  await prisma.$transaction(async (tx) => {
+    for (const tag of PRIORITY_TAGS) {
+      const existing = await tx.tag.findFirst({
+        where: { userId, slug: tag.slug, category: PRIORITY_TAG_CATEGORY },
+        select: { id: true },
+      });
 
-export async function seedIfEmpty() {
-  const count = await prisma.todoList.count();
-  if (count > 0) return;
-
-  await prisma.todoList.createMany({
-    data: [
-      { id: "1", name: "Work" },
-      { id: "2", name: "Personal" },
-      { id: "3", name: "Shopping" },
-    ],
-  });
-
-  await prisma.task.createMany({
-    data: [
-      {
-        id: "t1",
-        name: "Review pull request",
-        completed: false,
-        details: "",
-        position: 0,
-        listId: "1",
-      },
-      {
-        id: "t2",
-        name: "Send weekly update",
-        completed: true,
-        details: "",
-        position: 1,
-        listId: "1",
-      },
-      {
-        id: "t3",
-        name: "Buy groceries",
-        completed: false,
-        details: "",
-        position: 0,
-        listId: "2",
-      },
-    ],
+      if (existing) {
+        await tx.tag.update({
+          where: { id: existing.id },
+          data: { label: tag.label, level: tag.level },
+        });
+      } else {
+        await tx.tag.create({
+          data: {
+            slug: tag.slug,
+            label: tag.label,
+            category: PRIORITY_TAG_CATEGORY,
+            level: tag.level,
+            userId,
+          },
+        });
+      }
+    }
   });
 }
 
-export async function getTodoData() {
-  await seedIfEmpty();
-  await ensurePriorityTags();
+/**
+ * Creates a starter list and a couple of sample tasks for a brand-new user.
+ * Runs once per user (when they have zero lists), not globally.
+ */
+async function seedDefaultListsForUser(userId: string) {
+  const existingCount = await prisma.todoList.count({ where: { userId } });
+  if (existingCount > 0) return;
+
+  const list = await prisma.todoList.create({
+    data: {
+      name: "My tasks",
+      userId,
+      tasks: {
+        create: [
+          {
+            name: "Welcome to your new list!",
+            completed: false,
+            details: "",
+            position: 0,
+            userId,
+          },
+          {
+            name: "Click a task to add details, a due date, or a label",
+            completed: false,
+            details: "",
+            position: 1,
+            userId,
+          },
+        ],
+      },
+    },
+  });
+
+  return list;
+}
+
+export async function getTodoData(userId: string) {
+  await seedDefaultListsForUser(userId);
+  await ensurePriorityTags(userId);
 
   const detailFlags = await prisma.$queryRaw<Array<{ id: string; hasDetails: number }>>`
     SELECT
@@ -84,6 +90,7 @@ export async function getTodoData() {
         ELSE 1
       END AS "hasDetails"
     FROM "Task"
+    WHERE "userId" = ${userId}
   `;
   const hasDetailsByTaskId = Object.fromEntries(
     detailFlags.map((row) => [row.id, Boolean(row.hasDetails)]),
@@ -91,43 +98,45 @@ export async function getTodoData() {
 
   const [lists, folders] = await Promise.all([
     prisma.todoList.findMany({
-    include: {
-      kanbanColumns: {
-        orderBy: [{ position: "asc" }, { createdAt: "asc" }],
-        select: {
-          id: true,
-          listId: true,
-          name: true,
-          position: true,
+      where: { userId },
+      include: {
+        kanbanColumns: {
+          orderBy: [{ position: "asc" }, { createdAt: "asc" }],
+          select: {
+            id: true,
+            listId: true,
+            name: true,
+            position: true,
+          },
         },
-      },
-      tasks: {
-        where: { deletedAt: null },
-        orderBy: [{ position: "asc" }, { createdAt: "asc" }],
-        select: {
-          id: true,
-          name: true,
-          completed: true,
-          dueDate: true,
-          dueTimeMinutes: true,
-          dueDurationMinutes: true,
-          dueTimeZone: true,
-          calendarColor: true,
-          recurrenceRule: true,
-          pinned: true,
-          important: true,
-          isNote: true,
-          parentId: true,
-          kanbanColumnId: true,
-          tags: {
-            include: { tag: true },
+        tasks: {
+          where: { deletedAt: null, userId },
+          orderBy: [{ position: "asc" }, { createdAt: "asc" }],
+          select: {
+            id: true,
+            name: true,
+            completed: true,
+            dueDate: true,
+            dueTimeMinutes: true,
+            dueDurationMinutes: true,
+            dueTimeZone: true,
+            calendarColor: true,
+            recurrenceRule: true,
+            pinned: true,
+            important: true,
+            isNote: true,
+            parentId: true,
+            kanbanColumnId: true,
+            tags: {
+              include: { tag: true },
+            },
           },
         },
       },
-    },
-    orderBy: [{ position: "asc" }, { createdAt: "asc" }],
-  }),
+      orderBy: [{ position: "asc" }, { createdAt: "asc" }],
+    }),
     prisma.listFolder.findMany({
+      where: { userId },
       orderBy: [{ position: "asc" }, { createdAt: "asc" }],
       select: { id: true, name: true, position: true },
     }),
@@ -149,7 +158,7 @@ export async function getTodoData() {
       lists.map((list) => [list.id, list.kanbanColumns]),
     ),
     labels: await prisma.tag.findMany({
-      where: { category: LABEL_CATEGORY },
+      where: { category: LABEL_CATEGORY, userId },
       orderBy: [{ position: "asc" }, { createdAt: "asc" }],
       select: { id: true, label: true, color: true },
     }),
@@ -174,25 +183,25 @@ export async function getTodoData() {
             parentId,
             kanbanColumnId,
           }) => ({
-          id,
-          name,
-          completed,
-          details: "",
-          hasDetails: hasDetailsByTaskId[id] ?? false,
-          dueDate: dueDate ? dueDate.toISOString() : null,
-          dueTimeMinutes,
-          dueDurationMinutes,
-          dueTimeZone: normalizeDueTimeZone(dueTimeZone),
-          calendarColor: calendarColor ?? null,
-          recurrenceRule: recurrenceRule ?? null,
-          priority: getPriorityFromTaskTags(tags),
-          labels: getLabelsFromTaskTags(tags),
-          pinned: Boolean(pinned),
-          important: Boolean(important),
-          isNote: Boolean(isNote),
-          parentId: parentId ?? null,
-          kanbanColumnId: kanbanColumnId ?? null,
-        }),
+            id,
+            name,
+            completed,
+            details: "",
+            hasDetails: hasDetailsByTaskId[id] ?? false,
+            dueDate: dueDate ? dueDate.toISOString() : null,
+            dueTimeMinutes,
+            dueDurationMinutes,
+            dueTimeZone: normalizeDueTimeZone(dueTimeZone),
+            calendarColor: calendarColor ?? null,
+            recurrenceRule: recurrenceRule ?? null,
+            priority: getPriorityFromTaskTags(tags),
+            labels: getLabelsFromTaskTags(tags),
+            pinned: Boolean(pinned),
+            important: Boolean(important),
+            isNote: Boolean(isNote),
+            parentId: parentId ?? null,
+            kanbanColumnId: kanbanColumnId ?? null,
+          }),
         ),
       ]),
     ),

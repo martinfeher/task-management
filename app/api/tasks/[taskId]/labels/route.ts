@@ -2,6 +2,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { LABEL_CATEGORY } from "@/lib/task-tags";
 import { jsonWithCors, optionsWithCors } from "@/lib/api-cors";
+import { requireUser } from "@/lib/require-user";
 
 type RouteContext = {
   params: Promise<{ taskId: string }>;
@@ -24,13 +25,32 @@ export async function PATCH(request: Request, context: RouteContext) {
     );
   }
 
-  const task = await prisma.task.findUnique({
-    where: { id: taskId },
+  let userId: string;
+  try {
+    ({ id: userId } = await requireUser());
+  } catch {
+    return jsonWithCors({ error: "Not signed in" }, { status: 401 });
+  }
+
+  const task = await prisma.task.findFirst({
+    where: { id: taskId, userId },
     select: { id: true },
   });
 
   if (!task) {
     return jsonWithCors({ error: "Task not found" }, { status: 404 });
+  }
+
+  // Make sure the label being (dis)assigned also belongs to this user —
+  // without this check, a user could attach another user's label id to
+  // their own task (or discover its existence via create/delete side effects).
+  const label = await prisma.tag.findFirst({
+    where: { id: body.labelId, userId, category: LABEL_CATEGORY },
+    select: { id: true },
+  });
+
+  if (!label) {
+    return jsonWithCors({ error: "Label not found" }, { status: 404 });
   }
 
   if (body.assigned) {
@@ -60,7 +80,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   const labels = await prisma.taskTag.findMany({
     where: {
       taskId,
-      tag: { category: LABEL_CATEGORY },
+      tag: { category: LABEL_CATEGORY, userId },
     },
     include: {
       tag: {

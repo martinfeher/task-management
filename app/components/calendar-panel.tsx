@@ -259,7 +259,7 @@ function CalendarViewTabs({
             : "Dock calendar over task list"
         }
         onClick={listCalendarOverlap.toggleLayout}
-        className="flex size-7 shrink-0 items-center justify-center rounded-full text-zinc-600 transition-colors bg-slate-100 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800 cursor-pointer"
+        className="mb-2 flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-slate-100 text-zinc-600 transition-colors hover:bg-zinc-100 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
       >
         {listCalendarOverlap.isOverlapLayout ? (
           <BiChevronRight className="size-5" aria-hidden="true" />
@@ -271,10 +271,9 @@ function CalendarViewTabs({
 
   return (
     <div className={`relative z-40 ${activeView === "month" ? "mb-[26px]" : "mb-1"} grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-4 pl-2 pt-0`}>
-      {periodLabel || listCalendarLayoutToggle ? (
+      {periodLabel ? (
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-2">
-            {listCalendarLayoutToggle}
             {periodLabel ? (
               <>
                 <h2 className="truncate text-lg text-zinc-700 dark:text-zinc-50 text-[23px]">
@@ -413,6 +412,7 @@ function CalendarViewTabs({
             <TbLayoutSidebarRightExpandFilled className="size-5 text-zinc-350 group-text-zinc-450 " />
           )}
         </button>
+        {listCalendarLayoutToggle}
         {headerTrailingAction}
       </div>
     </div>

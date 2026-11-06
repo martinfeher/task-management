@@ -5,11 +5,11 @@ import {
   type TaskListBackgroundSettings,
 } from "@/lib/task-list-background-types";
 
-export const TASK_LIST_TEMPLATE_SETTING_ID = "default";
-
-export async function getTaskListBackgroundSettings(): Promise<TaskListBackgroundSettings> {
+export async function getTaskListBackgroundSettings(
+  userId: string,
+): Promise<TaskListBackgroundSettings> {
   const setting = await prisma.taskListTemplateSetting.findUnique({
-    where: { id: TASK_LIST_TEMPLATE_SETTING_ID },
+    where: { userId },
     select: {
       backgroundId: true,
       baseColor: true,
@@ -24,14 +24,15 @@ export async function getTaskListBackgroundSettings(): Promise<TaskListBackgroun
 }
 
 export async function setTaskListBackgroundSettings(
+  userId: string,
   settings: TaskListBackgroundSettings,
 ) {
   const normalized = normalizeTaskListBackgroundSettings(settings);
 
   await prisma.taskListTemplateSetting.upsert({
-    where: { id: TASK_LIST_TEMPLATE_SETTING_ID },
+    where: { userId },
     create: {
-      id: TASK_LIST_TEMPLATE_SETTING_ID,
+      userId,
       backgroundId: normalized.backgroundId,
       baseColor: normalized.baseColor,
     },

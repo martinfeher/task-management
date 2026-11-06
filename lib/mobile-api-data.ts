@@ -152,8 +152,11 @@ export type TasksQuery =
   | { view: "label"; labelId: string }
   | { view: "calendar" };
 
-export async function getTasksApiData(query: TasksQuery): Promise<TasksApiResponse> {
-  const { lists, labels, tasksByList } = await getTodoData();
+export async function getTasksApiData(
+  query: TasksQuery,
+  userId: string,
+): Promise<TasksApiResponse> {
+  const { lists, labels, tasksByList } = await getTodoData(userId);
 
   if (query.view === "list") {
     const list = lists.find((item) => item.id === query.listId);
@@ -244,8 +247,10 @@ export async function getTasksApiData(query: TasksQuery): Promise<TasksApiRespon
   };
 }
 
-export async function getSidebarApiData(): Promise<SidebarApiResponse> {
-  const { lists, folders, labels, tasksByList } = await getTodoData();
+export async function getSidebarApiData(
+  userId: string,
+): Promise<SidebarApiResponse> {
+  const { lists, folders, labels, tasksByList } = await getTodoData(userId);
 
   let todayCount = 0;
   let importantCount = 0;

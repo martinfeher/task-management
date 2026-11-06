@@ -3152,27 +3152,11 @@ export function TaskListPanel({
                     Add
                   </button>
                 </form>
-                {showEntityFilter ? (
-                  <div className="mt-[2px] flex">
-                    <TaskListEntityFilter
-                      value={entityScope}
-                      onChange={setEntityScope}
-                    />
-                  </div>
-                ) : null}
                 {newTaskParsePreview ? (
                   <p className="mt-1 px-1 text-[11px] ptxt-400 dark:ptxt-500">
                     {newTaskParsePreview}
                   </p>
                 ) : null}
-              </div>
-            ) : null}
-            {showEntityFilter && !showAddTask ? (
-              <div className="flex justify-end">
-                <TaskListEntityFilter
-                  value={entityScope}
-                  onChange={setEntityScope}
-                />
               </div>
             ) : null}
           </div>
@@ -3181,7 +3165,9 @@ export function TaskListPanel({
             ref={taskListScrollRef}
             className={
               panelWidth != null || title
-                ? "list-panel-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden"
+                ? `list-panel-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden${
+                    showEntityFilter ? " pb-14" : ""
+                  }`
                 : undefined
             }
           >
@@ -3320,6 +3306,15 @@ export function TaskListPanel({
           </p>
         </div>
       )}
+
+      {showEntityFilter ? (
+        <div className="pointer-events-none absolute bottom-3 right-2 z-30">
+          <TaskListEntityFilter
+            value={entityScope}
+            onChange={setEntityScope}
+          />
+        </div>
+      ) : null}
 
       {pointerContextMenuPortal}
     </section>

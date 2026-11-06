@@ -12,13 +12,103 @@ datasource db {
   provider = "postgresql"
 }
 
+// ---------------------------------------------------------------------------
+// Auth (Better Auth). Schema generated via `npx @better-auth/cli generate`
+// and kept here so it migrates alongside the app's own tables.
+// ---------------------------------------------------------------------------
+
+model User {
+  id            String    @id
+  name          String
+  email         String
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+
+  listFolders              ListFolder[]
+  todoLists                TodoList[]
+  tasks                    Task[]
+  tags                     Tag[]
+  templateStyles           TemplateStyle[]
+  appSettings              AppSetting[]
+  sidebarTemplateSettings  SidebarTemplateSetting[]
+  taskListTemplateSettings TaskListTemplateSetting[]
+  calendarTemplateSettings CalendarTaskTemplateSetting[]
+  tooltipTemplateSettings  TooltipTemplateSetting[]
+
+  @@unique([email])
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+// ---------------------------------------------------------------------------
+// App data. `userId` is nullable for now (expand phase of the multi-user
+// migration) so existing rows keep working until the legacy-data claim
+// script (`scripts/claim-legacy-data.ts`) assigns them to an owner and a
+// follow-up migration makes the column required.
+// ---------------------------------------------------------------------------
+
 model ListFolder {
   id        String     @id @default(cuid())
   name      String
   position  Int        @default(0)
   lists     TodoList[]
+  userId    String?
+  user      User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
+
+  @@index([userId])
 }
 
 model TodoList {
@@ -31,8 +121,12 @@ model TodoList {
   folder        ListFolder?    @relation(fields: [folderId], references: [id], onDelete: SetNull)
   tasks         Task[]
   kanbanColumns KanbanColumn[]
+  userId        String?
+  user          User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
+
+  @@index([userId, position])
 }
 
 model KanbanColumn {
@@ -49,36 +143,43 @@ model KanbanColumn {
 }
 
 model Task {
-  id        String    @id @default(cuid())
-  name      String
-  completed Boolean   @default(false)
-  details   String    @default("")
-  detailsDoc    Json?
-  detailsText   String    @default("")
-  schemaVersion Int       @default(1)
+  id                 String        @id @default(cuid())
+  name               String
+  completed          Boolean       @default(false)
+  details            String        @default("")
+  detailsDoc         Json?
+  detailsText        String        @default("")
+  schemaVersion      Int           @default(1)
   dueDate            DateTime?
   dueTimeMinutes     Int?
   dueDurationMinutes Int?
-  dueTimeZone        String    @default("floating")
+  dueTimeZone        String        @default("floating")
   calendarColor      String?
   recurrenceRule     String?
   recurrenceAnchor   DateTime?
-  position           Int       @default(0)
-  pinned             Boolean   @default(false)
-  important          Boolean   @default(false)
-  isNote             Boolean   @default(false)
+  position           Int           @default(0)
+  pinned             Boolean       @default(false)
+  important          Boolean       @default(false)
+  isNote             Boolean       @default(false)
   parentId           String?
-  parent             Task?     @relation("TaskSubtasks", fields: [parentId], references: [id], onDelete: SetNull)
-  subtasks           Task[]    @relation("TaskSubtasks")
-  listId         String
-  kanbanColumnId String?
-  list           TodoList      @relation(fields: [listId], references: [id], onDelete: Cascade)
-  kanbanColumn   KanbanColumn? @relation(fields: [kanbanColumnId], references: [id], onDelete: SetNull)
-  tags      TaskTag[]
-  versions  TaskVersion[]
-  deletedAt DateTime?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  parent             Task?         @relation("TaskSubtasks", fields: [parentId], references: [id], onDelete: SetNull)
+  subtasks           Task[]        @relation("TaskSubtasks")
+  listId             String
+  kanbanColumnId     String?
+  list               TodoList      @relation(fields: [listId], references: [id], onDelete: Cascade)
+  kanbanColumn       KanbanColumn? @relation(fields: [kanbanColumnId], references: [id], onDelete: SetNull)
+  tags               TaskTag[]
+  versions           TaskVersion[]
+  deletedAt          DateTime?
+  userId             String?
+  user               User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  @@index([userId, listId, position])
+  @@index([userId, dueDate])
+  @@index([userId, deletedAt])
+  @@index([parentId])
 }
 
 model TaskVersion {
@@ -97,14 +198,22 @@ model TaskVersion {
 
 model Tag {
   id        String    @id @default(cuid())
-  slug      String    @unique
+  slug      String
   label     String
   color     String?
   position  Int       @default(0)
   category  String    @default("priority")
   level     Int?
   tasks     TaskTag[]
+  userId    String?
+  user      User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime  @default(now())
+
+  // NOTE: duplicate (userId, slug) is still possible for legacy rows where
+  // userId is null until the claim script runs; enforced for real once the
+  // contract migration makes userId required.
+  @@index([userId, slug])
+  @@index([userId, category])
 }
 
 model TaskTag {
@@ -117,41 +226,57 @@ model TaskTag {
   @@id([taskId, tagId])
 }
 
+// `userId` null = legacy/global row from before multi-user support, claimed
+// by scripts/claim-legacy-data.ts. Once claimed, each user has their own row
+// per key (enforced by the composite unique index).
 model AppSetting {
-  key       String   @id
+  id        String   @id @default(cuid())
+  key       String
   value     String   @default("")
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   updatedAt DateTime @updatedAt
+
+  @@unique([userId, key])
 }
 
 model SidebarTemplateSetting {
-  id           String   @id @default("default")
+  id           String   @id @default(cuid())
   backgroundId String   @default("solid-blue")
   baseColor    String   @default("#f1f5ff")
+  userId       String?  @unique
+  user         User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   updatedAt    DateTime @updatedAt
 }
 
 model TaskListTemplateSetting {
-  id           String   @id @default("default")
+  id           String   @id @default(cuid())
   backgroundId String   @default("white")
   baseColor    String   @default("#f1f5ff")
+  userId       String?  @unique
+  user         User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   updatedAt    DateTime @updatedAt
 }
 
 model CalendarTaskTemplateSetting {
-  id           String   @id @default("default")
+  id           String   @id @default(cuid())
   backgroundId String   @default("solid")
   baseColor    String   @default("#bbd8fe")
   endColor     String   @default("#ffffff")
   titleColor   String   @default("#1f1f1f")
   timeColor    String   @default("#8f8f8f")
+  userId       String?  @unique
+  user         User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   updatedAt    DateTime @updatedAt
 }
 
 model TooltipTemplateSetting {
-  id              String   @id @default("default")
+  id              String   @id @default(cuid())
   backgroundColor String   @default("#3d3e3f")
   textColor       String   @default("#ffffff")
   cornerRadiusPx  Int      @default(6)
+  userId          String?  @unique
+  user            User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   updatedAt       DateTime @updatedAt
 }
 
@@ -166,6 +291,10 @@ model TemplateStyle {
   calendarEndColor     String   @default("#ffffff")
   calendarTitleColor   String   @default("#1f1f1f")
   calendarTimeColor    String   @default("#8f8f8f")
+  userId               String?
+  user                 User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
+
+  @@index([userId])
 }

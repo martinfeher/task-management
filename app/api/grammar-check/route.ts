@@ -1,4 +1,5 @@
 import { jsonWithCors, optionsWithCors } from "@/lib/api-cors";
+import { requireUser, UnauthorizedError } from "@/lib/require-user";
 
 type GrammarCheckRequest = {
   text?: string;
@@ -17,6 +18,8 @@ type OpenAIChatResponse = {
 
 export async function POST(request: Request) {
   try {
+    await requireUser();
+
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
       return jsonWithCors(
@@ -74,6 +77,9 @@ export async function POST(request: Request) {
 
     return jsonWithCors({ correctedText });
   } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return jsonWithCors({ error: "Not signed in" }, { status: 401 });
+    }
     console.error("Failed to check grammar:", error);
     return jsonWithCors({ error: "Failed to check grammar" }, { status: 500 });
   }

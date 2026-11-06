@@ -5,11 +5,11 @@ import {
   type CalendarTaskBackgroundSettings,
 } from "@/lib/calendar-task-background-types";
 
-export const CALENDAR_TASK_TEMPLATE_SETTING_ID = "default";
-
-export async function getCalendarTaskBackgroundSettings(): Promise<CalendarTaskBackgroundSettings> {
+export async function getCalendarTaskBackgroundSettings(
+  userId: string,
+): Promise<CalendarTaskBackgroundSettings> {
   const setting = await prisma.calendarTaskTemplateSetting.findUnique({
-    where: { id: CALENDAR_TASK_TEMPLATE_SETTING_ID },
+    where: { userId },
     select: {
       backgroundId: true,
       baseColor: true,
@@ -27,14 +27,15 @@ export async function getCalendarTaskBackgroundSettings(): Promise<CalendarTaskB
 }
 
 export async function setCalendarTaskBackgroundSettings(
+  userId: string,
   settings: CalendarTaskBackgroundSettings,
 ) {
   const normalized = normalizeCalendarTaskBackgroundSettings(settings);
 
   await prisma.calendarTaskTemplateSetting.upsert({
-    where: { id: CALENDAR_TASK_TEMPLATE_SETTING_ID },
+    where: { userId },
     create: {
-      id: CALENDAR_TASK_TEMPLATE_SETTING_ID,
+      userId,
       backgroundId: normalized.backgroundId,
       baseColor: normalized.baseColor,
       endColor: normalized.endColor,

@@ -4,12 +4,17 @@ import {
   setSidebarBackgroundSettings,
 } from "@/lib/sidebar-background-settings";
 import { parseSidebarBackgroundSettings } from "@/lib/sidebar-background-types";
+import { requireUser, UnauthorizedError } from "@/lib/require-user";
 
 export async function GET() {
   try {
-    const settings = await getSidebarBackgroundSettings();
+    const { id: userId } = await requireUser();
+    const settings = await getSidebarBackgroundSettings(userId);
     return jsonWithCors(settings);
   } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return jsonWithCors({ error: "Not signed in" }, { status: 401 });
+    }
     console.error("Failed to load sidebar background settings:", error);
     return jsonWithCors(
       { error: "Failed to load sidebar background settings" },
@@ -36,9 +41,13 @@ export async function PUT(request: Request) {
   }
 
   try {
-    const settings = await setSidebarBackgroundSettings(parsed);
+    const { id: userId } = await requireUser();
+    const settings = await setSidebarBackgroundSettings(userId, parsed);
     return jsonWithCors({ ok: true, settings });
   } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return jsonWithCors({ error: "Not signed in" }, { status: 401 });
+    }
     console.error("Failed to save sidebar background settings:", error);
     return jsonWithCors(
       { error: "Failed to save sidebar background settings" },

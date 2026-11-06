@@ -4,12 +4,17 @@ import {
   setTooltipSettings,
 } from "@/lib/tooltip-settings-server";
 import { parseTooltipSettings } from "@/lib/tooltip-settings-types";
+import { requireUser, UnauthorizedError } from "@/lib/require-user";
 
 export async function GET() {
   try {
-    const settings = await getTooltipSettings();
+    const { id: userId } = await requireUser();
+    const settings = await getTooltipSettings(userId);
     return jsonWithCors(settings);
   } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return jsonWithCors({ error: "Not signed in" }, { status: 401 });
+    }
     console.error("Failed to load tooltip settings:", error);
     return jsonWithCors({ error: "Failed to load tooltip settings" }, { status: 500 });
   }
@@ -33,9 +38,13 @@ export async function PUT(request: Request) {
   }
 
   try {
-    const settings = await setTooltipSettings(parsed);
+    const { id: userId } = await requireUser();
+    const settings = await setTooltipSettings(userId, parsed);
     return jsonWithCors({ ok: true, settings });
   } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return jsonWithCors({ error: "Not signed in" }, { status: 401 });
+    }
     console.error("Failed to save tooltip settings:", error);
     return jsonWithCors({ error: "Failed to save tooltip settings" }, { status: 500 });
   }

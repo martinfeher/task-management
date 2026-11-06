@@ -16,6 +16,7 @@ import {
   updateTaskPriority,
   updateTaskRecurrence,
 } from "@/app/actions/todo";
+import { requireUser, UnauthorizedError } from "@/lib/require-user";
 
 type RouteContext = {
   params: Promise<{ taskId: string }>;
@@ -24,8 +25,15 @@ type RouteContext = {
 export async function GET(_request: Request, context: RouteContext) {
   const { taskId } = await context.params;
 
-  const task = await prisma.task.findUnique({
-    where: { id: taskId },
+  let userId: string;
+  try {
+    ({ id: userId } = await requireUser());
+  } catch {
+    return jsonWithCors({ error: "Not signed in" }, { status: 401 });
+  }
+
+  const task = await prisma.task.findFirst({
+    where: { id: taskId, userId },
     select: {
       id: true,
       name: true,
@@ -244,8 +252,15 @@ export async function PATCH(request: Request, context: RouteContext) {
     );
   }
 
-  const existing = await prisma.task.findUnique({
-    where: { id: taskId },
+  let userId: string;
+  try {
+    ({ id: userId } = await requireUser());
+  } catch {
+    return jsonWithCors({ error: "Not signed in" }, { status: 401 });
+  }
+
+  const existing = await prisma.task.findFirst({
+    where: { id: taskId, userId },
     select: { id: true, listId: true },
   });
 
@@ -257,8 +272,8 @@ export async function PATCH(request: Request, context: RouteContext) {
     if (body.listId !== undefined) {
       const targetListId = body.listId.trim();
       if (targetListId === existing.listId) {
-        const currentList = await prisma.todoList.findUnique({
-          where: { id: targetListId },
+        const currentList = await prisma.todoList.findFirst({
+          where: { id: targetListId, userId },
           select: { id: true, name: true },
         });
         return jsonWithCors({
@@ -268,8 +283,8 @@ export async function PATCH(request: Request, context: RouteContext) {
         });
       }
 
-      const targetList = await prisma.todoList.findUnique({
-        where: { id: targetListId },
+      const targetList = await prisma.todoList.findFirst({
+        where: { id: targetListId, userId },
         select: { id: true, name: true },
       });
 
@@ -324,8 +339,8 @@ export async function PATCH(request: Request, context: RouteContext) {
       body.dueTimeMinutes !== undefined ||
       body.dueDurationMinutes !== undefined
     ) {
-      const current = await prisma.task.findUnique({
-        where: { id: taskId },
+      const current = await prisma.task.findFirst({
+        where: { id: taskId, userId },
         select: {
           dueTimeMinutes: true,
           dueDurationMinutes: true,
@@ -413,6 +428,9 @@ export async function PATCH(request: Request, context: RouteContext) {
       ...(spawnedTask ? { spawnedTask } : {}),
     });
   } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return jsonWithCors({ error: "Not signed in" }, { status: 401 });
+    }
     const message =
       error instanceof Error ? error.message : "Failed to update task";
     console.error("Failed to update task for mobile API:", error);
@@ -423,8 +441,15 @@ export async function PATCH(request: Request, context: RouteContext) {
 export async function DELETE(_request: Request, context: RouteContext) {
   const { taskId } = await context.params;
 
-  const existing = await prisma.task.findUnique({
-    where: { id: taskId },
+  let userId: string;
+  try {
+    ({ id: userId } = await requireUser());
+  } catch {
+    return jsonWithCors({ error: "Not signed in" }, { status: 401 });
+  }
+
+  const existing = await prisma.task.findFirst({
+    where: { id: taskId, userId },
     select: { id: true },
   });
 
@@ -436,6 +461,9 @@ export async function DELETE(_request: Request, context: RouteContext) {
     await deleteTask(taskId);
     return jsonWithCors({ id: taskId });
   } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return jsonWithCors({ error: "Not signed in" }, { status: 401 });
+    }
     const message =
       error instanceof Error ? error.message : "Failed to delete task";
     console.error("Failed to delete task for mobile API:", error);

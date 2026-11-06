@@ -3,6 +3,7 @@ import {
   reorderSidebarTopLevel,
   reorderTodoLists,
 } from "@/app/actions/todo";
+import { UnauthorizedError } from "@/lib/require-user";
 
 type ReorderBody = {
   listIds?: string[];
@@ -51,6 +52,9 @@ export async function PUT(request: Request) {
       await reorderSidebarTopLevel(listPositions, folderPositions);
       return jsonWithCors({ ok: true });
     } catch (error) {
+      if (error instanceof UnauthorizedError) {
+        return jsonWithCors({ error: "Not signed in" }, { status: 401 });
+      }
       const message =
         error instanceof Error ? error.message : "Failed to reorder sidebar";
       return jsonWithCors({ error: message }, { status: 400 });
@@ -65,6 +69,9 @@ export async function PUT(request: Request) {
     await reorderTodoLists(body.listIds);
     return jsonWithCors({ ok: true });
   } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return jsonWithCors({ error: "Not signed in" }, { status: 401 });
+    }
     const message =
       error instanceof Error ? error.message : "Failed to reorder lists";
     return jsonWithCors({ error: message }, { status: 400 });

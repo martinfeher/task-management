@@ -1,5 +1,6 @@
 import { jsonWithCors, optionsWithCors } from "@/lib/api-cors";
 import { reorderLabels } from "@/app/actions/todo";
+import { UnauthorizedError } from "@/lib/require-user";
 
 export async function PUT(request: Request) {
   let body: { labelIds?: string[] };
@@ -17,6 +18,9 @@ export async function PUT(request: Request) {
     await reorderLabels(body.labelIds);
     return jsonWithCors({ ok: true });
   } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return jsonWithCors({ error: "Not signed in" }, { status: 401 });
+    }
     const message =
       error instanceof Error ? error.message : "Failed to reorder labels";
     return jsonWithCors({ error: message }, { status: 400 });

@@ -4,12 +4,17 @@ import {
   listTemplateStyles,
 } from "@/lib/template-style-settings";
 import { parseTemplateStyleInput } from "@/lib/template-style-types";
+import { requireUser, UnauthorizedError } from "@/lib/require-user";
 
 export async function GET() {
   try {
-    const data = await listTemplateStyles();
+    const { id: userId } = await requireUser();
+    const data = await listTemplateStyles(userId);
     return jsonWithCors(data);
   } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return jsonWithCors({ error: "Not signed in" }, { status: 401 });
+    }
     console.error("Failed to list template styles:", error);
     return jsonWithCors({ error: "Failed to list template styles" }, { status: 500 });
   }
@@ -30,9 +35,13 @@ export async function POST(request: Request) {
   }
 
   try {
-    const style = await createTemplateStyle(parsed);
+    const { id: userId } = await requireUser();
+    const style = await createTemplateStyle(parsed, userId);
     return jsonWithCors({ ok: true, style }, { status: 201 });
   } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return jsonWithCors({ error: "Not signed in" }, { status: 401 });
+    }
     console.error("Failed to create template style:", error);
     const message =
       error instanceof Error ? error.message : "Failed to create template style";

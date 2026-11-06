@@ -6,6 +6,7 @@ import {
   updateTemplateStyle,
 } from "@/lib/template-style-settings";
 import { parseTemplateStyleInput } from "@/lib/template-style-types";
+import { requireUser, UnauthorizedError } from "@/lib/require-user";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -15,13 +16,17 @@ export async function GET(_request: Request, context: RouteContext) {
   const { id } = await context.params;
 
   try {
-    const style = await getTemplateStyleById(id);
+    const { id: userId } = await requireUser();
+    const style = await getTemplateStyleById(id, userId);
     if (!style) {
       return jsonWithCors({ error: "Template style not found" }, { status: 404 });
     }
 
     return jsonWithCors(style);
   } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return jsonWithCors({ error: "Not signed in" }, { status: 401 });
+    }
     console.error("Failed to load template style:", error);
     return jsonWithCors({ error: "Failed to load template style" }, { status: 500 });
   }
@@ -43,9 +48,13 @@ export async function PUT(request: Request, context: RouteContext) {
   }
 
   try {
-    const style = await updateTemplateStyle(id, parsed);
+    const { id: userId } = await requireUser();
+    const style = await updateTemplateStyle(id, parsed, userId);
     return jsonWithCors({ ok: true, style });
   } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return jsonWithCors({ error: "Not signed in" }, { status: 401 });
+    }
     console.error("Failed to update template style:", error);
     return jsonWithCors({ error: "Failed to update template style" }, { status: 500 });
   }
@@ -55,9 +64,13 @@ export async function DELETE(_request: Request, context: RouteContext) {
   const { id } = await context.params;
 
   try {
-    await deleteTemplateStyle(id);
+    const { id: userId } = await requireUser();
+    await deleteTemplateStyle(id, userId);
     return jsonWithCors({ ok: true });
   } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return jsonWithCors({ error: "Not signed in" }, { status: 401 });
+    }
     console.error("Failed to delete template style:", error);
     return jsonWithCors({ error: "Failed to delete template style" }, { status: 500 });
   }
@@ -86,14 +99,18 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   try {
-    const style = await getTemplateStyleById(id);
+    const { id: userId } = await requireUser();
+    const style = await getTemplateStyleById(id, userId);
     if (!style) {
       return jsonWithCors({ error: "Template style not found" }, { status: 404 });
     }
 
-    await setActiveTemplateStyleId(id);
+    await setActiveTemplateStyleId(userId, id);
     return jsonWithCors({ ok: true, style });
   } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return jsonWithCors({ error: "Not signed in" }, { status: 401 });
+    }
     console.error("Failed to activate template style:", error);
     return jsonWithCors({ error: "Failed to activate template style" }, { status: 500 });
   }

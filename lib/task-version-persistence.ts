@@ -48,9 +48,13 @@ function buildDetailsDocFields(detailsHtml: string): {
   }
 }
 
-export async function persistTaskDetailsUpdate(taskId: string, details: string) {
-  const existing = await prisma.task.findUnique({
-    where: { id: taskId },
+export async function persistTaskDetailsUpdate(
+  taskId: string,
+  details: string,
+  userId: string,
+) {
+  const existing = await prisma.task.findFirst({
+    where: { id: taskId, userId },
     select: {
       name: true,
       details: true,
@@ -99,10 +103,14 @@ export async function persistTaskDetailsUpdate(taskId: string, details: string) 
   return { changed: true as const };
 }
 
-export async function persistTaskRename(taskId: string, name: string) {
+export async function persistTaskRename(
+  taskId: string,
+  name: string,
+  userId: string,
+) {
   const trimmedName = name.trim();
-  const existing = await prisma.task.findUnique({
-    where: { id: taskId },
+  const existing = await prisma.task.findFirst({
+    where: { id: taskId, userId },
     select: {
       name: true,
       details: true,
@@ -130,9 +138,12 @@ export async function persistTaskRename(taskId: string, name: string) {
   });
 }
 
-export async function fetchTaskVersions(taskId: string): Promise<TaskVersionListItem[]> {
-  const task = await prisma.task.findUnique({
-    where: { id: taskId },
+export async function fetchTaskVersions(
+  taskId: string,
+  userId: string,
+): Promise<TaskVersionListItem[]> {
+  const task = await prisma.task.findFirst({
+    where: { id: taskId, userId },
     select: { id: true },
   });
 
@@ -143,9 +154,13 @@ export async function fetchTaskVersions(taskId: string): Promise<TaskVersionList
   return listTaskVersions(taskId);
 }
 
-export async function fetchTaskVersionById(taskId: string, versionId: string) {
-  const task = await prisma.task.findUnique({
-    where: { id: taskId },
+export async function fetchTaskVersionById(
+  taskId: string,
+  versionId: string,
+  userId: string,
+) {
+  const task = await prisma.task.findFirst({
+    where: { id: taskId, userId },
     select: { id: true },
   });
 
@@ -167,9 +182,9 @@ export async function fetchTaskVersionById(taskId: string, versionId: string) {
   };
 }
 
-export async function createManualTaskVersion(taskId: string) {
-  const task = await prisma.task.findUnique({
-    where: { id: taskId },
+export async function createManualTaskVersion(taskId: string, userId: string) {
+  const task = await prisma.task.findFirst({
+    where: { id: taskId, userId },
     select: {
       name: true,
       details: true,
@@ -190,9 +205,13 @@ export async function createManualTaskVersion(taskId: string) {
   return { created };
 }
 
-export async function restoreTaskVersion(taskId: string, versionId: string) {
-  const task = await prisma.task.findUnique({
-    where: { id: taskId },
+export async function restoreTaskVersion(
+  taskId: string,
+  versionId: string,
+  userId: string,
+) {
+  const task = await prisma.task.findFirst({
+    where: { id: taskId, userId },
     select: {
       name: true,
       details: true,

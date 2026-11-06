@@ -1,6 +1,7 @@
 import { jsonWithCors, optionsWithCors } from "@/lib/api-cors";
 import { prisma } from "@/lib/prisma";
 import { saveTaskImage } from "@/lib/task-image-storage";
+import { requireUser } from "@/lib/require-user";
 
 type RouteContext = {
   params: Promise<{ taskId: string }>;
@@ -9,8 +10,15 @@ type RouteContext = {
 export async function POST(request: Request, context: RouteContext) {
   const { taskId } = await context.params;
 
-  const task = await prisma.task.findUnique({
-    where: { id: taskId },
+  let userId: string;
+  try {
+    ({ id: userId } = await requireUser());
+  } catch {
+    return jsonWithCors({ error: "Not signed in" }, { status: 401 });
+  }
+
+  const task = await prisma.task.findFirst({
+    where: { id: taskId, userId },
     select: { id: true },
   });
 

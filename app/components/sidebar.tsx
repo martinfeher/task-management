@@ -1,7 +1,16 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import {
+  LuCircleUser,
+  LuCreditCard,
+  LuCircleHelp,
+  LuLogOut,
+  LuSlidersHorizontal,
+} from "react-icons/lu";
+import { authClient, useSession } from "@/lib/auth-client";
 import { BiCheckboxChecked, BiChevronDown } from "react-icons/bi";
 import { BiSolidCheckboxChecked } from "react-icons/bi";
 
@@ -9,7 +18,6 @@ import { BsArchiveFill, BsFolder2Open } from "react-icons/bs";
 import { IoIosSearch } from "react-icons/io";
 import { LABEL_PRESET_COLORS } from "@/lib/label-colors";
 import { getInboxListId } from "@/lib/inbox-list";
-import { FiSettings } from "react-icons/fi";
 import { getLabelDotColor } from "@/lib/label-colors";
 import { IoMdPricetag } from "react-icons/io";
 
@@ -62,6 +70,7 @@ import { ConfirmModal } from "./confirm-modal";
 import { MacCmdIcon } from "./mac-cmd-icon";
 import { EditListModal } from "./edit-list-modal";
 import { RenameListModal } from "./rename-list-modal";
+import { FiSettings } from "react-icons/fi";
 import { getListColor } from "@/lib/list-colors";
 import { LabelContextMenu, clampLabelContextMenuPosition } from "./label-context-menu";
 import {
@@ -81,7 +90,8 @@ const SearchModal = dynamic(
 );
 
 const SettingsModal = dynamic(
-  () => import("./settings-modal").then((module) => module.SettingsModal),
+  () =>
+    import("./settings-modal").then((module) => module.SettingsModal),
   { ssr: false },
 );
 
@@ -97,6 +107,24 @@ const ArchiveModal = dynamic(
   () => import("./archive-modal").then((module) => module.ArchiveModal),
   { ssr: false },
 );
+
+type SettingsModalSection =
+  | "account"
+  | "general"
+  | "tasks"
+  | "labels"
+  | "calendar";
+
+function getSidebarUserInitials(
+  name: string | undefined,
+  email: string | undefined,
+) {
+  const source = name?.trim() || email?.trim() || "";
+  const parts = source.split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0]!.slice(0, 1).toUpperCase();
+  return (parts[0]![0] + parts[parts.length - 1]![0]).toUpperCase();
+}
 
 const NAV_ITEM_TEXT_CLASS = {
   today: "ptxt-list-nav-today",
@@ -351,10 +379,14 @@ export function Sidebar({
     y: number;
   } | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsInitialSection, setSettingsInitialSection] =
+    useState<SettingsModalSection>("account");
+  const [settingsModalNonce, setSettingsModalNonce] = useState(0);
   const [settingsRevealOrigin, setSettingsRevealOrigin] = useState<{
     x: number;
     y: number;
   } | null>(null);
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isKeyboardShortcutsOpen, setIsKeyboardShortcutsOpen] = useState(false);
   const [keyboardShortcutsRevealOrigin, setKeyboardShortcutsRevealOrigin] =
     useState<{
@@ -367,6 +399,7 @@ export function Sidebar({
     y: number;
   } | null>(null);
   const completedFooterRef = useRef<HTMLDivElement>(null);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
   const [openMenuListId, setOpenMenuListId] = useState<string | null>(null);
   const [listMenuPosition, setListMenuPosition] = useState<{
     top: number;
@@ -530,14 +563,29 @@ export function Sidebar({
     setIsSearchOpen(true);
   }
 
-  function openSettingsModal(origin: { x: number; y: number }) {
+  function openSettingsModal(
+    origin: { x: number; y: number },
+    section: SettingsModalSection = "account",
+  ) {
+    setSettingsModalNonce((n) => n + 1);
+    setSettingsInitialSection(section);
     setSettingsRevealOrigin(origin);
     setIsSettingsOpen(true);
+    setIsProfileMenuOpen(false);
   }
 
   function openKeyboardShortcutsModal(origin: { x: number; y: number }) {
     setKeyboardShortcutsRevealOrigin(origin);
     setIsKeyboardShortcutsOpen(true);
+  }
+
+  const router = useRouter();
+  const { data: session } = useSession();
+
+  async function handleSignOut() {
+    await authClient.signOut();
+    router.push("/login");
+    router.refresh();
   }
 
   function openArchiveModal(origin: { x: number; y: number }) {
@@ -569,6 +617,13 @@ export function Sidebar({
       ) {
         setIsCompletedOpen(false);
       }
+      if (
+        isProfileMenuOpen &&
+        profileMenuRef.current &&
+        !profileMenuRef.current.contains(event.target as Node)
+      ) {
+        setIsProfileMenuOpen(false);
+      }
       if (!menuRef.current?.contains(event.target as Node)) {
         closeListMenu();
       }
@@ -585,7 +640,7 @@ export function Sidebar({
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [isCompletedOpen]);
+  }, [isCompletedOpen, isProfileMenuOpen]);
 
   useEffect(() => {
     function handleEscape(event: KeyboardEvent) {
@@ -659,6 +714,19 @@ export function Sidebar({
     document.addEventListener("pointerdown", handlePointerDown);
     return () => document.removeEventListener("pointerdown", handlePointerDown);
   }, [isBottomAddMenuOpen]);
+
+  useEffect(() => {
+    if (!isProfileMenuOpen) return;
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setIsProfileMenuOpen(false);
+    }
+
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [isProfileMenuOpen]);
 
   const inboxListId = getInboxListId(lists);
   const sidebarTopLevelEntries = buildSidebarTopLevelEntries(
@@ -2212,75 +2280,295 @@ export function Sidebar({
             </div>
           ) : null}
 
-          <div className="flex items-center justify-between px-4 py-2">
-            <div className="flex flex-col items-center">
-              <button
-                type="button"
-                aria-expanded={isCompletedOpen}
-                className="group flex items-center gap-1 text-sm ptxt-550 transition-colors hover:ptxt-900 dark:hover:ptxt-50 cursor-pointer"
-                onClick={() => {
-                  setIsCompletedOpen((open) => !open);
-                  setIsArchiveOpen(false);
-                }}
-              >
-                <BiSolidCheckboxChecked
-                  className={`size-[15px] shrink-0 ${
-                    isCompletedOpen ? "ptxt-950" : "ptxt-400"
-                  }`}
-                  aria-hidden="true"
-                />
-                <span className="text-[#9d9da3] group-hover:text-[#747479] text-[14px]">Completed</span>
-              </button>
-              <button
-                type="button"
-                className="group -ml-[26px]! flex items-center gap-1 text-sm ptxt-550 transition-colors hover:ptxt-900 dark:hover:ptxt-50 cursor-pointer"
-                onClick={(event) => {
-                  openArchiveModal({
-                    x: event.clientX,
-                    y: event.clientY,
-                  });
-                  closeDrawer();
-                }}
-              >
-                <BsArchiveFill
-                  className="size-[11px] shrink-0 text-[#b5b5bb] "
-                  aria-hidden="true"
-                />
-                <span className="text-[#9d9da3] group-hover:text-[#747479] text-[13px]">
-                  Archive
-                </span>
-              </button>
+          <div className="flex flex-col gap-2 px-3 pb-3 pt-2">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <button
+                  type="button"
+                  aria-expanded={isCompletedOpen}
+                  className="group flex w-full items-center gap-1.5 rounded-md px-1 py-0.5 text-left text-sm ptxt-550 transition-colors hover:bg-zinc-100/80 hover:ptxt-900 dark:hover:bg-zinc-800/50 dark:hover:ptxt-50"
+                  onClick={() => {
+                    setIsCompletedOpen((open) => !open);
+                    setIsArchiveOpen(false);
+                  }}
+                >
+                  <BiSolidCheckboxChecked
+                    className={`size-[15px] shrink-0 ${
+                      isCompletedOpen ? "ptxt-950" : "ptxt-400"
+                    }`}
+                    aria-hidden="true"
+                  />
+                  <span className="text-[#9d9da3] group-hover:text-[#747479] text-[14px]">
+                    Completed
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className="group flex w-full items-center gap-1.5 rounded-md px-1 py-0.5 text-left text-sm ptxt-550 transition-colors hover:bg-zinc-100/80 hover:ptxt-900 dark:hover:bg-zinc-800/50 dark:hover:ptxt-50"
+                  onClick={(event) => {
+                    openArchiveModal({
+                      x: event.clientX,
+                      y: event.clientY,
+                    });
+                    closeDrawer();
+                  }}
+                >
+                  <BsArchiveFill
+                    className="size-[11px] shrink-0 text-[#b5b5bb]"
+                    aria-hidden="true"
+                  />
+                  <span className="text-[#9d9da3] group-hover:text-[#747479] text-[13px]">
+                    Archive
+                  </span>
+                </button>
+              </div>
             </div>
-            <div className="flex items-center gap-0.5">
-              <button
-                type="button"
-                aria-label="Keyboard shortcuts"
-                onClick={(event) => {
-                  openKeyboardShortcutsModal({
-                    x: event.clientX,
-                    y: event.clientY,
-                  });
-                  closeDrawer();
-                }}
-                className="flex size-8 items-center justify-center rounded-full ptxt-400 transition-colors hover:bg-zinc-200/60 hover:ptxt-900 dark:hover:bg-zinc-800/60 dark:hover:ptxt-50 cursor-pointer"
-              >
-                <LuKeyboard className="size-[18px]" aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                aria-label="Open settings"
-                onClick={(event) => {
-                  openSettingsModal({
-                    x: event.clientX,
-                    y: event.clientY,
-                  });
-                  closeDrawer();
-                }}
-                className="flex size-8 items-center justify-center rounded-full ptxt-400 transition-colors hover:bg-zinc-200/60 hover:ptxt-900 dark:hover:bg-zinc-800/60 dark:hover:ptxt-50 cursor-pointer"
-              >
-                <FiSettings className="size-[18px]" aria-hidden="true" />
-              </button>
-            </div>
+
+            {session?.user ? (
+              <div ref={profileMenuRef} className="relative">
+                {isProfileMenuOpen ? (
+                  <div
+                    className="absolute bottom-full left-0 right-0 z-20 mb-2 overflow-hidden rounded-xl border border-zinc-200 bg-white py-1 text-left shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
+                    role="menu"
+                    aria-label="Account menu"
+                  >
+                    <div className="flex items-center gap-3 border-b border-zinc-100 px-3 py-3 dark:border-zinc-800">
+                      {session.user.image ? (
+                        <img
+                          src={session.user.image}
+                          alt=""
+                          referrerPolicy="no-referrer"
+                          className="size-10 shrink-0 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white dark:bg-zinc-100 dark:text-zinc-900">
+                          {getSidebarUserInitials(
+                            session.user.name,
+                            session.user.email,
+                          )}
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[12px] font-semibold text-zinc-900 dark:text-zinc-50">
+                          {session.user.name || "Account"}
+                        </p>
+                        <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
+                          {session.user.email}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="py-1">
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                        onClick={(event) => {
+                          openSettingsModal(
+                            {
+                              x: event.clientX,
+                              y: event.clientY,
+                            },
+                            "account",
+                          );
+                          closeDrawer();
+                        }}
+                      >
+                        <LuCircleUser
+                          className="size-4 shrink-0 text-zinc-500"
+                          aria-hidden="true"
+                        />
+                        <span className="min-w-0 flex-1">Account settings</span>
+                        <span className="flex shrink-0 items-center gap-0.5 text-xs text-zinc-400">
+                          <MacCmdIcon className="size-3.5" />,
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                        onClick={(event) => {
+                          openSettingsModal(
+                            {
+                              x: event.clientX,
+                              y: event.clientY,
+                            },
+                            "general",
+                          );
+                          closeDrawer();
+                        }}
+                      >
+                        <LuSlidersHorizontal
+                          className="size-4 shrink-0 text-zinc-500"
+                          aria-hidden="true"
+                        />
+                        <span>Preferences</span>
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                        onClick={(event) => {
+                          openSettingsModal(
+                            {
+                              x: event.clientX,
+                              y: event.clientY,
+                            },
+                            "account",
+                          );
+                          closeDrawer();
+                        }}
+                      >
+                        <LuCreditCard
+                          className="size-4 shrink-0 text-zinc-500"
+                          aria-hidden="true"
+                        />
+                        <span>Plan &amp; billing</span>
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                        onClick={(event) => {
+                          openKeyboardShortcutsModal({
+                            x: event.clientX,
+                            y: event.clientY,
+                          });
+                          setIsProfileMenuOpen(false);
+                          closeDrawer();
+                        }}
+                      >
+                        <LuKeyboard
+                          className="size-4 shrink-0 text-zinc-500"
+                          aria-hidden="true"
+                        />
+                        <span className="min-w-0 flex-1">Keyboard shortcuts</span>
+                        <span className="text-xs text-zinc-400">?</span>
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                        onClick={() => {
+                          window.location.href =
+                            "mailto:?subject=Todolist%20feedback";
+                          setIsProfileMenuOpen(false);
+                        }}
+                      >
+                        <LuCircleHelp
+                          className="size-4 shrink-0 text-zinc-500"
+                          aria-hidden="true"
+                        />
+                        <span>Help &amp; feedback</span>
+                      </button>
+                    </div>
+                    <div className="border-t border-zinc-100 py-1 dark:border-zinc-800">
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                        onClick={() => {
+                          void handleSignOut();
+                          setIsProfileMenuOpen(false);
+                          closeDrawer();
+                        }}
+                      >
+                        <LuLogOut
+                          className="size-4 shrink-0 text-zinc-500"
+                          aria-hidden="true"
+                        />
+                        <span>Log out</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-[#fafafa] px-2 py-1.5 dark:border-zinc-700 dark:bg-zinc-900/80">
+                  <button
+                    type="button"
+                    className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-0.5 text-left transition-colors hover:opacity-90"
+                    onClick={() => setIsProfileMenuOpen((open) => !open)}
+                    aria-expanded={isProfileMenuOpen}
+                    aria-haspopup="menu"
+                  >
+                    {session.user.image ? (
+                      <img
+                        src={session.user.image}
+                        alt=""
+                        referrerPolicy="no-referrer"
+                        className="size-7 shrink-0 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white dark:bg-zinc-100 dark:text-zinc-900">
+                        {getSidebarUserInitials(
+                          session.user.name,
+                          session.user.email,
+                        )}
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[12px] font-semibold text-zinc-900 dark:text-zinc-50">
+                        {session.user.name || "Account"}
+                      </p>
+                      <p className="truncate text-[11px] text-zinc-500 dark:text-zinc-400">
+                        Personal
+                      </p>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Open settings"
+                    title="Settings"
+                    onClick={(event) => {
+                      openSettingsModal(
+                        {
+                          x: event.clientX,
+                          y: event.clientY,
+                        },
+                        "account",
+                      );
+                      closeDrawer();
+                    }}
+                    className="flex size-9 shrink-0 items-center justify-center rounded-full text-zinc-500 transition-colors hover:bg-zinc-200/70 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                  >
+                    <FiSettings className="size-[18px]" aria-hidden="true" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-end gap-1 rounded-xl border border-zinc-200 bg-[#fafafa] px-2 py-1.5 dark:border-zinc-700 dark:bg-zinc-900/80">
+                <button
+                  type="button"
+                  aria-label="Keyboard shortcuts"
+                  onClick={(event) => {
+                    openKeyboardShortcutsModal({
+                      x: event.clientX,
+                      y: event.clientY,
+                    });
+                    closeDrawer();
+                  }}
+                  className="flex size-9 items-center justify-center rounded-full text-zinc-500 transition-colors hover:bg-zinc-200/70 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                >
+                  <LuKeyboard className="size-[18px]" aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Open settings"
+                  onClick={(event) => {
+                    openSettingsModal(
+                      {
+                        x: event.clientX,
+                        y: event.clientY,
+                      },
+                      "account",
+                    );
+                    closeDrawer();
+                  }}
+                  className="flex size-9 items-center justify-center rounded-full text-zinc-500 transition-colors hover:bg-zinc-200/70 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                >
+                  <FiSettings className="size-[18px]" aria-hidden="true" />
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </aside>
@@ -2300,8 +2588,10 @@ export function Sidebar({
       />
 
       <SettingsModal
+        key={settingsModalNonce}
         open={isSettingsOpen}
         revealOrigin={settingsRevealOrigin}
+        initialSection={settingsInitialSection}
         onClose={() => setIsSettingsOpen(false)}
       />
 

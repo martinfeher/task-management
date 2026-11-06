@@ -1,5 +1,6 @@
 import { createListFolder } from "@/app/actions/todo";
 import { jsonWithCors, optionsWithCors } from "@/lib/api-cors";
+import { UnauthorizedError } from "@/lib/require-user";
 
 export async function POST(request: Request) {
   let body: { name?: string };
@@ -21,6 +22,9 @@ export async function POST(request: Request) {
       { status: 201 },
     );
   } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return jsonWithCors({ error: "Not signed in" }, { status: 401 });
+    }
     const message =
       error instanceof Error ? error.message : "Failed to create folder";
     return jsonWithCors({ error: message }, { status: 500 });

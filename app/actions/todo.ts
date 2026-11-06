@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { initializeKanbanBoard } from "@/app/actions/kanban";
 import { prisma } from "@/lib/prisma";
+import { requireUser } from "@/lib/require-user";
 import {
   normalizeDueDurationMinutes,
   normalizeDueTimeMinutes,
@@ -36,9 +37,55 @@ import {
   type TaskRecurrenceRule,
 } from "@/lib/task-recurrence";
 
+/** Throws if `taskId` doesn't exist or doesn't belong to `userId`. */
+async function requireOwnedTask(taskId: string, userId: string) {
+  const task = await prisma.task.findFirst({
+    where: { id: taskId, userId },
+    select: { id: true },
+  });
+  if (!task) {
+    throw new Error("Task not found");
+  }
+}
+
+/** Throws if `listId` doesn't exist or doesn't belong to `userId`. */
+async function requireOwnedList(listId: string, userId: string) {
+  const list = await prisma.todoList.findFirst({
+    where: { id: listId, userId },
+    select: { id: true },
+  });
+  if (!list) {
+    throw new Error("List not found");
+  }
+}
+
+/** Throws if `folderId` doesn't exist or doesn't belong to `userId`. */
+async function requireOwnedFolder(folderId: string, userId: string) {
+  const folder = await prisma.listFolder.findFirst({
+    where: { id: folderId, userId },
+    select: { id: true },
+  });
+  if (!folder) {
+    throw new Error("Folder not found");
+  }
+}
+
+/** Throws if `labelId` doesn't exist, belongs to another user, or isn't a label tag. */
+async function requireOwnedLabel(labelId: string, userId: string) {
+  const label = await prisma.tag.findFirst({
+    where: { id: labelId, userId, category: LABEL_CATEGORY },
+    select: { id: true },
+  });
+  if (!label) {
+    throw new Error("Label not found");
+  }
+}
+
 export async function getTaskById(taskId: string) {
-  const task = await prisma.task.findUnique({
-    where: { id: taskId },
+  const { id: userId } = await requireUser();
+
+  const task = await prisma.task.findFirst({
+    where: { id: taskId, userId },
     select: {
       id: true,
       name: true,
@@ -82,8 +129,10 @@ export async function updateTaskRecurrence(
   taskId: string,
   rule: TaskRecurrenceRule | null,
 ) {
-  const task = await prisma.task.findUnique({
-    where: { id: taskId },
+  const { id: userId } = await requireUser();
+
+  const task = await prisma.task.findFirst({
+    where: { id: taskId, userId },
     select: { dueDate: true },
   });
 
@@ -117,16 +166,23 @@ export async function updateTaskRecurrence(
 }
 
 export async function updateTaskDetails(taskId: string, details: string) {
-  await persistTaskDetailsUpdate(taskId, details);
+  const { id: userId } = await requireUser();
+  await persistTaskDetailsUpdate(taskId, details, userId);
 }
 
 export async function updateTaskDueDate(taskId: string, dueDate: string | null) {
-  const existing = await prisma.task.findUnique({
-    where: { id: taskId },
+  const { id: userId } = await requireUser();
+
+  const existing = await prisma.task.findFirst({
+    where: { id: taskId, userId },
     select: { dueDate: true },
   });
 
-  const existingDateValue = existing?.dueDate
+  if (!existing) {
+    throw new Error("Task not found");
+  }
+
+  const existingDateValue = existing.dueDate
     ? existing.dueDate.toISOString().slice(0, 10)
     : null;
   const dateChanged = dueDate !== existingDateValue;
@@ -167,6 +223,9 @@ export async function updateTaskDueDateAndTime(
   dueDate: string | null,
   dueTime: TaskDueTime,
 ) {
+  const { id: userId } = await requireUser();
+  await requireOwnedTask(taskId, userId);
+
   const task = await prisma.task.update({
     where: { id: taskId },
     data: {
@@ -195,6 +254,9 @@ export async function updateTaskDueDateAndTime(
 }
 
 export async function updateTaskDueTime(taskId: string, dueTime: TaskDueTime) {
+  const { id: userId } = await requireUser();
+  await requireOwnedTask(taskId, userId);
+
   const task = await prisma.task.update({
     where: { id: taskId },
     data: {
@@ -220,6 +282,9 @@ export async function updateTaskDueTime(taskId: string, dueTime: TaskDueTime) {
 }
 
 export async function updateTaskPriority(taskId: string, priority: number | null) {
+  const { id: userId } = await requireUser();
+  await requireOwnedTask(taskId, userId);
+
   const normalizedPriority = normalizePriority(priority);
 
   await prisma.$transaction(async (tx) => {
@@ -231,8 +296,8 @@ export async function updateTaskPriority(taskId: string, priority: number | null
     });
 
     if (normalizedPriority !== null) {
-      const tag = await tx.tag.findUnique({
-        where: { slug: prioritySlug(normalizedPriority) },
+      const tag = await tx.tag.findFirst({
+        where: { userId, slug: prioritySlug(normalizedPriority) },
         select: { id: true },
       });
 
@@ -260,6 +325,9 @@ export async function updateTaskCalendarColor(
   taskId: string,
   calendarColor: string | null,
 ) {
+  const { id: userId } = await requireUser();
+  await requireOwnedTask(taskId, userId);
+
   const normalizedColor = normalizeCalendarTaskColor(calendarColor);
 
   const task = await prisma.task.update({
@@ -276,8 +344,10 @@ export async function updateTaskCalendarColor(
 }
 
 export async function getLabels() {
+  const { id: userId } = await requireUser();
+
   return prisma.tag.findMany({
-    where: { category: LABEL_CATEGORY },
+    where: { category: LABEL_CATEGORY, userId },
     orderBy: [{ position: "asc" }, { createdAt: "asc" }],
     select: {
       id: true,
@@ -288,6 +358,9 @@ export async function getLabels() {
 }
 
 export async function getTaskLabels(taskId: string) {
+  const { id: userId } = await requireUser();
+  await requireOwnedTask(taskId, userId);
+
   const entries = await prisma.taskTag.findMany({
     where: {
       taskId,
@@ -309,6 +382,8 @@ export async function getTaskLabels(taskId: string) {
 }
 
 export async function createLabel(label: string, color?: string | null) {
+  const { id: userId } = await requireUser();
+
   const trimmed = label.trim();
   if (!trimmed) {
     throw new Error("Label is required");
@@ -318,30 +393,42 @@ export async function createLabel(label: string, color?: string | null) {
   const normalizedColor = color
     ? normalizeLabelColorHex(color).toLowerCase()
     : null;
-  const lastLabel = await prisma.tag.findFirst({
-    where: { category: LABEL_CATEGORY },
-    orderBy: [{ position: "desc" }, { createdAt: "desc" }],
-    select: { position: true },
-  });
-  const position = (lastLabel?.position ?? -1) + 1;
-  const tag = await prisma.tag.upsert({
-    where: { slug },
-    create: {
-      slug,
-      label: trimmed,
-      category: LABEL_CATEGORY,
-      position,
-      color: normalizedColor,
-    },
-    update: {
-      label: trimmed,
-      ...(normalizedColor ? { color: normalizedColor } : {}),
-    },
-    select: {
-      id: true,
-      label: true,
-      color: true,
-    },
+
+  const tag = await prisma.$transaction(async (tx) => {
+    const lastLabel = await tx.tag.findFirst({
+      where: { userId, category: LABEL_CATEGORY },
+      orderBy: [{ position: "desc" }, { createdAt: "desc" }],
+      select: { position: true },
+    });
+    const position = (lastLabel?.position ?? -1) + 1;
+
+    const existing = await tx.tag.findFirst({
+      where: { userId, slug, category: LABEL_CATEGORY },
+      select: { id: true },
+    });
+
+    if (existing) {
+      return tx.tag.update({
+        where: { id: existing.id },
+        data: {
+          label: trimmed,
+          ...(normalizedColor ? { color: normalizedColor } : {}),
+        },
+        select: { id: true, label: true, color: true },
+      });
+    }
+
+    return tx.tag.create({
+      data: {
+        slug,
+        label: trimmed,
+        category: LABEL_CATEGORY,
+        position,
+        color: normalizedColor,
+        userId,
+      },
+      select: { id: true, label: true, color: true },
+    });
   });
 
   revalidatePath("/");
@@ -349,23 +436,17 @@ export async function createLabel(label: string, color?: string | null) {
 }
 
 export async function renameLabel(labelId: string, label: string) {
+  const { id: userId } = await requireUser();
+  await requireOwnedLabel(labelId, userId);
+
   const trimmed = label.trim();
   if (!trimmed) {
     throw new Error("Label is required");
   }
 
-  const existingLabel = await prisma.tag.findFirst({
-    where: { id: labelId, category: LABEL_CATEGORY },
-    select: { id: true },
-  });
-
-  if (!existingLabel) {
-    throw new Error("Label not found");
-  }
-
   const slug = labelSlug(trimmed);
-  const slugConflict = await prisma.tag.findUnique({
-    where: { slug },
+  const slugConflict = await prisma.tag.findFirst({
+    where: { userId, slug, category: LABEL_CATEGORY },
     select: { id: true },
   });
 
@@ -391,14 +472,8 @@ export async function renameLabel(labelId: string, label: string) {
 }
 
 export async function deleteLabel(labelId: string) {
-  const existingLabel = await prisma.tag.findFirst({
-    where: { id: labelId, category: LABEL_CATEGORY },
-    select: { id: true },
-  });
-
-  if (!existingLabel) {
-    throw new Error("Label not found");
-  }
+  const { id: userId } = await requireUser();
+  await requireOwnedLabel(labelId, userId);
 
   await prisma.$transaction([
     prisma.taskTag.deleteMany({
@@ -413,14 +488,8 @@ export async function deleteLabel(labelId: string) {
 }
 
 export async function updateLabelColor(labelId: string, color: string) {
-  const existingLabel = await prisma.tag.findFirst({
-    where: { id: labelId, category: LABEL_CATEGORY },
-    select: { id: true },
-  });
-
-  if (!existingLabel) {
-    throw new Error("Label not found");
-  }
+  const { id: userId } = await requireUser();
+  await requireOwnedLabel(labelId, userId);
 
   const normalizedColor = normalizeLabelColorHex(color).toLowerCase();
 
@@ -443,22 +512,35 @@ export async function applyTaskLabels(
   labelIds: string[],
   newLabelName?: string | null,
 ) {
-  const uniqueLabelIds = new Set(labelIds);
+  const { id: userId } = await requireUser();
+  await requireOwnedTask(taskId, userId);
+
+  // Only allow attaching labels the current user owns.
+  const ownedLabels = await prisma.tag.findMany({
+    where: { id: { in: labelIds }, userId, category: LABEL_CATEGORY },
+    select: { id: true },
+  });
+  const uniqueLabelIds = new Set(ownedLabels.map((label) => label.id));
 
   if (newLabelName?.trim()) {
     const trimmed = newLabelName.trim();
     const slug = labelSlug(trimmed);
-    const tag = await prisma.tag.upsert({
-      where: { slug },
-      create: {
-        slug,
-        label: trimmed,
-        category: LABEL_CATEGORY,
-      },
-      update: {
-        label: trimmed,
-      },
-      select: { id: true },
+    const tag = await prisma.$transaction(async (tx) => {
+      const existing = await tx.tag.findFirst({
+        where: { userId, slug, category: LABEL_CATEGORY },
+        select: { id: true },
+      });
+      if (existing) {
+        return tx.tag.update({
+          where: { id: existing.id },
+          data: { label: trimmed },
+          select: { id: true },
+        });
+      }
+      return tx.tag.create({
+        data: { slug, label: trimmed, category: LABEL_CATEGORY, userId },
+        select: { id: true },
+      });
     });
     uniqueLabelIds.add(tag.id);
   }
@@ -494,6 +576,10 @@ export async function setTaskLabel(
   labelId: string,
   assigned: boolean,
 ) {
+  const { id: userId } = await requireUser();
+  await requireOwnedTask(taskId, userId);
+  await requireOwnedLabel(labelId, userId);
+
   if (assigned) {
     await prisma.taskTag.upsert({
       where: {
@@ -523,6 +609,9 @@ export async function setTaskLabel(
 }
 
 export async function addTaskLabel(taskId: string, label: string) {
+  const { id: userId } = await requireUser();
+  await requireOwnedTask(taskId, userId);
+
   const trimmed = label.trim();
   if (!trimmed) {
     throw new Error("Label is required");
@@ -531,18 +620,21 @@ export async function addTaskLabel(taskId: string, label: string) {
   const slug = labelSlug(trimmed);
 
   await prisma.$transaction(async (tx) => {
-    const tag = await tx.tag.upsert({
-      where: { slug },
-      create: {
-        slug,
-        label: trimmed,
-        category: LABEL_CATEGORY,
-      },
-      update: {
-        label: trimmed,
-      },
+    const existing = await tx.tag.findFirst({
+      where: { userId, slug, category: LABEL_CATEGORY },
       select: { id: true },
     });
+
+    const tag = existing
+      ? await tx.tag.update({
+          where: { id: existing.id },
+          data: { label: trimmed },
+          select: { id: true },
+        })
+      : await tx.tag.create({
+          data: { slug, label: trimmed, category: LABEL_CATEGORY, userId },
+          select: { id: true },
+        });
 
     await tx.taskTag.upsert({
       where: {
@@ -564,6 +656,9 @@ export async function addTaskLabel(taskId: string, label: string) {
 }
 
 export async function updateTaskPinned(taskId: string, pinned: boolean) {
+  const { id: userId } = await requireUser();
+  await requireOwnedTask(taskId, userId);
+
   const task = await prisma.task.update({
     where: { id: taskId },
     data: { pinned },
@@ -575,6 +670,9 @@ export async function updateTaskPinned(taskId: string, pinned: boolean) {
 }
 
 export async function updateTaskImportant(taskId: string, important: boolean) {
+  const { id: userId } = await requireUser();
+  await requireOwnedTask(taskId, userId);
+
   const task = await prisma.task.update({
     where: { id: taskId },
     data: { important },
@@ -586,8 +684,10 @@ export async function updateTaskImportant(taskId: string, important: boolean) {
 }
 
 export async function convertTaskToNote(taskId: string) {
-  const task = await prisma.task.findUnique({
-    where: { id: taskId },
+  const { id: userId } = await requireUser();
+
+  const task = await prisma.task.findFirst({
+    where: { id: taskId, userId },
     select: {
       name: true,
       details: true,
@@ -620,7 +720,7 @@ export async function convertTaskToNote(taskId: string) {
   });
 
   if (nextDetails !== task.details) {
-    await persistTaskDetailsUpdate(taskId, nextDetails);
+    await persistTaskDetailsUpdate(taskId, nextDetails, userId);
     updated.details = nextDetails;
   }
 
@@ -629,6 +729,9 @@ export async function convertTaskToNote(taskId: string) {
 }
 
 export async function convertNoteToTask(taskId: string) {
+  const { id: userId } = await requireUser();
+  await requireOwnedTask(taskId, userId);
+
   const updated = await prisma.task.update({
     where: { id: taskId },
     data: {
@@ -647,13 +750,17 @@ export async function convertNoteToTask(taskId: string) {
 }
 
 export async function renameTask(taskId: string, name: string) {
-  const task = await persistTaskRename(taskId, name);
+  const { id: userId } = await requireUser();
+  const task = await persistTaskRename(taskId, name, userId);
 
   revalidatePath("/");
   return task;
 }
 
 export async function renameTodoList(listId: string, name: string) {
+  const { id: userId } = await requireUser();
+  await requireOwnedList(listId, userId);
+
   const list = await prisma.todoList.update({
     where: { id: listId },
     data: { name: name.trim() },
@@ -673,14 +780,21 @@ export type UpdateTodoListInput = {
 };
 
 export async function updateTodoList(listId: string, input: UpdateTodoListInput) {
+  const { id: userId } = await requireUser();
+  await requireOwnedList(listId, userId);
+
   const trimmedName = input.name.trim();
   if (!trimmedName) {
     throw new Error("List name is required");
   }
 
+  if (input.folderId) {
+    await requireOwnedFolder(input.folderId, userId);
+  }
+
   await prisma.$transaction(async (tx) => {
-    const existing = await tx.todoList.findUnique({
-      where: { id: listId },
+    const existing = await tx.todoList.findFirst({
+      where: { id: listId, userId },
       select: { folderId: true },
     });
 
@@ -706,8 +820,8 @@ export async function updateTodoList(listId: string, input: UpdateTodoListInput)
     if (input.folderId !== existing.folderId) {
       data.folderId = input.folderId;
       data.position = input.folderId
-        ? await getNextFolderListPosition(tx, input.folderId)
-        : await getNextTopLevelSidebarPosition(tx);
+        ? await getNextFolderListPosition(tx, input.folderId, userId)
+        : await getNextTopLevelSidebarPosition(tx, userId);
     }
 
     await tx.todoList.update({
@@ -724,8 +838,11 @@ export async function updateTodoList(listId: string, input: UpdateTodoListInput)
 }
 
 export async function deleteTodoList(listId: string) {
+  const { id: userId } = await requireUser();
+  await requireOwnedList(listId, userId);
+
   const tasks = await prisma.task.findMany({
-    where: { listId },
+    where: { listId, userId },
     select: { id: true },
   });
 
@@ -740,13 +857,15 @@ export async function deleteTodoList(listId: string) {
 
 async function getNextTopLevelSidebarPosition(
   tx: Pick<typeof prisma, "todoList" | "listFolder">,
+  userId: string,
 ) {
   const [listAggregate, folderAggregate] = await Promise.all([
     tx.todoList.aggregate({
-      where: { folderId: null },
+      where: { folderId: null, userId },
       _max: { position: true },
     }),
     tx.listFolder.aggregate({
+      where: { userId },
       _max: { position: true },
     }),
   ]);
@@ -762,9 +881,10 @@ async function getNextTopLevelSidebarPosition(
 async function getNextFolderListPosition(
   tx: Pick<typeof prisma, "todoList">,
   folderId: string,
+  userId: string,
 ) {
   const aggregate = await tx.todoList.aggregate({
-    where: { folderId },
+    where: { folderId, userId },
     _max: { position: true },
   });
 
@@ -772,13 +892,16 @@ async function getNextFolderListPosition(
 }
 
 export async function createTodoList(name: string) {
+  const { id: userId } = await requireUser();
+
   const list = await prisma.$transaction(async (tx) => {
-    const position = await getNextTopLevelSidebarPosition(tx);
+    const position = await getNextTopLevelSidebarPosition(tx, userId);
 
     return tx.todoList.create({
       data: {
         name,
         position,
+        userId,
       },
     });
   });
@@ -788,13 +911,16 @@ export async function createTodoList(name: string) {
 }
 
 export async function createListFolder(name: string) {
+  const { id: userId } = await requireUser();
+
   const folder = await prisma.$transaction(async (tx) => {
-    const position = await getNextTopLevelSidebarPosition(tx);
+    const position = await getNextTopLevelSidebarPosition(tx, userId);
 
     return tx.listFolder.create({
       data: {
         name,
         position,
+        userId,
       },
     });
   });
@@ -804,6 +930,9 @@ export async function createListFolder(name: string) {
 }
 
 export async function renameListFolder(folderId: string, name: string) {
+  const { id: userId } = await requireUser();
+  await requireOwnedFolder(folderId, userId);
+
   const folder = await prisma.listFolder.update({
     where: { id: folderId },
     data: { name },
@@ -814,14 +943,17 @@ export async function renameListFolder(folderId: string, name: string) {
 }
 
 export async function deleteListFolder(folderId: string) {
+  const { id: userId } = await requireUser();
+  await requireOwnedFolder(folderId, userId);
+
   await prisma.$transaction(async (tx) => {
     const lists = await tx.todoList.findMany({
-      where: { folderId },
+      where: { folderId, userId },
       select: { id: true },
       orderBy: [{ position: "asc" }, { createdAt: "asc" }],
     });
 
-    let nextPosition = await getNextTopLevelSidebarPosition(tx);
+    let nextPosition = await getNextTopLevelSidebarPosition(tx, userId);
 
     for (const list of lists) {
       await tx.todoList.update({
@@ -843,10 +975,16 @@ export async function deleteListFolder(folderId: string) {
 }
 
 export async function moveListToFolder(listId: string, folderId: string | null) {
+  const { id: userId } = await requireUser();
+  await requireOwnedList(listId, userId);
+  if (folderId) {
+    await requireOwnedFolder(folderId, userId);
+  }
+
   await prisma.$transaction(async (tx) => {
     const position = folderId
-      ? await getNextFolderListPosition(tx, folderId)
-      : await getNextTopLevelSidebarPosition(tx);
+      ? await getNextFolderListPosition(tx, folderId, userId)
+      : await getNextTopLevelSidebarPosition(tx, userId);
 
     await tx.todoList.update({
       where: { id: listId },
@@ -861,8 +999,10 @@ export async function moveListToFolder(listId: string, folderId: string | null) 
 }
 
 export async function reorderLabels(labelIds: string[]) {
+  const { id: userId } = await requireUser();
+
   const labels = await prisma.tag.findMany({
-    where: { category: LABEL_CATEGORY },
+    where: { category: LABEL_CATEGORY, userId },
     select: { id: true },
     orderBy: [{ position: "asc" }, { createdAt: "asc" }],
   });
@@ -901,8 +1041,10 @@ export async function reorderLabels(labelIds: string[]) {
 }
 
 export async function reorderTodoLists(listIds: string[]) {
+  const { id: userId } = await requireUser();
+
   const lists = await prisma.todoList.findMany({
-    where: { folderId: null },
+    where: { folderId: null, userId },
     select: { id: true },
     orderBy: [{ position: "asc" }, { createdAt: "asc" }],
   });
@@ -944,13 +1086,15 @@ export async function reorderSidebarTopLevel(
   listPositions: Array<{ id: string; position: number }>,
   folderPositions: Array<{ id: string; position: number }>,
 ) {
+  const { id: userId } = await requireUser();
+
   const [lists, folders] = await Promise.all([
     prisma.todoList.findMany({
-      where: { id: { in: listPositions.map((item) => item.id) } },
+      where: { id: { in: listPositions.map((item) => item.id) }, userId },
       select: { id: true },
     }),
     prisma.listFolder.findMany({
-      where: { id: { in: folderPositions.map((item) => item.id) } },
+      where: { id: { in: folderPositions.map((item) => item.id) }, userId },
       select: { id: true },
     }),
   ]);
@@ -989,9 +1133,12 @@ export async function createTask(
   dueDate?: string | null,
   options?: { isNote?: boolean },
 ) {
+  const { id: userId } = await requireUser();
+  await requireOwnedList(listId, userId);
+
   const task = await prisma.$transaction(async (tx) => {
     await tx.task.updateMany({
-      where: { listId },
+      where: { listId, userId },
       data: { position: { increment: 1 } },
     });
 
@@ -1003,6 +1150,7 @@ export async function createTask(
         important: false,
         isNote: options?.isNote ?? false,
         dueDate: dueDate ? new Date(`${dueDate}T12:00:00`) : null,
+        userId,
       },
     });
   });
@@ -1012,8 +1160,11 @@ export async function createTask(
 }
 
 export async function moveTaskToList(taskId: string, targetListId: string) {
-  const task = await prisma.task.findUnique({
-    where: { id: taskId },
+  const { id: userId } = await requireUser();
+  await requireOwnedList(targetListId, userId);
+
+  const task = await prisma.task.findFirst({
+    where: { id: taskId, userId },
     select: { listId: true, parentId: true },
   });
 
@@ -1026,7 +1177,7 @@ export async function moveTaskToList(taskId: string, targetListId: string) {
     ? []
     : (
         await prisma.task.findMany({
-          where: { parentId: taskId, deletedAt: null },
+          where: { parentId: taskId, deletedAt: null, userId },
           select: { id: true },
         })
       ).map((child) => child.id);
@@ -1034,7 +1185,7 @@ export async function moveTaskToList(taskId: string, targetListId: string) {
 
   await prisma.$transaction(async (tx) => {
     await tx.task.updateMany({
-      where: { listId: targetListId },
+      where: { listId: targetListId, userId },
       data: { position: { increment: movingIds.length } },
     });
 
@@ -1052,7 +1203,7 @@ export async function moveTaskToList(taskId: string, targetListId: string) {
     );
 
     const sourceTasks = await tx.task.findMany({
-      where: { listId: sourceListId },
+      where: { listId: sourceListId, userId },
       select: { id: true },
       orderBy: [{ position: "asc" }, { createdAt: "asc" }],
     });
@@ -1078,8 +1229,11 @@ export async function reorderTasks(
   taskIds: string[],
   parentUpdates: TaskParentUpdate[] = [],
 ) {
+  const { id: userId } = await requireUser();
+  await requireOwnedList(listId, userId);
+
   const tasks = await prisma.task.findMany({
-    where: { listId, deletedAt: null },
+    where: { listId, deletedAt: null, userId },
     select: { id: true },
     orderBy: [{ position: "asc" }, { createdAt: "asc" }],
   });
@@ -1120,8 +1274,8 @@ export async function reorderTasks(
       throw new Error("Task cannot be its own parent");
     }
 
-    const parentTask = await prisma.task.findUnique({
-      where: { id: update.parentId },
+    const parentTask = await prisma.task.findFirst({
+      where: { id: update.parentId, userId },
       select: { parentId: true },
     });
 
@@ -1149,7 +1303,17 @@ export async function reorderTasks(
 }
 
 export async function toggleTask(taskId: string, completed: boolean) {
+  const { id: userId } = await requireUser();
+
   if (!completed) {
+    const existing = await prisma.task.findFirst({
+      where: { id: taskId, userId },
+      select: { id: true },
+    });
+    if (!existing) {
+      throw new Error("Task not found");
+    }
+
     await prisma.task.update({
       where: { id: taskId },
       data: { completed: false },
@@ -1158,8 +1322,8 @@ export async function toggleTask(taskId: string, completed: boolean) {
     return { id: taskId, completed: false as const };
   }
 
-  const existing = await prisma.task.findUnique({
-    where: { id: taskId },
+  const existing = await prisma.task.findFirst({
+    where: { id: taskId, userId },
     include: {
       tags: {
         select: { tagId: true },
@@ -1185,7 +1349,7 @@ export async function toggleTask(taskId: string, completed: boolean) {
     const nextDueDate = advanceDueDate(existing.dueDate, recurrence);
 
     await tx.task.updateMany({
-      where: { listId: existing.listId },
+      where: { listId: existing.listId, userId },
       data: { position: { increment: 1 } },
     });
 
@@ -1203,6 +1367,7 @@ export async function toggleTask(taskId: string, completed: boolean) {
         important: existing.important,
         recurrenceRule: existing.recurrenceRule,
         recurrenceAnchor: existing.recurrenceAnchor ?? existing.dueDate,
+        userId,
       },
       select: {
         id: true,
@@ -1262,9 +1427,12 @@ export async function toggleTask(taskId: string, completed: boolean) {
 }
 
 export async function deleteTask(taskId: string) {
+  const { id: userId } = await requireUser();
+  await requireOwnedTask(taskId, userId);
+
   const childIds = (
     await prisma.task.findMany({
-      where: { parentId: taskId, deletedAt: null },
+      where: { parentId: taskId, deletedAt: null, userId },
       select: { id: true },
     })
   ).map((child) => child.id);
@@ -1272,7 +1440,7 @@ export async function deleteTask(taskId: string) {
   const deletedAt = new Date();
 
   await prisma.task.updateMany({
-    where: { id: { in: idsToDelete }, deletedAt: null },
+    where: { id: { in: idsToDelete }, deletedAt: null, userId },
     data: { deletedAt },
   });
 
@@ -1415,8 +1583,10 @@ export type DuplicateTaskResult = {
 export async function duplicateTask(
   taskId: string,
 ): Promise<DuplicateTaskResult> {
+  const { id: userId } = await requireUser();
+
   const existing = await prisma.task.findFirst({
-    where: { id: taskId, deletedAt: null },
+    where: { id: taskId, deletedAt: null, userId },
     select: {
       name: true,
       details: true,
@@ -1446,7 +1616,7 @@ export async function duplicateTask(
 
   const duplicatedId = await prisma.$transaction(async (tx) => {
     await tx.task.updateMany({
-      where: { listId: existing.listId, deletedAt: null },
+      where: { listId: existing.listId, deletedAt: null, userId },
       data: { position: { increment: 1 } },
     });
 
@@ -1472,6 +1642,7 @@ export async function duplicateTask(
         kanbanColumnId: existing.kanbanColumnId,
         position: 0,
         completed: false,
+        userId,
       },
       select: restoredTaskSelect,
     });
@@ -1519,8 +1690,10 @@ export async function duplicateTask(
 }
 
 export async function getArchivedTasks(): Promise<ArchivedTaskItem[]> {
+  const { id: userId } = await requireUser();
+
   const tasks = await prisma.task.findMany({
-    where: { deletedAt: { not: null } },
+    where: { deletedAt: { not: null }, userId },
     orderBy: [{ deletedAt: "desc" }, { name: "asc" }],
     select: {
       id: true,
@@ -1549,8 +1722,10 @@ export async function getArchivedTasks(): Promise<ArchivedTaskItem[]> {
 export async function restoreArchivedTask(
   taskId: string,
 ): Promise<RestoredTaskItem[]> {
-  const task = await prisma.task.findUnique({
-    where: { id: taskId },
+  const { id: userId } = await requireUser();
+
+  const task = await prisma.task.findFirst({
+    where: { id: taskId, userId },
     select: { id: true, parentId: true, deletedAt: true },
   });
 
@@ -1562,19 +1737,19 @@ export async function restoreArchivedTask(
     ? []
     : (
         await prisma.task.findMany({
-          where: { parentId: taskId, deletedAt: { not: null } },
+          where: { parentId: taskId, deletedAt: { not: null }, userId },
           select: { id: true },
         })
       ).map((child) => child.id);
   const idsToRestore = [taskId, ...childIds];
 
   await prisma.task.updateMany({
-    where: { id: { in: idsToRestore } },
+    where: { id: { in: idsToRestore }, userId },
     data: { deletedAt: null },
   });
 
   const restoredTasks = await prisma.task.findMany({
-    where: { id: { in: idsToRestore } },
+    where: { id: { in: idsToRestore }, userId },
     select: restoredTaskSelect,
   });
 
@@ -1584,8 +1759,10 @@ export async function restoreArchivedTask(
 }
 
 export async function permanentlyDeleteArchivedTask(taskId: string) {
-  const task = await prisma.task.findUnique({
-    where: { id: taskId },
+  const { id: userId } = await requireUser();
+
+  const task = await prisma.task.findFirst({
+    where: { id: taskId, userId },
     select: { id: true, parentId: true, deletedAt: true },
   });
 
@@ -1597,14 +1774,14 @@ export async function permanentlyDeleteArchivedTask(taskId: string) {
     ? []
     : (
         await prisma.task.findMany({
-          where: { parentId: taskId, deletedAt: { not: null } },
+          where: { parentId: taskId, deletedAt: { not: null }, userId },
           select: { id: true },
         })
       ).map((child) => child.id);
   const idsToDelete = [taskId, ...childIds];
 
   await prisma.task.deleteMany({
-    where: { id: { in: idsToDelete } },
+    where: { id: { in: idsToDelete }, userId },
   });
 
   await Promise.all(idsToDelete.map((id) => deleteTaskImageDirectory(id)));
@@ -1616,10 +1793,12 @@ export async function createSubtask(
   parentId: string,
   name: string,
 ): Promise<{ id: string; name: string; listId: string; parentId: string }> {
+  const { id: userId } = await requireUser();
+
   const trimmed = name.trim();
 
-  const parent = await prisma.task.findUnique({
-    where: { id: parentId },
+  const parent = await prisma.task.findFirst({
+    where: { id: parentId, userId },
     select: { id: true, listId: true, parentId: true },
   });
 
@@ -1643,6 +1822,7 @@ export async function createSubtask(
         name: trimmed,
         position: siblingCount,
         important: false,
+        userId,
       },
       select: {
         id: true,
