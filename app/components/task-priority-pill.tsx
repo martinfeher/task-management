@@ -15,6 +15,10 @@ import {
   type TaskPriorityLevel,
 } from "@/lib/task-priority";
 import { TaskPriorityFlagIcon } from "./task-priority-icon";
+import {
+  APP_HOVER_TOOLTIP_ABOVE_START,
+  APP_HOVER_TOOLTIP_SHOWN,
+} from "@/lib/app-hover-tooltip-classes";
 
 type TaskPriorityPillProps = {
   priority: number | null | undefined;
@@ -181,8 +185,8 @@ function TaskPriorityPillInner({
             <span
               ref={tooltipRef}
               role="tooltip"
-              className={`task-priority-tooltip add-task-date-tooltip pointer-events-none fixed z-[200] whitespace-nowrap px-3 py-1.5 text-[11px] font-medium ${
-                tooltipStyle ? "opacity-100" : "opacity-0"
+              className={`task-priority-tooltip add-task-date-tooltip ${APP_HOVER_TOOLTIP_ABOVE_START} pointer-events-none fixed z-[200] whitespace-nowrap px-3 py-1.5 text-[11px] font-medium ${
+                tooltipStyle ? APP_HOVER_TOOLTIP_SHOWN : ""
               }`}
               style={
                 tooltipStyle

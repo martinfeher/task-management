@@ -101,7 +101,7 @@ function KanbanTaskLabelBars({
           />
           <span
             role="tooltip"
-            className="add-task-date-tooltip pointer-events-none absolute bottom-[calc(100%+6px)] left-0 z-50 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity group-hover/kanban-label-bar:opacity-100"
+            className="add-task-date-tooltip app-hover-tooltip app-hover-tooltip-above-start pointer-events-none absolute bottom-[calc(100%+6px)] left-0 z-50 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium"
           >
             {label.label}
           </span>

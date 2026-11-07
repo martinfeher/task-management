@@ -1897,7 +1897,7 @@ export function Sidebar({
                 <LuPlus className="size-3.5 text-[#acadb2]" aria-hidden="true" />
                 <span
                   aria-hidden="true"
-                  className="task-date-picker-remove-tooltip add-task-date-tooltip pointer-events-none absolute right-0 bottom-[calc(100%+8px)] z-[200] whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity group-hover/add-list:opacity-100"
+                  className="task-date-picker-remove-tooltip add-task-date-tooltip app-hover-tooltip app-hover-tooltip-above-end pointer-events-none absolute right-0 bottom-[calc(100%+8px)] z-[200] whitespace-nowrap px-3 py-1.5 text-[11px] font-medium"
                 >
                   Add List
                 </span>
@@ -1976,7 +1976,7 @@ export function Sidebar({
                         />
                         <span
                           role="tooltip"
-                          className="add-task-date-tooltip pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-[200] -translate-x-1/2 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity group-hover/folder:opacity-100"
+                          className="add-task-date-tooltip app-hover-tooltip app-hover-tooltip-above-center pointer-events-none absolute bottom-[calc(100%+8px)] z-[200] whitespace-nowrap px-3 py-1.5 text-[11px] font-medium"
                         >
                           {isExpanded ? "Fold" : "Unfold"}
                         </span>
@@ -2090,7 +2090,7 @@ export function Sidebar({
                 <LuPlus className="size-3.5 text-[#acadb2]" />
                 <span
                   aria-hidden="true"
-                  className="task-date-picker-remove-tooltip add-task-date-tooltip pointer-events-none absolute right-0 bottom-[calc(100%+8px)] z-[200] whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity group-hover/add-label:opacity-100"
+                  className="task-date-picker-remove-tooltip add-task-date-tooltip app-hover-tooltip app-hover-tooltip-above-end pointer-events-none absolute right-0 bottom-[calc(100%+8px)] z-[200] whitespace-nowrap px-3 py-1.5 text-[11px] font-medium"
                 >
                   Add Label
                 </span>

@@ -68,6 +68,10 @@ import {
 } from "@/lib/calendar-layout";
 import { useCalendarTaskDefaultColor } from "@/lib/calendar-task-default-color-settings";
 import type { CalendarSidebarSyncProps } from "./calendar-view-sidebar-layout";
+import {
+  calendarNowLineIntersectsAnyBlock,
+  getCalendarTimedBlockBounds,
+} from "@/lib/calendar-now-line-overlap";
 
 const HOUR_START = CALENDAR_HOUR_START;
 const HOUR_END = CALENDAR_HOUR_END;
@@ -524,6 +528,35 @@ export function CalendarDayView({
     currentTimeTop !== null &&
     currentTimeTop >= 0 &&
     currentTimeTop <= hours.length * HOUR_HEIGHT_PX;
+
+  const dimNowLineOverTasks = useMemo(() => {
+    if (currentTimeTop === null) return false;
+
+    const blocks = dayTasks.timed
+      .filter((task) => {
+        if (
+          draggingTaskPreview?.taskId === task.id &&
+          draggingTaskPreview !== null &&
+          isCalendarTaskAtDragSource(task, draggingTaskPreview)
+        ) {
+          return false;
+        }
+        return true;
+      })
+      .map((task) => {
+        const timing = getTaskTiming(task, resizePreview);
+        return getCalendarTimedBlockBounds(
+          timing.dueTimeMinutes,
+          timing.dueDurationMinutes,
+          HOUR_START,
+          HOUR_HEIGHT_PX,
+          GRID_TOP_OFFSET_PX,
+        );
+      });
+
+    return calendarNowLineIntersectsAnyBlock(currentTimeTop, blocks);
+  }, [currentTimeTop, dayTasks.timed, draggingTaskPreview, resizePreview]);
+
   const timedGridMinMinutes = getMinutesFromCalendarGridY(
     GRID_TOP_OFFSET_PX,
     HOUR_START,
@@ -850,6 +883,7 @@ export function CalendarDayView({
                 now={now}
                 top={currentTimeTop ?? 0}
                 className="absolute inset-x-0 z-20"
+                dimTaskColumn={dimNowLineOverTasks}
               />
             ) : null}
           </div>

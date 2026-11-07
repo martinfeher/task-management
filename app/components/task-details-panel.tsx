@@ -382,7 +382,7 @@ const RECENT_FORMAT_COLORS_STORAGE_KEY = "todolist:recent-format-colors";
 const MAX_RECENT_FORMAT_COLORS = 5;
 
 const TASK_DETAILS_TOOLTIP_CLASS =
-  "add-task-date-tooltip add-task-date-tooltip-below pointer-events-none absolute top-[calc(100%+8px)] left-1/2 z-50 -translate-x-1/2 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity";
+  "add-task-date-tooltip add-task-date-tooltip-below app-hover-tooltip app-hover-tooltip-below-center pointer-events-none absolute top-[calc(100%+8px)] z-50 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium";
 
 const FORMAT_TOOLBAR_DIVIDER_CLASS =
   "mx-0.5 h-5 w-px shrink-0 self-center bg-zinc-200 dark:bg-zinc-700";
@@ -7397,7 +7397,7 @@ export function TaskDetailsPanel({
                   <span
                     id="task-details-undo-tooltip"
                     role="tooltip"
-                    className={`${TASK_DETAILS_TOOLTIP_CLASS} group-hover/undo:opacity-100`}
+                    className={TASK_DETAILS_TOOLTIP_CLASS}
                   >
                     Undo
                   </span>
@@ -7419,7 +7419,7 @@ export function TaskDetailsPanel({
                   <span
                     id="task-details-redo-tooltip"
                     role="tooltip"
-                    className={`${TASK_DETAILS_TOOLTIP_CLASS} group-hover/redo:opacity-100`}
+                    className={TASK_DETAILS_TOOLTIP_CLASS}
                   >
                     Redo
                   </span>
@@ -7443,7 +7443,7 @@ export function TaskDetailsPanel({
                     <span
                       id="task-details-clear-formatting-tooltip"
                       role="tooltip"
-                      className={`${TASK_DETAILS_TOOLTIP_CLASS} group-hover/clear-format:opacity-100`}
+                      className={TASK_DETAILS_TOOLTIP_CLASS}
                     >
                       Remove formatting
                     </span>
@@ -7520,7 +7520,7 @@ export function TaskDetailsPanel({
                           <span
                             id="task-details-clear-formatting-tooltip-note"
                             role="tooltip"
-                            className={`${TASK_DETAILS_TOOLTIP_CLASS} group-hover/clear-format:opacity-100`}
+                            className={TASK_DETAILS_TOOLTIP_CLASS}
                           >
                             Remove formatting
                           </span>
@@ -7566,7 +7566,7 @@ export function TaskDetailsPanel({
                 <span
                   id="task-details-history-tooltip"
                   role="tooltip"
-                  className={`${TASK_DETAILS_TOOLTIP_CLASS} group-hover/history:opacity-100`}
+                  className={TASK_DETAILS_TOOLTIP_CLASS}
                 >
                   Version history
                 </span>

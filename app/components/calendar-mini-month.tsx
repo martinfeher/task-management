@@ -5,6 +5,10 @@ import { CALENDAR_TODAY_DATE_CIRCLE_CLASS } from "@/lib/calendar-layout";
 import { BiChevronLeft, BiChevronRight } from "react-icons/bi";
 import type { TaskListItem } from "./todo-app";
 import {
+  APP_HOVER_TOOLTIP_ABOVE_END,
+  APP_HOVER_TOOLTIP_ABOVE_START,
+} from "@/lib/app-hover-tooltip-classes";
+import {
   buildTasksByDateForRange,
   type CalendarDateRange,
   type CalendarTaskOccurrence,
@@ -126,8 +130,8 @@ function MiniMonthNavButton({
 }) {
   const tooltipPositionClass =
     direction === "previous"
-      ? "right-0 task-context-menu-tooltip-end"
-      : "left-0 task-context-menu-tooltip-start";
+      ? `${APP_HOVER_TOOLTIP_ABOVE_END} right-0 task-context-menu-tooltip-end`
+      : `${APP_HOVER_TOOLTIP_ABOVE_START} left-0 task-context-menu-tooltip-start`;
 
   return (
     <div className="group/mini-month-nav relative">
@@ -145,7 +149,7 @@ function MiniMonthNavButton({
       <span
         id={tooltipId}
         role="tooltip"
-        className={`add-task-date-tooltip pointer-events-none absolute bottom-[calc(100%+6px)] z-50 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity group-hover/mini-month-nav:opacity-100 ${tooltipPositionClass}`}
+        className={`add-task-date-tooltip pointer-events-none absolute bottom-[calc(100%+6px)] z-50 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium ${tooltipPositionClass}`}
       >
         {monthLabel}
       </span>

@@ -86,6 +86,10 @@ import {
   useCalendarTaskDragPreview,
 } from "./calendar-task-hover-preview";
 import { useCalendarTaskColorMenuCaptureHandler } from "./calendar-task-color-menu";
+import {
+  buildCalendarNowLineDimmedColumns,
+  getCalendarTimedBlockBounds,
+} from "@/lib/calendar-now-line-overlap";
 
 const GRID_HOUR_START = CALENDAR_COLLAPSE_EARLY_END_HOUR;
 const GRID_TOP_OFFSET_PX = 0;
@@ -578,6 +582,43 @@ export function CalendarMultiDayView({
     setNowLineTop(GRID_TOP_OFFSET_PX + currentTimeTop);
   }, [showGlobalNowLine, currentTimeTop]);
 
+  const nowLineDimmedColumns = useMemo(() => {
+    const blocksPerColumn = visibleDays.map((day) => {
+      const dateKey = toDateKey(day);
+      return (tasksByDate.get(dateKey)?.timed ?? [])
+        .filter((task) => {
+          if (
+            draggingTaskPreview?.taskId === task.id &&
+            draggingTaskPreview?.sourceDateKey === dateKey &&
+            draggingTaskPreview !== null &&
+            isCalendarTaskAtDragSource(task, draggingTaskPreview)
+          ) {
+            return false;
+          }
+          return true;
+        })
+        .map((task) => {
+          const timing = getTaskTiming(task, resizePreview);
+          return getCalendarTimedBlockBounds(
+            timing.dueTimeMinutes,
+            timing.dueDurationMinutes,
+            GRID_HOUR_START,
+            hourHeightPx,
+            GRID_TOP_OFFSET_PX,
+          );
+        });
+    });
+
+    return buildCalendarNowLineDimmedColumns(nowLineTop, blocksPerColumn);
+  }, [
+    visibleDays,
+    tasksByDate,
+    nowLineTop,
+    draggingTaskPreview,
+    resizePreview,
+    hourHeightPx,
+  ]);
+
   if (!rangeStart || !today || !now) {
     return (
       <div className="flex min-h-0 flex-1 p-4">
@@ -1052,6 +1093,7 @@ export function CalendarMultiDayView({
                 todayColumnIndex={todayIndex}
                 columnCount={dayCount}
                 className="absolute inset-x-0 z-20"
+                dimmedColumns={nowLineDimmedColumns}
               />
             ) : null}
               </div>

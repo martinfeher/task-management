@@ -148,7 +148,7 @@ export function TaskListEntityFilter({
               <span
                 id={tooltipId}
                 role="tooltip"
-                className="add-task-date-tooltip pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-40 -translate-x-1/2 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity group-hover:opacity-100"
+                className="add-task-date-tooltip app-hover-tooltip app-hover-tooltip-above-center pointer-events-none absolute bottom-[calc(100%+8px)] z-40 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium"
               >
                 {tab.label}
               </span>

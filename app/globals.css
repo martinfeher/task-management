@@ -1109,19 +1109,70 @@ body {
   box-shadow: var(--app-tooltip-shadow);
 }
 
-.add-task-form-icon-tooltip {
-  left: 50%;
+.app-hover-tooltip {
   opacity: 0;
-  transform: translate(-50%, 4px) scale(0.96);
   transition:
     opacity 160ms cubic-bezier(0.16, 1, 0.3, 1),
     transform 160ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.add-task-form .group\/date-picker:hover > .add-task-form-icon-tooltip,
-.add-task-form .group\/add-label:hover > .add-task-form-icon-tooltip,
-.add-task-form .group\/add-priority:hover > .add-task-form-icon-tooltip {
+.app-hover-tooltip-above-center {
+  left: 50%;
+  transform: translate(-50%, 4px) scale(0.96);
+}
+
+.app-hover-tooltip-above-start {
+  transform: translateY(4px) scale(0.96);
+}
+
+.app-hover-tooltip-above-end {
+  transform: translateY(4px) scale(0.96);
+}
+
+.app-hover-tooltip-below-center {
+  left: 50%;
+  transform: translate(-50%, -4px) scale(0.96);
+}
+
+.group:hover > .app-hover-tooltip,
+[class*="group/"]:hover > .app-hover-tooltip {
   opacity: 1;
+}
+
+.group:hover > .app-hover-tooltip-above-center,
+[class*="group/"]:hover > .app-hover-tooltip-above-center {
+  transform: translate(-50%, 0) scale(1);
+}
+
+.group:hover > .app-hover-tooltip-above-start,
+[class*="group/"]:hover > .app-hover-tooltip-above-start {
+  transform: translateY(0) scale(1);
+}
+
+.group:hover > .app-hover-tooltip-above-end,
+[class*="group/"]:hover > .app-hover-tooltip-above-end {
+  transform: translateY(0) scale(1);
+}
+
+.group:hover > .app-hover-tooltip-below-center,
+[class*="group/"]:hover > .app-hover-tooltip-below-center {
+  transform: translate(-50%, 0) scale(1);
+}
+
+.app-hover-tooltip--shown {
+  opacity: 1;
+}
+
+.app-hover-tooltip--shown.app-hover-tooltip-above-center {
+  transform: translate(-50%, 0) scale(1);
+}
+
+.app-hover-tooltip--shown.app-hover-tooltip-above-start,
+.app-hover-tooltip--shown.app-hover-tooltip-above-end {
+  transform: translateY(0) scale(1);
+}
+
+.app-hover-tooltip--shown.app-hover-tooltip-below-center {
   transform: translate(-50%, 0) scale(1);
 }
 
@@ -1205,9 +1256,36 @@ body {
     filter: none;
   }
 
-  .add-task-form-icon-tooltip {
-    transform: translate(-50%, 0);
+  .app-hover-tooltip {
     transition: opacity 150ms ease;
+  }
+
+  .app-hover-tooltip-above-center,
+  .app-hover-tooltip-below-center {
+    transform: translateX(-50%);
+  }
+
+  .app-hover-tooltip-above-start,
+  .app-hover-tooltip-above-end {
+    transform: none;
+  }
+
+  .group:hover > .app-hover-tooltip-above-center,
+  [class*="group/"]:hover > .app-hover-tooltip-above-center,
+  .group:hover > .app-hover-tooltip-below-center,
+  [class*="group/"]:hover > .app-hover-tooltip-below-center,
+  .app-hover-tooltip--shown.app-hover-tooltip-above-center,
+  .app-hover-tooltip--shown.app-hover-tooltip-below-center {
+    transform: translateX(-50%);
+  }
+
+  .group:hover > .app-hover-tooltip-above-start,
+  [class*="group/"]:hover > .app-hover-tooltip-above-start,
+  .group:hover > .app-hover-tooltip-above-end,
+  [class*="group/"]:hover > .app-hover-tooltip-above-end,
+  .app-hover-tooltip--shown.app-hover-tooltip-above-start,
+  .app-hover-tooltip--shown.app-hover-tooltip-above-end {
+    transform: none;
   }
 }
 

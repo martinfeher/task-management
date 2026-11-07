@@ -76,6 +76,10 @@ import {
   useCalendarTaskDropRevealMask,
   type CalendarTaskDragState,
 } from "@/lib/calendar-task-drag";
+import {
+  buildCalendarNowLineDimmedColumns,
+  getCalendarTimedBlockBounds,
+} from "@/lib/calendar-now-line-overlap";
 
 const GRID_HOUR_START = CALENDAR_COLLAPSE_EARLY_END_HOUR;
 const GRID_TOP_OFFSET_PX = 0;
@@ -630,6 +634,41 @@ export function CalendarWeekView({
                 );
                 const showThisWeekNowLine =
                   showWeekNowLine && todayColumnIndex >= 0;
+                const weekNowLineDimmedColumns =
+                  showThisWeekNowLine && nowLineTop !== null
+                    ? buildCalendarNowLineDimmedColumns(
+                        nowLineTop,
+                        weekDays.map((day) => {
+                          const dayDateKey = toDateKey(day);
+                          return (tasksByDate.get(dayDateKey)?.timed ?? [])
+                            .filter((task) => {
+                              if (
+                                draggingTaskPreview?.taskId === task.id &&
+                                draggingTaskPreview?.sourceDateKey ===
+                                  dayDateKey &&
+                                draggingTaskPreview !== null &&
+                                isCalendarTaskAtDragSource(
+                                  task,
+                                  draggingTaskPreview,
+                                )
+                              ) {
+                                return false;
+                              }
+                              return true;
+                            })
+                            .map((task) => {
+                              const timing = getTaskTiming(task, resizePreview);
+                              return getCalendarTimedBlockBounds(
+                                timing.dueTimeMinutes,
+                                timing.dueDurationMinutes,
+                                gridHourStart,
+                                hourHeightPx,
+                                effectiveGridTopOffset,
+                              );
+                            });
+                        }),
+                      )
+                    : undefined;
 
                 return (
                   <div
@@ -1065,6 +1104,7 @@ export function CalendarWeekView({
                 todayColumnIndex={todayColumnIndex}
                 columnCount={weekDays.length}
                 className="absolute inset-x-0 z-20"
+                dimmedColumns={weekNowLineDimmedColumns}
               />
             ) : null}
                 </div>

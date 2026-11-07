@@ -42,6 +42,7 @@ import {
   type TaskListEntityScope,
 } from "./task-list-entity-filter";
 import { useAddTaskNoteSwitchEnabled } from "@/lib/add-task-note-switch-settings";
+import { APP_HOVER_TOOLTIP_ABOVE_CENTER } from "@/lib/app-hover-tooltip-classes";
 import {
   TaskRowContextMenu,
 } from "./task-row-context-menu";
@@ -2990,7 +2991,7 @@ export function TaskListPanel({
                     <span
                       id="add-task-calendar-tooltip"
                       role="tooltip"
-                      className="add-task-date-tooltip add-task-form-icon-tooltip pointer-events-none absolute bottom-[calc(100%+10px)] z-40 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium"
+                      className={`add-task-date-tooltip ${APP_HOVER_TOOLTIP_ABOVE_CENTER} pointer-events-none absolute bottom-[calc(100%+10px)] z-40 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium`}
                     >
                       date
                     </span>
@@ -3055,7 +3056,7 @@ export function TaskListPanel({
                     <span
                       id="add-task-label-tooltip"
                       role="tooltip"
-                      className="add-task-date-tooltip add-task-form-icon-tooltip pointer-events-none absolute bottom-[calc(100%+10px)] z-40 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium"
+                      className={`add-task-date-tooltip ${APP_HOVER_TOOLTIP_ABOVE_CENTER} pointer-events-none absolute bottom-[calc(100%+10px)] z-40 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium`}
                     >
                       label
                     </span>
@@ -3115,7 +3116,7 @@ export function TaskListPanel({
                     <span
                       id="add-task-priority-tooltip"
                       role="tooltip"
-                      className="add-task-date-tooltip add-task-form-icon-tooltip pointer-events-none absolute bottom-[calc(100%+10px)] z-40 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium"
+                      className={`add-task-date-tooltip ${APP_HOVER_TOOLTIP_ABOVE_CENTER} pointer-events-none absolute bottom-[calc(100%+10px)] z-40 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium`}
                     >
                       priority
                     </span>

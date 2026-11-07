@@ -1,11 +1,11 @@
 import type { CSSProperties } from "react";
 import { CALENDAR_HOUR_COLUMN_WIDTH_PX } from "@/lib/calendar-layout";
+import {
+  CALENDAR_NOW_LINE_OPACITY,
+  CALENDAR_NOW_LINE_OVER_TASK_OPACITY,
+} from "@/lib/calendar-now-line-overlap";
 
 const CALENDAR_NOW_LINE_COLOR = "#9d9d9d";
-const CALENDAR_NOW_LINE_STYLE: CSSProperties = {
-  backgroundColor: CALENDAR_NOW_LINE_COLOR,
-  opacity: 0.5,
-};
 const CALENDAR_NOW_LABEL_BG = "#BBBBBB";
 
 export function formatCalendarCurrentTimeLabel(date: Date) {
@@ -14,6 +14,13 @@ export function formatCalendarCurrentTimeLabel(date: Date) {
     minute: "2-digit",
     hour12: false,
   }).format(date);
+}
+
+function calendarNowLineStyle(opacity: number): CSSProperties {
+  return {
+    backgroundColor: CALENDAR_NOW_LINE_COLOR,
+    opacity,
+  };
 }
 
 type CalendarCurrentTimeLineProps = {
@@ -26,6 +33,12 @@ type CalendarCurrentTimeLineProps = {
   variant?: "default" | "accent";
   todayColumnIndex?: number;
   columnCount?: number;
+  /** When true, task-column segments use reduced opacity (single-column day view). */
+  dimTaskColumn?: boolean;
+  /** Per-column dimming for week / multi-day grids (same length as `columnCount`). */
+  dimmedColumns?: boolean[];
+  lineOpacity?: number;
+  overTaskLineOpacity?: number;
 };
 
 export function CalendarCurrentTimeLine({
@@ -38,12 +51,18 @@ export function CalendarCurrentTimeLine({
   variant = "default",
   todayColumnIndex,
   columnCount = 1,
+  dimTaskColumn = false,
+  dimmedColumns,
+  lineOpacity = CALENDAR_NOW_LINE_OPACITY,
+  overTaskLineOpacity = CALENDAR_NOW_LINE_OVER_TASK_OPACITY,
 }: CalendarCurrentTimeLineProps) {
   const showAccentColumns =
     variant === "accent" &&
     todayColumnIndex !== undefined &&
     todayColumnIndex >= 0 &&
     columnCount > 0;
+
+  const taskColumnOpacity = dimTaskColumn ? overTaskLineOpacity : lineOpacity;
 
   return (
     <div
@@ -77,6 +96,10 @@ export function CalendarCurrentTimeLine({
         >
           {Array.from({ length: columnCount }, (_, index) => {
             const isToday = index === todayColumnIndex;
+            const columnDimmed = dimmedColumns?.[index] ?? false;
+            const columnLineOpacity = columnDimmed
+              ? overTaskLineOpacity
+              : lineOpacity;
 
             return (
               <div key={index} className="relative flex min-w-0 items-center">
@@ -85,19 +108,28 @@ export function CalendarCurrentTimeLine({
                     <span
                       aria-hidden="true"
                       className="absolute left-0 size-2 -translate-x-1/2 rounded-full"
-                      style={CALENDAR_NOW_LINE_STYLE}
+                      style={calendarNowLineStyle(columnLineOpacity)}
                     />
-                    <div className="h-px min-w-0 flex-1" style={CALENDAR_NOW_LINE_STYLE} />
+                    <div
+                      className="h-px min-w-0 flex-1"
+                      style={calendarNowLineStyle(columnLineOpacity)}
+                    />
                   </>
                 ) : (
-                  <div className="h-px w-full" style={CALENDAR_NOW_LINE_STYLE} />
+                  <div
+                    className="h-px w-full"
+                    style={calendarNowLineStyle(columnLineOpacity)}
+                  />
                 )}
               </div>
             );
           })}
         </div>
       ) : (
-        <div className="h-px min-w-0 flex-1" style={CALENDAR_NOW_LINE_STYLE} />
+        <div
+          className="h-px min-w-0 flex-1"
+          style={calendarNowLineStyle(taskColumnOpacity)}
+        />
       )}
     </div>
   );

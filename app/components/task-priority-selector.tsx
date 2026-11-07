@@ -7,6 +7,11 @@ import {
 } from "@/lib/task-priority";
 import { TaskPriorityFlagIcon } from "./task-priority-icon";
 import { taskContextMenuTextColor } from "@/lib/task-context-menu-colors";
+import {
+  APP_HOVER_TOOLTIP_ABOVE_CENTER,
+  APP_HOVER_TOOLTIP_ABOVE_END,
+  APP_HOVER_TOOLTIP_ABOVE_START,
+} from "@/lib/app-hover-tooltip-classes";
 
 type TaskPrioritySelectorProps = {
   selectedPriority: number | null;
@@ -32,10 +37,10 @@ function TaskPrioritySelectorButton({
 }) {
   const tooltipPositionClass =
     tooltipAlign === "start"
-      ? "left-0 task-context-menu-tooltip-start"
+      ? `${APP_HOVER_TOOLTIP_ABOVE_START} left-0 task-context-menu-tooltip-start`
       : tooltipAlign === "end"
-        ? "right-0 left-auto task-context-menu-tooltip-end"
-        : "left-1/2 -translate-x-1/2";
+        ? `${APP_HOVER_TOOLTIP_ABOVE_END} right-0 left-auto task-context-menu-tooltip-end`
+        : APP_HOVER_TOOLTIP_ABOVE_CENTER;
 
   return (
     <div className="group/priority-option relative cursor-pointer">
@@ -54,7 +59,7 @@ function TaskPrioritySelectorButton({
       <span
         id={tooltipId}
         role="tooltip"
-        className={`add-task-date-tooltip pointer-events-none absolute bottom-[calc(100%+6px)] z-50 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity group-hover/priority-option:opacity-100 ${tooltipPositionClass}`}
+        className={`add-task-date-tooltip pointer-events-none absolute bottom-[calc(100%+6px)] z-50 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium ${tooltipPositionClass}`}
       >
         {label}
       </span>

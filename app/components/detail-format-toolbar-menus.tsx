@@ -127,17 +127,19 @@ function useFormatToolbarAnchorPlacement() {
   return useContext(FormatToolbarAnchorPlacementContext);
 }
 
-const FORMAT_TOOLBAR_TOOLTIP_BASE_CLASS =
-  "add-task-date-tooltip pointer-events-none absolute left-1/2 z-50 -translate-x-1/2 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity";
+const FORMAT_TOOLBAR_TOOLTIP_CHROME =
+  "add-task-date-tooltip pointer-events-none absolute z-50 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium";
 
 function getFormatToolbarTooltipPositionClass(
   placement: FormatToolbarAnchorPlacement,
+  showOnHover: boolean,
 ) {
+  const motion = showOnHover ? "app-hover-tooltip " : "";
   if (placement === "above") {
-    return `${FORMAT_TOOLBAR_TOOLTIP_BASE_CLASS} bottom-[calc(100%+6px)]`;
+    return `${FORMAT_TOOLBAR_TOOLTIP_CHROME} ${motion}app-hover-tooltip-above-center bottom-[calc(100%+6px)]`;
   }
 
-  return `${FORMAT_TOOLBAR_TOOLTIP_BASE_CLASS} add-task-date-tooltip-below top-[calc(100%+6px)]`;
+  return `${FORMAT_TOOLBAR_TOOLTIP_CHROME} ${motion}app-hover-tooltip-below-center add-task-date-tooltip-below top-[calc(100%+6px)]`;
 }
 
 function getFormatToolbarDropdownAnchorClass(
@@ -160,7 +162,7 @@ function getFormatToolbarDropdownAnchorClass(
 
 /** @deprecated Use placement-aware tooltips via FormatToolbarAnchorPlacementProvider */
 export const FORMAT_TOOLBAR_TOOLTIP_CLASS =
-  getFormatToolbarTooltipPositionClass("below");
+  getFormatToolbarTooltipPositionClass("below", true);
 
 export const FORMAT_TOOLBAR_TOOLTIP_SHORTCUT_CLASS =
   "format-toolbar-tooltip-shortcut mt-0.5 block text-[10px] font-normal leading-none";
@@ -196,9 +198,9 @@ export function FormatToolbarTooltipWrap({
       <span
         id={tooltipId}
         role="tooltip"
-        className={`${getFormatToolbarTooltipPositionClass(placement)} ${
+        className={`${getFormatToolbarTooltipPositionClass(placement, !hideTooltip)} ${
           shortcut ? "py-2 text-center" : ""
-        } ${hideTooltip ? "" : "group-hover/format-tooltip:opacity-100"}`}
+        } ${hideTooltip ? "opacity-0" : ""}`}
       >
         <span className="block whitespace-nowrap">{label}</span>
         {shortcut ? (

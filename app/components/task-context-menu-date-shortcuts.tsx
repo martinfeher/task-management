@@ -12,6 +12,11 @@ import {
 } from "@/lib/task-due-date";
 import { TodayCalendarIcon } from "./today-calendar-icon";
 import {
+  APP_HOVER_TOOLTIP_ABOVE_CENTER,
+  APP_HOVER_TOOLTIP_ABOVE_END,
+  APP_HOVER_TOOLTIP_ABOVE_START,
+} from "@/lib/app-hover-tooltip-classes";
+import {
   TASK_CONTEXT_MENU_COLORS,
   taskContextMenuTextColor,
 } from "@/lib/task-context-menu-colors";
@@ -49,10 +54,10 @@ function DateShortcutButton({
 }) {
   const tooltipPositionClass =
     tooltipAlign === "start"
-      ? "left-0 task-context-menu-tooltip-start"
+      ? `${APP_HOVER_TOOLTIP_ABOVE_START} left-0 task-context-menu-tooltip-start`
       : tooltipAlign === "end"
-        ? "right-0 left-auto task-context-menu-tooltip-end"
-        : "left-1/2 -translate-x-1/2";
+        ? `${APP_HOVER_TOOLTIP_ABOVE_END} right-0 left-auto task-context-menu-tooltip-end`
+        : APP_HOVER_TOOLTIP_ABOVE_CENTER;
 
   return (
     <div className="group/date-option relative cursor-pointer mx-1">
@@ -76,7 +81,7 @@ function DateShortcutButton({
       <span
         id={tooltipId}
         role="tooltip"
-        className={`add-task-date-tooltip pointer-events-none absolute bottom-[calc(100%+6px)] z-50 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity group-hover/date-option:opacity-100 ${tooltipPositionClass}`}
+        className={`add-task-date-tooltip pointer-events-none absolute bottom-[calc(100%+6px)] z-50 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium ${tooltipPositionClass}`}
       >
         {label}
       </span>
@@ -201,7 +206,7 @@ export function TaskContextMenuDateShortcuts({
             <span
               id={`${tooltipBaseId}-clear-date`}
               role="tooltip"
-              className="add-task-date-tooltip pointer-events-none absolute bottom-[calc(100%+6px)] right-0 left-auto z-50 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity group-hover/clear-date:opacity-100 task-context-menu-tooltip-end"
+              className={`add-task-date-tooltip ${APP_HOVER_TOOLTIP_ABOVE_END} pointer-events-none absolute bottom-[calc(100%+6px)] right-0 left-auto z-50 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium task-context-menu-tooltip-end`}
             >
               Clear date
             </span>

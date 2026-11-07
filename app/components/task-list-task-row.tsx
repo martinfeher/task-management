@@ -704,7 +704,7 @@ export function TaskListTaskRow({
           <span
             id={`note-icon-tooltip-${task.id}`}
             role="tooltip"
-            className="add-task-date-tooltip pointer-events-none absolute bottom-[calc(100%+10px)] left-1/2 z-40 -translate-x-1/2 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity group-hover/note-icon:opacity-100"
+            className="add-task-date-tooltip app-hover-tooltip app-hover-tooltip-above-center pointer-events-none absolute bottom-[calc(100%+10px)] z-40 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium"
           >
             Note
           </span>
@@ -796,7 +796,7 @@ export function TaskListTaskRow({
                       <span
                         id={`subtask-collapse-tooltip-${task.id}`}
                         role="tooltip"
-                        className="add-task-date-tooltip add-task-date-tooltip-sm pointer-events-none absolute bottom-[calc(100%+10px)] left-1/2 z-40 -translate-x-1/2 whitespace-nowrap font-medium opacity-0 transition-opacity group-hover/subtask-collapse:opacity-100"
+                        className="add-task-date-tooltip add-task-date-tooltip-sm app-hover-tooltip app-hover-tooltip-above-center pointer-events-none absolute bottom-[calc(100%+10px)] z-40 whitespace-nowrap font-medium"
                       >
                         Collapse subtasks
                       </span>
@@ -869,7 +869,7 @@ export function TaskListTaskRow({
                   <span
                     id={`subtask-toggle-tooltip-${task.id}`}
                     role="tooltip"
-                    className="add-task-date-tooltip pointer-events-none absolute bottom-[calc(100%+10px)] left-1/2 z-40 -translate-x-1/2 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity group-hover/subtask-toggle:opacity-100"
+                    className="add-task-date-tooltip app-hover-tooltip app-hover-tooltip-above-center pointer-events-none absolute bottom-[calc(100%+10px)] z-40 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium"
                   >
                     Subtasks
                   </span>
@@ -996,7 +996,7 @@ export function TaskListTaskRow({
               <span
                 id={`set-date-tooltip-${task.id}`}
                 role="tooltip"
-                className="add-task-date-tooltip pointer-events-none absolute bottom-[calc(100%+10px)] left-1/2 z-40 -translate-x-1/2 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity group-hover/set-date:opacity-100"
+                className="add-task-date-tooltip app-hover-tooltip app-hover-tooltip-above-center pointer-events-none absolute bottom-[calc(100%+10px)] z-40 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium"
               >
                 Set date
               </span>
@@ -1072,7 +1072,7 @@ export function TaskListTaskRow({
               <span
                 id={`set-priority-tooltip-${task.id}`}
                 role="tooltip"
-                className="add-task-date-tooltip pointer-events-none absolute bottom-[calc(100%+10px)] left-1/2 z-40 -translate-x-1/2 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity group-hover/add-priority:opacity-100"
+                className="add-task-date-tooltip app-hover-tooltip app-hover-tooltip-above-center pointer-events-none absolute bottom-[calc(100%+10px)] z-40 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium"
               >
                 Priority
               </span>
@@ -1105,7 +1105,7 @@ export function TaskListTaskRow({
               <span
                 id={`set-label-tooltip-${task.id}`}
                 role="tooltip"
-                className="add-task-date-tooltip pointer-events-none absolute bottom-[calc(100%+10px)] left-1/2 z-40 -translate-x-1/2 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity group-hover/add-label:opacity-100"
+                className="add-task-date-tooltip app-hover-tooltip app-hover-tooltip-above-center pointer-events-none absolute bottom-[calc(100%+10px)] z-40 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium"
               >
                 Add label
               </span>
