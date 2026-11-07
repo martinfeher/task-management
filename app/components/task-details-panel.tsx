@@ -280,6 +280,12 @@ type TaskDetailsPanelProps = {
   onBack?: () => void;
   layout?: "default" | "modal";
   modalFooterConfig?: TaskModalFooterConfig | null;
+  /** Calendar new-task modal: replaces “Saved” with a primary action (e.g. Create). */
+  modalCreateAction?: {
+    label: string;
+    onClick: () => void | Promise<void>;
+    disabled?: boolean;
+  } | null;
   hideModalFormatToggle?: boolean;
   onClose?: () => void;
 };
@@ -2172,6 +2178,7 @@ export function TaskDetailsPanel({
   onBack,
   layout = "default",
   modalFooterConfig = null,
+  modalCreateAction = null,
   hideModalFormatToggle = false,
   onClose,
 }: TaskDetailsPanelProps) {
@@ -8140,11 +8147,42 @@ export function TaskDetailsPanel({
       {isModalLayout && task && modalFooterConfig ? (
         <footer className="flex shrink-0 items-center justify-between gap-2 px-[22px] py-2.5 dark:border-zinc-800">
           <TaskModalFooter taskId={task.id} {...modalFooterConfig} />
-          {taskId &&
-          saveStatus !== "loading" &&
-          (saveStatus === "error" ||
-            showClipboardNotice ||
-            (lastSavedAt !== null && saveStatus === "saved")) ? (
+          {modalCreateAction ? (
+            <div className="flex shrink-0 flex-col items-end gap-1">
+              {metadataError ? (
+                <span className="text-xs text-red-600 dark:text-red-400">
+                  {metadataError}
+                </span>
+              ) : null}
+              {saveStatus === "error" ? (
+                <span className="pointer-events-auto flex items-center gap-2 text-xs text-red-600 dark:text-red-400">
+                  <span>{saveErrorMessage ?? "Something went wrong"}</span>
+                  <button
+                    type="button"
+                    onClick={() => void saveDetails()}
+                    className="rounded-md border border-red-200 px-2 py-0.5 text-[11px] font-medium text-red-700 transition-colors hover:bg-red-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/40"
+                  >
+                    Retry
+                  </button>
+                </span>
+              ) : null}
+              <button
+                type="button"
+                disabled={
+                  modalCreateAction.disabled === true ||
+                  saveStatus === "loading"
+                }
+                onClick={() => void modalCreateAction.onClick()}
+                className="rounded-[12px] bg-[#6387cf] px-3.5 py-1.5 cursor-pointer text-[13px] font-medium text-white transition-colors hover:bg-[#3f68bd] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {modalCreateAction.label}
+              </button>
+            </div>
+          ) : taskId &&
+            saveStatus !== "loading" &&
+            (saveStatus === "error" ||
+              showClipboardNotice ||
+              (lastSavedAt !== null && saveStatus === "saved")) ? (
             <div className="shrink-0">
               <span className="flex flex-wrap items-center justify-end gap-2 text-xs text-[#82828a] dark:text-[#acacb4]">
                 {showClipboardNotice ? <span>{clipboardNoticeMessage}</span> : null}
@@ -8156,20 +8194,20 @@ export function TaskDetailsPanel({
                 {saveStatus === "error" ? (
                   <span className="pointer-events-auto flex items-center gap-2 text-red-600 dark:text-red-400">
                     <span>{saveErrorMessage ?? "Something went wrong"}</span>
-                  <button
-                    type="button"
+                    <button
+                      type="button"
                       onClick={() => void saveDetails()}
                       className="rounded-md border border-red-200 px-2 py-0.5 text-[11px] font-medium text-red-700 transition-colors hover:bg-red-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/40"
                     >
                       Retry
-                  </button>
+                    </button>
                   </span>
                 ) : null}
                 {lastSavedAt && saveStatus === "saved" ? (
                   <span>Saved · {formatSaveTime(lastSavedAt)}</span>
                 ) : null}
               </span>
-              </div>
+            </div>
           ) : null}
         </footer>
       ) : null}

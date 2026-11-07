@@ -837,6 +837,82 @@ body {
   }
 }
 
+@property --sidebar-search-border-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.sidebar-search-border-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.sidebar-search-border-wrap::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 7px;
+  padding: 1px;
+  background: conic-gradient(
+    from var(--sidebar-search-border-angle),
+    #c4b5fd,
+    #93c5fd,
+    #f9a8d4,
+    #a5b4fc,
+    #7dd3fc,
+    #c4b5fd
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  animation: sidebar-search-border-spin 2.6s linear infinite;
+  animation-play-state: paused;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.sidebar-search-border-wrap:hover::before,
+.sidebar-search-border-wrap:focus-within::before {
+  opacity: 1;
+  animation-play-state: running;
+}
+
+@keyframes sidebar-search-border-spin {
+  to {
+    --sidebar-search-border-angle: 360deg;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-search-border-wrap::before {
+    animation: none;
+    --sidebar-search-border-angle: 45deg;
+  }
+
+  .sidebar-search-border-wrap:hover::before,
+  .sidebar-search-border-wrap:focus-within::before {
+    opacity: 1;
+  }
+}
+
+.sidebar-search-trigger {
+  position: relative;
+  z-index: 1;
+}
+
+.sidebar-search-border-wrap:hover .sidebar-search-trigger,
+.sidebar-search-border-wrap:focus-within .sidebar-search-trigger {
+  border-color: transparent;
+}
+
 .search-modal-overlay {
   opacity: 0;
   pointer-events: none;
@@ -1033,6 +1109,22 @@ body {
   box-shadow: var(--app-tooltip-shadow);
 }
 
+.add-task-form-icon-tooltip {
+  left: 50%;
+  opacity: 0;
+  transform: translate(-50%, 4px) scale(0.96);
+  transition:
+    opacity 160ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.add-task-form .group\/date-picker:hover > .add-task-form-icon-tooltip,
+.add-task-form .group\/add-label:hover > .add-task-form-icon-tooltip,
+.add-task-form .group\/add-priority:hover > .add-task-form-icon-tooltip {
+  opacity: 1;
+  transform: translate(-50%, 0) scale(1);
+}
+
 .add-task-date-tooltip-sm {
   padding: 4.5px 9px;
   font-size: 10px;
@@ -1111,6 +1203,11 @@ body {
     animation: none;
     opacity: 1;
     filter: none;
+  }
+
+  .add-task-form-icon-tooltip {
+    transform: translate(-50%, 0);
+    transition: opacity 150ms ease;
   }
 }
 

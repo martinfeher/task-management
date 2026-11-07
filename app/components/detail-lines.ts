@@ -3077,6 +3077,12 @@ export function syncLineEmptyState(editor: HTMLElement) {
   });
 }
 
+function editorHasStartedBodyContent(editor: HTMLElement) {
+  const lines = getLineElements(editor);
+  if (lines.length <= 1) return false;
+  return lines.slice(1).some((line) => isBodyLineWithContent(line));
+}
+
 export function syncEditorBodyPlaceholderVisibility(
   editor: HTMLElement,
   options?: { hoveredLine?: HTMLElement | null },
@@ -3103,7 +3109,7 @@ export function syncEditorBodyPlaceholderVisibility(
       activeLine.dataset.showBodyPlaceholder = "true";
     }
 
-    if (activeLine && !isLineEmpty(activeLine)) {
+    if (editorHasStartedBodyContent(editor)) {
       editor.dataset.hideBodyPlaceholder = "true";
     } else {
       delete editor.dataset.hideBodyPlaceholder;

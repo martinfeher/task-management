@@ -2990,7 +2990,7 @@ export function TaskListPanel({
                     <span
                       id="add-task-calendar-tooltip"
                       role="tooltip"
-                      className="add-task-date-tooltip pointer-events-none absolute bottom-[calc(100%+10px)] left-1/2 z-40 -translate-x-1/2 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity group-hover/date-picker:opacity-100"
+                      className="add-task-date-tooltip add-task-form-icon-tooltip pointer-events-none absolute bottom-[calc(100%+10px)] z-40 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium"
                     >
                       date
                     </span>
@@ -3055,7 +3055,7 @@ export function TaskListPanel({
                     <span
                       id="add-task-label-tooltip"
                       role="tooltip"
-                      className="add-task-date-tooltip pointer-events-none absolute bottom-[calc(100%+10px)] left-1/2 z-40 -translate-x-1/2 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity group-hover/add-label:opacity-100"
+                      className="add-task-date-tooltip add-task-form-icon-tooltip pointer-events-none absolute bottom-[calc(100%+10px)] z-40 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium"
                     >
                       label
                     </span>
@@ -3115,7 +3115,7 @@ export function TaskListPanel({
                     <span
                       id="add-task-priority-tooltip"
                       role="tooltip"
-                      className="add-task-date-tooltip pointer-events-none absolute bottom-[calc(100%+10px)] left-1/2 z-40 -translate-x-1/2 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium opacity-0 transition-opacity group-hover/add-priority:opacity-100"
+                      className="add-task-date-tooltip add-task-form-icon-tooltip pointer-events-none absolute bottom-[calc(100%+10px)] z-40 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium"
                     >
                       priority
                     </span>

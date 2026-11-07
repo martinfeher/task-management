@@ -197,6 +197,69 @@ const TASK_PRIORITY_MENU_WIDTH = 196;
 const TASK_PRIORITY_MENU_HEIGHT = 72;
 const TASK_PRIORITY_MENU_GAP = 4;
 
+function getTaskListPanelScrollBounds(anchor: HTMLElement | null) {
+  const viewportPadding = 8;
+  const scrollContainer = anchor?.closest(
+    ".list-panel-scroll",
+  ) as HTMLElement | null;
+
+  if (!scrollContainer) {
+    return {
+      top: viewportPadding,
+      bottom: window.innerHeight - viewportPadding,
+    };
+  }
+
+  const panelRect = scrollContainer.getBoundingClientRect();
+  return {
+    top: panelRect.top + viewportPadding,
+    bottom: panelRect.bottom - viewportPadding,
+  };
+}
+
+function computeTaskPriorityMenuPosition(
+  rect: DOMRect,
+  anchor: HTMLElement | null,
+) {
+  const viewportPadding = 8;
+  let left = rect.left + rect.width / 2 - TASK_PRIORITY_MENU_WIDTH / 2;
+  left = Math.max(
+    viewportPadding,
+    Math.min(
+      left,
+      window.innerWidth - TASK_PRIORITY_MENU_WIDTH - viewportPadding,
+    ),
+  );
+
+  const panelBounds = getTaskListPanelScrollBounds(anchor);
+  const belowTop = rect.bottom + TASK_PRIORITY_MENU_GAP;
+  const fitsBelowInPanel =
+    belowTop + TASK_PRIORITY_MENU_HEIGHT <= panelBounds.bottom;
+
+  let top: number;
+  if (fitsBelowInPanel) {
+    top = belowTop;
+  } else {
+    top = rect.top - TASK_PRIORITY_MENU_HEIGHT - TASK_PRIORITY_MENU_GAP;
+    if (top < panelBounds.top) {
+      top = Math.max(
+        panelBounds.top,
+        Math.min(
+          belowTop,
+          panelBounds.bottom - TASK_PRIORITY_MENU_HEIGHT,
+        ),
+      );
+    }
+  }
+
+  top = Math.max(
+    viewportPadding,
+    Math.min(top, window.innerHeight - TASK_PRIORITY_MENU_HEIGHT - viewportPadding),
+  );
+
+  return { top, left };
+}
+
 const TASK_ROW_LEFT_BORDER_WIDTH_CLASS = "border-l-[2px]";
 const TASK_ROW_LEFT_BORDER_COLOR_CLASS = "border-l-[#dADFeF]";
 
@@ -559,27 +622,9 @@ export function TaskListTaskRow({
       const anchor = priorityMenuButtonRef.current;
       if (!anchor) return;
 
-      const rect = anchor.getBoundingClientRect();
-      const viewportPadding = 8;
-      let left = rect.left + rect.width / 2 - TASK_PRIORITY_MENU_WIDTH / 2;
-      left = Math.max(
-        viewportPadding,
-        Math.min(
-          left,
-          window.innerWidth - TASK_PRIORITY_MENU_WIDTH - viewportPadding,
-        ),
+      setPriorityMenuPosition(
+        computeTaskPriorityMenuPosition(anchor.getBoundingClientRect(), anchor),
       );
-
-      let top = rect.top - TASK_PRIORITY_MENU_HEIGHT - TASK_PRIORITY_MENU_GAP;
-      top = Math.max(
-        viewportPadding,
-        Math.min(
-          top,
-          window.innerHeight - TASK_PRIORITY_MENU_HEIGHT - viewportPadding,
-        ),
-      );
-
-      setPriorityMenuPosition({ top, left });
     }
 
     updatePriorityMenuPosition();

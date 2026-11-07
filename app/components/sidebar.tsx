@@ -1847,45 +1847,38 @@ export function Sidebar({
               );
             })()
             ) : (
-            <button
-              key={item.label}
-              type="button"
-              onClick={
-                item.action === "search"
-                  ? (event) =>
-                      openSearchModal({
-                        x: event.clientX,
-                        y: event.clientY,
-                      })
-                  : undefined
-              }
-              className={
-                item.action === "search"
-                  ? `ml-[14px] mt-2 mb-[4px] flex w-auto bg-[#fcfbff] cursor-pointer items-center gap-2 self-stretch rounded-[7px] border border-[#e3e3e9] py-0 pl-[8px] pr-[3px] text-left text-sm ptxt-list-search transition-colors hover:bg-slate-50 dark:hover:bg-zinc-800/60 ${SIDEBAR_NAV_ITEM_SIZE_CLASS}`
-                  : `${getItemClassName(isNavItemSelected)} gap-1 px-4`
-              }
-            >
-              {item.action === "search" ? (
-                <IoIosSearch
-                  className="size-[18px] shrink-0 cursor-pointer"
-                  aria-hidden="true"
-                />
-              ) : null}
-              {item.label}
-              {item.action === "search" ? (
-                <div
-                  className="ml-auto flex h-[25px] w-[37px] shrink-0 items-center justify-center rounded-full bg-[#EcEcEf] mr-[1px] border border-[#eee8ef]"
-                  aria-hidden="true"
+              <div
+                key={item.label}
+                className="sidebar-search-border-wrap ml-[14px] mr-[6px] mt-2 mb-[4px] w-auto"
+              >
+                <button
+                  type="button"
+                  onClick={(event) =>
+                    openSearchModal({
+                      x: event.clientX,
+                      y: event.clientY,
+                    })
+                  }
+                  className={`sidebar-search-trigger flex w-full cursor-pointer items-center gap-2 rounded-[8px] border border-[#e3e3e9] bg-[#fcfbff] py-0 pl-[8px] pr-[3px] text-left text-sm ptxt-list-search transition-colors hover:bg-slate-50 dark:border-zinc-700 dark:bg-zinc-950 dark:hover:bg-zinc-800/60 ${SIDEBAR_NAV_ITEM_SIZE_CLASS}`}
                 >
-                  <div className="flex items-center gap-px text-zinc-400/80">
-                    <MacCmdIcon className="size-[9px] shrink-0" />
-                    <span className="text-[10px] font-bold leading-none text-zinc-400/80">
-                      +K
-                    </span>
+                  <IoIosSearch
+                    className="size-[18px] shrink-0 cursor-pointer"
+                    aria-hidden="true"
+                  />
+                  {item.label}
+                  <div
+                    className="ml-auto flex h-[25px] w-[37px] shrink-0 items-center justify-center rounded-full border border-[#eee8ef] bg-[#EcEcEf] mr-[1px] dark:border-zinc-700 dark:bg-zinc-800"
+                    aria-hidden="true"
+                  >
+                    <div className="flex items-center gap-px text-zinc-400/80">
+                      <MacCmdIcon className="size-[9px] shrink-0" />
+                      <span className="text-[10px] font-bold leading-none text-zinc-400/80">
+                        +K
+                      </span>
+                    </div>
                   </div>
-                </div>
-              ) : null}
-            </button>
+                </button>
+              </div>
             )
             );
           })}

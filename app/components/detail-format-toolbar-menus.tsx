@@ -61,8 +61,15 @@ export const FORMAT_TOOLBAR_DROPDOWN_TRIGGER_CLASS =
 export const FORMAT_TOOLBAR_DROPDOWN_MENU_CLASS =
   "overflow-hidden rounded-[12px] border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900 min-w-[168px] cursor-pointer";
 
+/** List + heading menus: +3px vs default dropdown padding. */
+export const FORMAT_TOOLBAR_LIST_BLOCK_MENU_CLASS =
+  "overflow-hidden rounded-[12px] border border-zinc-200 bg-white py-[7px] shadow-lg dark:border-zinc-700 dark:bg-zinc-900 min-w-[168px] cursor-pointer";
+
 export const FORMAT_TOOLBAR_DROPDOWN_ITEM_CLASS =
   "flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm text-zinc-900 transition-colors hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800";
+
+export const FORMAT_TOOLBAR_LIST_BLOCK_MENU_ITEM_CLASS =
+  "flex w-full items-center gap-2 px-[11px] py-[9px] text-left text-sm text-zinc-900 transition-colors hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800";
 
 export const FORMAT_TOOLBAR_FONT_FAMILY_TRIGGER_CLASS =
   `flex h-8 cursor-pointer items-center gap-0.5 rounded-lg px-1 text-[13px] ${FORMAT_TOOLBAR_ICON_COLOR} transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800`;
@@ -135,10 +142,20 @@ function getFormatToolbarTooltipPositionClass(
 
 function getFormatToolbarDropdownAnchorClass(
   placement: FormatToolbarAnchorPlacement,
+  extraGapPx = 0,
 ) {
+  const gapClass =
+    extraGapPx > 0
+      ? placement === "above"
+        ? "pb-[7px]"
+        : "pt-[7px]"
+      : placement === "above"
+        ? "pb-1"
+        : "pt-1";
+
   return placement === "above"
-    ? "absolute bottom-full z-10 pb-1"
-    : "absolute top-full z-10 pt-1";
+    ? `absolute bottom-full z-10 ${gapClass}`
+    : `absolute top-full z-10 ${gapClass}`;
 }
 
 /** @deprecated Use placement-aware tooltips via FormatToolbarAnchorPlacementProvider */
@@ -374,6 +391,7 @@ type DropdownShellProps = {
   menuStyle?: CSSProperties;
   align?: "left" | "right" | "center";
   menuRef?: RefObject<HTMLDivElement | null>;
+  menuAnchorExtraGapPx?: number;
   trigger: ReactNode;
   children: ReactNode;
 };
@@ -393,6 +411,7 @@ function FormatToolbarDropdownShell({
   menuStyle,
   align = "left",
   menuRef,
+  menuAnchorExtraGapPx = 0,
   trigger,
   children,
 }: DropdownShellProps) {
@@ -448,7 +467,10 @@ function FormatToolbarDropdownShell({
 
         {open ? (
           <div
-            className={`${getFormatToolbarDropdownAnchorClass(placement)} ${
+            className={`${getFormatToolbarDropdownAnchorClass(
+              placement,
+              menuAnchorExtraGapPx,
+            )} ${
               align === "right"
                 ? "right-0"
                 : align === "center"
@@ -874,6 +896,8 @@ export function DetailFormatListDropdown({
       ariaLabel="List type"
       tooltipId="format-toolbar-list-type-tooltip"
       tooltipLabel="List type"
+      menuClassName={FORMAT_TOOLBAR_LIST_BLOCK_MENU_CLASS}
+      menuAnchorExtraGapPx={3}
       trigger={
         <>
           <BulletListIcon
@@ -888,7 +912,7 @@ export function DetailFormatListDropdown({
           key={type}
           type="button"
           role="menuitem"
-          className={FORMAT_TOOLBAR_DROPDOWN_ITEM_CLASS}
+          className={FORMAT_TOOLBAR_LIST_BLOCK_MENU_ITEM_CLASS}
           onClick={() => {
             onSelect(type);
             onOpenChange(false);
@@ -924,6 +948,8 @@ export function DetailFormatBlockTypeDropdown({
       ariaLabel="Block type"
       tooltipId="format-toolbar-block-type-tooltip"
       tooltipLabel="Text style"
+      menuClassName={FORMAT_TOOLBAR_LIST_BLOCK_MENU_CLASS}
+      menuAnchorExtraGapPx={3}
       trigger={
         <>
           <span
@@ -947,7 +973,7 @@ export function DetailFormatBlockTypeDropdown({
             type="button"
             role="menuitem"
             disabled={disabled}
-            className={`${FORMAT_TOOLBAR_DROPDOWN_ITEM_CLASS} ${
+            className={`${FORMAT_TOOLBAR_LIST_BLOCK_MENU_ITEM_CLASS} ${
               active ? "bg-zinc-100 dark:bg-zinc-800" : ""
             } ${disabled ? "cursor-not-allowed opacity-40" : ""}`}
             onClick={() => {

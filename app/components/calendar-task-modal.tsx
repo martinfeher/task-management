@@ -62,6 +62,8 @@ type CalendarTaskModalProps = {
   taskId: string;
   taskSnapshot?: CalendarTaskSnapshot | null;
   anchorRect?: CalendarTaskModalAnchorRect | null;
+  isNewTaskDraft?: boolean;
+  onNewTaskDraftComplete?: () => void;
   onClose: () => void;
 } & CalendarTaskEditorCallbacks;
 
@@ -69,6 +71,8 @@ export function CalendarTaskModal({
   taskId,
   taskSnapshot = null,
   anchorRect: _anchorRect = null,
+  isNewTaskDraft = false,
+  onNewTaskDraftComplete,
   onClose,
   onDetailsSaved,
   onTaskHasDetailsKnown,
@@ -103,6 +107,23 @@ export function CalendarTaskModal({
       onClose();
     },
     [onClose, onToggleTask],
+  );
+
+  const handleCreateNewTask = useCallback(async () => {
+    await detailsSaveControllerRef.current?.flushSave();
+    onNewTaskDraftComplete?.();
+    onClose();
+  }, [onClose, onNewTaskDraftComplete]);
+
+  const modalCreateAction = useMemo(
+    () =>
+      isNewTaskDraft
+        ? {
+            label: "Create",
+            onClick: handleCreateNewTask,
+          }
+        : null,
+    [handleCreateNewTask, isNewTaskDraft],
   );
 
   const modalFooterConfig = useMemo(
@@ -196,6 +217,7 @@ export function CalendarTaskModal({
             }
             onClose={() => void handleClose()}
             modalFooterConfig={modalFooterConfig}
+            modalCreateAction={modalCreateAction}
             hideModalFormatToggle
           />
         </div>

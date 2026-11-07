@@ -1109,8 +1109,12 @@ export function CalendarViewsPanel({
   const [taskEditorModalId, setTaskEditorModalId] = useState<string | null>(
     null,
   );
+  const [newCalendarTaskDraftId, setNewCalendarTaskDraftId] = useState<
+    string | null
+  >(null);
   const closeTaskEditorModal = useCallback(() => {
     setTaskEditorModalId(null);
+    setNewCalendarTaskDraftId(null);
   }, []);
   const handleCalendarSelectTask = useCallback(
     (taskId: string) => {
@@ -1133,6 +1137,7 @@ export function CalendarViewsPanel({
       });
 
       if (taskId) {
+        setNewCalendarTaskDraftId(taskId);
         handleCalendarSelectTask(taskId);
       }
     },
@@ -1545,6 +1550,8 @@ export function CalendarViewsPanel({
         <CalendarTaskModal
           taskId={taskEditorModalId}
           taskSnapshot={taskEditorModalSnapshot}
+          isNewTaskDraft={taskEditorModalId === newCalendarTaskDraftId}
+          onNewTaskDraftComplete={() => setNewCalendarTaskDraftId(null)}
           onClose={closeTaskEditorModal}
           onDetailsSaved={onDetailsSaved}
           onTaskHasDetailsKnown={onTaskHasDetailsKnown}

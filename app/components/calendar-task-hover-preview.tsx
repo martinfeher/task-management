@@ -34,7 +34,7 @@ import type { TaskListItem } from "./todo-app";
 const PREVIEW_WIDTH = 280;
 const PREVIEW_ESTIMATED_HEIGHT = 240;
 const PREVIEW_SUBTITLE_CLASS =
-  "text-[11.5px] leading-[15px] text-[#bfbfbf] dark:text-[#bfbfbf]";
+  "text-[12.5px] leading-[16px] text-[#bfbfbf] dark:text-[#bfbfbf]";
 const TASK_GAP = 12;
 const TASK_EDGE_PREVIEW_UPWARD_OFFSET_PX = 10;
 const CURSOR_OFFSET_PX = 50;
@@ -205,8 +205,8 @@ function PreviewMetaRow({
   children: ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-2.5 text-[13px] leading-5 text-zinc-600 dark:text-zinc-300">
-      <span className="flex size-4 shrink-0 items-center justify-center text-zinc-400 dark:text-zinc-500">
+    <div className="flex items-center gap-2.5 text-[11px] leading-5 text-zinc-600 dark:text-zinc-300">
+      <span className="flex size-[14px] shrink-0 items-center justify-center text-zinc-400 dark:text-zinc-500">
         {icon}
       </span>
       <span className="min-w-0 truncate">{children}</span>
@@ -243,7 +243,7 @@ function CalendarTaskHoverPreviewCard({ task }: { task: TaskListItem }) {
 
       <div className="flex flex-col gap-1.5">
         {task.listName ? (
-          <PreviewMetaRow icon={<LuList className="size-4" />}>
+          <PreviewMetaRow icon={<LuList className="h-[14px] w-[14px]" />}>
             {task.listName}
           </PreviewMetaRow>
         ) : null}
