@@ -351,7 +351,7 @@ const FORMAT_TOOLBAR_BOLD_ITALIC_ACTIVE_CLASS =
   "bg-[#E8EAEF] text-zinc-800 dark:text-zinc-900";
 
 const HEADER_QUICK_FORMAT_BUTTON_CLASS =
-  "inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100";
+  "inline-flex h-8 w-7 cursor-pointer items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100";
 
 type FormatMenuInlineFormats = {
   bold: boolean;

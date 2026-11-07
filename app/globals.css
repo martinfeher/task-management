@@ -515,7 +515,7 @@ body {
 .detail-line[data-line-type="bullet"]::before {
   content: "•";
   margin-right: 0.5rem;
-  color: #cdcdcd;
+  color: #ABB1C5;
 }
 
 .task-details-editor .detail-line[data-line-type="bullet"][data-list-indent="1"],
