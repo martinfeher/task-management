@@ -889,7 +889,7 @@ export function TaskListTaskRow({
         {task.labels.length > 0 || task.priority != null ? (
           <span
             ref={labelPillsAnchorRef}
-            className={`relative z-10 flex min-w-0 max-w-[180px] -translate-x-[20px] items-center gap-1 ${checkedContentDim}`}
+            className={`relative z-10 mr-[20px] flex min-w-0 max-w-[180px] items-center gap-1 ${checkedContentDim}`}
             style={{ transition: dimTransition }}
           >
             {task.labels.length > 0 ? (

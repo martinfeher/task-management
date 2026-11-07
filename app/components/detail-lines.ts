@@ -11,6 +11,10 @@ import {
   plainTextToPasteLineParts,
   type PasteLinePart,
 } from "./detail-paste";
+import {
+  logEditorEnterDebug,
+  traceEditorEnterDebug,
+} from "./detail-enter-debug";
 
 export const DETAIL_LINE_CLASS = "detail-line";
 export const MAX_LIST_INDENT_LEVEL = 16;
@@ -1271,7 +1275,7 @@ function getTrailingBodyPlaceholderLine(editor: HTMLElement) {
   if (lines.length <= 1) return null;
 
   const lastLine = lines.at(-1);
-  if (lastLine && isBodyPlaceholderLine(lastLine)) {
+  if (lastLine && isTextBodyPlaceholderLine(lastLine)) {
     return lastLine;
   }
 
@@ -1282,12 +1286,21 @@ function insertLineAfterLine(line: HTMLElement, newLine: HTMLElement) {
   const nextSibling = line.nextElementSibling;
   if (
     nextSibling instanceof HTMLElement &&
-    isBodyPlaceholderLine(nextSibling)
+    isTextBodyPlaceholderLine(nextSibling)
   ) {
+    traceEditorEnterDebug("insertLineAfterLine: before trailing placeholder", {
+      newLineHtml: newLine.outerHTML,
+    });
     nextSibling.before(newLine);
     return;
   }
 
+  traceEditorEnterDebug("insertLineAfterLine: after line", {
+    lineText: line.textContent,
+    nextSiblingHtml:
+      nextSibling instanceof HTMLElement ? nextSibling.outerHTML : null,
+    newLineHtml: newLine.outerHTML,
+  });
   line.after(newLine);
 }
 
@@ -1402,6 +1415,11 @@ function splitListLineAtCursor(
 ) {
   if (isLineEmpty(activeLine)) {
     const trailingPlaceholder = getTrailingBodyPlaceholderLine(editor);
+    logEditorEnterDebug("splitListLineAtCursor: empty line -> exit list", editor, {
+      lineType,
+      hasTrailingPlaceholder: trailingPlaceholder !== null,
+      placeholderIsNext: activeLine.nextElementSibling === trailingPlaceholder,
+    });
 
     if (trailingPlaceholder && activeLine.nextElementSibling === trailingPlaceholder) {
       activeLine.remove();
@@ -1422,6 +1440,11 @@ function splitListLineAtCursor(
 
   const contentRoot = getListLineEditableRoot(activeLine);
   if (!contentRoot.contains(range.startContainer)) {
+    logEditorEnterDebug(
+      "splitListLineAtCursor: caret outside editable root (no split)",
+      editor,
+      { lineType, contentRootHtml: contentRoot.outerHTML },
+    );
     placeCaretInLine(activeLine);
     return;
   }
@@ -1438,6 +1461,18 @@ function splitListLineAtCursor(
 
   const afterIsEmpty = isEmptySplitHtml(afterHtml);
   const beforeIsEmpty = isEmptySplitHtml(beforeHtml);
+  logEditorEnterDebug("splitListLineAtCursor: split", editor, {
+    lineType,
+    branch:
+      afterIsEmpty && !beforeIsEmpty
+        ? "caret at end"
+        : beforeIsEmpty && !afterIsEmpty
+          ? "caret at start"
+          : "middle split",
+    beforeHtml,
+    afterHtml,
+    activeLineHtml: activeLine.outerHTML,
+  });
 
   if (afterIsEmpty && !beforeIsEmpty) {
     normalizeNonEmptyLineInlineContent(activeLine);
@@ -2339,6 +2374,14 @@ export function isBodyPlaceholderLine(line: HTMLElement) {
   return index === lines.length - 1;
 }
 
+/**
+ * Trailing placeholder that new rows may be inserted above. An empty list row
+ * at the end is a real list item, not a placeholder.
+ */
+export function isTextBodyPlaceholderLine(line: HTMLElement) {
+  return isBodyPlaceholderLine(line) && !isListBlockLine(line);
+}
+
 export function isEmptyEditableBodyLine(
   editor: HTMLElement,
   line: HTMLElement | null | undefined,
@@ -2902,7 +2945,39 @@ function syncTrailingBodyPlaceholderLine(editor: HTMLElement) {
     isBodyLineWithContent(lastLine) &&
     !isListBlockLine(lastLine)
   ) {
+    traceEditorEnterDebug("syncTrailingBodyPlaceholderLine: append placeholder", {
+      lastLineHtml: lastLine.outerHTML,
+    });
     editor.appendChild(createLineElement("<br>", "text"));
+  }
+
+  trimTrailingEmptyRowAfterEmptyListContinuation(editor);
+}
+
+/**
+ * After Enter in a list, the new row is often inserted before the trailing
+ * "body placeholder" text line. That yields: [empty checklist] [empty text],
+ * which looks like an extra blank line under the checkbox. Drop the trailing
+ * empty non-list row when it immediately follows an empty list row.
+ */
+function trimTrailingEmptyRowAfterEmptyListContinuation(editor: HTMLElement) {
+  while (true) {
+    const lines = getLineElements(editor);
+    if (lines.length < 3) return;
+
+    const last = lines[lines.length - 1];
+    const prev = lines[lines.length - 2];
+    if (!last || !prev) return;
+
+    if (!isListBlockLine(prev) || !isLineEmpty(prev)) return;
+    if (isListBlockLine(last) || isCodeLine(last)) return;
+    if (last.querySelector(".detail-image-wrapper")) return;
+    if (!isLineEmpty(last)) return;
+
+    traceEditorEnterDebug("trimTrailingEmptyRowAfterEmptyListContinuation: remove", {
+      lastHtml: last.outerHTML,
+    });
+    last.remove();
   }
 }
 

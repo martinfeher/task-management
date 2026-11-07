@@ -114,9 +114,18 @@ export function CalendarShortcutModal({
         className="absolute inset-10 z-10 flex min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-[#fbfbfc] shadow-2xl dark:border-zinc-700 dark:bg-zinc-950"
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <button
+          type="button"
+          aria-label="Close calendar"
+          onClick={handleClose}
+          className="absolute top-[3px] right-[3px] z-[2100] flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-zinc-500 transition-colors hover:bg-[#e8e8e8] hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+        >
+          <LuX className="size-4" />
+        </button>
+        <div className="flex min-h-0 px-2 pb-2 pt-1 flex-1 flex-col overflow-hidden">
           <CalendarPanel
             {...calendarPanelProps}
+            embeddedInCalendarModal
             periodLabelAction={
               onExpandToFullPage ? (
                 <button
@@ -129,16 +138,6 @@ export function CalendarShortcutModal({
                   <CalendarExpandIcon className="size-[18px]" />
                 </button>
               ) : undefined
-            }
-            headerTrailingAction={
-              <button
-                type="button"
-                aria-label="Close calendar"
-                onClick={handleClose}
-                className="flex -mt-[10px] size-8 shrink-0 items-center justify-center rounded-full text-zinc-500 transition-colors hover:bg-[#e8e8e8] hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
-              >
-                <LuX className="size-4" />
-              </button>
             }
             view={view}
             onViewChange={setView}

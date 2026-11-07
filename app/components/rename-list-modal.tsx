@@ -109,7 +109,7 @@ export function RenameListModal({
           onChange={(event) => setName(event.target.value)}
           autoFocus
           placeholder={placeholder}
-          className="mt-4 h-[35px] w-full rounded-md border border-zinc-300 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-50"
+          className="mt-4 h-[35px] w-full rounded-md border border-zinc-300 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-zinc-350 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-50"
         />
         <div className="mt-5 flex justify-end gap-2">
           <button

@@ -13,16 +13,9 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { BiCalendar, BiTimeFive } from "react-icons/bi";
-import { LuFlag, LuList } from "react-icons/lu";
-import { formatShortDayMonth } from "@/lib/date-format";
-import { formatCalendarSlotTimeLabel } from "@/lib/calendar-time-grid";
+import { LuList } from "react-icons/lu";
 import type { CalendarDropSlot } from "@/lib/calendar-time-grid";
-import { getCalendarWeekdayLabel } from "@/lib/calendar-layout";
-import {
-  getTaskPriorityColor,
-  getTaskPriorityShortLabel,
-} from "@/lib/task-priority";
+import { fetchTaskById } from "@/lib/task-details-api";
 import {
   taskDetailsHasContent,
   taskDetailsToPlainText,
@@ -33,20 +26,17 @@ import {
   getLabelPillStyle,
 } from "@/lib/label-colors";
 import {
-  normalizeDueDurationMinutes,
-  normalizeDueTimeMinutes,
-} from "@/lib/task-due-time";
-import {
   CALENDAR_TASK_ID_DATA_ATTR,
   useCalendarTaskColorMenu,
 } from "./calendar-task-color-menu";
 import type { TaskListItem } from "./todo-app";
 
 const PREVIEW_WIDTH = 280;
-const PREVIEW_ESTIMATED_HEIGHT = 200;
+const PREVIEW_ESTIMATED_HEIGHT = 240;
 const PREVIEW_SUBTITLE_CLASS =
-  "text-[13px] leading-5 text-zinc-400 dark:text-zinc-500";
+  "text-[11.5px] leading-[15px] text-[#bfbfbf] dark:text-[#bfbfbf]";
 const TASK_GAP = 12;
+const TASK_EDGE_PREVIEW_UPWARD_OFFSET_PX = 10;
 const CURSOR_OFFSET_PX = 50;
 const POST_DRAG_HOVER_SUPPRESS_MS = 300;
 
@@ -100,60 +90,81 @@ const CalendarTaskHoverPreviewContext =
 function getPreviewPosition(
   rect: DOMRect,
   clientX: number,
-  clientY: number,
   options: PreviewPositionOptions = { mode: "task-edge" },
 ) {
   let left =
     options.mode === "cursor"
       ? clientX + (options.cursorOffsetPx ?? CURSOR_OFFSET_PX)
       : Math.max(rect.right, clientX) + TASK_GAP;
-  let top = clientY - PREVIEW_ESTIMATED_HEIGHT / 2;
+  let top = rect.top;
+  if (options.mode === "task-edge") {
+    top -= TASK_EDGE_PREVIEW_UPWARD_OFFSET_PX;
+  }
 
   if (typeof window !== "undefined") {
+    const minTop = 8;
+    const maxTop = window.innerHeight - PREVIEW_ESTIMATED_HEIGHT - 8;
     left = Math.max(8, Math.min(left, window.innerWidth - PREVIEW_WIDTH - 8));
-    top = Math.max(
-      8,
-      Math.min(top, window.innerHeight - PREVIEW_ESTIMATED_HEIGHT - 8),
-    );
+    top = Math.max(minTop, Math.min(top, maxTop));
   }
 
   return { left, top };
 }
 
-function formatCalendarPreviewDate(dueDate: string | null) {
-  if (!dueDate) return null;
+const TASK_PREVIEW_CONTENT_LINE_COUNT = 3;
 
-  const date = new Date(`${dueDate.slice(0, 10)}T12:00:00`);
-  if (Number.isNaN(date.getTime())) return null;
+/** Tasks in calendar views often ship without `details` HTML; cache lazy loads on hover. */
+const calendarPreviewDetailsCache = new Map<string, string>();
 
-  const weekday = getCalendarWeekdayLabel(date);
-  return `${weekday}, ${formatShortDayMonth(date)}`;
+function normalizePreviewLine(line: string) {
+  return line.trim().toLowerCase();
 }
 
-function getTaskPreviewDescriptionLines(details: string, maxLines = 2) {
+function taskWithResolvedDetails(task: TaskListItem): TaskListItem {
+  if (taskDetailsHasContent(task.details)) return task;
+
+  const cached = calendarPreviewDetailsCache.get(task.id);
+  if (cached === undefined) return task;
+
+  return { ...task, details: cached };
+}
+
+async function loadTaskDetailsForPreview(task: TaskListItem): Promise<string> {
+  if (taskDetailsHasContent(task.details)) return task.details;
+
+  if (calendarPreviewDetailsCache.has(task.id)) {
+    return calendarPreviewDetailsCache.get(task.id) ?? "";
+  }
+
+  if (!task.hasDetails) {
+    calendarPreviewDetailsCache.set(task.id, "");
+    return "";
+  }
+
+  const loaded = await fetchTaskById(task.id);
+  const details = loaded?.details ?? "";
+  calendarPreviewDetailsCache.set(task.id, details);
+  return details;
+}
+
+function getTaskPreviewDescriptionLines(
+  details: string,
+  taskName: string,
+  maxLines = TASK_PREVIEW_CONTENT_LINE_COUNT,
+) {
   if (!taskDetailsHasContent(details)) return [];
 
-  return taskDetailsToPlainText(details)
+  let lines = taskDetailsToPlainText(details)
     .split("\n")
     .map((line) => line.trim())
-    .filter(Boolean)
-    .slice(0, maxLines);
-}
+    .filter(Boolean);
 
-function formatCalendarPreviewTimeRange(
-  task: TaskListItem,
-  dueTimeMinutes: number | null,
-) {
-  if (dueTimeMinutes === null) return null;
+  const normalizedTitle = normalizePreviewLine(taskName);
+  if (lines.length > 0 && normalizePreviewLine(lines[0]) === normalizedTitle) {
+    lines = lines.slice(1);
+  }
 
-  const duration =
-    normalizeDueDurationMinutes(task.dueDurationMinutes) ??
-    (task.dueDurationMinutes && task.dueDurationMinutes > 0
-      ? task.dueDurationMinutes
-      : 60);
-  const endMinutes = dueTimeMinutes + duration;
-
-  return `${formatCalendarSlotTimeLabel(dueTimeMinutes)} - ${formatCalendarSlotTimeLabel(endMinutes)}`;
+  return lines.slice(0, maxLines);
 }
 
 function openPreview(
@@ -176,7 +187,6 @@ function openPreview(
   const { left, top } = getPreviewPosition(
     element.getBoundingClientRect(),
     clientX,
-    clientY,
     positionOptions,
   );
 
@@ -204,23 +214,11 @@ function PreviewMetaRow({
   );
 }
 
-function CalendarTaskHoverPreviewCard({
-  task,
-  scheduleOverride = null,
-}: {
-  task: TaskListItem;
-  scheduleOverride?: PreviewScheduleOverride | null;
-}) {
-  const dueTimeMinutes = scheduleOverride
-    ? scheduleOverride.dueTimeMinutes
-    : normalizeDueTimeMinutes(task.dueTimeMinutes);
-  const dueDate =
-    scheduleOverride?.dueDate ?? task.dueDate?.slice(0, 10) ?? null;
-  const timeLabel = formatCalendarPreviewTimeRange(task, dueTimeMinutes);
-  const dateLabel = formatCalendarPreviewDate(dueDate);
-  const priorityLabel = getTaskPriorityShortLabel(task.priority);
-  const priorityColor = getTaskPriorityColor(task.priority);
-  const descriptionLines = getTaskPreviewDescriptionLines(task.details);
+function CalendarTaskHoverPreviewCard({ task }: { task: TaskListItem }) {
+  const descriptionLines = getTaskPreviewDescriptionLines(
+    task.details,
+    task.name,
+  );
 
   return (
     <div className="flex flex-col gap-2.5 px-3.5 py-3">
@@ -244,34 +242,9 @@ function CalendarTaskHoverPreviewCard({
       </div>
 
       <div className="flex flex-col gap-1.5">
-        {timeLabel ? (
-          <PreviewMetaRow icon={<BiTimeFive className="size-4" />}>
-            {timeLabel}
-          </PreviewMetaRow>
-        ) : null}
-
-        {dateLabel ? (
-          <PreviewMetaRow icon={<BiCalendar className="size-4" />}>
-            {dateLabel}
-          </PreviewMetaRow>
-        ) : null}
-
         {task.listName ? (
           <PreviewMetaRow icon={<LuList className="size-4" />}>
             {task.listName}
-          </PreviewMetaRow>
-        ) : null}
-
-        {priorityLabel ? (
-          <PreviewMetaRow
-            icon={
-              <LuFlag
-                className="size-4"
-                style={priorityColor ? { color: priorityColor } : undefined}
-              />
-            }
-          >
-            {priorityLabel}
           </PreviewMetaRow>
         ) : null}
       </div>
@@ -342,11 +315,10 @@ export function CalendarTaskHoverPreviewProvider({
 
   const repositionPreview = useCallback(
     (element: HTMLElement) => {
-      const { x, y } = cursorRef.current;
+      const { x } = cursorRef.current;
       const { left, top } = getPreviewPosition(
         element.getBoundingClientRect(),
         x,
-        y,
         positionOptions,
       );
       setPreview((previous) =>
@@ -411,8 +383,10 @@ export function CalendarTaskHoverPreviewProvider({
       if (dragPreviewActiveRef.current) return;
       if (Date.now() < suppressHoverUntilRef.current) return;
 
+      const taskForPreview = taskWithResolvedDetails(task);
+
       openPreview(
-        task,
+        taskForPreview,
         element,
         clientX,
         clientY,
@@ -420,30 +394,29 @@ export function CalendarTaskHoverPreviewProvider({
         refs,
         positionOptions,
       );
+
+      if (
+        !taskDetailsHasContent(taskForPreview.details) &&
+        task.hasDetails
+      ) {
+        void loadTaskDetailsForPreview(task).then((details) => {
+          if (activeTaskIdRef.current !== task.id) return;
+
+          setPreview((previous) =>
+            previous?.task.id === task.id
+              ? { ...previous, task: { ...previous.task, details } }
+              : previous,
+          );
+        });
+      }
     },
     [positionOptions, refs],
   );
 
-  const move = useCallback(
-    (clientX: number, clientY: number) => {
-      if (dragPreviewActiveRef.current) return;
-
-      cursorRef.current = { x: clientX, y: clientY };
-      const element = activeElementRef.current;
-      if (!element || !activeTaskIdRef.current) return;
-
-      const { left, top } = getPreviewPosition(
-        element.getBoundingClientRect(),
-        clientX,
-        clientY,
-        positionOptions,
-      );
-      setPreview((previous) =>
-        previous ? { ...previous, x: left, y: top } : null,
-      );
-    },
-    [positionOptions],
-  );
+  const move = useCallback((_clientX: number, clientY: number) => {
+    if (dragPreviewActiveRef.current) return;
+    cursorRef.current = { x: cursorRef.current.x, y: clientY };
+  }, []);
 
   useEffect(() => {
     if (!preview || preview.dragPreview) return;
@@ -484,7 +457,7 @@ export function CalendarTaskHoverPreviewProvider({
       {preview && typeof document !== "undefined"
         ? createPortal(
             <div
-              className="calendar-task-hover-preview pointer-events-none fixed z-[200] overflow-hidden bg-white dark:bg-zinc-950"
+              className="calendar-task-hover-preview pointer-events-none fixed z-[4100] overflow-hidden bg-white dark:bg-zinc-950"
               style={{
                 width: PREVIEW_WIDTH,
                 left: preview.x,
@@ -493,10 +466,7 @@ export function CalendarTaskHoverPreviewProvider({
               role="tooltip"
               aria-label={preview.task.name}
             >
-              <CalendarTaskHoverPreviewCard
-                task={preview.task}
-                scheduleOverride={preview.scheduleOverride}
-              />
+              <CalendarTaskHoverPreviewCard task={preview.task} />
             </div>,
             document.body,
           )
@@ -525,9 +495,6 @@ export function useCalendarTaskHoverPreview(task: TaskListItem) {
         if (!context.isDragPreviewActive()) {
           context.hide();
         }
-      },
-      onMouseMove: (event: MouseEvent<HTMLElement>) => {
-        context.move(event.clientX, event.clientY);
       },
     };
   }, [context, task]);

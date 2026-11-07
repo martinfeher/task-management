@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CalendarAddTaskPopover } from "./calendar-add-task-popover";
 import { CalendarTaskPriorityFlag } from "./calendar-task-title";
+import type { CalendarStartTaskOptions } from "@/lib/calendar-start-task";
 import { CalendarPeriodNavigation } from "./calendar-period-navigation";
 import { type CalendarTaskEditorCallbacks } from "./calendar-task-modal";
 import type { TaskListItem, TodoList } from "./todo-app";
@@ -49,12 +49,9 @@ type CalendarMultiWeekViewProps = {
   onSetTaskDueDate?: (taskId: string, dateValue: string | null) => void;
   onSetTaskDueTime?: (taskId: string, dueTime: TaskDueTime) => void;
 } & CalendarTaskEditorCallbacks & {
-  onAddCalendarTask?: (payload: {
-    name: string;
-    dueDate: string;
-    details: string;
-    listId: string;
-  }) => void | Promise<void>;
+  onStartCalendarTask?: (
+    options: CalendarStartTaskOptions,
+  ) => void | Promise<void>;
   defaultListId?: string | null;
   fullWidth?: boolean;
   externalDropTargetDateKey?: string | null;
@@ -173,7 +170,7 @@ export function CalendarMultiWeekView({
   onDueDateUpdated,
   onRecurrenceUpdated,
   onSaveTaskRecurrence,
-  onAddCalendarTask,
+  onStartCalendarTask,
   defaultListId = null,
   fullWidth = false,
   externalDropTargetDateKey = null,
@@ -189,12 +186,6 @@ export function CalendarMultiWeekView({
   function closeTaskModal() {
     onCloseTaskEditor?.();
   }
-  const [addTaskPopover, setAddTaskPopover] = useState<{
-    date: Date;
-    x: number;
-    y: number;
-  } | null>(null);
-  const [draftTaskName, setDraftTaskName] = useState("");
   const [dropTargetDateKey, setDropTargetDateKey] = useState<string | null>(
     null,
   );
@@ -296,43 +287,21 @@ export function CalendarMultiWeekView({
     onSidebarFocusDateChange?.(current);
   }
 
-  function closeAddTaskPopover() {
-    setAddTaskPopover(null);
-    setDraftTaskName("");
-  }
-
   function isFocusedWeekDay(day: Date) {
     return sidebarFocusDate !== undefined && isSameDay(day, sidebarFocusDate);
   }
 
   function handleDayClick(
-    event:
+    _event:
       | React.MouseEvent<HTMLDivElement>
       | React.KeyboardEvent<HTMLDivElement>,
     day: Date,
   ) {
     closeTaskModal();
 
-    if (!onAddCalendarTask || lists.length === 0) return;
+    if (!onStartCalendarTask || lists.length === 0) return;
 
-    let x: number;
-    let y: number;
-
-    if ("clientX" in event) {
-      x = event.clientX;
-      y = event.clientY;
-    } else {
-      const rect = event.currentTarget.getBoundingClientRect();
-      x = rect.left + rect.width / 2;
-      y = rect.top + rect.height / 2;
-    }
-
-    setDraftTaskName("");
-    setAddTaskPopover({
-      date: day,
-      x,
-      y,
-    });
+    void onStartCalendarTask({ date: day, dueTimeMinutes: null });
   }
 
   function handleCalendarTaskClick(
@@ -347,7 +316,6 @@ export function CalendarMultiWeekView({
     }
 
     onSelectTask(task.id);
-    closeAddTaskPopover();
   }
 
   function handleCalendarTaskPointerDown(
@@ -457,7 +425,6 @@ export function CalendarMultiWeekView({
   useEffect(() => {
     if (!rangeStart) return;
     closeTaskModal();
-    closeAddTaskPopover();
   }, [rangeStart, weekCount]);
 
   if (!rangeStart || !today) {
@@ -509,8 +476,6 @@ export function CalendarMultiWeekView({
               const isDropTarget =
                 dropTargetDateKey === dateKey ||
                 externalDropTargetDateKey === dateKey;
-              const isActiveDay =
-                addTaskPopover !== null && isSameDay(day, addTaskPopover.date);
               const maxVisibleTasks = 3;
 
               return (
@@ -529,9 +494,7 @@ export function CalendarMultiWeekView({
                   className={`h-full cursor-pointer border-b border-zinc-200 p-2 text-left transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900/60 ${getMultiWeekDayColumnDividerClass(dayIndex, visibleDays, isFocusedWeekDay)} ${
                     isDropTarget
                       ? "bg-blue-50 ring-1 ring-inset ring-blue-400 dark:bg-blue-950/30 dark:ring-blue-500"
-                      : isActiveDay
-                        ? "bg-blue-50 ring-1 ring-inset ring-[#4873c7] dark:bg-blue-950/30 dark:ring-[#7da2ff]"
-                        : isFocusedDay
+                      : isFocusedDay
                           ? `${SELECTED_WEEK_DAY_COLUMN_CLASS} rounded-t-[8px]`
                           : "bg-white dark:bg-zinc-950"
                   }`}
@@ -594,20 +557,6 @@ export function CalendarMultiWeekView({
         </div>
         </div>
       </div>
-
-      {addTaskPopover && onAddCalendarTask ? (
-        <CalendarAddTaskPopover
-          date={addTaskPopover.date}
-          lists={lists}
-          defaultListId={defaultListId}
-          x={addTaskPopover.x}
-          y={addTaskPopover.y}
-          name={draftTaskName}
-          onNameChange={setDraftTaskName}
-          onClose={closeAddTaskPopover}
-          onAddTask={onAddCalendarTask}
-        />
-      ) : null}
     </div>
   );
 }

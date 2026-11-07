@@ -3,7 +3,7 @@
 import { useCallback, useSyncExternalStore } from "react";
 
 export const COMPACT_LAYOUT_MEDIA_QUERY = "(max-width: 1023px)";
-export const NARROW_DESKTOP_TASK_LIST_MEDIA_QUERY = "(max-width: 1699px)";
+export const NARROW_DESKTOP_TASK_LIST_MEDIA_QUERY = "(max-width: 1799px)";
 
 function subscribeToMediaQuery(query: string, onStoreChange: () => void) {
   const mediaQuery = window.matchMedia(query);

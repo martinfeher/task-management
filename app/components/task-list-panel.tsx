@@ -103,9 +103,9 @@ import { useTaskListBackground } from "@/lib/task-list-background";
 import { LiaTagSolid } from "react-icons/lia";
 
 export const TASK_LIST_PANEL_DEFAULT_WIDTH = 520;
-export const TASK_LIST_PANEL_NARROW_DEFAULT_WIDTH = 348;
+export const TASK_LIST_PANEL_NARROW_DEFAULT_WIDTH = 346;
 export const TASK_LIST_PANEL_AUTO_EXPAND_MAX_WIDTH = 620;
-export const TASK_LIST_PANEL_MIN_WIDTH = 348;
+export const TASK_LIST_PANEL_MIN_WIDTH = 346;
 
 export function resolveTaskListPanelDefaultWidth(isNarrowDesktop: boolean) {
   return isNarrowDesktop
@@ -2756,7 +2756,7 @@ export function TaskListPanel({
           ? "flex min-h-0 flex-col border-r border-zinc-200 dark:border-zinc-800"
           : embedded
             ? "w-[520px] border-r border-zinc-200 dark:border-zinc-800"
-            : "w-full min-w-[348px] border-r border-zinc-200 dark:border-zinc-800"
+            : "w-full min-w-[346px] border-r border-zinc-200 dark:border-zinc-800"
       }`}
     >
       {title ? (
@@ -2835,7 +2835,7 @@ export function TaskListPanel({
               <div className="flex shrink-0 items-center gap-1">
               {showSortButton && orderedTasks.length >= 2 ? (
                 <div
-                  className="relative flex shrink-0 items-center rounded-[6px] bg-[#fbfbfc] border border-[#e7e7eb] shadow-[0_7px_17px_rgba(0,0,0,0.06)]"
+                  className="relative flex size-[29px] shrink-0 items-center justify-center rounded-[6px] bg-[#fbfbfc] border border-[#e7e7eb] shadow-[0_7px_17px_rgba(0,0,0,0.06)]"
                   ref={sortMenuRef}
                   onMouseEnter={() => setIsSortMenuOpen(true)}
                   onMouseLeave={() => setIsSortMenuOpen(false)}
@@ -2849,13 +2849,13 @@ export function TaskListPanel({
                     }
                     aria-haspopup="menu"
                     aria-expanded={isSortMenuOpen}
-                    className="flex h-[27px] cursor-pointer items-center rounded-lg pl-1 pr-[6px] text-[13px] ptxt-500 transition-colors hover:ptxt-900 dark:ptxt-400 dark:hover:ptxt-100"
+                    className="flex size-[27px] cursor-pointer items-center justify-center rounded-lg p-0 text-[13px] ptxt-500 transition-colors hover:ptxt-900 dark:ptxt-400 dark:hover:ptxt-100"
                   >
                     <BiSortAlt2
                       className="size-[15px] shrink-0"
                       aria-hidden="true"
                     />
-                    {activeSort ? (
+                    {/* {activeSort ? (
                       <div className="ml-[1px] flex">
                         Sort:{" "}
                         <div className="ml-[1px] mt-[3.5px] cursor-pointer text-[11px] font-medium">
@@ -2864,7 +2864,7 @@ export function TaskListPanel({
                       </div>
                     ) : (
                       "Sort"
-                    )}
+                    )} */}
                   </button>
 
                   {isSortMenuOpen && (
@@ -2979,7 +2979,7 @@ export function TaskListPanel({
                         setIsAddTaskPriorityMenuOpen(false);
                         setIsAddTaskDatePickerOpen((open) => !open);
                       }}
-                      className={`flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-[#eef0f3] dark:hover:bg-zinc-800 ${
+                      className={`flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-full hover:bg-rgb(244 245 246)3]  transition-colors dark:hover:bg-zinc-800 ${
                         newTaskDueDate || newTaskDueTime
                           ? "text-[#4873c7] dark:text-[#7da2ff]"
                           : ""
@@ -3241,13 +3241,12 @@ export function TaskListPanel({
                 type="button"
                 onClick={() => setIsCompletedOpen((open) => !open)}
                 aria-expanded={isCompletedOpen}
-                className="flex w-full items-center gap-1.5 pl-1 pr-4 py-2.5 text-left text-sm outline-none ptxt-completed-tasks transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-900/40"
+                className="flex w-full items-center gap-1.5 pl-1 pr-4 py-2.5 text-left text-[12px] cursor-pointer outline-none ptxt-completed-tasks transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-900/40"
               >
                 <BiChevronDown
-                  className={`size-4 shrink-0 ptxt-400 transition-transform ${
+                  className={`size-4 shrink-0 ptxt-400 transition-transform text-[#DFDFE2]! ${
                     isCompletedOpen ? "rotate-0" : "-rotate-90"
                   }`}
-                  aria-hidden="true"
                 />
                 <span>Completed</span>
                 <span className="text-xs ptxt-400 dark:ptxt-500">

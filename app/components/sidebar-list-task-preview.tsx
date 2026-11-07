@@ -66,7 +66,7 @@ export function SidebarListTaskPreview({
       }}
     >
       <div
-        className="box-border flex h-full flex-col overflow-hidden border border-[#67679b] bg-[#75758f] p-5 shadow-[0_10px_28px_rgba(0,0,0,0.22)]"
+        className="box-border flex h-full flex-col overflow-hidden border border-[#67679b]/90 bg-[#75758f]/90 p-5 shadow-[0_10px_28px_rgba(0,0,0,0.22)] backdrop-blur-[1px]"
         style={{
           borderRadius: PREVIEW_OUTER_RADIUS_PX,
           paddingTop: PREVIEW_FRAME_SIDE_PADDING_PX,

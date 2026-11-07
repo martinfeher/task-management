@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useState, type RefObject } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 import {
   CALENDAR_COLLAPSE_EARLY_END_HOUR,
   CALENDAR_HOUR_END,
@@ -50,6 +56,8 @@ export function useCalendarViewportHourHeight(
   ready = true,
 ) {
   const [hourHeightPx, setHourHeightPx] = useState(CALENDAR_FALLBACK_HOUR_HEIGHT_PX);
+  const hourHeightRef = useRef(hourHeightPx);
+  hourHeightRef.current = hourHeightPx;
 
   useLayoutEffect(() => {
     if (!ready) return;
@@ -71,6 +79,7 @@ export function useCalendarViewportHourHeight(
       const firstHourCell = hourColumn.firstElementChild;
       if (!(firstHourCell instanceof HTMLElement)) return;
 
+      const savedScrollTop = scrollEl.scrollTop;
       scrollEl.scrollTop = 0;
 
       const scrollRect = scrollEl.getBoundingClientRect();
@@ -78,7 +87,10 @@ export function useCalendarViewportHourHeight(
       const timedGridViewportTop = firstHourRect.top - scrollRect.top;
       const availableHeight = scrollEl.clientHeight - timedGridViewportTop;
 
-      if (availableHeight <= 0) return;
+      if (availableHeight <= 0) {
+        scrollEl.scrollTop = savedScrollTop;
+        return;
+      }
 
       const nextHourHeight =
         availableHeight / CALENDAR_DESKTOP_VISIBLE_HOUR_COUNT;
@@ -87,7 +99,18 @@ export function useCalendarViewportHourHeight(
         Math.min(CALENDAR_MAX_HOUR_HEIGHT_PX, nextHourHeight),
       );
 
+      const previousHourHeight = hourHeightRef.current;
       setHourHeightPx((current) => (current === clamped ? current : clamped));
+
+      let appliedScrollTop = savedScrollTop;
+      if (
+        previousHourHeight > 0 &&
+        previousHourHeight !== clamped &&
+        savedScrollTop > 0
+      ) {
+        appliedScrollTop = savedScrollTop * (clamped / previousHourHeight);
+      }
+      scrollEl.scrollTop = appliedScrollTop;
     };
 
     measure();

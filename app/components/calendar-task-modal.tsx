@@ -96,6 +96,15 @@ export function CalendarTaskModal({
     onClose();
   }, [onClose]);
 
+  const handleMarkTaskComplete = useCallback(
+    async (toggleTaskId: string) => {
+      await detailsSaveControllerRef.current?.flushSave();
+      onToggleTask?.(toggleTaskId);
+      onClose();
+    },
+    [onClose, onToggleTask],
+  );
+
   const modalFooterConfig = useMemo(
     () =>
       modalActions
@@ -182,6 +191,9 @@ export function CalendarTaskModal({
             onRecurrenceUpdated={onRecurrenceUpdated}
             onSaveTaskRecurrence={onSaveTaskRecurrence}
             onToggleTask={onToggleTask}
+            onMarkTaskComplete={
+              onToggleTask ? handleMarkTaskComplete : undefined
+            }
             onClose={() => void handleClose()}
             modalFooterConfig={modalFooterConfig}
             hideModalFormatToggle

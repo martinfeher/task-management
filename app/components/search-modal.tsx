@@ -119,6 +119,71 @@ function taskMatchesScope(
   return nameMatch || contentMatch;
 }
 
+function isNameMatchWordStart(normalizedName: string, query: string, index: number) {
+  if (index <= 0) return true;
+
+  const before = normalizedName[index - 1];
+  return /[\s\-_(/[{(]/.test(before);
+}
+
+function getNameMatchRelevance(normalizedName: string, query: string) {
+  const index = normalizedName.indexOf(query);
+  if (index === -1) return 0;
+
+  const lengthBonus =
+    (query.length / Math.max(normalizedName.length, 1)) * 40;
+
+  if (index === 0) {
+    return 1_000 + lengthBonus;
+  }
+
+  if (isNameMatchWordStart(normalizedName, query, index)) {
+    return 820 - index + lengthBonus;
+  }
+
+  return 650 - index + lengthBonus;
+}
+
+function getContentMatchRelevance(normalizedDetails: string, query: string) {
+  const index = normalizedDetails.indexOf(query);
+  if (index === -1) return 0;
+
+  return 380 - Math.min(index, 250);
+}
+
+function getSearchRelevanceScore(
+  task: IndexedSearchTask,
+  query: string,
+  scope: SearchScope,
+) {
+  const trimmed = query.trim().toLowerCase();
+  if (!trimmed) return 0;
+
+  const nameScore = getNameMatchRelevance(task.normalizedName, trimmed);
+  const contentScore = getContentMatchRelevance(task.normalizedDetails, trimmed);
+
+  if (scope === "names") return nameScore;
+  if (scope === "content") return contentScore;
+
+  if (nameScore > 0) return nameScore;
+  return contentScore;
+}
+
+function compareSearchResults(
+  left: IndexedSearchTask,
+  right: IndexedSearchTask,
+  query: string,
+  scope: SearchScope,
+) {
+  const scoreDelta =
+    getSearchRelevanceScore(right, query, scope) -
+    getSearchRelevanceScore(left, query, scope);
+
+  if (scoreDelta !== 0) return scoreDelta;
+
+  return left.name.localeCompare(right.name, undefined, { sensitivity: "base" });
+}
+
 function filterTasks(
   index: IndexedSearchTask[],
   query: string,
@@ -139,6 +204,11 @@ function filterTasks(
       openMatches.push(task);
     }
   }
+
+  openMatches.sort((left, right) => compareSearchResults(left, right, trimmed, scope));
+  completedMatches.sort((left, right) =>
+    compareSearchResults(left, right, trimmed, scope),
+  );
 
   return [...openMatches, ...completedMatches].slice(0, SEARCH_RESULT_LIMIT);
 }

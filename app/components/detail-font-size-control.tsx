@@ -47,7 +47,7 @@ export function DetailFontSizeControl({
   const closeTimerRef = useRef<number | null>(null);
 
   const buttonClassName = formatToolbar
-    ? `flex h-8 min-w-[28px] cursor-pointer items-center justify-center rounded-lg px-2 ${FORMAT_TOOLBAR_FONT_SIZE_TEXT_CLASS} ${FORMAT_TOOLBAR_ICON_COLOR} transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-zinc-800 ${
+    ? `flex h-8 min-w-[28px] text-[14px]! cursor-pointer items-center justify-center rounded-lg px-2 ${FORMAT_TOOLBAR_FONT_SIZE_TEXT_CLASS} ${FORMAT_TOOLBAR_ICON_COLOR} transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-zinc-800 ${
         open ? "bg-zinc-100 dark:bg-zinc-800" : ""
       }`
     : compact

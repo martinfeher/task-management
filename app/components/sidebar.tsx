@@ -14,7 +14,7 @@ import { authClient, useSession } from "@/lib/auth-client";
 import { BiCheckboxChecked, BiChevronDown } from "react-icons/bi";
 import { BiSolidCheckboxChecked } from "react-icons/bi";
 
-import { BsArchiveFill, BsFolder2Open } from "react-icons/bs";
+import { BsArchiveFill } from "react-icons/bs";
 import { IoIosSearch } from "react-icons/io";
 import { LABEL_PRESET_COLORS } from "@/lib/label-colors";
 import { getInboxListId } from "@/lib/inbox-list";
@@ -24,7 +24,6 @@ import { IoMdPricetag } from "react-icons/io";
 import { AiFillTag } from "react-icons/ai";
 
 import {
-  LuFolder,
   LuInbox,
   LuKeyboard,
   LuList,
@@ -81,6 +80,7 @@ import {
   FolderContextMenu,
   clampFolderContextMenuPosition,
 } from "./folder-context-menu";
+import { SidebarFolderIcon } from "./sidebar-folder-icon";
 import { TodayCalendarIcon } from "./today-calendar-icon";
 
 
@@ -261,7 +261,8 @@ const SIDEBAR_CALENDAR_SHORTCUT_CLASS =
 const SIDEBAR_NAV_ITEM_SIZE_CLASS =
   "h-[36px] min-h-[36px] max-h-[36px] shrink-0";
 
-const SIDEBAR_FOLDER_ICON_SELECTED_COLOR = "#8f8fa0";
+const SIDEBAR_FOLDER_ICON_CLASS =
+  "mb-[1px] mr-1 h-[13px] w-[15px] shrink-0";
 
 const SIDEBAR_ROW_MENU_WRAPPER_CLASS =
   "absolute right-[var(--sidebar-row-trailing-inset)] top-1/2 -translate-y-1/2";
@@ -760,34 +761,6 @@ export function Sidebar({
     }
 
     return "sidebar-list-item";
-  }
-
-  function isFolderContainingSelectedList(folderId: string) {
-    if (!selectedListId || selectedListId === suppressListSelectionHighlightId) {
-      return false;
-    }
-
-    const selectedList = orderedLists.find((list) => list.id === selectedListId);
-    if (!selectedList || selectedList.folderId !== folderId) {
-      return false;
-    }
-
-    return isListSelected(selectedListId);
-  }
-
-  function getFolderIconProps(folderId: string) {
-    if (isFolderContainingSelectedList(folderId)) {
-      return {
-        className: "size-[15px] mb-[1px] mr-1 shrink-0",
-        style: { color: SIDEBAR_FOLDER_ICON_SELECTED_COLOR },
-      };
-    }
-
-    return {
-      className:
-        "size-[15px] mb-[1px] mr-1 shrink-0 text-[#acadb7] group-hover:text-[#9191af]",
-      style: undefined,
-    };
   }
 
   function getNavItemClassName(
@@ -1599,7 +1572,13 @@ export function Sidebar({
   }
 
   function renderListRow(list: TodoList, nested = false) {
-    const listTitleTextClass = nested ? "text-[#676a6f] " : "ptxt-list-items";
+    const isSelected =
+      isListSelected(list.id) && list.id !== suppressListSelectionHighlightId;
+    const listTitleTextClass = nested
+      ? isSelected
+        ? "ptxt-list-items"
+        : "text-[#676a6f]"
+      : "ptxt-list-items";
     const isNameHovered =
       sidebarHoverPreview?.kind === "list" &&
       sidebarHoverPreview.listId === list.id;
@@ -1912,7 +1891,7 @@ export function Sidebar({
           })}
           
           <div className="flex flex-col overflow-visible">
-            <div className="group/lists-header relative z-10 flex items-center overflow-visible px-4 pt-1 -mb-[2px]">
+            <div className="group/lists-header relative z-10 flex items-center overflow-visible px-4 pt-0.5 -mb-[2px]">
               <span className="min-w-0 flex-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-[#bdbfc2]">
                 Lists
               </span>
@@ -1954,6 +1933,10 @@ export function Sidebar({
               const isListDragOver = listDragOverFolderId === folder.id;
               const showChevronOpen = isExpanded || isListDragOver;
               const folderLists = getListsForFolder(orderedLists, folder.id);
+              const isFolderListSelected =
+                selectedListId != null &&
+                orderedLists.find((list) => list.id === selectedListId)
+                  ?.folderId === folder.id;
 
               return (
                 <div key={folder.id} className="flex flex-col">
@@ -1980,19 +1963,15 @@ export function Sidebar({
                         : ""
                     } ${onReorderLists ? "touch-none" : ""}`}
                   >
-                    {isExpanded ? (
-                      <BsFolder2Open
-                        {...getFolderIconProps(folder.id)}
-                        aria-hidden="true"
-                      />
-                    ) : (
-                      <LuFolder
-                        {...getFolderIconProps(folder.id)}
-                        aria-hidden="true"
-                      />
-                    )}
+                    <SidebarFolderIcon className={SIDEBAR_FOLDER_ICON_CLASS} />
                     <div className="ml-[2px] flex min-w-0 flex-1 items-center gap-0.5 pr-8">
-                      <span className="min-w-0 truncate text-left text-sm ptxt-list-items">
+                      <span
+                        className={`min-w-0 truncate text-left text-sm ${
+                          isFolderListSelected
+                            ? "ptxt-list-items"
+                            : "text-[#585858] dark:text-[#777777]"
+                        }`}
+                      >
                         {folder.name}
                       </span>
                       <span className="relative ml-1 mt-[1px] mb-[1px] shrink-0">
@@ -2038,7 +2017,7 @@ export function Sidebar({
             })}
             <div
               ref={bottomAddMenuRef}
-              className="relative ml-[3px] w-fit mt-1"
+              className="relative ml-[3px] w-fit mt-[2px]"
               onMouseEnter={() => setIsBottomAddMenuOpen(true)}
               onMouseLeave={() => setIsBottomAddMenuOpen(false)}
             >
@@ -2057,7 +2036,7 @@ export function Sidebar({
                 Add
               </button>
               {isBottomAddMenuOpen ? (
-                <div className="absolute bottom-full left-0 z-[1000] pb-2">
+                <div className="absolute bottom-full left-0 z-[1000] pb-[4px]">
                   <div
                     role="menu"
                     aria-label="Add list or folder"
@@ -2084,7 +2063,7 @@ export function Sidebar({
                       setIsAddFolderOpen(true);
                     }}
                   >
-                    <LuFolder className="size-[14px] shrink-0 text-[#acadb7]" aria-hidden="true" />
+                    <SidebarFolderIcon className="h-[12px] w-[14px] shrink-0" />
                     Folder
                   </button>
                   </div>
@@ -2098,7 +2077,7 @@ export function Sidebar({
             className="group/labels-section flex flex-col overflow-visible"
             onMouseLeave={() => onSidebarHoverEnd?.()}
           >
-            <div className="relative z-[200] flex items-center overflow-visible px-4 pb-0.5 pt-1">
+            <div className="relative z-[20] flex items-center overflow-visible px-4 pb-0.5 pt-1">
               <button
                 type="button"
                 onClick={() => setIsLabelsOpen((open) => !open)}
@@ -2240,11 +2219,9 @@ export function Sidebar({
             ) : null}
           </div>
 
-        </nav>
-
         <div
           ref={completedFooterRef}
-          className="relative shrink-0 border-t border-zinc-200 dark:border-zinc-800"
+          className="relative mt-auto shrink-0 border-t border-zinc-150 dark:border-zinc-800"
         >
           {isCompletedOpen ? (
             <div className="absolute bottom-full left-0 right-0 z-10 border-t border-zinc-200 bg-inherit shadow-[0_-8px_24px_rgba(15,23,42,0.08)] dark:border-zinc-800 dark:shadow-[0_-8px_24px_rgba(0,0,0,0.35)]">
@@ -2280,50 +2257,54 @@ export function Sidebar({
             </div>
           ) : null}
 
-          <div className="flex flex-col gap-2 px-3 pb-3 pt-2">
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex min-w-0 flex-1 flex-col gap-1">
-                <button
-                  type="button"
-                  aria-expanded={isCompletedOpen}
-                  className="group flex w-full items-center gap-1.5 rounded-md px-1 py-0.5 text-left text-sm ptxt-550 transition-colors hover:bg-zinc-100/80 hover:ptxt-900 dark:hover:bg-zinc-800/50 dark:hover:ptxt-50"
-                  onClick={() => {
-                    setIsCompletedOpen((open) => !open);
-                    setIsArchiveOpen(false);
-                  }}
-                >
-                  <BiSolidCheckboxChecked
-                    className={`size-[15px] shrink-0 ${
-                      isCompletedOpen ? "ptxt-950" : "ptxt-400"
-                    }`}
-                    aria-hidden="true"
-                  />
-                  <span className="text-[#9d9da3] group-hover:text-[#747479] text-[14px]">
-                    Completed
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  className="group flex w-full items-center gap-1.5 rounded-md px-1 py-0.5 text-left text-sm ptxt-550 transition-colors hover:bg-zinc-100/80 hover:ptxt-900 dark:hover:bg-zinc-800/50 dark:hover:ptxt-50"
-                  onClick={(event) => {
-                    openArchiveModal({
-                      x: event.clientX,
-                      y: event.clientY,
-                    });
-                    closeDrawer();
-                  }}
-                >
-                  <BsArchiveFill
-                    className="size-[11px] shrink-0 text-[#b5b5bb]"
-                    aria-hidden="true"
-                  />
-                  <span className="text-[#9d9da3] group-hover:text-[#747479] text-[13px]">
-                    Archive
-                  </span>
-                </button>
-              </div>
+          <div className="flex flex-col gap-0.5 px-4 pb-1 pt-[3px]">
+            <div className="flex min-w-0 flex-col gap-px">
+              <button
+                type="button"
+                aria-expanded={isCompletedOpen}
+                className="group flex w-full items-center gap-1.5 rounded-md py-0.5 text-left text-[11px] transition-colors hover:bg-zinc-100/80 dark:hover:bg-zinc-800/50"
+                onClick={() => {
+                  setIsCompletedOpen((open) => !open);
+                  setIsArchiveOpen(false);
+                }}
+              >
+                <BiSolidCheckboxChecked
+                  className={`size-[15px] shrink-0 -ml-[2px] ${
+                    isCompletedOpen
+                      ? "ptxt-950 dark:ptxt-50"
+                      : "text-[#acacb1] group-hover:text-[#9d9da3]"
+                  }`}
+                />
+                <span className="text-[11px] text-[#acacb1] transition-colors group-hover:text-[#9d9da3]">
+                  Completed
+                </span>
+              </button>
+              <button
+                type="button"
+                className="group flex w-full items-center gap-1.5 rounded-md py-0.5 text-left text-[11px] transition-colors hover:bg-zinc-100/80 dark:hover:bg-zinc-800/50"
+                onClick={(event) => {
+                  openArchiveModal({
+                    x: event.clientX,
+                    y: event.clientY,
+                  });
+                  closeDrawer();
+                }}
+              >
+                <BsArchiveFill
+                  className="size-[11px] ml-[1px] shrink-0 text-[#c0c0c5] transition-colors group-hover:text-[#b5b5bb]"
+                />
+                <span className="text-[11px] text-[#acacb1] transition-colors group-hover:text-[#9d9da3]">
+                  Archive
+                </span>
+              </button>
             </div>
+          </div>
+        </div>
 
+        </nav>
+
+        <div className="relative shrink-0 border-t border-zinc-200 dark:border-zinc-800">
+          <div className="flex flex-col gap-2 px-2 pb-2 pt-1.5">
             {session?.user ? (
               <div ref={profileMenuRef} className="relative">
                 {isProfileMenuOpen ? (
@@ -2332,16 +2313,16 @@ export function Sidebar({
                     role="menu"
                     aria-label="Account menu"
                   >
-                    <div className="flex items-center gap-3 border-b border-zinc-100 px-3 py-3 dark:border-zinc-800">
+                    <div className="flex items-center gap-3 border-b border-zinc-100 px-2.5 py-2.5 dark:border-zinc-800">
                       {session.user.image ? (
                         <img
                           src={session.user.image}
                           alt=""
                           referrerPolicy="no-referrer"
-                          className="size-10 shrink-0 rounded-full object-cover"
+                          className="size-6 shrink-0 rounded-full object-cover"
                         />
                       ) : (
-                        <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white dark:bg-zinc-100 dark:text-zinc-900">
+                        <div className="flex size-10 shrink-0 items-center justify-center cursor-pointer rounded-full bg-zinc-900 text-sm font-semibold text-white dark:bg-zinc-100 dark:text-zinc-900">
                           {getSidebarUserInitials(
                             session.user.name,
                             session.user.email,
@@ -2349,10 +2330,10 @@ export function Sidebar({
                         </div>
                       )}
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-[12px] font-semibold text-zinc-900 dark:text-zinc-50">
+                        <p className="truncate text-[11.5px] font-semibold text-zinc-700 dark:text-zinc-50 leading-none">
                           {session.user.name || "Account"}
                         </p>
-                        <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
+                        <p className="truncate text-[11px] text-zinc-500 dark:text-zinc-400">
                           {session.user.email}
                         </p>
                       </div>
@@ -2361,7 +2342,7 @@ export function Sidebar({
                       <button
                         type="button"
                         role="menuitem"
-                        className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                        className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm cursor-pointer text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
                         onClick={(event) => {
                           openSettingsModal(
                             {
@@ -2385,7 +2366,7 @@ export function Sidebar({
                       <button
                         type="button"
                         role="menuitem"
-                        className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                        className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm cursor-pointer text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
                         onClick={(event) => {
                           openSettingsModal(
                             {
@@ -2406,7 +2387,7 @@ export function Sidebar({
                       <button
                         type="button"
                         role="menuitem"
-                        className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                        className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm cursor-pointer text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
                         onClick={(event) => {
                           openSettingsModal(
                             {
@@ -2427,7 +2408,7 @@ export function Sidebar({
                       <button
                         type="button"
                         role="menuitem"
-                        className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                        className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm cursor-pointer text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
                         onClick={(event) => {
                           openKeyboardShortcutsModal({
                             x: event.clientX,
@@ -2447,7 +2428,7 @@ export function Sidebar({
                       <button
                         type="button"
                         role="menuitem"
-                        className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                        className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm cursor-pointer text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
                         onClick={() => {
                           window.location.href =
                             "mailto:?subject=Todolist%20feedback";
@@ -2465,7 +2446,7 @@ export function Sidebar({
                       <button
                         type="button"
                         role="menuitem"
-                        className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                        className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm cursor-pointer text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
                         onClick={() => {
                           void handleSignOut();
                           setIsProfileMenuOpen(false);
@@ -2482,10 +2463,10 @@ export function Sidebar({
                   </div>
                 ) : null}
 
-                <div className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-[#fafafa] px-2 py-1.5 dark:border-zinc-700 dark:bg-zinc-900/80">
+                <div className="flex items-center gap-2 rounded-xl border border-[#e1e8ee] bg-[#fdfdfd] pr-1 pl-2 py-[2px] dark:border-zinc-700 dark:bg-zinc-900/80 cursor-pointer">
                   <button
                     type="button"
-                    className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-0.5 text-left transition-colors hover:opacity-90"
+                    className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-0.5 text-left transition-colors hover:opacity-90 cursor-pointer"
                     onClick={() => setIsProfileMenuOpen((open) => !open)}
                     aria-expanded={isProfileMenuOpen}
                     aria-haspopup="menu"
@@ -2495,10 +2476,10 @@ export function Sidebar({
                         src={session.user.image}
                         alt=""
                         referrerPolicy="no-referrer"
-                        className="size-7 shrink-0 rounded-full object-cover"
+                        className="size-6 shrink-0 rounded-full object-cover"
                       />
                     ) : (
-                      <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white dark:bg-zinc-100 dark:text-zinc-900">
+                      <div className="flex size-9 shrink-0 items-center justify-center cursor-pointer rounded-full bg-zinc-900 text-sm font-semibold text-white dark:bg-zinc-100 dark:text-zinc-900">
                         {getSidebarUserInitials(
                           session.user.name,
                           session.user.email,
@@ -2506,36 +2487,36 @@ export function Sidebar({
                       </div>
                     )}
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-[12px] font-semibold text-zinc-900 dark:text-zinc-50">
+                      <p className="truncate text-[11px] mt-px font-semibold text-zinc-700 dark:text-zinc-50 leading-none">
                         {session.user.name || "Account"}
                       </p>
-                      <p className="truncate text-[11px] text-zinc-500 dark:text-zinc-400">
+                      <p className="truncate text-[10.5px] text-zinc-500 dark:text-zinc-400">
                         Personal
                       </p>
                     </div>
                   </button>
                   <button
                     type="button"
-                    aria-label="Open settings"
-                    title="Settings"
+                    aria-label="Open settings (General)"
+                    title="Settings — General"
                     onClick={(event) => {
                       openSettingsModal(
                         {
                           x: event.clientX,
                           y: event.clientY,
                         },
-                        "account",
+                        "general",
                       );
                       closeDrawer();
                     }}
-                    className="flex size-9 shrink-0 items-center justify-center rounded-full text-zinc-500 transition-colors hover:bg-zinc-200/70 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                    className="flex size-9 shrink-0 items-center justify-center rounded-full text-zinc-350 transition-colors hover:bg-zinc-200/70 hover:text-zinc-800 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 cursor-pointer"
                   >
-                    <FiSettings className="size-[18px]" aria-hidden="true" />
+                    <FiSettings className="size-[16px]"  />
                   </button>
                 </div>
               </div>
             ) : (
-              <div className="flex items-center justify-end gap-1 rounded-xl border border-zinc-200 bg-[#fafafa] px-2 py-1.5 dark:border-zinc-700 dark:bg-zinc-900/80">
+              <div className="flex items-center justify-end gap-1 rounded-xl border border-zinc-200 bg-[#fdfdfd] pr-1 pl-1.5 py-[2px] dark:border-zinc-700 dark:bg-zinc-900/80">
                 <button
                   type="button"
                   aria-label="Keyboard shortcuts"
@@ -2552,14 +2533,15 @@ export function Sidebar({
                 </button>
                 <button
                   type="button"
-                  aria-label="Open settings"
+                  aria-label="Open settings (General)"
+                  title="Settings — General"
                   onClick={(event) => {
                     openSettingsModal(
                       {
                         x: event.clientX,
                         y: event.clientY,
                       },
-                      "account",
+                      "general",
                     );
                     closeDrawer();
                   }}

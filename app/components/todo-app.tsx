@@ -100,7 +100,7 @@ import {
 } from "./calendar-task-modal";
 import { CalendarTaskModalActionsProvider } from "./calendar-task-modal-actions";
 import { CalendarShortcutModal } from "./calendar-shortcut-modal";
-import { plainTextToTaskDetails } from "./calendar-add-task-popover";
+import { plainTextToTaskDetails } from "@/lib/task-details-content";
 import { TaskDetailsPanel, type TaskDetailsSaveController } from "./task-details-panel";
 import { PanelResizeHandle } from "./panel-resize-handle";
 import {
@@ -139,7 +139,7 @@ import {
   buildVisibleTasks,
   saveSubtasksExpanded,
 } from "@/lib/task-subtasks";
-import { AppFontSwitcher } from "./app-font-switcher";
+import { AppFontBootstrap } from "./app-font-switcher";
 import { CalendarTaskDefaultColorBootstrap } from "./calendar-task-default-color-bootstrap";
 import { TaskEditorDefaultsBootstrap } from "./task-editor-defaults-bootstrap";
 import { TemplateOptionsDrawer } from "./template-options-drawer";
@@ -2844,6 +2844,59 @@ export function TodoApp({
     selectNewTaskAndFocusDetails(task.id);
   }
 
+  async function startCalendarTask(payload: {
+    dueDate: string;
+    listId: string;
+    dueTimeMinutes?: number | null;
+  }): Promise<string | null> {
+    const { dueDate, listId, dueTimeMinutes = null } = payload;
+    if (!listId) return null;
+
+    const task = await createTask(listId, "", dueDate);
+
+    let resolvedDueTimeMinutes: number | null = null;
+    let resolvedDueDurationMinutes: number | null = null;
+    let resolvedDueTimeZone: TaskDueTime["dueTimeZone"] = "floating";
+
+    if (dueTimeMinutes !== null && dueTimeMinutes !== undefined) {
+      const updated = await updateTaskDueTimeInDb(task.id, {
+        dueTimeMinutes,
+        dueDurationMinutes: null,
+        dueTimeZone: "floating",
+      });
+      resolvedDueTimeMinutes = updated.dueTimeMinutes;
+      resolvedDueDurationMinutes = updated.dueDurationMinutes;
+      resolvedDueTimeZone = updated.dueTimeZone;
+    }
+
+    const newTask: Task = {
+      id: task.id,
+      name: task.name,
+      completed: task.completed,
+      details: "",
+      hasDetails: false,
+      dueDate: task.dueDate ? new Date(task.dueDate).toISOString() : null,
+      dueTimeMinutes: resolvedDueTimeMinutes,
+      dueDurationMinutes: resolvedDueDurationMinutes,
+      dueTimeZone: resolvedDueTimeZone,
+      calendarColor: null,
+      recurrenceRule: null,
+      priority: null,
+      pinned: false,
+      important: false,
+      isNote: false,
+      parentId: null,
+      labels: [],
+    };
+
+    setTasksByList((current) => ({
+      ...current,
+      [listId]: [newTask, ...(current[listId] ?? [])],
+    }));
+
+    return task.id;
+  }
+
   async function toggleTask(taskId: string) {
     let listId = selectedListId;
 
@@ -3940,7 +3993,7 @@ export function TodoApp({
     onDueDateUpdated: handleDueDateUpdated,
     onRecurrenceUpdated: handleRecurrenceUpdated,
     onSaveTaskRecurrence: setTaskRecurrence,
-    onAddCalendarTask: addCalendarTask,
+    onStartCalendarTask: startCalendarTask,
     labels,
     onDeleteTask: deleteTaskById,
     defaultListId: inboxListId,
@@ -4194,7 +4247,7 @@ export function TodoApp({
             {!isCompactLayout || compactDetailView ? (
             <div
               className={`flex min-h-0 flex-1 flex-col overflow-hidden ${
-                isCompactLayout ? "min-w-0" : "min-w-[348px]"
+                isCompactLayout ? "min-w-0" : "min-w-[344px]"
               }`}
             >
               {showListCalendarPanel ? (
@@ -4230,7 +4283,7 @@ export function TodoApp({
                     onDueDateUpdated={handleDueDateUpdated}
                     onRecurrenceUpdated={handleRecurrenceUpdated}
                     onSaveTaskRecurrence={setTaskRecurrence}
-                    onAddCalendarTask={addCalendarTask}
+                    onStartCalendarTask={startCalendarTask}
                     defaultListId={displayedListId}
                     view={listCalendarPanelView}
                     onViewChange={handleListCalendarViewChange}
@@ -4399,7 +4452,7 @@ export function TodoApp({
                   onDueDateUpdated={handleDueDateUpdated}
                   onRecurrenceUpdated={handleRecurrenceUpdated}
                   onSaveTaskRecurrence={setTaskRecurrence}
-                  onAddCalendarTask={addCalendarTask}
+                  onStartCalendarTask={startCalendarTask}
                   defaultListId={displayedListId}
                   view={listCalendarPanelView}
                   onViewChange={handleListCalendarViewChange}
@@ -4427,7 +4480,10 @@ export function TodoApp({
               </ListCalendarOverlapShell>
             ) : null}
             {showTaskDetails ? (
-              <div className="flex min-h-0 min-w-[348px] flex-1 flex-col overflow-hidden">
+              <div
+                className="flex min-h-0 flex-1 flex-col overflow-hidden"
+                style={{ minWidth: TASK_LIST_PANEL_MIN_WIDTH }}
+              >
                 <TaskDetailsPanel
                   taskId={selectedTaskId}
                   taskSnapshot={selectedTaskSnapshot}
@@ -4470,7 +4526,7 @@ export function TodoApp({
       ) : null}
       <TaskEditorDefaultsBootstrap />
       <CalendarTaskDefaultColorBootstrap />
-      <AppFontSwitcher />
+      <AppFontBootstrap />
       <TemplateOptionsDrawer />
       <CalendarShortcutModal
         open={isCalendarShortcutModalOpen}

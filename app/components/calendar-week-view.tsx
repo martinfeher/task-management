@@ -1,11 +1,10 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, Fragment } from "react";
-import { CalendarAddTaskPopover } from "./calendar-add-task-popover";
 import { CalendarTaskTitle } from "./calendar-task-title";
 import { CalendarPeriodNavigation } from "./calendar-period-navigation";
 import { CalendarCurrentTimeLine } from "./calendar-current-time-line";
-import { CalendarNewTaskSlotPreview } from "./calendar-new-task-slot-preview";
+import type { CalendarStartTaskOptions } from "@/lib/calendar-start-task";
 import { type CalendarTaskEditorCallbacks } from "./calendar-task-modal";
 import type { TaskListItem, TodoList } from "./todo-app";
 import type { TaskDueTime } from "@/lib/task-due-time";
@@ -23,9 +22,9 @@ import {
   isCalendarTaskPast,
   getCalendarAllDayRowHeightPx,
   getCalendarShellClassName,
-  CALENDAR_VIEW_SURFACE_CLASS,
+  getCalendarViewSurfaceClassName,
+  getCalendarTimedGridScrollClassName,
   CALENDAR_VIEW_WRAPPER_CLASS,
-  CALENDAR_TIMED_GRID_SCROLL_CLASS,
   CALENDAR_HOUR_COLUMN_DIVIDER_CLASS,
   formatCalendarHourLabel,
   calendarHourLabelCellClassName,
@@ -119,13 +118,9 @@ type CalendarWeekViewProps = {
     dueTime: TaskDueTime,
   ) => void;
 } & CalendarTaskEditorCallbacks & {
-  onAddCalendarTask?: (payload: {
-    name: string;
-    dueDate: string;
-    details: string;
-    listId: string;
-    dueTimeMinutes?: number | null;
-  }) => void | Promise<void>;
+  onStartCalendarTask?: (
+    options: CalendarStartTaskOptions,
+  ) => void | Promise<void>;
   defaultListId?: string | null;
   fullWidth?: boolean;
   externalDropTargetDateKey?: string | null;
@@ -260,7 +255,7 @@ export function CalendarWeekView({
   onDueDateUpdated,
   onRecurrenceUpdated,
   onSaveTaskRecurrence,
-  onAddCalendarTask,
+  onStartCalendarTask,
   defaultListId = null,
   fullWidth = false,
   externalDropTargetDateKey = null,
@@ -281,13 +276,6 @@ export function CalendarWeekView({
   }
   const { defaultColor: calendarTaskDefaultColor } =
     useCalendarTaskDefaultColor();
-  const [addTaskPopover, setAddTaskPopover] = useState<{
-    date: Date;
-    x: number;
-    y: number;
-    dueTimeMinutes: number | null;
-  } | null>(null);
-  const [draftTaskName, setDraftTaskName] = useState("");
   const [dropTargetSlot, setDropTargetSlot] = useState<CalendarDropSlot | null>(
     null,
   );
@@ -304,8 +292,6 @@ export function CalendarWeekView({
   const dragStateRef = useRef<CalendarTaskDragState | null>(null);
   const resizingTaskIdRef = useRef<string | null>(null);
   const suppressTaskClickRef = useRef(false);
-  const timeGridRef = useRef<HTMLDivElement>(null);
-  const newTaskPreviewRef = useRef<HTMLDivElement>(null);
   const hourColumnRef = useRef<HTMLDivElement>(null);
   const timeScrollRef = useRef<HTMLDivElement>(null);
   const isTimedGridReady = Boolean(weekStart && today && now);
@@ -439,26 +425,15 @@ export function CalendarWeekView({
     return sidebarFocusDate !== undefined && isSameDay(day, sidebarFocusDate);
   }
 
-  function closeAddTaskPopover() {
-    setAddTaskPopover(null);
-    setDraftTaskName("");
-  }
-
   function handleAllDayClick(
-    event: React.MouseEvent<HTMLElement>,
+    _event: React.MouseEvent<HTMLElement>,
     day: Date,
   ) {
     closeTaskModal();
 
-    if (!onAddCalendarTask || lists.length === 0) return;
+    if (!onStartCalendarTask || lists.length === 0) return;
 
-    setDraftTaskName("");
-    setAddTaskPopover({
-      date: day,
-      x: event.clientX,
-      y: event.clientY,
-      dueTimeMinutes: null,
-    });
+    void onStartCalendarTask({ date: day, dueTimeMinutes: null });
   }
 
   function handleTimeGridClick(
@@ -473,7 +448,7 @@ export function CalendarWeekView({
     event.stopPropagation();
     closeTaskModal();
 
-    if (!onAddCalendarTask || lists.length === 0) return;
+    if (!onStartCalendarTask || lists.length === 0) return;
 
     const rect = event.currentTarget.getBoundingClientRect();
     const y = event.clientY - rect.top;
@@ -499,13 +474,7 @@ export function CalendarWeekView({
       return;
     }
 
-    setDraftTaskName("");
-    setAddTaskPopover({
-      date: day,
-      x: event.clientX,
-      y: event.clientY,
-      dueTimeMinutes,
-    });
+    void onStartCalendarTask({ date: day, dueTimeMinutes });
   }
 
   function handleCalendarTaskClick(
@@ -520,13 +489,6 @@ export function CalendarWeekView({
     }
 
     onSelectTask(task.id);
-    closeAddTaskPopover();
-  }
-
-  function handleNewTaskTimeChange(minutes: number) {
-    setAddTaskPopover((current) =>
-      current ? { ...current, dueTimeMinutes: minutes } : null,
-    );
   }
 
   function handleSetDropTargetSlot(slot: CalendarDropSlot | null) {
@@ -577,7 +539,6 @@ export function CalendarWeekView({
   useEffect(() => {
     if (!weekStart) return;
     closeTaskModal();
-    closeAddTaskPopover();
   }, [weekStart]);
 
   const showWeekNowLine =
@@ -628,36 +589,13 @@ export function CalendarWeekView({
     draggingTask,
     draggingTaskPreview,
   );
-  const timedGridMinMinutes = getMinutesFromCalendarGridY(
-    effectiveGridTopOffset,
-    gridHourStart,
-    hourHeightPx,
-    CALENDAR_TIME_SLOT_MINUTES,
-    effectiveGridTopOffset,
-  );
-  const timedGridMaxMinutes = getMinutesFromCalendarGridY(
-    effectiveGridTopOffset + hours.length * hourHeightPx,
-    gridHourStart,
-    hourHeightPx,
-    CALENDAR_TIME_SLOT_MINUTES,
-    effectiveGridTopOffset,
-  );
-
   function getAllDayRowHeightPx(days: Date[]) {
     return getCalendarAllDayRowHeightPx(
       Math.max(
         0,
         ...days.map((day) => {
           const dateKey = toDateKey(day);
-          let count = tasksByDate.get(dateKey)?.allDay.length ?? 0;
-          if (
-            addTaskPopover !== null &&
-            isSameDay(day, addTaskPopover.date) &&
-            addTaskPopover.dueTimeMinutes === null
-          ) {
-            count += 1;
-          }
-          return count;
+          return tasksByDate.get(dateKey)?.allDay.length ?? 0;
         }),
       ),
     );
@@ -666,8 +604,12 @@ export function CalendarWeekView({
   return (
     <div className={CALENDAR_VIEW_WRAPPER_CLASS}>
       <div className={getCalendarShellClassName(fullWidth)}>
-        <div className={CALENDAR_VIEW_SURFACE_CLASS}>
-          <div className="flex shrink-0 items-center justify-start pr-3 mb-[10px]">
+        <div className={getCalendarViewSurfaceClassName(fullWidth)}>
+          <div
+            className={`flex shrink-0 items-center justify-start mb-[10px] ${
+              fullWidth ? "pr-2 pl-0" : "pr-3"
+            }`}
+          >
             <CalendarPeriodNavigation
               onToday={goToToday}
               onPrevious={goToPreviousWeek}
@@ -676,8 +618,11 @@ export function CalendarWeekView({
               nextLabel="Next week"
             />
           </div>
-          <div ref={timeScrollRef} className={CALENDAR_TIMED_GRID_SCROLL_CLASS}>
-            <div className="min-w-[753px]">
+          <div
+            ref={timeScrollRef}
+            className={getCalendarTimedGridScrollClassName(fullWidth)}
+          >
+            <div className="w-full min-w-[753px]">
               {visibleWeeks.map((weekDays, weekIndex) => {
                 const allDayRowHeightPx = getAllDayRowHeightPx(weekDays);
                 const todayColumnIndex = weekDays.findIndex((day) =>
@@ -697,7 +642,7 @@ export function CalendarWeekView({
                   >
                     <div className={CALENDAR_WEEK_HEADER_STICKY_CLASS}>
                       <div
-                        className="grid bg-white dark:bg-zinc-950"
+                        className="grid w-full bg-white dark:bg-zinc-950"
                         style={{
                           gridTemplateColumns: getCalendarTimedGridTemplateColumns(7),
                         }}
@@ -739,7 +684,7 @@ export function CalendarWeekView({
                       style={{ top: CALENDAR_WEEK_HEADER_HEIGHT_PX }}
                     >
                       <div
-                        className="grid bg-white dark:bg-zinc-950"
+                        className="grid w-full bg-white dark:bg-zinc-950"
                         style={{
                           gridTemplateColumns: getCalendarTimedGridTemplateColumns(7),
                         }}
@@ -763,10 +708,6 @@ export function CalendarWeekView({
                           const isDropTarget =
                             activeDropSlot?.dateKey === dateKey &&
                             activeDropSlot.dueTimeMinutes === null;
-                          const isActiveDay =
-                            addTaskPopover !== null &&
-                            isSameDay(day, addTaskPopover.date) &&
-                            addTaskPopover.dueTimeMinutes === null;
                           const isSelectedDay = isSelectedWeekDay(day);
 
                           return (
@@ -778,9 +719,7 @@ export function CalendarWeekView({
                                 `cursor-pointer transition-colors ${getWeekDayColumnDividerClass(dayIndex, weekDays, isSelectedWeekDay)} ${
                                   isDropTarget
                                     ? "border-b border-zinc-200 bg-blue-50 ring-1 ring-inset ring-blue-400 dark:border-zinc-800 dark:bg-blue-950/30"
-                                    : isActiveDay
-                                      ? "border-b border-zinc-200 bg-blue-50 ring-1 ring-inset ring-[#4873c7] dark:border-zinc-800 dark:bg-blue-950/30"
-                                      : isSelectedDay
+                                    : isSelectedDay
                                         ? `${SELECTED_WEEK_DAY_COLUMN_CLASS} ${SELECTED_WEEK_DAY_ROW_BORDER_CLASS}`
                                         : `${SELECTED_WEEK_DAY_ROW_BORDER_CLASS} bg-white hover:bg-zinc-50 dark:bg-zinc-950 dark:hover:bg-zinc-900/60`
                                 }`,
@@ -837,7 +776,7 @@ export function CalendarWeekView({
                       </div>
                     </div>
                 <div
-                  className="relative grid"
+                  className="relative grid w-full"
                   style={{
                     gridTemplateColumns: getCalendarTimedGridTemplateColumns(7),
                   }}
@@ -881,22 +820,16 @@ export function CalendarWeekView({
                   gridHourStart,
                   effectiveGridTopOffset,
                 );
-              const isActiveTimedDay =
-                addTaskPopover !== null &&
-                isSameDay(day, addTaskPopover.date) &&
-                addTaskPopover.dueTimeMinutes !== null;
+              const externalDropSlotMinutes = isTimedDropTarget
+                ? (activeDropSlot?.dueTimeMinutes ?? null)
+                : null;
+              const selectedSlotMinutes = externalDropSlotMinutes;
               const showDragSlotMarker =
                 resizingTaskId === null &&
                 resizePreview === null &&
                 isTimedDropTarget &&
-                !isActiveTimedDay &&
-                (activeDropSlot?.dueTimeMinutes ?? null) !== null &&
+                externalDropSlotMinutes !== null &&
                 internalDragStillAtSource;
-              const selectedSlotMinutes = isActiveTimedDay
-                ? addTaskPopover.dueTimeMinutes
-                : isTimedDropTarget
-                  ? activeDropSlot?.dueTimeMinutes ?? null
-                  : null;
               const selectedSlotTop =
                 selectedSlotMinutes === null
                   ? null
@@ -912,13 +845,12 @@ export function CalendarWeekView({
                 selectedSlotTop >= effectiveGridTopOffset &&
                 selectedSlotTop <=
                   effectiveGridTopOffset + hours.length * hourHeightPx &&
-                (isActiveTimedDay || showDragSlotMarker);
+                showDragSlotMarker;
               const isSelectedDay = isSelectedWeekDay(day);
 
               return (
                 <div
                   key={`time-${dateKey}`}
-                  ref={isActiveTimedDay ? timeGridRef : undefined}
                   data-calendar-day={dateKey}
                   data-calendar-time-grid="true"
                   data-hour-start={gridHourStart}
@@ -1118,20 +1050,6 @@ export function CalendarWeekView({
                           priority={externalDraggingTask?.priority ?? null}
                           calendarColor={externalDraggingTask?.calendarColor ?? null}
                         />
-                      ) : isActiveTimedDay ? (
-                        <CalendarNewTaskSlotPreview
-                          previewRef={newTaskPreviewRef}
-                          slotTop={selectedSlotTop}
-                          timeMinutes={selectedSlotMinutes}
-                          hourHeightPx={hourHeightPx}
-                          hourStart={gridHourStart}
-                          gridTopOffsetPx={effectiveGridTopOffset}
-                          gridRef={timeGridRef}
-                          minMinutes={timedGridMinMinutes}
-                          maxMinutes={timedGridMaxMinutes}
-                          label={draftTaskName}
-                          onTimeChange={handleNewTaskTimeChange}
-                        />
                       ) : null}
                     </>
                   ) : null}
@@ -1157,34 +1075,6 @@ export function CalendarWeekView({
           </div>
         </div>
       </div>
-
-      {addTaskPopover && onAddCalendarTask ? (
-        <CalendarAddTaskPopover
-          date={addTaskPopover.date}
-          dueTimeMinutes={addTaskPopover.dueTimeMinutes}
-          lists={lists}
-          defaultListId={defaultListId}
-          anchorRef={
-            addTaskPopover.dueTimeMinutes !== null
-              ? newTaskPreviewRef
-              : undefined
-          }
-          x={
-            addTaskPopover.dueTimeMinutes === null
-              ? addTaskPopover.x
-              : undefined
-          }
-          y={
-            addTaskPopover.dueTimeMinutes === null
-              ? addTaskPopover.y
-              : undefined
-          }
-          name={draftTaskName}
-          onNameChange={setDraftTaskName}
-          onClose={closeAddTaskPopover}
-          onAddTask={onAddCalendarTask}
-        />
-      ) : null}
     </div>
   );
 }

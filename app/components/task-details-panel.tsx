@@ -4,6 +4,8 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObje
 import { createPortal } from "react-dom";
 import { BiLink, BiLeftArrowAlt, BiRedo, BiUndo } from "react-icons/bi";
 import { LuCheck, LuCode, LuHeading1, LuHeading2, LuHeading3, LuHistory, LuPilcrow, LuRemoveFormatting, LuType, LuX } from "react-icons/lu";
+import { HiItalic } from "react-icons/hi2";
+import { VscChecklist } from "react-icons/vsc";
 import { renameTask, updateTaskDueDate, updateTaskDueTime, updateTaskRecurrence } from "@/app/actions/todo";
 import type { TaskRecurrenceRule } from "@/lib/task-recurrence";
 import { serializeRecurrenceRule } from "@/lib/task-recurrence";
@@ -64,6 +66,7 @@ import {
   isListBlockLine,
   isDetailLineEmpty,
   isBodyPlaceholderLine,
+  isTextBodyPlaceholderLine,
   isEmptyEditableBodyLine,
   isCaretAtStartOfLine,
   getDetailLineFromNode,
@@ -89,6 +92,10 @@ import {
   syncLineEmptyState,
   toggleChecklistLine,
 } from "./detail-lines";
+import {
+  beginEditorEnterDebugSession,
+  logEditorEnterDebug,
+} from "./detail-enter-debug";
 import {
   deleteUploadedTaskImage,
   extractTaskImageFilename,
@@ -255,6 +262,8 @@ type TaskDetailsPanelProps = {
     },
   ) => void;
   onToggleTask?: (taskId: string) => void;
+  /** Modal header only: save, mark complete, and close without affecting subtask toggles. */
+  onMarkTaskComplete?: (taskId: string) => void | Promise<void>;
   subtasks?: TaskDetailsSubtask[];
   canManageSubtasks?: boolean;
   onAddSubtask?: (
@@ -309,6 +318,7 @@ type DropIndicatorState = {
 type AddBlockMenuState = {
   top: number;
   left: number;
+  selectedIndex: number;
 };
 
 const FORMAT_TOOLBAR_SURFACE_CLASS =
@@ -337,8 +347,11 @@ const FORMAT_TOOLBAR_ICON_BUTTON_CLASS =
 
 const TASK_DETAILS_DATE_MENU_HOVER_CLOSE_MS = 120;
 
-const FORMAT_TOOLBAR_ACTIVE_BUTTON_CLASS =
-  "bg-[#c3eaff] text-[#2563eb] dark:text-blue-300";
+const FORMAT_TOOLBAR_BOLD_ITALIC_ACTIVE_CLASS =
+  "bg-[#E8EAEF] text-zinc-800 dark:text-zinc-900";
+
+const HEADER_QUICK_FORMAT_BUTTON_CLASS =
+  "inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100";
 
 type FormatMenuInlineFormats = {
   bold: boolean;
@@ -392,6 +405,11 @@ const ADD_BLOCK_OPTIONS: {
   { type: "checklist", label: "Checklist", Icon: ChecklistIcon },
   { type: "code", label: "Code", Icon: LuCode },
 ];
+
+/** Row specs for `getSlashCommandPreviewTopOffset` when the add-block (+) menu is open. */
+const ADD_BLOCK_MENU_PREVIEW_ROW_SPECS = ADD_BLOCK_OPTIONS.map(() => ({
+  kind: "block" as const,
+}));
 
 const SLASH_LINK_OPTION = {
   kind: "link" as const,
@@ -2142,6 +2160,7 @@ export function TaskDetailsPanel({
   onTaskRenamed,
   onDueDateUpdated,
   onToggleTask,
+  onMarkTaskComplete,
   subtasks = [],
   canManageSubtasks = false,
   onAddSubtask,
@@ -2209,6 +2228,9 @@ export function TaskDetailsPanel({
   }, [defaultFontSizePx, defaultLineHeight]);
   const [formatMenuInlineFormats, setFormatMenuInlineFormats] =
     useState<FormatMenuInlineFormats>(DEFAULT_FORMAT_MENU_INLINE_FORMATS);
+  const [formatMenuListLineType, setFormatMenuListLineType] = useState<
+    "bullet" | "numbered" | "checklist" | null
+  >(null);
   const [showHeaderClearFormatting, setShowHeaderClearFormatting] =
     useState(false);
   const [recentFormatColors, setRecentFormatColors] = useState<RecentFormatColor[]>(
@@ -3250,9 +3272,15 @@ export function TaskDetailsPanel({
       ensureTitleLine(editor);
 
       if (mode === "full") {
+        logEditorEnterDebug("runEditorNormalization: before", editor);
         splitBlockLinesOnBreaks(editor);
+        logEditorEnterDebug(
+          "runEditorNormalization: after splitBlockLinesOnBreaks",
+          editor,
+        );
         normalizeLinks(editor);
         syncEditorLineEmptyState(editor);
+        logEditorEnterDebug("runEditorNormalization: after sync", editor);
       }
 
       syncEditorContent();
@@ -3571,6 +3599,15 @@ export function TaskDetailsPanel({
     setFormatMenuFontFamily(getDetailSelectionFontState(editor).familyId);
     setFormatMenuLineHeight(getDetailSelectionLineHeight(editor));
     setFormatMenuBlockType(getActiveTextBlockType(editor));
+    const activeLine = getActiveLineElement(editor);
+    const activeListType = activeLine?.dataset.lineType;
+    setFormatMenuListLineType(
+      activeListType === "bullet" ||
+        activeListType === "numbered" ||
+        activeListType === "checklist"
+        ? activeListType
+        : null,
+    );
     syncHeaderClearFormattingState();
   }, [syncHeaderClearFormattingState]);
 
@@ -4146,6 +4183,8 @@ export function TaskDetailsPanel({
     [applyFormat, captureFormatSelectionFromEditor, syncFormatMenuSelectionState],
   );
 
+  const handleHeaderQuickFormatApply = handleModalInlineFormatApply;
+
   const clearFormatting = useCallback(() => {
     const editor = editorRef.current;
     if (!editor) return;
@@ -4499,6 +4538,40 @@ export function TaskDetailsPanel({
       syncEditorContent,
       updateLineControls,
     ],
+  );
+
+  const handleHeaderChecklistApply = useCallback(() => {
+    captureFormatSelectionFromEditor();
+    applyLineBlockType("checklist");
+    requestAnimationFrame(() => {
+      syncFormatMenuSelectionState();
+    });
+  }, [
+    applyLineBlockType,
+    captureFormatSelectionFromEditor,
+    syncFormatMenuSelectionState,
+  ]);
+
+  const rememberHeaderFormatSelectionOnPointerDown = useCallback(
+    (event: React.MouseEvent) => {
+      if (event.button !== 0) return;
+
+      const editor = editorRef.current;
+      if (!editor) return;
+
+      const selection = window.getSelection();
+      if (
+        selection?.rangeCount &&
+        !selection.isCollapsed &&
+        selection.anchorNode &&
+        editor.contains(selection.anchorNode)
+      ) {
+        rememberFormatSelection(editor, selection.getRangeAt(0));
+      } else {
+        captureFormatSelectionFromEditor();
+      }
+    },
+    [captureFormatSelectionFromEditor],
   );
 
   const restoreHistorySnapshot = useCallback(
@@ -5557,7 +5630,15 @@ export function TaskDetailsPanel({
     handleApplySlashCommand(option.type);
   }
 
-  function handleEditorInput() {
+  function handleEditorInput(event: React.FormEvent<HTMLDivElement>) {
+    if (editorRef.current) {
+      const nativeEvent = event.nativeEvent as InputEvent;
+      logEditorEnterDebug("input event (native edit)", editorRef.current, {
+        inputType: nativeEvent.inputType,
+        data: nativeEvent.data,
+        isComposing: nativeEvent.isComposing,
+      });
+    }
     if (editorRef.current && isReadyRef.current) {
       detailsUserModifiedRef.current = true;
       detailsRef.current = normalizeDetails(editorRef.current.innerHTML);
@@ -6143,14 +6224,19 @@ export function TaskDetailsPanel({
 
     const rect = event.currentTarget.getBoundingClientRect();
     setSlashCommandMenu(null);
-    setAddBlockMenu((current) =>
-      current
-        ? null
-        : {
-            top: rect.bottom + 4,
-            left: rect.left,
-          },
-    );
+    setAddBlockMenu((current) => {
+      if (current) {
+        return null;
+      }
+      requestAnimationFrame(() => {
+        editor.focus();
+      });
+      return {
+        top: rect.bottom + 4,
+        left: rect.left,
+        selectedIndex: 0,
+      };
+    });
   }
 
   function handleInsertBlockType(type: LineBlockType) {
@@ -6288,6 +6374,55 @@ export function TaskDetailsPanel({
       return;
     }
 
+    if (addBlockMenu) {
+      const count = ADD_BLOCK_OPTIONS.length;
+      const selectedIndex = Math.min(
+        addBlockMenu.selectedIndex,
+        Math.max(count - 1, 0),
+      );
+
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        setAddBlockMenu((current) =>
+          current
+            ? {
+                ...current,
+                selectedIndex: Math.min(selectedIndex + 1, count - 1),
+              }
+            : null,
+        );
+        return;
+      }
+
+      if (event.key === "ArrowUp") {
+        event.preventDefault();
+        setAddBlockMenu((current) =>
+          current
+            ? {
+                ...current,
+                selectedIndex: Math.max(selectedIndex - 1, 0),
+              }
+            : null,
+        );
+        return;
+      }
+
+      if (event.key === "Enter") {
+        event.preventDefault();
+        const option = ADD_BLOCK_OPTIONS[selectedIndex];
+        if (option) {
+          handleInsertBlockType(option.type);
+        }
+        return;
+      }
+
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setAddBlockMenu(null);
+        return;
+      }
+    }
+
     if (slashCommandMenu) {
       const filtered = getSlashCommandOptions(slashCommandMenu.query);
       const selectedIndex = Math.min(
@@ -6422,6 +6557,12 @@ export function TaskDetailsPanel({
       const editor = editorRef.current;
       if (!editor) return;
 
+      beginEditorEnterDebugSession(editor);
+      logEditorEnterDebug("Enter keydown: before", editor, {
+        isComposing: event.nativeEvent.isComposing,
+        repeat: event.repeat,
+      });
+
       let activeLine = getActiveLineElement(editor);
       if (!activeLine) {
         const lines = getLineElements(editor);
@@ -6435,13 +6576,16 @@ export function TaskDetailsPanel({
 
       if (isTitleLine(editor, activeLine)) {
         enterFromTitleLine(editor);
-      } else if (isBodyPlaceholderLine(activeLine)) {
+      } else if (isTextBodyPlaceholderLine(activeLine)) {
+        logEditorEnterDebug("Enter: insertLineBeforeBodyPlaceholder", editor);
         insertLineBeforeBodyPlaceholder(editor, activeLine);
       } else {
-      splitLineAtCursor(editor);
+        splitLineAtCursor(editor);
       }
+      logEditorEnterDebug("Enter keydown: after split", editor);
       setSlashCommandMenu(null);
       syncEditorLineEmptyState(editor);
+      logEditorEnterDebug("Enter keydown: after syncEditorLineEmptyState", editor);
       syncEditorContent();
       recordHistorySnapshot();
       scheduleAutoSave();
@@ -6821,11 +6965,63 @@ export function TaskDetailsPanel({
   const dueTimeLabel = task ? formatDueTimeLabel(task.dueTimeMinutes) : null;
   const showModalMarkComplete =
     isModalLayout &&
-    Boolean(onToggleTask && task && !task.completed && !task.isNote);
+    Boolean(
+      (onMarkTaskComplete || onToggleTask) &&
+        task &&
+        !task.completed &&
+        !task.isNote,
+    );
   const showModalFormatToggle =
     isModalLayout &&
     Boolean(task && !task.isNote) &&
     !hideModalFormatToggle;
+
+  function renderHeaderQuickFormatButtons() {
+    if (!task) return null;
+
+    return (
+      <div
+        className="ml-1 flex items-center gap-0.5"
+        onMouseDown={rememberHeaderFormatSelectionOnPointerDown}
+      >
+        <button
+          type="button"
+          aria-label="Bold"
+          aria-pressed={formatMenuInlineFormats.bold}
+          className={`${HEADER_QUICK_FORMAT_BUTTON_CLASS} text-[15px] font-bold ${
+            formatMenuInlineFormats.bold ? FORMAT_TOOLBAR_BOLD_ITALIC_ACTIVE_CLASS : ""
+          }`}
+          onClick={() => handleHeaderQuickFormatApply("bold")}
+        >
+          B
+        </button>
+        <button
+          type="button"
+          aria-label="Italic"
+          aria-pressed={formatMenuInlineFormats.italic}
+          className={`${HEADER_QUICK_FORMAT_BUTTON_CLASS} ${
+            formatMenuInlineFormats.italic ? FORMAT_TOOLBAR_BOLD_ITALIC_ACTIVE_CLASS : ""
+          }`}
+          onClick={() => handleHeaderQuickFormatApply("italic")}
+        >
+          <HiItalic className="size-4" aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          aria-label="Checklist"
+          aria-pressed={formatMenuListLineType === "checklist"}
+          className={`${HEADER_QUICK_FORMAT_BUTTON_CLASS} ${
+            formatMenuListLineType === "checklist"
+              ? FORMAT_TOOLBAR_BOLD_ITALIC_ACTIVE_CLASS
+              : ""
+          }`}
+          onClick={handleHeaderChecklistApply}
+        >
+          <VscChecklist className="size-4 text-zinc-400" aria-hidden="true" />
+        </button>
+      </div>
+    );
+  }
 
   function renderModalHeaderActions() {
     if (!isModalLayout || !task) return null;
@@ -6835,32 +7031,19 @@ export function TaskDetailsPanel({
         {showModalMarkComplete ? (
           <button
             type="button"
-            onClick={() => onToggleTask?.(task.id)}
+            onClick={() => {
+              if (onMarkTaskComplete) {
+                void onMarkTaskComplete(task.id);
+                return;
+              }
+              onToggleTask?.(task.id);
+            }}
             className="flex cursor-pointer items-center gap-1.5 rounded-full border border-[#e6e9ec] bg-white py-[5px] pl-2 pr-[9px] text-[12px] font-normal text-[#454545] transition-colors hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
           >
-            <LuCheck className="size-3.5 shrink-0" aria-hidden="true" />
+            <LuCheck className="size-3.5 shrink-0 text-[#79cf79]" />
             Mark complete
           </button>
         ) : null}
-
-        <div className="group/history relative">
-          <button
-            type="button"
-            aria-label="Version history"
-            aria-describedby="task-details-history-tooltip-modal"
-            onClick={() => setIsVersionHistoryOpen(true)}
-            className="flex size-8 cursor-pointer items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-zinc-200/80 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
-          >
-            <LuHistory className="size-[16px] text-[#b6b6b6]" />
-          </button>
-          <span
-            id="task-details-history-tooltip-modal"
-            role="tooltip"
-            className={`${TASK_DETAILS_TOOLTIP_CLASS} group-hover/history:opacity-100`}
-          >
-            Version history
-          </span>
-        </div>
 
         {showModalFormatToggle ? (
           <>
@@ -6912,7 +7095,7 @@ export function TaskDetailsPanel({
                   aria-pressed={formatMenuInlineFormats.bold}
                   className={`flex size-8 cursor-pointer items-center justify-center rounded-full text-[15px] font-bold transition-colors ${
                     formatMenuInlineFormats.bold
-                      ? "bg-[#c3eaff] text-[#2563eb] dark:text-blue-300"
+                      ? FORMAT_TOOLBAR_BOLD_ITALIC_ACTIVE_CLASS
                       : "text-zinc-600 hover:bg-zinc-200 dark:text-zinc-300 dark:hover:bg-zinc-700"
                   }`}
                   onMouseDown={(event) => event.preventDefault()}
@@ -6924,15 +7107,15 @@ export function TaskDetailsPanel({
                   type="button"
                   aria-label="Italic"
                   aria-pressed={formatMenuInlineFormats.italic}
-                  className={`flex size-8 cursor-pointer items-center justify-center rounded-full text-[15px] italic transition-colors ${
+                  className={`flex size-8 cursor-pointer items-center justify-center rounded-full transition-colors ${
                     formatMenuInlineFormats.italic
-                      ? "bg-[#c3eaff] text-[#2563eb] dark:text-blue-300"
+                      ? FORMAT_TOOLBAR_BOLD_ITALIC_ACTIVE_CLASS
                       : "text-zinc-600 hover:bg-zinc-200 dark:text-zinc-300 dark:hover:bg-zinc-700"
                   }`}
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => handleModalInlineFormatApply("italic")}
                 >
-                  I
+                  <HiItalic className="size-4" aria-hidden="true" />
                 </button>
                 <button
                   type="button"
@@ -6984,7 +7167,7 @@ export function TaskDetailsPanel({
             type="button"
             aria-label="Close task editor"
             onClick={() => void onClose()}
-            className="flex size-8 cursor-pointer items-center justify-center rounded-full text-zinc-500 transition-colors hover:bg-zinc-200/80 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+            className="flex size-8 cursor-pointer items-center justify-center rounded-full text-zinc-500 transition-colors bg-zinc-200/50 hover:bg-zinc-200/80 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
           >
             <LuX className="size-4" aria-hidden="true" />
           </button>
@@ -7070,7 +7253,9 @@ export function TaskDetailsPanel({
     >
       {renderModalHeaderActions()}
       <div
-        className={`relative flex shrink-0 h-[41px] items-center justify-between overflow-visible ml-[6px] px-2.5 pt-[12px] pb-[10px] ${
+        className={`relative flex shrink-0 ${
+          task?.isNote ? "h-[41px]" : "h-[47px]"
+        } items-center justify-between overflow-visible ml-[6px] px-2.5 pt-[8px] pb-[8px] ${
           isModalLayout
             ? isModalFormatToolbarOpen
               ? "pr-[22rem]"
@@ -7218,7 +7403,7 @@ export function TaskDetailsPanel({
                     aria-describedby="task-details-redo-tooltip"
                   disabled={!canRedo}
                   onClick={handleRedo}
-                    className={`flex h-[34px] min-w-[2.25rem] items-center justify-center rounded-full px-[7px] text-zinc-500 transition-colors hover:bg-zinc-200 hover:text-zinc-800 disabled:pointer-events-none dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 ${
+                    className={`flex h-[34px] min-w-[2.25rem] items-center justify-center rounded-full px-[7px] text-zinc-450 transition-colors hover:bg-zinc-200 hover:text-zinc-800 disabled:pointer-events-none dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 ${
                     canRedo ? "cursor-pointer" : "cursor-not-allowed"
                   } disabled:opacity-40`}
                 >
@@ -7232,6 +7417,7 @@ export function TaskDetailsPanel({
                     Redo
                   </span>
               </div>
+                {renderHeaderQuickFormatButtons()}
                 {showHeaderClearFormatting && !task.isNote ? (
                   <div className="group/clear-format relative">
                     <button
@@ -7355,7 +7541,7 @@ export function TaskDetailsPanel({
                 onClick={() => onToggleTask(task.id)}
                 className="mr-1 ml-3 flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-[#e6e9ec] bg-white pl-2 pr-[9px] py-[5px] text-[12px] font-normal text-[#454545] transition-colors hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
               >
-                <LuCheck className="size-3.5 shrink-0" aria-hidden="true" />
+                <LuCheck className="size-3.5 shrink-0 text-[#79cf79]" />
                 Mark complete
               </button>
             ) : null}
@@ -7392,7 +7578,7 @@ export function TaskDetailsPanel({
         <div
           data-task-details-content
           className={`flex flex-col px-4 ${
-            isModalLayout ? "pb-0" : "min-h-0 flex-1 pb-[30px]"
+            isModalLayout ? "pb-0" : "min-h-0 flex-1"
           }`}
         >
           <div
@@ -7510,35 +7696,74 @@ export function TaskDetailsPanel({
         </p>
       )}
 
-      {addBlockMenu && (
-        <div
-          ref={addBlockMenuRef}
-          role="menu"
-          className={`fixed z-50 ${TASK_DETAILS_BLOCK_MENU_CLASS}`}
-          style={{ top: addBlockMenu.top, left: addBlockMenu.left }}
-        >
-          {ADD_BLOCK_OPTIONS.map((option, index) => (
-            <div key={option.type}>
-              {index === TEXT_BLOCK_OPTIONS.length && (
-                <div
-                  role="separator"
-                  className="my-1 border-t border-zinc-200 dark:border-zinc-700"
-                />
-              )}
-              <button
-                type="button"
-                role="menuitem"
-                className={TASK_DETAILS_BLOCK_MENU_ITEM_CLASS}
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => handleInsertBlockType(option.type)}
+      {addBlockMenu && (() => {
+        const count = ADD_BLOCK_OPTIONS.length;
+        const selectedIndex = Math.min(
+          addBlockMenu.selectedIndex,
+          Math.max(count - 1, 0),
+        );
+        const selectedOption = ADD_BLOCK_OPTIONS[selectedIndex];
+        const previewType =
+          selectedOption &&
+          isSlashCommandPreviewBlockType(selectedOption.type)
+            ? selectedOption.type
+            : null;
+        const previewTopOffset = previewType
+          ? getSlashCommandPreviewTopOffset(
+              selectedIndex,
+              ADD_BLOCK_MENU_PREVIEW_ROW_SPECS,
+              true,
+            )
+          : 0;
+
+        return (
+          <div
+            ref={addBlockMenuRef}
+            className="fixed z-50"
+            style={{ top: addBlockMenu.top, left: addBlockMenu.left }}
+          >
+            {previewType ? (
+              <div
+                className="absolute left-full ml-2"
+                style={{ top: previewTopOffset }}
               >
-                <option.Icon className="size-4 shrink-0 text-zinc-500 dark:text-zinc-400" />
-                {option.label}
-              </button>
+                <SlashCommandBlockPreview type={previewType} />
+              </div>
+            ) : null}
+            <div role="menu" className={TASK_DETAILS_BLOCK_MENU_CLASS}>
+              {ADD_BLOCK_OPTIONS.map((option, index) => (
+                <div key={option.type}>
+                  {index === TEXT_BLOCK_OPTIONS.length && (
+                    <div
+                      role="separator"
+                      className="my-1 border-t border-zinc-200 dark:border-zinc-700"
+                    />
+                  )}
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={`${TASK_DETAILS_BLOCK_MENU_ITEM_CLASS} ${
+                      index === selectedIndex
+                        ? "bg-zinc-100 dark:bg-zinc-800"
+                        : ""
+                    }`}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onMouseEnter={() =>
+                      setAddBlockMenu((current) =>
+                        current ? { ...current, selectedIndex: index } : null,
+                      )
+                    }
+                    onClick={() => handleInsertBlockType(option.type)}
+                  >
+                    <option.Icon className="size-4 shrink-0 text-zinc-500 dark:text-zinc-400" />
+                    {option.label}
+                  </button>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      )}
+          </div>
+        );
+      })()}
 
       {slashCommandMenu && (() => {
         const filteredOptions = getSlashCommandOptions(slashCommandMenu.query);
@@ -7728,7 +7953,7 @@ export function TaskDetailsPanel({
                     aria-describedby="format-toolbar-bold-tooltip"
                     className={`${FORMAT_TOOLBAR_TEXT_BUTTON_CLASS} font-bold ${
                       formatMenuInlineFormats.bold
-                        ? FORMAT_TOOLBAR_ACTIVE_BUTTON_CLASS
+                        ? FORMAT_TOOLBAR_BOLD_ITALIC_ACTIVE_CLASS
                         : ""
                     }`}
                   onMouseDown={(event) => event.preventDefault()}
@@ -7747,15 +7972,15 @@ export function TaskDetailsPanel({
                   aria-label="Italic"
                     aria-pressed={formatMenuInlineFormats.italic}
                     aria-describedby="format-toolbar-italic-tooltip"
-                    className={`${FORMAT_TOOLBAR_TEXT_BUTTON_CLASS} italic ${
+                    className={`${FORMAT_TOOLBAR_TEXT_BUTTON_CLASS} ${
                       formatMenuInlineFormats.italic
-                        ? FORMAT_TOOLBAR_ACTIVE_BUTTON_CLASS
+                        ? FORMAT_TOOLBAR_BOLD_ITALIC_ACTIVE_CLASS
                         : ""
                     }`}
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => applyFormat("italic")}
                 >
-                  I
+                  <HiItalic className="size-4" aria-hidden="true" />
                 </button>
                 </FormatToolbarTooltipWrap>
                 <div aria-hidden="true" className={FORMAT_TOOLBAR_DIVIDER_CLASS} />
@@ -7913,13 +8138,13 @@ export function TaskDetailsPanel({
       />
 
       {isModalLayout && task && modalFooterConfig ? (
-        <footer className="flex shrink-0 items-center justify-between gap-4 border-t border-zinc-100 px-[22px] py-2.5 dark:border-zinc-800">
+        <footer className="flex shrink-0 items-center justify-between gap-2 px-[22px] py-2.5 dark:border-zinc-800">
           <TaskModalFooter taskId={task.id} {...modalFooterConfig} />
           {taskId &&
           saveStatus !== "loading" &&
-          (saveStatus !== "idle" ||
+          (saveStatus === "error" ||
             showClipboardNotice ||
-            lastSavedAt !== null) ? (
+            (lastSavedAt !== null && saveStatus === "saved")) ? (
             <div className="shrink-0">
               <span className="flex flex-wrap items-center justify-end gap-2 text-xs text-[#82828a] dark:text-[#acacb4]">
                 {showClipboardNotice ? <span>{clipboardNoticeMessage}</span> : null}
@@ -7928,7 +8153,6 @@ export function TaskDetailsPanel({
                     {metadataError}
                   </span>
                 ) : null}
-                {saveStatus === "pending" ? <span>Unsaved changes</span> : null}
                 {saveStatus === "error" ? (
                   <span className="pointer-events-auto flex items-center gap-2 text-red-600 dark:text-red-400">
                     <span>{saveErrorMessage ?? "Something went wrong"}</span>

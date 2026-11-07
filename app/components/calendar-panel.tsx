@@ -7,7 +7,11 @@ import {
   TbLayoutSidebarRightCollapseFilled,
   TbLayoutSidebarRightExpandFilled,
 } from "react-icons/tb";
-import { CalendarAddTaskPopover } from "./calendar-add-task-popover";
+import {
+  type CalendarStartTaskOptions,
+  type StartCalendarTaskRequest,
+  toCalendarDueDateKey,
+} from "@/lib/calendar-start-task";
 import {
   CalendarTaskModal,
   getCalendarTaskSnapshot,
@@ -124,12 +128,9 @@ type CalendarPanelProps = {
   labels?: TaskLabel[];
   onDeleteTask?: (taskId: string) => void | Promise<void>;
 } & CalendarTaskEditorCallbacks & {
-  onAddCalendarTask?: (payload: {
-    name: string;
-    dueDate: string;
-    details: string;
-    listId: string;
-  }) => void | Promise<void>;
+  onStartCalendarTask?: (
+    payload: StartCalendarTaskRequest,
+  ) => Promise<string | null> | string | null;
   defaultListId?: string | null;
   defaultView?: CalendarViewTab;
   view?: CalendarViewTab;
@@ -139,6 +140,7 @@ type CalendarPanelProps = {
   onMultiDayCountChange?: (count: number) => void;
   onMultiWeekCountChange?: (count: number) => void;
   persistViewSession?: boolean;
+  embeddedInCalendarModal?: boolean;
   periodLabelAction?: ReactNode;
   headerTrailingAction?: ReactNode;
 };
@@ -259,7 +261,7 @@ function CalendarViewTabs({
             : "Dock calendar over task list"
         }
         onClick={listCalendarOverlap.toggleLayout}
-        className="mb-2 flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-slate-100 text-zinc-600 transition-colors hover:bg-zinc-100 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+        className="flex size-7 shrink-0 cursor-pointer items-center justify-center self-center rounded-full bg-slate-100 text-zinc-600 transition-colors hover:bg-zinc-100 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
       >
         {listCalendarOverlap.isOverlapLayout ? (
           <BiChevronRight className="size-5" aria-hidden="true" />
@@ -271,9 +273,10 @@ function CalendarViewTabs({
 
   return (
     <div className={`relative z-40 ${activeView === "month" ? "mb-[26px]" : "mb-1"} grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-4 pl-2 pt-0`}>
-      {periodLabel ? (
+      {periodLabel || listCalendarLayoutToggle ? (
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-2">
+            {listCalendarLayoutToggle}
             {periodLabel ? (
               <>
                 <h2 className="truncate text-lg text-zinc-700 dark:text-zinc-50 text-[23px]">
@@ -309,7 +312,11 @@ function CalendarViewTabs({
             ) : null}
           </div>
           {periodSubLabel ? (
-            <p className="truncate text-sm font-normal text-zinc-600 dark:text-zinc-400">
+            <p
+              className={`truncate text-sm font-normal text-zinc-600 dark:text-zinc-400 ${
+                listCalendarLayoutToggle ? "pl-11" : ""
+              }`}
+            >
               {periodSubLabel}
             </p>
           ) : null}
@@ -317,7 +324,7 @@ function CalendarViewTabs({
       ) : (
         <div />
       )}
-      <div className="calendar-view-tabs inline-flex flex-wrap items-center justify-center gap-0.5 rounded-full bg-white px-1 py-1 dark:border-zinc-700 dark:bg-zinc-900">
+      <div className="calendar-view-tabs inline-flex flex-wrap items-center justify-center gap-0.5 rounded-full bg-white px-1 py-1 border border-slate-50 ">
         {PRIMARY_CALENDAR_VIEW_TABS.map((tab) => (
           <button
             key={tab.id}
@@ -412,7 +419,6 @@ function CalendarViewTabs({
             <TbLayoutSidebarRightExpandFilled className="size-5 text-zinc-350 group-text-zinc-450 " />
           )}
         </button>
-        {listCalendarLayoutToggle}
         {headerTrailingAction}
       </div>
     </div>
@@ -448,7 +454,7 @@ export function CalendarMonthView({
   onDueDateUpdated,
   onRecurrenceUpdated,
   onSaveTaskRecurrence,
-  onAddCalendarTask,
+  onStartCalendarTask,
   defaultListId = null,
   fullWidth = false,
   externalDropTargetDateKey = null,
@@ -475,12 +481,9 @@ export function CalendarMonthView({
     targetListId: string,
   ) => void;
 } & CalendarTaskEditorCallbacks & {
-  onAddCalendarTask?: (payload: {
-    name: string;
-    dueDate: string;
-    details: string;
-    listId: string;
-  }) => void | Promise<void>;
+  onStartCalendarTask?: (
+    options: CalendarStartTaskOptions,
+  ) => void | Promise<void>;
   defaultListId?: string | null;
   fullWidth?: boolean;
   externalDropTargetDateKey?: string | null;
@@ -495,12 +498,6 @@ export function CalendarMonthView({
   function closeTaskModal() {
     onCloseTaskEditor?.();
   }
-  const [addTaskPopover, setAddTaskPopover] = useState<{
-    date: Date;
-    x: number;
-    y: number;
-  } | null>(null);
-  const [draftTaskName, setDraftTaskName] = useState("");
   const [dropTargetDateKey, setDropTargetDateKey] = useState<string | null>(
     null,
   );
@@ -604,17 +601,11 @@ export function CalendarMonthView({
     onMonthNavigationChange,
   ]);
 
-  function closeAddTaskPopover() {
-    setAddTaskPopover(null);
-    setDraftTaskName("");
-  }
-
   function handleDaySelect(day: Date) {
     const normalized = startOfDay(day);
     setSelectedDate(normalized);
     onSidebarFocusDateChange?.(normalized);
     closeTaskModal();
-    closeAddTaskPopover();
   }
 
   function isFocusedMonthDay(day: Date) {
@@ -623,20 +614,15 @@ export function CalendarMonthView({
   }
 
   function handleDayDoubleClick(
-    event: React.MouseEvent<HTMLDivElement>,
+    _event: React.MouseEvent<HTMLDivElement>,
     day: Date,
   ) {
     setSelectedDate(day);
     closeTaskModal();
 
-    if (!onAddCalendarTask || lists.length === 0) return;
+    if (!onStartCalendarTask || lists.length === 0) return;
 
-    setDraftTaskName("");
-    setAddTaskPopover({
-      date: day,
-      x: event.clientX,
-      y: event.clientY,
-    });
+    void onStartCalendarTask({ date: day, dueTimeMinutes: null });
   }
 
   function handleCalendarTaskClick(
@@ -653,7 +639,6 @@ export function CalendarMonthView({
 
     setSelectedDate(day);
     onSelectTask(task.id);
-    closeAddTaskPopover();
   }
 
   function handleCalendarTaskPointerDown(
@@ -767,7 +752,6 @@ export function CalendarMonthView({
   useEffect(() => {
     if (!monthDate) return;
     closeTaskModal();
-    closeAddTaskPopover();
   }, [monthDate]);
 
   useEffect(() => {
@@ -821,8 +805,6 @@ export function CalendarMonthView({
               const isDropTarget =
                 dropTargetDateKey === dateKey ||
                 externalDropTargetDateKey === dateKey;
-              const isActiveDay =
-                addTaskPopover !== null && isSameDay(day, addTaskPopover.date);
 
               return (
                 <div
@@ -841,9 +823,7 @@ export function CalendarMonthView({
                   className={`flex h-full min-h-0 cursor-pointer flex-col border-b border-zinc-200 p-[2px] text-left transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900/60 ${getCalendarDayColumnDividerClass(index % 7, 7)} ${
                     isDropTarget
                       ? "bg-blue-50 ring-1 ring-inset ring-blue-400 dark:bg-blue-950/30 dark:ring-blue-500"
-                      : isActiveDay
-                        ? "bg-blue-50 ring-1 ring-inset ring-[#4873c7] dark:bg-blue-950/30 dark:ring-[#7da2ff]"
-                        : isSelected
+                      : isSelected
                           ? "bg-zinc-100 ring-[1px] ring-inset ring-zinc-300 dark:bg-zinc-900 dark:ring-zinc-600"
                           : "bg-white dark:bg-zinc-950"
                   }`}
@@ -914,14 +894,6 @@ export function CalendarMonthView({
                         />
                       </CalendarTaskHoverButton>
                     ))}
-                    {isActiveDay ? (
-                      <div
-                        aria-hidden="true"
-                        className="block w-full truncate h-[16px] rounded-[6px] bg-zinc-200/50 px-2 py-0.5 text-left text-[11px] text-zinc-400 dark:bg-zinc-700 dark:text-zinc-100"
-                      >
-                        {draftTaskName.trim() || ""}
-                      </div>
-                    ) : null}
                   </div>
                 </div>
               );
@@ -930,19 +902,6 @@ export function CalendarMonthView({
           </div>
         </div>
 
-      {addTaskPopover && onAddCalendarTask ? (
-        <CalendarAddTaskPopover
-          date={addTaskPopover.date}
-          lists={lists}
-          defaultListId={defaultListId}
-          x={addTaskPopover.x}
-          y={addTaskPopover.y}
-          name={draftTaskName}
-          onNameChange={setDraftTaskName}
-          onClose={closeAddTaskPopover}
-          onAddTask={onAddCalendarTask}
-        />
-      ) : null}
     </div>
   );
 }
@@ -980,13 +939,9 @@ type CalendarViewsPanelProps = {
   labels?: TaskLabel[];
   onDeleteTask?: (taskId: string) => void | Promise<void>;
 } & CalendarTaskEditorCallbacks & {
-  onAddCalendarTask?: (payload: {
-    name: string;
-    dueDate: string;
-    details: string;
-    listId: string;
-    dueTimeMinutes?: number | null;
-  }) => void | Promise<void>;
+  onStartCalendarTask?: (
+    payload: StartCalendarTaskRequest,
+  ) => Promise<string | null> | string | null;
   defaultListId?: string | null;
   defaultView?: CalendarViewTab;
   view?: CalendarViewTab;
@@ -996,6 +951,7 @@ type CalendarViewsPanelProps = {
   onMultiDayCountChange?: (count: number) => void;
   onMultiWeekCountChange?: (count: number) => void;
   persistViewSession?: boolean;
+  embeddedInCalendarModal?: boolean;
   fullWidth?: boolean;
   externalDropTargetDateKey?: string | null;
   externalDropTargetTimeMinutes?: number | null;
@@ -1031,7 +987,7 @@ export function CalendarViewsPanel({
   onDueDateUpdated,
   onRecurrenceUpdated,
   onSaveTaskRecurrence,
-  onAddCalendarTask,
+  onStartCalendarTask,
   defaultListId = null,
   defaultView = "week",
   view,
@@ -1041,6 +997,7 @@ export function CalendarViewsPanel({
   onMultiDayCountChange,
   onMultiWeekCountChange,
   persistViewSession = true,
+  embeddedInCalendarModal = false,
   fullWidth = false,
   externalDropTargetDateKey = null,
   externalDropTargetTimeMinutes = null,
@@ -1161,6 +1118,25 @@ export function CalendarViewsPanel({
       setTaskEditorModalId(taskId);
     },
     [onSelectTask],
+  );
+  const handleStartCalendarTask = useCallback(
+    async (options: CalendarStartTaskOptions) => {
+      if (!onStartCalendarTask) return;
+
+      const listId = defaultListId ?? lists[0]?.id ?? null;
+      if (!listId) return;
+
+      const taskId = await onStartCalendarTask({
+        dueDate: toCalendarDueDateKey(options.date),
+        listId,
+        dueTimeMinutes: options.dueTimeMinutes ?? null,
+      });
+
+      if (taskId) {
+        handleCalendarSelectTask(taskId);
+      }
+    },
+    [defaultListId, handleCalendarSelectTask, lists, onStartCalendarTask],
   );
   const taskEditorModalSnapshot = useMemo(
     () =>
@@ -1347,7 +1323,11 @@ export function CalendarViewsPanel({
       cursorOffsetPx={50}
     >
     <CalendarTaskModalActionsProvider value={calendarTaskModalActions}>
-    <div className="calendar-panel pt-2 pb-3 flex min-h-0 min-w-0 w-full flex-1 flex-col z-2000! overflow-hidden">
+    <div
+      className={`calendar-panel flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden pt-2 pb-3 pl-2 z-50! ${
+        fullWidth ? "pr-2" : ""
+      }`}
+    >
       <CalendarViewTabs
         activeView={activeView}
         multiDayCount={multiDayCount}
@@ -1390,7 +1370,7 @@ export function CalendarViewsPanel({
             onDueDateUpdated={onDueDateUpdated}
             onRecurrenceUpdated={onRecurrenceUpdated}
             onSaveTaskRecurrence={onSaveTaskRecurrence}
-            onAddCalendarTask={onAddCalendarTask}
+            onStartCalendarTask={handleStartCalendarTask}
             defaultListId={defaultListId}
             fullWidth={fullWidth}
             externalDropTargetDateKey={externalDropTargetDateKey}
@@ -1419,7 +1399,7 @@ export function CalendarViewsPanel({
             onDueDateUpdated={onDueDateUpdated}
             onRecurrenceUpdated={onRecurrenceUpdated}
             onSaveTaskRecurrence={onSaveTaskRecurrence}
-            onAddCalendarTask={onAddCalendarTask}
+            onStartCalendarTask={handleStartCalendarTask}
             defaultListId={defaultListId}
             fullWidth={fullWidth}
             externalDropTargetDateKey={externalDropTargetDateKey}
@@ -1451,8 +1431,9 @@ export function CalendarViewsPanel({
             onDueDateUpdated={onDueDateUpdated}
             onRecurrenceUpdated={onRecurrenceUpdated}
             onSaveTaskRecurrence={onSaveTaskRecurrence}
-            onAddCalendarTask={onAddCalendarTask}
+            onStartCalendarTask={handleStartCalendarTask}
             defaultListId={defaultListId}
+            embeddedInCalendarModal={embeddedInCalendarModal}
             externalDropTargetDateKey={externalDropTargetDateKey}
             externalDropTargetTimeMinutes={externalDropTargetTimeMinutes}
             externalDraggingTaskId={externalDraggingTaskId}
@@ -1482,8 +1463,9 @@ export function CalendarViewsPanel({
             onDueDateUpdated={onDueDateUpdated}
             onRecurrenceUpdated={onRecurrenceUpdated}
             onSaveTaskRecurrence={onSaveTaskRecurrence}
-            onAddCalendarTask={onAddCalendarTask}
+            onStartCalendarTask={handleStartCalendarTask}
             defaultListId={defaultListId}
+            embeddedInCalendarModal={embeddedInCalendarModal}
             fullWidth={fullWidth}
             externalDropTargetDateKey={externalDropTargetDateKey}
             externalDropTargetTimeMinutes={externalDropTargetTimeMinutes}
@@ -1517,7 +1499,7 @@ export function CalendarViewsPanel({
               onDueDateUpdated={onDueDateUpdated}
               onRecurrenceUpdated={onRecurrenceUpdated}
               onSaveTaskRecurrence={onSaveTaskRecurrence}
-              onAddCalendarTask={onAddCalendarTask}
+              onStartCalendarTask={handleStartCalendarTask}
               defaultListId={defaultListId}
               fullWidth={fullWidth}
               externalDropTargetDateKey={externalDropTargetDateKey}
@@ -1544,7 +1526,7 @@ export function CalendarViewsPanel({
               onDueDateUpdated={onDueDateUpdated}
               onRecurrenceUpdated={onRecurrenceUpdated}
               onSaveTaskRecurrence={onSaveTaskRecurrence}
-              onAddCalendarTask={onAddCalendarTask}
+              onStartCalendarTask={handleStartCalendarTask}
               defaultListId={defaultListId}
               fullWidth={fullWidth}
               externalDropTargetDateKey={externalDropTargetDateKey}
@@ -1604,7 +1586,7 @@ export function CalendarPanel({
   onDueDateUpdated,
   onRecurrenceUpdated,
   onSaveTaskRecurrence,
-  onAddCalendarTask,
+  onStartCalendarTask,
   defaultListId,
   defaultView = "week",
   view,
@@ -1614,13 +1596,14 @@ export function CalendarPanel({
   onMultiDayCountChange,
   onMultiWeekCountChange,
   persistViewSession = true,
+  embeddedInCalendarModal = false,
   periodLabelAction,
   headerTrailingAction,
   labels = [],
   onDeleteTask,
 }: CalendarPanelProps) {
   return (
-    <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white dark:bg-zinc-950 calendar-panel">
+    <section className="relative z-[4000] flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white dark:bg-zinc-950 calendar-panel">
       <CalendarViewsPanel
         tasks={tasks}
         searchTasks={searchTasks}
@@ -1649,7 +1632,7 @@ export function CalendarPanel({
         onDueDateUpdated={onDueDateUpdated}
         onRecurrenceUpdated={onRecurrenceUpdated}
         onSaveTaskRecurrence={onSaveTaskRecurrence}
-        onAddCalendarTask={onAddCalendarTask}
+        onStartCalendarTask={onStartCalendarTask}
         defaultListId={defaultListId}
         defaultView={defaultView}
         view={view}
@@ -1659,6 +1642,7 @@ export function CalendarPanel({
         onMultiDayCountChange={onMultiDayCountChange}
         onMultiWeekCountChange={onMultiWeekCountChange}
         persistViewSession={persistViewSession}
+        embeddedInCalendarModal={embeddedInCalendarModal}
         periodLabelAction={periodLabelAction}
         headerTrailingAction={headerTrailingAction}
       />

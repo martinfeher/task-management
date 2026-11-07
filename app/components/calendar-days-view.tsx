@@ -9,11 +9,10 @@ import {
   useState,
   Fragment,
 } from "react";
-import { CalendarAddTaskPopover } from "./calendar-add-task-popover";
 import { CalendarTaskTitle } from "./calendar-task-title";
 import { CalendarPeriodNavigation } from "./calendar-period-navigation";
 import { CalendarCurrentTimeLine } from "./calendar-current-time-line";
-import { CalendarNewTaskSlotPreview } from "./calendar-new-task-slot-preview";
+import type { CalendarStartTaskOptions } from "@/lib/calendar-start-task";
 import { type CalendarTaskEditorCallbacks } from "./calendar-task-modal";
 import type { TaskListItem, TodoList } from "./todo-app";
 import type { TaskDueTime } from "@/lib/task-due-time";
@@ -29,9 +28,9 @@ import {
   calendarAllDayTaskClassName,
   getCalendarAllDayRowHeightPx,
   getCalendarShellClassName,
-  CALENDAR_VIEW_SURFACE_CLASS,
+  getCalendarViewSurfaceClassName,
+  getCalendarTimedGridScrollClassName,
   CALENDAR_VIEW_WRAPPER_CLASS,
-  CALENDAR_TIMED_GRID_SCROLL_CLASS,
   CALENDAR_HOUR_COLUMN_DIVIDER_CLASS,
   formatCalendarHourLabel,
   calendarHourLabelCellClassName,
@@ -125,14 +124,11 @@ type CalendarMultiDayViewProps = {
     dueTime: TaskDueTime,
   ) => void;
 } & CalendarTaskEditorCallbacks & {
-  onAddCalendarTask?: (payload: {
-    name: string;
-    dueDate: string;
-    details: string;
-    listId: string;
-    dueTimeMinutes?: number | null;
-  }) => void | Promise<void>;
+  onStartCalendarTask?: (
+    options: CalendarStartTaskOptions,
+  ) => void | Promise<void>;
   defaultListId?: string | null;
+  embeddedInCalendarModal?: boolean;
   fullWidth?: boolean;
   externalDropTargetDateKey?: string | null;
   externalDropTargetTimeMinutes?: number | null;
@@ -239,8 +235,9 @@ export function CalendarMultiDayView({
   onDueDateUpdated,
   onRecurrenceUpdated,
   onSaveTaskRecurrence,
-  onAddCalendarTask,
+  onStartCalendarTask,
   defaultListId = null,
+  embeddedInCalendarModal = false,
   fullWidth = false,
   externalDropTargetDateKey = null,
   externalDropTargetTimeMinutes = null,
@@ -279,13 +276,6 @@ export function CalendarMultiDayView({
   function closeTaskModal() {
     onCloseTaskEditor?.();
   }
-  const [addTaskPopover, setAddTaskPopover] = useState<{
-    date: Date;
-    x: number;
-    y: number;
-    dueTimeMinutes: number | null;
-  } | null>(null);
-  const [draftTaskName, setDraftTaskName] = useState("");
   const [dropTargetSlot, setDropTargetSlot] = useState<CalendarDropSlot | null>(
     null,
   );
@@ -310,8 +300,6 @@ export function CalendarMultiDayView({
   const handleCalendarTaskContextMenuCapture =
     useCalendarTaskColorMenuCaptureHandler(tasks);
   const canDragTasks = Boolean(onSetTaskDueDate || onSetTaskDueTime);
-  const timeGridRef = useRef<HTMLDivElement>(null);
-  const newTaskPreviewRef = useRef<HTMLDivElement>(null);
   const hourColumnRef = useRef<HTMLDivElement>(null);
   const timeScrollRef = useRef<HTMLDivElement>(null);
   const isTimedGridReady = Boolean(rangeStart && today && now);
@@ -469,19 +457,8 @@ export function CalendarMultiDayView({
     return sidebarFocusDate !== undefined && isSameDay(day, sidebarFocusDate);
   }
 
-  function closeAddTaskPopover() {
-    setAddTaskPopover(null);
-    setDraftTaskName("");
-  }
-
-  function handleNewTaskTimeChange(minutes: number) {
-    setAddTaskPopover((current) =>
-      current ? { ...current, dueTimeMinutes: minutes } : null,
-    );
-  }
-
   function handleAllDayClick(
-    event: React.MouseEvent<HTMLElement>,
+    _event: React.MouseEvent<HTMLElement>,
     day: Date,
   ) {
     if (suppressTaskClickRef.current) {
@@ -492,15 +469,9 @@ export function CalendarMultiDayView({
     handleDaySelect(day);
     closeTaskModal();
 
-    if (!onAddCalendarTask || lists.length === 0) return;
+    if (!onStartCalendarTask || lists.length === 0) return;
 
-    setDraftTaskName("");
-    setAddTaskPopover({
-      date: day,
-      x: event.clientX,
-      y: event.clientY,
-      dueTimeMinutes: null,
-    });
+    void onStartCalendarTask({ date: day, dueTimeMinutes: null });
   }
 
   function handleTimeGridClick(
@@ -516,7 +487,7 @@ export function CalendarMultiDayView({
     handleDaySelect(day);
     closeTaskModal();
 
-    if (!onAddCalendarTask || lists.length === 0) return;
+    if (!onStartCalendarTask || lists.length === 0) return;
 
     const rect = event.currentTarget.getBoundingClientRect();
     const y = event.clientY - rect.top;
@@ -530,13 +501,7 @@ export function CalendarMultiDayView({
       return;
     }
 
-    setDraftTaskName("");
-    setAddTaskPopover({
-      date: day,
-      x: event.clientX,
-      y: event.clientY,
-      dueTimeMinutes,
-    });
+    void onStartCalendarTask({ date: day, dueTimeMinutes });
   }
 
   function handleCalendarTaskClick(
@@ -551,7 +516,6 @@ export function CalendarMultiDayView({
     }
 
     onSelectTask(task.id);
-    closeAddTaskPopover();
   }
 
   function handleSetDropTargetSlot(slot: CalendarDropSlot | null) {
@@ -603,7 +567,6 @@ export function CalendarMultiDayView({
   useEffect(() => {
     if (!rangeStart) return;
     closeTaskModal();
-    closeAddTaskPopover();
   }, [rangeStart, dayCount]);
 
   useLayoutEffect(() => {
@@ -623,24 +586,12 @@ export function CalendarMultiDayView({
     );
   }
 
-  const timedGridMinMinutes = getMinutesFromGridY(GRID_TOP_OFFSET_PX);
-  const timedGridMaxMinutes = getMinutesFromGridY(
-    GRID_TOP_OFFSET_PX + hours.length * hourHeightPx,
-  );
   const allDayRowHeightPx = getCalendarAllDayRowHeightPx(
     Math.max(
       0,
       ...visibleDays.map((day) => {
         const dateKey = toDateKey(day);
-        let count = tasksByDate.get(dateKey)?.allDay.length ?? 0;
-        if (
-          addTaskPopover !== null &&
-          isSameDay(day, addTaskPopover.date) &&
-          addTaskPopover.dueTimeMinutes === null
-        ) {
-          count += 1;
-        }
-        return count;
+        return tasksByDate.get(dateKey)?.allDay.length ?? 0;
       }),
     ),
   );
@@ -670,8 +621,16 @@ export function CalendarMultiDayView({
       onContextMenuCapture={handleCalendarTaskContextMenuCapture}
     >
       <div className={getCalendarShellClassName(fullWidth)}>
-        <div className={CALENDAR_VIEW_SURFACE_CLASS}>
-          <div className="flex shrink-0 items-center justify-start px-3 mb-[10px]">
+        <div className={getCalendarViewSurfaceClassName(fullWidth)}>
+          <div
+            className={
+              embeddedInCalendarModal
+                ? "relative z-20 flex shrink-0 items-center justify-start overflow-visible pl-1 pr-3 pt-1 pb-2"
+                : `flex shrink-0 items-center justify-start mb-[10px] ${
+                    fullWidth ? "pr-2 pl-0" : "px-3"
+                  }`
+            }
+          >
             <CalendarPeriodNavigation
               onToday={goToToday}
               onPrevious={goToPreviousRange}
@@ -682,11 +641,14 @@ export function CalendarMultiDayView({
             />
           </div>
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <div ref={timeScrollRef} className={CALENDAR_TIMED_GRID_SCROLL_CLASS}>
-            <div style={{ minWidth: minGridWidth }}>
+          <div
+            ref={timeScrollRef}
+            className={getCalendarTimedGridScrollClassName(fullWidth)}
+          >
+            <div className="w-full" style={{ minWidth: minGridWidth }}>
               <div className={CALENDAR_DAYS_HEADER_STICKY_CLASS}>
                 <div
-                  className="grid"
+                  className="grid w-full bg-white dark:bg-zinc-950"
                   style={{ gridTemplateColumns, minWidth: minGridWidth }}
                 >
                   <div className="bg-white dark:bg-zinc-950" />
@@ -699,20 +661,20 @@ export function CalendarMultiDayView({
                         key={`head-${toDateKey(day)}`}
                         type="button"
                         onClick={() => handleDaySelect(day)}
-                        className={`px-2 pb-2 pt-1 text-center transition-colors cursor-pointer ${getSelectedDayColumnDividerClass(dayIndex, visibleDays, isSelectedDay)} ${
+                        className={`pt-1 pb-[5px] py-2 text-center transition-colors cursor-pointer ${getSelectedDayColumnDividerClass(dayIndex, visibleDays, isSelectedDay)} ${
                           isDaySelected
                             ? `${SELECTED_DAY_COLUMN_CLASS} rounded-t-[8px] ${SELECTED_DAY_ROW_BORDER_CLASS}`
                             : `${SELECTED_DAY_ROW_BORDER_CLASS} bg-white dark:bg-zinc-950`
                         }`}
                       >
-                        <div className="text-xs font-medium uppercase tracking-wide text-[#393939]">
+                        <div className="text-[14px] font-medium uppercase tracking-wide text-[#393939] dark:text-zinc-200">
                           {getCalendarWeekdayLabel(day)}
                         </div>
                         <div
                           className={`mt-px inline-flex size-7 items-center justify-center rounded-full text-sm ${
                             isToday
                               ? CALENDAR_TODAY_DATE_CIRCLE_CLASS
-                              : "font-medium text-[#999999] dark:text-zinc-200"
+                              : " text-[#999999] dark:text-zinc-400"
                           }`}
                         >
                           {day.getDate()}
@@ -727,7 +689,7 @@ export function CalendarMultiDayView({
                 style={{ top: CALENDAR_DAYS_HEADER_HEIGHT_PX }}
               >
                 <div
-                  className="grid"
+                  className="grid w-full"
                   style={{ gridTemplateColumns, minWidth: minGridWidth }}
                 >
                   <div
@@ -749,10 +711,6 @@ export function CalendarMultiDayView({
                     const isDropTarget =
                       activeDropSlot?.dateKey === dateKey &&
                       activeDropSlot.dueTimeMinutes === null;
-                    const isActiveDay =
-                      addTaskPopover !== null && isSameDay(day, addTaskPopover.date);
-                    const isActiveAllDay =
-                      isActiveDay && addTaskPopover?.dueTimeMinutes === null;
                     const isDaySelected = isSelectedDay(day);
 
                     return (
@@ -764,9 +722,7 @@ export function CalendarMultiDayView({
                           `cursor-pointer transition-colors ${getSelectedDayColumnDividerClass(dayIndex, visibleDays, isSelectedDay)} ${
                           isDropTarget
                             ? "bg-blue-50 ring-1 ring-inset ring-blue-400 dark:bg-blue-950/30"
-                            : isActiveAllDay
-                              ? "bg-blue-50 ring-1 ring-inset ring-[#4873c7] dark:bg-blue-950/30"
-                              : isDaySelected
+                            : isDaySelected
                                 ? `${SELECTED_DAY_COLUMN_CLASS} ${SELECTED_DAY_ROW_BORDER_CLASS}`
                                 : `${SELECTED_DAY_ROW_BORDER_CLASS} bg-white hover:bg-zinc-50 dark:bg-zinc-950 dark:hover:bg-zinc-900/60`
                         }`,
@@ -818,14 +774,6 @@ export function CalendarMultiDayView({
                               />
                             </CalendarTaskHoverButton>
                           ))}
-                          {isActiveAllDay ? (
-                            <div
-                              aria-hidden="true"
-                              className="block h-4 truncate rounded bg-zinc-200/50 px-1.5 text-[11px] text-zinc-400 dark:bg-zinc-700"
-                            >
-                              {draftTaskName.trim() || ""}
-                            </div>
-                          ) : null}
                         </div>
                       </div>
                     );
@@ -833,7 +781,7 @@ export function CalendarMultiDayView({
                 </div>
               </div>
               <div
-                className="relative grid"
+                className="relative grid w-full"
                 style={{ gridTemplateColumns, minWidth: minGridWidth }}
               >
             <div
@@ -871,23 +819,17 @@ export function CalendarMultiDayView({
                   hourHeightPx,
                   GRID_HOUR_START,
                 );
-              const isActiveDay =
-                addTaskPopover !== null && isSameDay(day, addTaskPopover.date);
-              const isActiveTimedDay =
-                isActiveDay && addTaskPopover?.dueTimeMinutes !== null;
               const isDaySelected = isSelectedDay(day);
+              const externalDropSlotMinutes = isTimedDropTarget
+                ? (activeDropSlot?.dueTimeMinutes ?? null)
+                : null;
+              const selectedSlotMinutes = externalDropSlotMinutes;
               const showDragSlotMarker =
                 resizingTaskId === null &&
                 resizePreview === null &&
                 isTimedDropTarget &&
-                !isActiveTimedDay &&
-                (activeDropSlot?.dueTimeMinutes ?? null) !== null &&
+                externalDropSlotMinutes !== null &&
                 internalDragStillAtSource;
-              const selectedSlotMinutes = isActiveTimedDay
-                ? (addTaskPopover?.dueTimeMinutes ?? null)
-                : isTimedDropTarget
-                  ? (activeDropSlot?.dueTimeMinutes ?? null)
-                  : null;
               const selectedSlotTop =
                 selectedSlotMinutes === null
                   ? null
@@ -898,12 +840,11 @@ export function CalendarMultiDayView({
                 selectedSlotTop >= GRID_TOP_OFFSET_PX &&
                 selectedSlotTop <=
                   GRID_TOP_OFFSET_PX + hours.length * hourHeightPx &&
-                (isActiveTimedDay || showDragSlotMarker);
+                showDragSlotMarker;
 
               return (
                 <div
                   key={`time-${dateKey}`}
-                  ref={isActiveTimedDay ? timeGridRef : undefined}
                   data-calendar-day={dateKey}
                   data-calendar-time-grid="true"
                   data-hour-start={GRID_HOUR_START}
@@ -1096,20 +1037,6 @@ export function CalendarMultiDayView({
                           priority={externalDraggingTask?.priority ?? null}
                           calendarColor={externalDraggingTask?.calendarColor ?? null}
                         />
-                      ) : isActiveTimedDay ? (
-                        <CalendarNewTaskSlotPreview
-                          previewRef={newTaskPreviewRef}
-                          slotTop={selectedSlotTop}
-                          timeMinutes={selectedSlotMinutes}
-                          hourHeightPx={hourHeightPx}
-                          hourStart={GRID_HOUR_START}
-                          gridTopOffsetPx={GRID_TOP_OFFSET_PX}
-                          gridRef={timeGridRef}
-                          minMinutes={timedGridMinMinutes}
-                          maxMinutes={timedGridMaxMinutes}
-                          label={draftTaskName}
-                          onTimeChange={handleNewTaskTimeChange}
-                        />
                       ) : null}
                     </>
                   ) : null}
@@ -1133,34 +1060,6 @@ export function CalendarMultiDayView({
           </div>
         </div>
       </div>
-
-      {addTaskPopover && onAddCalendarTask ? (
-        <CalendarAddTaskPopover
-          date={addTaskPopover.date}
-          dueTimeMinutes={addTaskPopover.dueTimeMinutes}
-          lists={lists}
-          defaultListId={defaultListId}
-          anchorRef={
-            addTaskPopover.dueTimeMinutes !== null
-              ? newTaskPreviewRef
-              : undefined
-          }
-          x={
-            addTaskPopover.dueTimeMinutes === null
-              ? addTaskPopover.x
-              : undefined
-          }
-          y={
-            addTaskPopover.dueTimeMinutes === null
-              ? addTaskPopover.y
-              : undefined
-          }
-          name={draftTaskName}
-          onNameChange={setDraftTaskName}
-          onClose={closeAddTaskPopover}
-          onAddTask={onAddCalendarTask}
-        />
-      ) : null}
     </div>
   );
 }

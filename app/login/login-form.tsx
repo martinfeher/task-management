@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
@@ -8,10 +9,33 @@ type LoginFormProps = {
   googleConfigured: boolean;
 };
 
+function getErrorMessage(raw: unknown, fallback: string): string {
+  if (raw && typeof raw === "object" && "message" in raw) {
+    const m = (raw as { message?: string }).message;
+    if (typeof m === "string" && m.length > 0) return m;
+  }
+  return fallback;
+}
+
+function getErrorCode(raw: unknown): string | undefined {
+  if (raw && typeof raw === "object" && "code" in raw) {
+    const c = (raw as { code?: string }).code;
+    if (typeof c === "string") return c;
+  }
+  return undefined;
+}
+
 export function LoginForm({ googleConfigured }: LoginFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [isSigningIn, setIsSigningIn] = useState(false);
+  const next = searchParams.get("next") ?? "/";
+  const resetOk = searchParams.get("reset") === "1";
+
+  const [mode, setMode] = useState<"sign-in" | "sign-up">("sign-in");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+  const [isBusy, setIsBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleGoogleSignIn() {
@@ -23,9 +47,7 @@ export function LoginForm({ googleConfigured }: LoginFormProps) {
       return;
     }
 
-    setIsSigningIn(true);
-
-    const next = searchParams.get("next") ?? "/";
+    setIsBusy(true);
 
     const result = await authClient.signIn.social({
       provider: "google",
@@ -34,14 +56,11 @@ export function LoginForm({ googleConfigured }: LoginFormProps) {
 
     const signInError = result.error;
     if (signInError) {
-      const code =
-        signInError && typeof signInError === "object" && "code" in signInError
-          ? String((signInError as { code?: string }).code)
-          : undefined;
-      let message =
-        typeof signInError === "object" && signInError !== null && "message" in signInError
-          ? String((signInError as { message?: string }).message)
-          : "Could not sign in with Google";
+      const code = getErrorCode(signInError);
+      let message = getErrorMessage(
+        signInError,
+        "Could not sign in with Google",
+      );
 
       if (
         code === "CLIENT_ID_AND_SECRET_REQUIRED" ||
@@ -57,10 +76,56 @@ export function LoginForm({ googleConfigured }: LoginFormProps) {
       }
 
       setError(message);
-      setIsSigningIn(false);
+      setIsBusy(false);
       return;
     }
 
+    router.refresh();
+  }
+
+  async function handleEmailAuth(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setIsBusy(true);
+
+    const trimmedEmail = email.trim();
+    const trimmedName = name.trim();
+
+    if (mode === "sign-up") {
+      const { error: signUpError } = await authClient.signUp.email({
+        email: trimmedEmail,
+        password,
+        name: trimmedName || trimmedEmail.split("@")[0] || "User",
+        callbackURL: next,
+      });
+
+      if (signUpError) {
+        setError(
+          getErrorMessage(signUpError, "Could not create your account."),
+        );
+        setIsBusy(false);
+        return;
+      }
+    } else {
+      const { error: signInError } = await authClient.signIn.email({
+        email: trimmedEmail,
+        password,
+        callbackURL: next,
+      });
+
+      if (signInError) {
+        const code = getErrorCode(signInError);
+        let msg = getErrorMessage(signInError, "Invalid email or password.");
+        if (code === "EMAIL_PASSWORD_DISABLED") {
+          msg = "Email sign-in is not enabled on the server.";
+        }
+        setError(msg);
+        setIsBusy(false);
+        return;
+      }
+    }
+
+    router.push(next);
     router.refresh();
   }
 
@@ -71,8 +136,14 @@ export function LoginForm({ googleConfigured }: LoginFormProps) {
           Sign in
         </h1>
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          Sign in with Google to access your lists and tasks.
+          Use your email or Google to access your lists and tasks.
         </p>
+
+        {resetOk ? (
+          <p className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100">
+            Your password was updated. Sign in with your new password.
+          </p>
+        ) : null}
 
         {!googleConfigured ? (
           <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
@@ -102,11 +173,143 @@ export function LoginForm({ googleConfigured }: LoginFormProps) {
           </p>
         ) : null}
 
+        <form className="mt-6 space-y-4" onSubmit={handleEmailAuth}>
+          <div className="flex rounded-lg border border-zinc-200 p-0.5 dark:border-zinc-700">
+            <button
+              type="button"
+              className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                mode === "sign-in"
+                  ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                  : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+              }`}
+              onClick={() => {
+                setMode("sign-in");
+                setError(null);
+              }}
+            >
+              Sign in
+            </button>
+            <button
+              type="button"
+              className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                mode === "sign-up"
+                  ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                  : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+              }`}
+              onClick={() => {
+                setMode("sign-up");
+                setError(null);
+              }}
+            >
+              Create account
+            </button>
+          </div>
+
+          {mode === "sign-up" ? (
+            <div>
+              <label
+                htmlFor="auth-name"
+                className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+              >
+                Name
+              </label>
+              <input
+                id="auth-name"
+                type="text"
+                autoComplete="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-400 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+                placeholder="Your name"
+              />
+            </div>
+          ) : null}
+
+          <div>
+            <label
+              htmlFor="auth-email"
+              className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+            >
+              Email
+            </label>
+            <input
+              id="auth-email"
+              type="email"
+              autoComplete="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-400 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+            />
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between">
+              <label
+                htmlFor="auth-password"
+                className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+              >
+                Password
+              </label>
+              {mode === "sign-in" ? (
+                <Link
+                  href="/forgot-password"
+                  className="text-xs font-medium text-zinc-600 underline-offset-2 hover:text-zinc-900 hover:underline dark:text-zinc-400 dark:hover:text-zinc-200"
+                >
+                  Forgot password?
+                </Link>
+              ) : null}
+            </div>
+            <input
+              id="auth-password"
+              type="password"
+              autoComplete={
+                mode === "sign-up" ? "new-password" : "current-password"
+              }
+              required
+              minLength={8}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-400 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+            />
+            {mode === "sign-up" ? (
+              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                At least 8 characters.
+              </p>
+            ) : null}
+          </div>
+
+          <button
+            type="submit"
+            disabled={isBusy}
+            className="w-full rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+          >
+            {isBusy
+              ? mode === "sign-up"
+                ? "Creating account…"
+                : "Signing in…"
+              : mode === "sign-up"
+                ? "Create account"
+                : "Sign in with email"}
+          </button>
+        </form>
+
+        <div className="relative my-6">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-zinc-200 dark:border-zinc-700" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-white px-2 text-zinc-500 dark:bg-zinc-900 dark:text-zinc-400">
+              Or
+            </span>
+          </div>
+        </div>
+
         <button
           type="button"
           onClick={handleGoogleSignIn}
-          disabled={isSigningIn || !googleConfigured}
-          className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+          disabled={isBusy || !googleConfigured}
+          className="flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
         >
           <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
             <path
@@ -126,7 +329,7 @@ export function LoginForm({ googleConfigured }: LoginFormProps) {
               d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.27 0 3.19 2.7 1.26 6.57l4.06 3.07c.94-2.81 3.57-4.89 6.68-4.89z"
             />
           </svg>
-          {isSigningIn ? "Signing in..." : "Continue with Google"}
+          {isBusy ? "Please wait…" : "Continue with Google"}
         </button>
 
         {error ? (

@@ -30,6 +30,6 @@ export const config = {
      * - favicon.ico and other public static files
      * - /login itself (avoid a redirect loop)
      */
-    "/((?!api|_next/static|_next/image|favicon.ico|login).*)",
+    "/((?!api|_next/static|_next/image|favicon.ico|login|forgot-password|reset-password).*)",
   ],
 };

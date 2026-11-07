@@ -37,6 +37,7 @@ type TaskModalFooterProps = {
     targetListId: string,
   ) => void;
   onDeleteTask?: (taskId: string) => void | Promise<void>;
+  /** When true, assigned labels render as pills (still ordered before Move to / Copy link). */
   showLabelsAfterCopyLink?: boolean;
   hideDelete?: boolean;
 };
@@ -94,9 +95,6 @@ export function TaskModalFooter({
   const hasLabelActions = Boolean(onToggleTaskLabel);
   const hasMoveActions = Boolean(onMoveTaskToList && listId);
   const hasDeleteActions = Boolean(onDeleteTask) && !hideDelete;
-  const showLabelControlInline = hasLabelActions && !showLabelsAfterCopyLink;
-  const showLabelControlAfterCopyLink = hasLabelActions && showLabelsAfterCopyLink;
-
   const sortedLabels = useMemo(
     () =>
       [...labels].sort((a, b) =>
@@ -323,7 +321,11 @@ export function TaskModalFooter({
         </div>
       ) : null}
 
-      {showLabelControlInline ? renderLabelMenu("") : null}
+      {hasLabelActions
+        ? renderLabelMenu(
+            showLabelsAfterCopyLink ? "min-w-0 max-w-[min(240px,40vw)]" : "",
+          )
+        : null}
 
       {hasMoveActions ? (
         <div className="relative shrink-0">
@@ -356,10 +358,6 @@ export function TaskModalFooter({
       <FooterTextButton ariaLabel="Copy task link" onClick={() => void handleCopyLink()}>
         {copyLinkMessage ?? "Copy link"}
       </FooterTextButton>
-
-      {showLabelControlAfterCopyLink
-        ? renderLabelMenu("min-w-0 max-w-[min(240px,40vw)]")
-        : null}
 
       {hasDeleteActions ? (
         <FooterTextButton ariaLabel="Delete task" onClick={handleDelete}>

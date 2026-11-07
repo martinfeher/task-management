@@ -14,9 +14,10 @@ import {
   type RefObject,
 } from "react";
 import { createPortal } from "react-dom";
+import { TASK_LIST_PANEL_MIN_WIDTH } from "./task-list-panel";
 
 export const LIST_CALENDAR_OVERLAP_MAX_WIDTH_PX = 1800;
-export const LIST_CALENDAR_OVERLAP_LEFT_INSET_PX = 40;
+export const LIST_CALENDAR_OVERLAP_LEFT_INSET_PX = 44;
 
 type ListCalendarOverlapContextValue = {
   canToggleLayout: boolean;
@@ -90,6 +91,14 @@ export function ListCalendarOverlapShell({
     setIsSlideExpanded((current) => !current);
   }, []);
 
+  useEffect(() => {
+    if (!canToggleLayout) return;
+    const timer = window.setTimeout(() => {
+      window.dispatchEvent(new Event("resize"));
+    }, 320);
+    return () => window.clearTimeout(timer);
+  }, [isSlideExpanded, canToggleLayout]);
+
   const expandToDefaultLayout = useCallback(() => {
     setIsSlideExpanded(true);
   }, []);
@@ -156,8 +165,10 @@ export function ListCalendarOverlapShell({
       : undefined;
 
   const shellClassName = [
-    "flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-white transition-[left,right,transform] duration-300 ease-out dark:bg-zinc-950",
-    overlapActive ? "shadow-[0_0_28px_rgba(15,23,42,0.14)]" : "",
+    "flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-white rounded-l-[15px] transition-[left,right,transform] duration-300 ease-out dark:bg-zinc-950",
+    overlapActive
+      ? "shadow-[0_0_28px_rgba(15,23,42,0.14),12px_0_32px_-6px_rgba(15,23,42,0.22)] dark:shadow-[0_0_28px_rgba(0,0,0,0.4),12px_0_32px_-6px_rgba(0,0,0,0.55)]"
+      : "",
     className,
   ]
     .filter(Boolean)
@@ -197,7 +208,8 @@ export function ListCalendarOverlapShell({
         : null}
       <div
         ref={wrapperRef}
-        className="relative flex min-h-0 min-w-[348px] flex-1 flex-col self-stretch"
+        className="relative flex min-h-0 flex-1 flex-col self-stretch"
+        style={{ minWidth: TASK_LIST_PANEL_MIN_WIDTH }}
       >
         <div ref={shellRef} className={shellClassName} style={overlapStyle}>
           {children}

@@ -174,15 +174,29 @@ export function getCalendarShellClassName(
 export const CALENDAR_VIEW_WRAPPER_CLASS = "flex min-h-0 flex-1 flex-col";
 export const CALENDAR_VIEW_SURFACE_CLASS =
   "flex min-h-0 flex-1 flex-col overflow-hidden bg-white dark:bg-zinc-950 ml-1";
+
+/** Week/day grid surface: drop extra left inset when the panel spans full width. */
+export function getCalendarViewSurfaceClassName(fullWidth = false) {
+  const base =
+    "flex min-h-0 flex-1 flex-col overflow-hidden bg-white dark:bg-zinc-950";
+  return fullWidth ? `${base} min-w-0` : `${base} ml-1`;
+}
+
+/** Timed grid scroll: avoid stable scrollbar gutter when filling a wide panel. */
+export function getCalendarTimedGridScrollClassName(fullWidth = false) {
+  return fullWidth
+    ? `${CALENDAR_TIMED_GRID_SCROLL_CLASS} calendar-grid-scroll--fit-width min-w-0 w-full`
+    : CALENDAR_TIMED_GRID_SCROLL_CLASS;
+}
 /** Sticky offset for all-day rows sitting below day headers in week view. */
 export const CALENDAR_WEEK_HEADER_HEIGHT_PX = 62;
 export const CALENDAR_WEEK_HEADER_STICKY_CLASS = "sticky top-0 z-30 bg-white dark:bg-zinc-950";
 export const CALENDAR_WEEK_ALLDAY_STICKY_CLASS =
   "sticky z-20 bg-white dark:bg-zinc-950";
 /** Sticky offset for all-day rows sitting below day headers in multi-day view. */
-export const CALENDAR_DAYS_HEADER_HEIGHT_PX = 60;
+export const CALENDAR_DAYS_HEADER_HEIGHT_PX = 62;
 export const CALENDAR_DAYS_HEADER_STICKY_CLASS =
-  "sticky top-0 z-30 bg-[#efefef] dark:bg-zinc-950 mt-4";
+  "sticky top-0 z-30 bg-white dark:bg-zinc-950";
 export const CALENDAR_DAYS_ALLDAY_STICKY_CLASS =
   "sticky z-20 bg-white dark:bg-zinc-950";
 export const CALENDAR_GRID_SCROLL_CLASS =

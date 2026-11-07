@@ -16,6 +16,7 @@ import { useListPreviewEnabled } from "@/lib/list-preview-settings";
 import { useAddTaskNoteSwitchEnabled } from "@/lib/add-task-note-switch-settings";
 import { useSubtasksEnabled } from "@/lib/subtasks-settings";
 import { ConfirmModal } from "./confirm-modal";
+import { AppFontSetting } from "./app-font-switcher";
 import {
   TASK_EDITOR_FONT_SIZE_MAX_PX,
   TASK_EDITOR_FONT_SIZE_MIN_PX,
@@ -198,7 +199,7 @@ function AccountSettingsContent() {
               </div>
             )}
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[12px] font-semibold text-zinc-900 dark:text-zinc-50">
+              <p className="truncate text-[11px] font-semibold text-zinc-900 dark:text-zinc-50">
                 {user.name}
               </p>
               <p className="flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">
@@ -310,6 +311,7 @@ function GeneralSettingsContent() {
         checked={addTaskNoteSwitchEnabled}
         onChange={setAddTaskNoteSwitchEnabled}
       />
+      <AppFontSetting />
     </div>
   );
 }

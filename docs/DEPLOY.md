@@ -17,10 +17,10 @@ npm run build
 npm run start
 ```
 
-## Auth setup (Better Auth + Google)
+## Auth setup (Better Auth: Google + email/password)
 
-The app uses [Better Auth](https://www.better-auth.com/) with Google as the
-only sign-in provider. `lib/auth.ts` is the server config;
+The app uses [Better Auth](https://www.better-auth.com/) with **Google OAuth**
+and **email + password** (credential) accounts. `lib/auth.ts` is the server config;
 `lib/require-user.ts` is the single choke point every Server Action and
 Route Handler calls to get the current user (`requireUser()` throws
 `UnauthorizedError` → routes map that to `401`; nothing ever trusts a
@@ -41,9 +41,21 @@ Route Handler calls to get the current user (`requireUser()` throws
      also drives the CORS allow-list in `lib/api-cors.ts` — see
      [CORS](#cors) below.
    - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`
-5. Google's `email_verified` claim is honored automatically: `lib/auth.ts`'s
-   `databaseHooks.user.create.before` rejects sign-up when Google reports
-   the email as unverified.
+5. Google's `email_verified` claim is honored for **OAuth only**:
+   `databaseHooks.user.create.before` rejects Google sign-up when Google reports
+   the email as unverified. Email/password users can sign in without verifying
+   first (`emailAndPassword.requireEmailVerification` is off); turn it on and
+   add `emailVerification` if you need verified-email-only access.
+
+### Email & password + password reset
+
+- **Sign up / sign in**: `/login` — create account or sign in with email.
+- **Forgot password**: `/forgot-password` → sends a reset link via **`SMTP_*`**
+  env vars (see `.env.example`). If SMTP is not set, **development** logs the
+  link to the server console instead of sending mail.
+- **Set new password**: users land on `/reset-password?token=…` from the
+  email link (handled by Better Auth’s `/api/auth/reset-password/:token`
+  redirect).
 
 Mobile clients (Expo/Capacitor) authenticate with a **bearer token**
 instead of cookies, via Better Auth's `bearer()` plugin — no CORS

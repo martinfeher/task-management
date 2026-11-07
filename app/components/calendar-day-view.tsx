@@ -1,10 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, Fragment } from "react";
-import { CalendarAddTaskPopover } from "./calendar-add-task-popover";
 import { CalendarTaskTitle } from "./calendar-task-title";
 import { CalendarCurrentTimeLine } from "./calendar-current-time-line";
-import { CalendarNewTaskSlotPreview } from "./calendar-new-task-slot-preview";
+import type { CalendarStartTaskOptions } from "@/lib/calendar-start-task";
 import { CalendarPeriodNavigation } from "./calendar-period-navigation";
 import { formatDayMonthYear } from "./calendar-mini-month";
 import { type CalendarTaskEditorCallbacks } from "./calendar-task-modal";
@@ -52,7 +51,6 @@ import {
 } from "@/lib/calendar-task-drag";
 import {
   calendarAllDayCellClassName,
-  calendarAllDayDraftClassName,
   calendarAllDayLabelCellClassName,
   calendarAllDayTaskClassName,
   getCalendarTaskItemStyle,
@@ -99,19 +97,16 @@ type CalendarDayViewProps = {
     dueTime: TaskDueTime,
   ) => void;
 } & CalendarTaskEditorCallbacks & {
-  onAddCalendarTask?: (payload: {
-    name: string;
-    dueDate: string;
-    details: string;
-    listId: string;
-    dueTimeMinutes?: number | null;
-  }) => void | Promise<void>;
+  onStartCalendarTask?: (
+    options: CalendarStartTaskOptions,
+  ) => void | Promise<void>;
   defaultListId?: string | null;
   externalDropTargetDateKey?: string | null;
   externalDropTargetTimeMinutes?: number | null;
   externalDraggingTaskId?: string | null;
   externalDraggingTaskName?: string | null;
   onPeriodLabelChange?: (label: string) => void;
+  embeddedInCalendarModal?: boolean;
 } & CalendarSidebarSyncProps;
 
 function formatWeekdayLong(date: Date) {
@@ -162,13 +157,14 @@ export function CalendarDayView({
   onDueDateUpdated,
   onRecurrenceUpdated,
   onSaveTaskRecurrence,
-  onAddCalendarTask,
+  onStartCalendarTask,
   defaultListId = null,
   externalDropTargetDateKey = null,
   externalDropTargetTimeMinutes = null,
   externalDraggingTaskId = null,
   externalDraggingTaskName = null,
   onPeriodLabelChange,
+  embeddedInCalendarModal = false,
   sidebarFocusDate,
   sidebarJumpRequestId,
   onSidebarFocusDateChange,
@@ -183,13 +179,6 @@ export function CalendarDayView({
   }
   const { defaultColor: calendarTaskDefaultColor } =
     useCalendarTaskDefaultColor();
-  const [addTaskPopover, setAddTaskPopover] = useState<{
-    date: Date;
-    x: number;
-    y: number;
-    dueTimeMinutes: number | null;
-  } | null>(null);
-  const [draftTaskName, setDraftTaskName] = useState("");
   const [dropTargetSlot, setDropTargetSlot] = useState<CalendarDropSlot | null>(
     null,
   );
@@ -208,7 +197,6 @@ export function CalendarDayView({
   const suppressTaskClickRef = useRef(false);
   const timeGridRef = useRef<HTMLDivElement>(null);
   const timeScrollRef = useRef<HTMLDivElement>(null);
-  const newTaskPreviewRef = useRef<HTMLDivElement>(null);
   const {
     startDragPreview,
     updateDragPreview,
@@ -317,28 +305,16 @@ export function CalendarDayView({
   useEffect(() => {
     if (!selectedDay) return;
     closeTaskModal();
-    closeAddTaskPopover();
   }, [selectedDay]);
 
-  function closeAddTaskPopover() {
-    setAddTaskPopover(null);
-    setDraftTaskName("");
-  }
-
-  function handleAllDayClick(event: React.MouseEvent<HTMLElement>) {
+  function handleAllDayClick(_event: React.MouseEvent<HTMLElement>) {
     if (!selectedDay) return;
 
     closeTaskModal();
 
-    if (!onAddCalendarTask || lists.length === 0) return;
+    if (!onStartCalendarTask || lists.length === 0) return;
 
-    setDraftTaskName("");
-    setAddTaskPopover({
-      date: selectedDay,
-      x: event.clientX,
-      y: event.clientY,
-      dueTimeMinutes: null,
-    });
+    void onStartCalendarTask({ date: selectedDay, dueTimeMinutes: null });
   }
 
   function handleTimeGridClick(event: React.MouseEvent<HTMLDivElement>) {
@@ -352,7 +328,7 @@ export function CalendarDayView({
     event.stopPropagation();
     closeTaskModal();
 
-    if (!onAddCalendarTask || lists.length === 0) return;
+    if (!onStartCalendarTask || lists.length === 0) return;
 
     const rect = event.currentTarget.getBoundingClientRect();
     const y = event.clientY - rect.top;
@@ -374,13 +350,7 @@ export function CalendarDayView({
       return;
     }
 
-    setDraftTaskName("");
-    setAddTaskPopover({
-      date: selectedDay,
-      x: event.clientX,
-      y: event.clientY,
-      dueTimeMinutes,
-    });
+    void onStartCalendarTask({ date: selectedDay, dueTimeMinutes });
   }
 
   function handleCalendarTaskClick(
@@ -395,13 +365,6 @@ export function CalendarDayView({
     }
 
     onSelectTask(task.id);
-    closeAddTaskPopover();
-  }
-
-  function handleNewTaskTimeChange(minutes: number) {
-    setAddTaskPopover((current) =>
-      current ? { ...current, dueTimeMinutes: minutes } : null,
-    );
   }
 
   function handleSetDropTargetSlot(slot: CalendarDropSlot | null) {
@@ -514,8 +477,6 @@ export function CalendarDayView({
     draggingTask,
     draggingTaskPreview,
   );
-  const isActiveDay =
-    addTaskPopover !== null && isSameDay(selectedDay, addTaskPopover.date);
   const activeDropSlot = getActiveCalendarDropSlot(
     dropTargetSlot,
     externalDropTargetDateKey,
@@ -536,10 +497,7 @@ export function CalendarDayView({
   const externalDropSlotMinutes = isTimedDropTarget
     ? (activeDropSlot?.dueTimeMinutes ?? null)
     : null;
-  const selectedSlotMinutes =
-    addTaskPopover?.dueTimeMinutes ??
-    externalDropSlotMinutes ??
-    null;
+  const selectedSlotMinutes = externalDropSlotMinutes;
   const selectedSlotTop =
     selectedSlotMinutes === null
       ? null
@@ -553,7 +511,6 @@ export function CalendarDayView({
     resizingTaskId === null &&
     resizePreview === null &&
     isTimedDropTarget &&
-    !isActiveDay &&
     externalDropSlotMinutes !== null &&
     internalDragStillAtSource;
   const showSelectedSlotMarker =
@@ -561,8 +518,7 @@ export function CalendarDayView({
     selectedSlotTop !== null &&
     selectedSlotTop >= GRID_TOP_OFFSET_PX &&
     selectedSlotTop <= GRID_TOP_OFFSET_PX + hours.length * HOUR_HEIGHT_PX &&
-    ((isActiveDay && addTaskPopover?.dueTimeMinutes !== null) ||
-      showDragSlotMarker);
+    showDragSlotMarker;
   const showNowLine =
     isToday &&
     currentTimeTop !== null &&
@@ -582,16 +538,18 @@ export function CalendarDayView({
     CALENDAR_TIME_SLOT_MINUTES,
     GRID_TOP_OFFSET_PX,
   );
-  const allDayStackCount =
-    dayTasks.allDay.length +
-    (isActiveDay && addTaskPopover?.dueTimeMinutes === null ? 1 : 0);
+  const allDayStackCount = dayTasks.allDay.length;
   const allDayRowHeightPx = getCalendarAllDayRowHeightPx(allDayStackCount);
 
   return (
     <div className={CALENDAR_VIEW_WRAPPER_CLASS}>
       <div className={getCalendarShellClassName()}>
         <div className={CALENDAR_VIEW_SURFACE_CLASS}>
-          <div className="relative z-20 flex shrink-0 items-center justify-start overflow-visible px-3 pt-1 pb-2">
+          <div
+            className={`relative z-20 flex shrink-0 items-center justify-start overflow-visible pt-1 pb-2 ${
+              embeddedInCalendarModal ? "pl-1 pr-3" : "px-3"
+            }`}
+          >
             <CalendarPeriodNavigation
               centerLabel={formatWeekdayLong(selectedDay)}
               isViewingToday={isToday}
@@ -620,11 +578,9 @@ export function CalendarDayView({
             onClick={handleAllDayClick}
             className={calendarAllDayCellClassName(
               `shrink-0 cursor-pointer border-b border-zinc-200 bg-white transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900/60 ${
-                isActiveDay && addTaskPopover?.dueTimeMinutes === null
-                  ? "bg-blue-50 ring-1 ring-inset ring-[#4873c7] dark:bg-blue-950/30"
-                  : isAllDayDropTarget
-                    ? "bg-blue-50 ring-1 ring-inset ring-blue-400 dark:bg-blue-950/30"
-                    : ""
+                isAllDayDropTarget
+                  ? "bg-blue-50 ring-1 ring-inset ring-blue-400 dark:bg-blue-950/30"
+                  : ""
               }`,
             )}
             style={{ height: allDayRowHeightPx }}
@@ -672,11 +628,6 @@ export function CalendarDayView({
                 />
               </CalendarTaskHoverButton>
             ))}
-            {isActiveDay && addTaskPopover?.dueTimeMinutes === null ? (
-              <div aria-hidden="true" className={calendarAllDayDraftClassName()}>
-                {draftTaskName.trim() || ""}
-              </div>
-            ) : null}
           </div>
         </div>
 
@@ -856,21 +807,7 @@ export function CalendarDayView({
               selectedSlotTop !== null &&
               selectedSlotMinutes !== null ? (
                 <>
-                  {isActiveDay && addTaskPopover?.dueTimeMinutes !== null ? (
-                    <CalendarNewTaskSlotPreview
-                      previewRef={newTaskPreviewRef}
-                      slotTop={selectedSlotTop}
-                      timeMinutes={selectedSlotMinutes}
-                      hourHeightPx={HOUR_HEIGHT_PX}
-                      hourStart={HOUR_START}
-                      gridTopOffsetPx={GRID_TOP_OFFSET_PX}
-                      gridRef={timeGridRef}
-                      minMinutes={timedGridMinMinutes}
-                      maxMinutes={timedGridMaxMinutes}
-                      label={draftTaskName}
-                      onTimeChange={handleNewTaskTimeChange}
-                    />
-                  ) : showDragSlotMarker &&
+                  {showDragSlotMarker &&
                     draggingTask &&
                     dragPreviewDuration !== null ? (
                     <CalendarTaskDropPreview
@@ -920,34 +857,6 @@ export function CalendarDayView({
           </div>
         </div>
       </div>
-
-      {addTaskPopover && onAddCalendarTask ? (
-        <CalendarAddTaskPopover
-          date={addTaskPopover.date}
-          dueTimeMinutes={addTaskPopover.dueTimeMinutes}
-          lists={lists}
-          defaultListId={defaultListId}
-          anchorRef={
-            addTaskPopover.dueTimeMinutes !== null
-              ? newTaskPreviewRef
-              : undefined
-          }
-          x={
-            addTaskPopover.dueTimeMinutes === null
-              ? addTaskPopover.x
-              : undefined
-          }
-          y={
-            addTaskPopover.dueTimeMinutes === null
-              ? addTaskPopover.y
-              : undefined
-          }
-          name={draftTaskName}
-          onNameChange={setDraftTaskName}
-          onClose={closeAddTaskPopover}
-          onAddTask={onAddCalendarTask}
-        />
-      ) : null}
     </div>
   );
 }

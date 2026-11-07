@@ -344,6 +344,19 @@ html[data-app-font="euclid-circular"] {
   --color-gray-750: oklch(32.55% 0.0335 258.291);
   --color-gray-850: oklch(24.4% 0.0335 260.757);
 
+  /* Tailwind default slate scale (50–950); mid-tone overrides follow */
+  --color-slate-50: oklch(98.4% 0.003 247.858);
+  --color-slate-100: oklch(96.8% 0.007 247.896);
+  --color-slate-200: oklch(92.9% 0.013 255.508);
+  --color-slate-300: oklch(86.9% 0.022 252.894);
+  --color-slate-400: oklch(70.4% 0.04 256.788);
+  --color-slate-500: oklch(55.4% 0.046 257.417);
+  --color-slate-600: oklch(44.6% 0.043 257.281);
+  --color-slate-700: oklch(37.2% 0.044 257.287);
+  --color-slate-800: oklch(27.9% 0.041 260.031);
+  --color-slate-900: oklch(20.8% 0.042 265.755);
+  --color-slate-950: oklch(12.9% 0.042 264.695);
+
   --color-slate-150: oklch(94.85% 0.01 251.702);
   --color-slate-250: oklch(89.9% 0.0175 254.201);
   --color-slate-350: oklch(78.65% 0.031 254.841);
@@ -502,6 +515,7 @@ body {
 .detail-line[data-line-type="bullet"]::before {
   content: "•";
   margin-right: 0.5rem;
+  color: #cdcdcd;
 }
 
 .task-details-editor .detail-line[data-line-type="bullet"][data-list-indent="1"],
@@ -1725,6 +1739,10 @@ body {
   scrollbar-gutter: stable;
   scrollbar-width: thin;
   scrollbar-color: rgb(212 212 216 / 0.85) transparent;
+}
+
+.calendar-grid-scroll--fit-width {
+  scrollbar-gutter: auto;
 }
 
 .calendar-grid-scroll::-webkit-scrollbar,
