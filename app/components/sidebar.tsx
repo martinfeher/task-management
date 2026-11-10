@@ -3,13 +3,6 @@
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import {
-  LuCircleUser,
-  LuCreditCard,
-  LuCircleHelp,
-  LuLogOut,
-  LuSlidersHorizontal,
-} from "react-icons/lu";
 import { authClient, useSession } from "@/lib/auth-client";
 import { BiCheckboxChecked, BiChevronDown } from "react-icons/bi";
 import { BiSolidCheckboxChecked } from "react-icons/bi";
@@ -71,6 +64,7 @@ import { EditListModal } from "./edit-list-modal";
 import { RenameListModal } from "./rename-list-modal";
 import { FiSettings } from "react-icons/fi";
 import { getListColor } from "@/lib/list-colors";
+import { SidebarAccountMenu } from "./sidebar-account-menu";
 import { LabelContextMenu, clampLabelContextMenuPosition } from "./label-context-menu";
 import {
   ListContextMenu,
@@ -115,15 +109,8 @@ type SettingsModalSection =
   | "labels"
   | "calendar";
 
-function getSidebarUserInitials(
-  name: string | undefined,
-  email: string | undefined,
-) {
-  const source = name?.trim() || email?.trim() || "";
-  const parts = source.split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0]!.slice(0, 1).toUpperCase();
-  return (parts[0]![0] + parts[parts.length - 1]![0]).toUpperCase();
+function getTotalActiveTaskCount(taskCountByListId: Record<string, number>) {
+  return Object.values(taskCountByListId).reduce((sum, count) => sum + count, 0);
 }
 
 const NAV_ITEM_TEXT_CLASS = {
@@ -2299,215 +2286,22 @@ export function Sidebar({
         <div className="relative shrink-0 border-t border-zinc-200 dark:border-zinc-800">
           <div className="flex flex-col gap-2 px-2 pb-2 pt-1.5">
             {session?.user ? (
-              <div ref={profileMenuRef} className="relative">
-                {isProfileMenuOpen ? (
-                  <div
-                    className="absolute bottom-full left-0 right-0 z-20 mb-2 overflow-hidden rounded-xl border border-zinc-200 bg-white py-1 text-left shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
-                    role="menu"
-                    aria-label="Account menu"
-                  >
-                    <div className="flex items-center gap-3 border-b border-zinc-100 px-2.5 py-2.5 dark:border-zinc-800">
-                      {session.user.image ? (
-                        <img
-                          src={session.user.image}
-                          alt=""
-                          referrerPolicy="no-referrer"
-                          className="size-6 shrink-0 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex size-10 shrink-0 items-center justify-center cursor-pointer rounded-full bg-zinc-900 text-sm font-semibold text-white dark:bg-zinc-100 dark:text-zinc-900">
-                          {getSidebarUserInitials(
-                            session.user.name,
-                            session.user.email,
-                          )}
-                        </div>
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-[11.5px] font-semibold text-zinc-700 dark:text-zinc-50 leading-none">
-                          {session.user.name || "Account"}
-                        </p>
-                        <p className="truncate text-[11px] text-zinc-500 dark:text-zinc-400">
-                          {session.user.email}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="py-1">
-                      <button
-                        type="button"
-                        role="menuitem"
-                        className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm cursor-pointer text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
-                        onClick={(event) => {
-                          openSettingsModal(
-                            {
-                              x: event.clientX,
-                              y: event.clientY,
-                            },
-                            "account",
-                          );
-                          closeDrawer();
-                        }}
-                      >
-                        <LuCircleUser
-                          className="size-4 shrink-0 text-zinc-500"
-                          aria-hidden="true"
-                        />
-                        <span className="min-w-0 flex-1">Account settings</span>
-                        <span className="flex shrink-0 items-center gap-0.5 text-xs text-zinc-400">
-                          <MacCmdIcon className="size-3.5" />,
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm cursor-pointer text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
-                        onClick={(event) => {
-                          openSettingsModal(
-                            {
-                              x: event.clientX,
-                              y: event.clientY,
-                            },
-                            "general",
-                          );
-                          closeDrawer();
-                        }}
-                      >
-                        <LuSlidersHorizontal
-                          className="size-4 shrink-0 text-zinc-500"
-                          aria-hidden="true"
-                        />
-                        <span>Preferences</span>
-                      </button>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm cursor-pointer text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
-                        onClick={(event) => {
-                          openSettingsModal(
-                            {
-                              x: event.clientX,
-                              y: event.clientY,
-                            },
-                            "account",
-                          );
-                          closeDrawer();
-                        }}
-                      >
-                        <LuCreditCard
-                          className="size-4 shrink-0 text-zinc-500"
-                          aria-hidden="true"
-                        />
-                        <span>Plan &amp; billing</span>
-                      </button>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm cursor-pointer text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
-                        onClick={(event) => {
-                          openKeyboardShortcutsModal({
-                            x: event.clientX,
-                            y: event.clientY,
-                          });
-                          setIsProfileMenuOpen(false);
-                          closeDrawer();
-                        }}
-                      >
-                        <LuKeyboard
-                          className="size-4 shrink-0 text-zinc-500"
-                          aria-hidden="true"
-                        />
-                        <span className="min-w-0 flex-1">Keyboard shortcuts</span>
-                        <span className="text-xs text-zinc-400">?</span>
-                      </button>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm cursor-pointer text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
-                        onClick={() => {
-                          window.location.href =
-                            "mailto:?subject=Todolist%20feedback";
-                          setIsProfileMenuOpen(false);
-                        }}
-                      >
-                        <LuCircleHelp
-                          className="size-4 shrink-0 text-zinc-500"
-                          aria-hidden="true"
-                        />
-                        <span>Help &amp; feedback</span>
-                      </button>
-                    </div>
-                    <div className="border-t border-zinc-100 py-1 dark:border-zinc-800">
-                      <button
-                        type="button"
-                        role="menuitem"
-                        className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm cursor-pointer text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
-                        onClick={() => {
-                          void handleSignOut();
-                          setIsProfileMenuOpen(false);
-                          closeDrawer();
-                        }}
-                      >
-                        <LuLogOut
-                          className="size-4 shrink-0 text-zinc-500"
-                          aria-hidden="true"
-                        />
-                        <span>Log out</span>
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
-
-                <div className="flex items-center gap-2 rounded-xl border border-[#e1e8ee] bg-[#fdfdfd] pr-1 pl-2 py-[2px] dark:border-zinc-700 dark:bg-zinc-900/80 cursor-pointer">
-                  <button
-                    type="button"
-                    className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-0.5 text-left transition-colors hover:opacity-90 cursor-pointer"
-                    onClick={() => setIsProfileMenuOpen((open) => !open)}
-                    aria-expanded={isProfileMenuOpen}
-                    aria-haspopup="menu"
-                  >
-                    {session.user.image ? (
-                      <img
-                        src={session.user.image}
-                        alt=""
-                        referrerPolicy="no-referrer"
-                        className="size-6 shrink-0 rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex size-9 shrink-0 items-center justify-center cursor-pointer rounded-full bg-zinc-900 text-sm font-semibold text-white dark:bg-zinc-100 dark:text-zinc-900">
-                        {getSidebarUserInitials(
-                          session.user.name,
-                          session.user.email,
-                        )}
-                      </div>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-[11px] mt-px font-semibold text-zinc-700 dark:text-zinc-50 leading-none">
-                        {session.user.name || "Account"}
-                      </p>
-                      <p className="truncate text-[10.5px] text-zinc-500 dark:text-zinc-400">
-                        Personal
-                      </p>
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="Open settings (General)"
-                    title="Settings — General"
-                    onClick={(event) => {
-                      openSettingsModal(
-                        {
-                          x: event.clientX,
-                          y: event.clientY,
-                        },
-                        "general",
-                      );
-                      closeDrawer();
-                    }}
-                    className="flex size-9 shrink-0 items-center justify-center rounded-full text-zinc-350 transition-colors hover:bg-zinc-200/70 hover:text-zinc-800 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 cursor-pointer"
-                  >
-                    <FiSettings className="size-[16px]"  />
-                  </button>
-                </div>
-              </div>
+              <SidebarAccountMenu
+                user={session.user}
+                isOpen={isProfileMenuOpen}
+                onToggle={() => setIsProfileMenuOpen((open) => !open)}
+                onCloseMenu={() => setIsProfileMenuOpen(false)}
+                menuRef={profileMenuRef}
+                activeTaskCount={getTotalActiveTaskCount(taskCountByListId)}
+                onOpenSettings={(section, pointer) =>
+                  openSettingsModal(pointer, section)
+                }
+                onOpenKeyboardShortcuts={openKeyboardShortcutsModal}
+                onSignOut={() => {
+                  void handleSignOut();
+                }}
+                onCloseDrawer={closeDrawer}
+              />
             ) : (
               <div className="flex items-center justify-end gap-1 rounded-xl border border-zinc-200 bg-[#fdfdfd] pr-1 pl-1.5 py-[2px] dark:border-zinc-700 dark:bg-zinc-900/80">
                 <button

@@ -18,6 +18,7 @@ import { TASK_LIST_PANEL_MIN_WIDTH } from "./task-list-panel";
 
 export const LIST_CALENDAR_OVERLAP_MAX_WIDTH_PX = 1800;
 export const LIST_CALENDAR_OVERLAP_LEFT_INSET_PX = 44;
+export const LIST_CALENDAR_OVERLAP_TRANSITION_MS = 400;
 
 type ListCalendarOverlapContextValue = {
   canToggleLayout: boolean;
@@ -62,6 +63,7 @@ export function ListCalendarOverlapShell({
     width: number;
     height: number;
   } | null>(null);
+  const pendingFlipRef = useRef<DOMRect | null>(null);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia(
@@ -87,21 +89,37 @@ export function ListCalendarOverlapShell({
   const canToggleLayout = enabled && isNarrowViewport;
   const overlapActive = canToggleLayout && !isSlideExpanded;
 
+  const captureFlipStart = useCallback(() => {
+    const shell = shellRef.current;
+    const prefersReducedMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    if (!shell || !canToggleLayout || prefersReducedMotion) {
+      pendingFlipRef.current = null;
+      return;
+    }
+
+    pendingFlipRef.current = shell.getBoundingClientRect();
+  }, [canToggleLayout]);
+
   const toggleLayout = useCallback(() => {
+    captureFlipStart();
     setIsSlideExpanded((current) => !current);
-  }, []);
+  }, [captureFlipStart]);
 
   useEffect(() => {
     if (!canToggleLayout) return;
     const timer = window.setTimeout(() => {
       window.dispatchEvent(new Event("resize"));
-    }, 320);
+    }, LIST_CALENDAR_OVERLAP_TRANSITION_MS);
     return () => window.clearTimeout(timer);
   }, [isSlideExpanded, canToggleLayout]);
 
   const expandToDefaultLayout = useCallback(() => {
+    captureFlipStart();
     setIsSlideExpanded(true);
-  }, []);
+  }, [captureFlipStart]);
 
   useLayoutEffect(() => {
     if (!overlapActive) {
@@ -152,6 +170,64 @@ export function ListCalendarOverlapShell({
     };
   }, [overlapActive, enabled, taskListPanelRef]);
 
+  useLayoutEffect(() => {
+    if (!canToggleLayout) return;
+
+    const first = pendingFlipRef.current;
+    if (!first) return;
+
+    if (overlapActive && !overlapFrame) {
+      return;
+    }
+
+    const shellElement = shellRef.current;
+    if (!shellElement) {
+      pendingFlipRef.current = null;
+      return;
+    }
+
+    const last = shellElement.getBoundingClientRect();
+    const deltaX = first.left - last.left;
+    const deltaY = first.top - last.top;
+    const scaleX = first.width / Math.max(last.width, 1);
+
+    pendingFlipRef.current = null;
+
+    if (
+      Math.abs(deltaX) < 0.5 &&
+      Math.abs(deltaY) < 0.5 &&
+      Math.abs(scaleX - 1) < 0.002
+    ) {
+      return;
+    }
+
+    shellElement.style.transformOrigin = "top left";
+    shellElement.style.transition = "none";
+    shellElement.style.transform = `translate3d(${deltaX}px, ${deltaY}px, 0) scaleX(${scaleX})`;
+
+    requestAnimationFrame(() => {
+      shellElement.style.transition = `transform ${LIST_CALENDAR_OVERLAP_TRANSITION_MS}ms cubic-bezier(0.16, 1, 0.3, 1)`;
+      shellElement.style.transform = "";
+
+      function onTransitionEnd(event: TransitionEvent) {
+        const el = shellRef.current;
+        if (
+          !el ||
+          event.target !== el ||
+          event.propertyName !== "transform"
+        ) {
+          return;
+        }
+        el.style.transition = "";
+        el.style.transform = "";
+        el.style.transformOrigin = "";
+        el.removeEventListener("transitionend", onTransitionEnd);
+      }
+
+      shellElement.addEventListener("transitionend", onTransitionEnd);
+    });
+  }, [canToggleLayout, isSlideExpanded, overlapActive, overlapFrame]);
+
   const overlapStyle: CSSProperties | undefined =
     overlapActive && overlapFrame
       ? {
@@ -165,7 +241,7 @@ export function ListCalendarOverlapShell({
       : undefined;
 
   const shellClassName = [
-    "flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-white rounded-l-[15px] transition-[left,right,transform] duration-300 ease-out dark:bg-zinc-950",
+    "list-calendar-overlap-shell flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-white rounded-l-[15px] dark:bg-zinc-950",
     overlapActive
       ? "shadow-[0_0_28px_rgba(15,23,42,0.14),12px_0_32px_-6px_rgba(15,23,42,0.22)] dark:shadow-[0_0_28px_rgba(0,0,0,0.4),12px_0_32px_-6px_rgba(0,0,0,0.55)]"
       : "",
