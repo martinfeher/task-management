@@ -1,3 +1,4 @@
+import { expo } from "@better-auth/expo";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { bearer } from "better-auth/plugins/bearer";
@@ -70,7 +71,7 @@ export const auth = betterAuth({
       },
     },
   },
-  plugins: [bearer(), nextCookies()],
+  plugins: [bearer(), nextCookies(), expo()],
 });
 
 export type Session = typeof auth.$Infer.Session;

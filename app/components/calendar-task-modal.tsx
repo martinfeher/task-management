@@ -146,10 +146,11 @@ export function CalendarTaskModal({
                 }
               : undefined,
             showLabelsAfterCopyLink: true,
-            hideDelete: true,
+            hideDelete: isNewTaskDraft,
+            deleteButtonVariant: "icon" as const,
           }
         : null,
-    [handleClose, modalActions, modalTask],
+    [handleClose, isNewTaskDraft, modalActions, modalTask],
   );
 
   useEffect(() => {

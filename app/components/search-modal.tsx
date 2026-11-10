@@ -548,6 +548,16 @@ export function SearchModal({
   }, [isMounted]);
 
   useEffect(() => {
+    if (!open || !isMounted) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      focusSearchInputSelectAll();
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [open, isMounted]);
+
+  useEffect(() => {
     if (!open) return;
 
     let cancelled = false;
@@ -557,17 +567,13 @@ export function SearchModal({
         if (cancelled) return;
         setQuery(savedQuery);
         requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            focusSearchInputSelectAll();
-          });
+          focusSearchInputSelectAll();
         });
       })
       .catch(() => {
         if (cancelled) return;
         requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            focusSearchInputSelectAll();
-          });
+          focusSearchInputSelectAll();
         });
       });
 
@@ -797,6 +803,7 @@ export function SearchModal({
             <input
               ref={inputRef}
               type="search"
+              autoFocus
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search tasks and notes"

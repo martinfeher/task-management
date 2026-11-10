@@ -205,11 +205,13 @@ function PreviewMetaRow({
   children: ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-2.5 text-[11px] leading-5 text-zinc-600 dark:text-zinc-300">
+    <div className="flex items-center gap-2.5 text-[11px] leading-5">
       <span className="flex size-[14px] shrink-0 items-center justify-center text-zinc-400 dark:text-zinc-500">
         {icon}
       </span>
-      <span className="min-w-0 truncate">{children}</span>
+      <span className="min-w-0 truncate text-[#7f7f7f] dark:text-[#7f7f7f]">
+        {children}
+      </span>
     </div>
   );
 }

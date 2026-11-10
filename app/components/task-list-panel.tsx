@@ -138,7 +138,7 @@ function measureTaskListTruncationOverflow(root: HTMLElement | null) {
   return maxOverflow;
 }
 
-type SortField = "date" | "title" | "kind";
+type SortField = "date" | "title" | "kind" | "list" | "groupDate" | "priority";
 type SortDirection = "asc" | "desc";
 
 type SortOption = {
@@ -300,6 +300,9 @@ const SORT_OPTIONS: SortOption[] = [
   { field: "title", direction: "desc", label: "Title (Z-A)" },
   { field: "kind", direction: "asc", label: "Group: Notes first" },
   { field: "kind", direction: "desc", label: "Group: Tasks first" },
+  { field: "list", direction: "asc", label: "Group: List" },
+  { field: "groupDate", direction: "asc", label: "Group: Date" },
+  { field: "priority", direction: "asc", label: "Group: Priority" },
 ];
 
 function shouldIgnoreAddTaskShortcut(target: EventTarget | null) {
@@ -404,6 +407,36 @@ function sortTasks(
       }
 
       return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+    }
+
+    if (field === "list") {
+      const aList = a.listName ?? "";
+      const bList = b.listName ?? "";
+      const comparison = aList.localeCompare(bList, undefined, {
+        sensitivity: "base",
+      });
+      if (comparison !== 0) {
+        return direction === "asc" ? comparison : -comparison;
+      }
+
+      return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+    }
+
+    if (field === "priority") {
+      const priorityRank = (priority: number | null) =>
+        priority === null || priority === undefined ? 99 : priority;
+      const aRank = priorityRank(a.priority);
+      const bRank = priorityRank(b.priority);
+      if (aRank !== bRank) {
+        return direction === "asc" ? aRank - bRank : bRank - aRank;
+      }
+
+      return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+    }
+
+    const sortByDueDate = field === "date" || field === "groupDate";
+    if (!sortByDueDate) {
+      return 0;
     }
 
     const aDate = getDueDateTimestamp(a.dueDate);

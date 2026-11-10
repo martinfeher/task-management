@@ -917,6 +917,8 @@ export function TodoApp({
     bootState.calendarView,
   );
   const [isListCalendarPreview, setIsListCalendarPreview] = useState(false);
+  const [isListCalendarOverlapLayout, setIsListCalendarOverlapLayout] =
+    useState(false);
   const [calendarExternalDropTarget, setCalendarExternalDropTarget] =
     useState<CalendarExternalDragTarget | null>(null);
   const [sidebarListDropTarget, setSidebarListDropTarget] =
@@ -4148,13 +4150,17 @@ export function TodoApp({
         ) : showRightPanel ? (
           <div
             ref={splitContainerRef}
-            className="flex min-h-0 min-w-0 flex-1 overflow-hidden"
+            className={`flex min-h-0 min-w-0 flex-1 ${
+              isListCalendarOverlapLayout ? "overflow-visible" : "overflow-hidden"
+            }`}
           >
             {compactShowTaskList ? (
               <div className="flex min-h-0 shrink-0">
                 <div
                   ref={taskListPanelRef}
-                  className="flex min-h-0 shrink-0 self-stretch"
+                  className={`flex min-h-0 shrink-0 self-stretch ${
+                    isListCalendarOverlapLayout ? "relative z-0" : ""
+                  }`}
                   onMouseEnter={commitSidebarHoverSelection}
                 >
                 <TaskListPanel
@@ -4246,14 +4252,15 @@ export function TodoApp({
             ) : null}
             {!isCompactLayout || compactDetailView ? (
             <div
-              className={`flex min-h-0 flex-1 flex-col overflow-hidden ${
-                isCompactLayout ? "min-w-0" : "min-w-[344px]"
-              }`}
+              className={`flex min-h-0 flex-1 flex-col ${
+                isListCalendarOverlapLayout ? "overflow-visible" : "overflow-hidden"
+              } ${isCompactLayout ? "min-w-0" : "min-w-[344px]"}`}
             >
               {showListCalendarPanel ? (
                 <ListCalendarOverlapShell
                   enabled={listCalendarOverlapEnabled}
                   taskListPanelRef={taskListPanelRef}
+                  onOverlapLayoutChange={setIsListCalendarOverlapLayout}
                 >
                   <CalendarViewsPanel
                     tasks={taskListItems}
@@ -4340,10 +4347,16 @@ export function TodoApp({
             ) : null}
           </div>
         ) : (
-          <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
+          <div
+            className={`flex min-h-0 min-w-0 flex-1 ${
+              isListCalendarOverlapLayout ? "overflow-visible" : "overflow-hidden"
+            }`}
+          >
             <div
               ref={taskListPanelRef}
-              className="flex min-h-0 shrink-0 self-stretch"
+              className={`flex min-h-0 shrink-0 self-stretch ${
+                isListCalendarOverlapLayout ? "relative z-0" : ""
+              }`}
               onMouseEnter={commitSidebarHoverSelection}
             >
               <TaskListPanel
@@ -4420,64 +4433,73 @@ export function TodoApp({
               />
             </div>
             {showListCalendarPanel ? (
-              <ListCalendarOverlapShell
-                enabled={listCalendarOverlapEnabled}
-                taskListPanelRef={taskListPanelRef}
+              <div
+                className={`flex min-h-0 min-w-0 flex-1 flex-col ${
+                  isListCalendarOverlapLayout
+                    ? "overflow-visible"
+                    : "overflow-hidden"
+                }`}
               >
-                <CalendarViewsPanel
-                  tasks={taskListItems}
-                  searchTasks={searchTasks}
-                  lists={lists}
-                  completingTaskIds={completingTaskIds}
-                  completingWithoutBackgroundTaskIds={
-                    completingWithoutBackgroundTaskIds
-                  }
-                  checkAnimatingTaskIds={checkAnimatingTaskIds}
-                  selectedTaskId={selectedTaskId}
-                  onSelectTask={handleListCalendarTaskSelect}
-                  onToggleTask={toggleTask}
-                  onSetTaskDueDate={setTaskDueDate}
-                  onSetTaskDueTime={setTaskDueTime}
-                  onSetTaskDueDateAndTime={setTaskDueDateAndTime}
-                  onSetTaskCalendarColor={setTaskCalendarColor}
-                  onSetTaskPriority={setTaskPriority}
-                  onToggleTaskLabel={toggleTaskLabel}
-                  onLabelsChanged={refreshLabels}
-                  onMoveTaskToList={moveTaskToList}
-                  labels={labels}
-                  onDeleteTask={deleteTaskById}
-                  onDetailsSaved={handleDetailsSaved}
-                  onTaskHasDetailsKnown={handleTaskHasDetailsKnown}
-                  onTaskRenamed={handleTaskRenamed}
-                  onDueDateUpdated={handleDueDateUpdated}
-                  onRecurrenceUpdated={handleRecurrenceUpdated}
-                  onSaveTaskRecurrence={setTaskRecurrence}
-                  onStartCalendarTask={startCalendarTask}
-                  defaultListId={displayedListId}
-                  view={listCalendarPanelView}
-                  onViewChange={handleListCalendarViewChange}
-                  multiDayCount={listCalendarMultiDayCount}
-                  multiWeekCount={listCalendarMultiWeekCount}
-                  onMultiDayCountChange={handleListCalendarMultiDayCountChange}
-                  onMultiWeekCountChange={
-                    handleListCalendarMultiWeekCountChange
-                  }
-                  persistViewSession={false}
-                  fullWidth
-                  externalDropTargetDateKey={
-                    calendarExternalDropTarget?.dateKey ?? null
-                  }
-                  externalDropTargetTimeMinutes={
-                    calendarExternalDropTarget?.dueTimeMinutes ?? null
-                  }
-                  externalDraggingTaskId={
-                    calendarExternalDropTarget?.taskId ?? null
-                  }
-                  externalDraggingTaskName={
-                    calendarExternalDropTarget?.taskName ?? null
-                  }
-                />
-              </ListCalendarOverlapShell>
+                <ListCalendarOverlapShell
+                  enabled={listCalendarOverlapEnabled}
+                  taskListPanelRef={taskListPanelRef}
+                  onOverlapLayoutChange={setIsListCalendarOverlapLayout}
+                >
+                  <CalendarViewsPanel
+                    tasks={taskListItems}
+                    searchTasks={searchTasks}
+                    lists={lists}
+                    completingTaskIds={completingTaskIds}
+                    completingWithoutBackgroundTaskIds={
+                      completingWithoutBackgroundTaskIds
+                    }
+                    checkAnimatingTaskIds={checkAnimatingTaskIds}
+                    selectedTaskId={selectedTaskId}
+                    onSelectTask={handleListCalendarTaskSelect}
+                    onToggleTask={toggleTask}
+                    onSetTaskDueDate={setTaskDueDate}
+                    onSetTaskDueTime={setTaskDueTime}
+                    onSetTaskDueDateAndTime={setTaskDueDateAndTime}
+                    onSetTaskCalendarColor={setTaskCalendarColor}
+                    onSetTaskPriority={setTaskPriority}
+                    onToggleTaskLabel={toggleTaskLabel}
+                    onLabelsChanged={refreshLabels}
+                    onMoveTaskToList={moveTaskToList}
+                    labels={labels}
+                    onDeleteTask={deleteTaskById}
+                    onDetailsSaved={handleDetailsSaved}
+                    onTaskHasDetailsKnown={handleTaskHasDetailsKnown}
+                    onTaskRenamed={handleTaskRenamed}
+                    onDueDateUpdated={handleDueDateUpdated}
+                    onRecurrenceUpdated={handleRecurrenceUpdated}
+                    onSaveTaskRecurrence={setTaskRecurrence}
+                    onStartCalendarTask={startCalendarTask}
+                    defaultListId={displayedListId}
+                    view={listCalendarPanelView}
+                    onViewChange={handleListCalendarViewChange}
+                    multiDayCount={listCalendarMultiDayCount}
+                    multiWeekCount={listCalendarMultiWeekCount}
+                    onMultiDayCountChange={handleListCalendarMultiDayCountChange}
+                    onMultiWeekCountChange={
+                      handleListCalendarMultiWeekCountChange
+                    }
+                    persistViewSession={false}
+                    fullWidth
+                    externalDropTargetDateKey={
+                      calendarExternalDropTarget?.dateKey ?? null
+                    }
+                    externalDropTargetTimeMinutes={
+                      calendarExternalDropTarget?.dueTimeMinutes ?? null
+                    }
+                    externalDraggingTaskId={
+                      calendarExternalDropTarget?.taskId ?? null
+                    }
+                    externalDraggingTaskName={
+                      calendarExternalDropTarget?.taskName ?? null
+                    }
+                  />
+                </ListCalendarOverlapShell>
+              </div>
             ) : null}
             {showTaskDetails ? (
               <div

@@ -140,10 +140,12 @@ import {
   isDefaultDetailFontSize,
   pastedHtmlHasFormatting,
   sanitizePastedHtml,
+  stripDefaultAppFontFamiliesInEditor,
   stripFormattingInSelection,
   type DetailFontFamilyId,
   type DetailFontSizeOption,
 } from "./detail-fonts";
+import { APP_FONT_CHANGE_EVENT } from "@/lib/app-font";
 import {
   clampPastePlainText,
   isDetailLinesClipboardHtml,
@@ -353,6 +355,8 @@ const FORMAT_TOOLBAR_ICON_BUTTON_CLASS =
   `flex h-8 w-8 items-center justify-center rounded-lg ${FORMAT_TOOLBAR_ICON_COLOR} transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer`;
 
 const TASK_DETAILS_DATE_MENU_HOVER_CLOSE_MS = 120;
+/** Above `calendar-task-modal` overlay (`z-[10050]`). */
+const TASK_DETAILS_MODAL_DATE_MENU_Z_CLASS = "z-[10060]";
 
 const FORMAT_TOOLBAR_BOLD_ITALIC_ACTIVE_CLASS =
   "bg-[#E8EAEF] text-zinc-800 dark:text-zinc-900";
@@ -2973,6 +2977,22 @@ export function TaskDetailsPanel({
     }, debounceMs);
   }, [markSavePending, rememberPendingLocalSave, runPendingAutoSave]);
 
+  useEffect(() => {
+    function onAppFontChange() {
+      setFormatMenuFontFamily(getAppFontFamilyId());
+      const editor = editorRef.current;
+      if (!editor) return;
+
+      stripDefaultAppFontFamiliesInEditor(editor);
+      syncEditorContent();
+      scheduleAutoSave();
+    }
+
+    window.addEventListener(APP_FONT_CHANGE_EVENT, onAppFontChange);
+    return () =>
+      window.removeEventListener(APP_FONT_CHANGE_EVENT, onAppFontChange);
+  }, [scheduleAutoSave, syncEditorContent]);
+
   const flushAutoSave = useCallback(() => {
     runPendingAutoSave(true);
   }, [runPendingAutoSave]);
@@ -3589,6 +3609,10 @@ export function TaskDetailsPanel({
           setFormatMenuInlineFormats(getDetailSelectionInlineFormatState(editor));
         }
 
+        if (dropdown === "fontFamily") {
+          ensureTextColorPreviewSetup();
+        }
+
         return;
       }
 
@@ -3598,7 +3622,11 @@ export function TaskDetailsPanel({
 
       setOpenFormatDropdown((current) => (current === dropdown ? null : current));
     },
-    [captureFormatSelectionFromEditor, clearTextColorLivePreview],
+    [
+      captureFormatSelectionFromEditor,
+      clearTextColorLivePreview,
+      ensureTextColorPreviewSetup,
+    ],
   );
 
   clearTextColorLivePreviewRef.current = clearTextColorLivePreview;
@@ -3676,12 +3704,18 @@ export function TaskDetailsPanel({
     selectionObj?.removeAllRanges();
     selectionObj?.addRange(selectionForRead);
 
-    rememberFormatSelection(editor, effectiveRange);
     const fontState = getDetailSelectionFontState(editor);
     setFormatMenuFontSize(fontState.size);
     setFormatMenuFontFamily(fontState.familyId);
     setFormatMenuLineHeight(getDetailSelectionLineHeight(editor));
     setFormatMenuBlockType(getActiveTextBlockType(editor));
+
+    if (
+      !effectiveRange.collapsed &&
+      effectiveRange.toString().trim().length > 0
+    ) {
+      rememberFormatSelection(editor, effectiveRange);
+    }
 
     if (previousRange) {
       selectionObj?.removeAllRanges();
@@ -3710,6 +3744,9 @@ export function TaskDetailsPanel({
         });
         captureFormatSelectionFromEditor();
         syncFormatMenuFontState();
+        if (dropdown === "family") {
+          ensureTextColorPreviewSetup();
+        }
       } else if (dropdown === "family") {
         clearTextColorLivePreview();
       }
@@ -3719,6 +3756,7 @@ export function TaskDetailsPanel({
       captureFormatSelectionFromEditor,
       clearTextColorLivePreview,
       closeFormatMenu,
+      ensureTextColorPreviewSetup,
       syncFormatMenuFontState,
     ],
   );
@@ -3729,12 +3767,20 @@ export function TaskDetailsPanel({
         captureFormatSelectionFromEditor();
         syncFormatMenuFontState();
         setOpenFormatDropdown(null);
+        if (dropdown === "family") {
+          ensureTextColorPreviewSetup();
+        }
       } else if (dropdown === "family") {
         clearTextColorLivePreview();
       }
       setOpenModalFormatDropdown(open ? dropdown : null);
     },
-    [captureFormatSelectionFromEditor, clearTextColorLivePreview, syncFormatMenuFontState],
+    [
+      captureFormatSelectionFromEditor,
+      clearTextColorLivePreview,
+      ensureTextColorPreviewSetup,
+      syncFormatMenuFontState,
+    ],
   );
 
   const handleModalFormatToggle = useCallback(() => {
@@ -3771,7 +3817,9 @@ export function TaskDetailsPanel({
       const editor = editorRef.current;
       if (!editor) return;
 
-      const savedRange = savedFormatSelectionRef.current?.cloneRange() ?? null;
+      const savedRange =
+        savedFormatSelectionRef.current?.cloneRange() ??
+        captureLiveEditorFormatSelection(editor);
       if (
         savedRange &&
         editor.contains(savedRange.commonAncestorContainer)
@@ -3779,9 +3827,21 @@ export function TaskDetailsPanel({
         restoreEditorSelectionRange(savedRange);
       }
 
-      captureFormatSelectionFromEditor();
       const rangeToApply =
-        savedFormatSelectionRef.current?.cloneRange() ?? savedRange;
+        savedFormatSelectionRef.current?.cloneRange() ??
+        savedRange ??
+        captureLiveEditorFormatSelection(editor);
+
+      if (
+        !rangeToApply ||
+        rangeToApply.collapsed ||
+        !rangeToApply.toString().trim()
+      ) {
+        closeFormatDropdowns();
+        return;
+      }
+
+      editor.focus({ preventScroll: true });
 
       if (applyDetailFontSize(editor, size, rangeToApply)) {
         const selection = window.getSelection();
@@ -3809,7 +3869,9 @@ export function TaskDetailsPanel({
 
       clearTextColorLivePreview({ keepContent: true });
 
-      const savedRange = savedFormatSelectionRef.current?.cloneRange() ?? null;
+      const savedRange =
+        savedFormatSelectionRef.current?.cloneRange() ??
+        captureLiveEditorFormatSelection(editor);
       if (
         savedRange &&
         editor.contains(savedRange.commonAncestorContainer)
@@ -3817,9 +3879,21 @@ export function TaskDetailsPanel({
         restoreEditorSelectionRange(savedRange);
       }
 
-      captureFormatSelectionFromEditor();
       const rangeToApply =
-        savedFormatSelectionRef.current?.cloneRange() ?? savedRange;
+        savedFormatSelectionRef.current?.cloneRange() ??
+        savedRange ??
+        captureLiveEditorFormatSelection(editor);
+
+      if (
+        !rangeToApply ||
+        rangeToApply.collapsed ||
+        !rangeToApply.toString().trim()
+      ) {
+        closeFormatDropdowns();
+        return;
+      }
+
+      editor.focus({ preventScroll: true });
 
       if (
         applyDetailFontFamily(
@@ -4583,11 +4657,9 @@ export function TaskDetailsPanel({
         editor.contains(selection.anchorNode)
       ) {
         rememberFormatSelection(editor, selection.getRangeAt(0));
-      } else {
-        captureFormatSelectionFromEditor();
       }
     },
-    [captureFormatSelectionFromEditor],
+    [],
   );
 
   const restoreHistorySnapshot = useCallback(
@@ -6557,17 +6629,42 @@ export function TaskDetailsPanel({
       const selection = window.getSelection();
       if (!selection?.rangeCount) return;
 
-      const listLines = getSelectedListBlockLines(
-        editor,
-        selection.getRangeAt(0),
-      );
-      if (listLines.length === 0) return;
+      const range = selection.getRangeAt(0);
+      const listLines = getSelectedListBlockLines(editor, range);
+      if (listLines.length > 0) {
+        event.preventDefault();
+        const delta = event.shiftKey ? -1 : 1;
+        if (!indentListLines(editor, listLines, delta)) return;
+
+        renumberNumberedLines(editor);
+        syncEditorLineEmptyState(editor);
+        syncEditorContent();
+        recordHistorySnapshot();
+        scheduleAutoSave();
+        updateLineControls();
+        scheduleEditorHeightSync();
+        return;
+      }
 
       event.preventDefault();
-      const delta = event.shiftKey ? -1 : 1;
-      if (!indentListLines(editor, listLines, delta)) return;
 
-      renumberNumberedLines(editor);
+      if (event.shiftKey) {
+        return;
+      }
+
+      editor.focus();
+      const inserted = document.execCommand("insertText", false, "\t");
+      if (!inserted) {
+        const tabNode = document.createTextNode("\t");
+        range.deleteContents();
+        range.insertNode(tabNode);
+        const afterTab = document.createRange();
+        afterTab.setStartAfter(tabNode);
+        afterTab.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(afterTab);
+      }
+
       syncEditorLineEmptyState(editor);
       syncEditorContent();
       recordHistorySnapshot();
@@ -6884,6 +6981,7 @@ export function TaskDetailsPanel({
   }
 
   function handleDateMenuMouseLeave(event: React.MouseEvent) {
+    if (isModalLayout) return;
     if (isMovingWithinDateMenuSurface(event.relatedTarget)) return;
 
     dateMenuHoverDismissedRef.current = false;
@@ -6891,6 +6989,7 @@ export function TaskDetailsPanel({
   }
 
   function handleDatePickerMouseLeave(event: React.MouseEvent) {
+    if (isModalLayout) return;
     if (isMovingWithinDateMenuSurface(event.relatedTarget)) return;
 
     scheduleDateMenuClose();
@@ -6905,6 +7004,12 @@ export function TaskDetailsPanel({
     if (!task) return;
 
     clearDateMenuCloseTimer();
+    if (isModalLayout) {
+      dateMenuHoverDismissedRef.current = false;
+      setIsDateMenuOpen((open) => !open);
+      return;
+    }
+
     setIsDateMenuOpen((open) => {
       if (open) {
         dateMenuHoverDismissedRef.current = true;
@@ -7249,7 +7354,7 @@ export function TaskDetailsPanel({
         data-task-date-picker-menu
         className={
           isModalLayout
-            ? "fixed z-[110]"
+            ? `fixed ${TASK_DETAILS_MODAL_DATE_MENU_Z_CLASS}`
             : "absolute left-0 top-full z-50 pt-1.5"
         }
         style={
@@ -7354,8 +7459,12 @@ export function TaskDetailsPanel({
                 <>
                   <div
                     className="relative"
-                    onMouseEnter={handleDateMenuMouseEnter}
-                    onMouseLeave={handleDateMenuMouseLeave}
+                    onMouseEnter={
+                      isModalLayout ? undefined : handleDateMenuMouseEnter
+                    }
+                    onMouseLeave={
+                      isModalLayout ? undefined : handleDateMenuMouseLeave
+                    }
                   >
                     <button
                       ref={dateButtonRef}
@@ -7482,111 +7591,68 @@ export function TaskDetailsPanel({
                   </span>
               </div>
                 {renderHeaderQuickFormatButtons()}
-                {showHeaderClearFormatting && !task.isNote ? (
-                  <div className="group/clear-format relative">
-                    <button
-                      type="button"
-                      aria-label="Remove formatting"
-                      aria-describedby="task-details-clear-formatting-tooltip"
-                      onMouseDown={(event) => {
-                        event.preventDefault();
-                        captureFormatSelectionFromEditor();
-                        clearFormatting();
-                      }}
-                      className="flex h-10 min-w-[2.25rem] cursor-pointer items-center justify-center rounded-full px-2.5 text-zinc-500 transition-colors hover:bg-zinc-200 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
-                    >
-                      <LuRemoveFormatting className="size-[18px]" />
-                    </button>
-                    <span
-                      id="task-details-clear-formatting-tooltip"
-                      role="tooltip"
-                      className={TASK_DETAILS_TOOLTIP_CLASS}
-                    >
-                      Remove formatting
-                    </span>
-                  </div>
-                ) : null}
-              </div>
-              {task.isNote ? (
-                <>
+                <span className="text-[#cacaca]" aria-hidden="true">
+                  |
+                </span>
+                <div
+                  ref={headerFormatControlsRef}
+                  className="flex items-center gap-1"
+                  onMouseDown={rememberHeaderFormatSelectionOnPointerDown}
+                >
+                  <DetailFontFamilyControl
+                    formatToolbar
+                    value={formatMenuFontFamily}
+                    open={openHeaderFormatDropdown === "family"}
+                    onOpenChange={(open) =>
+                      setHeaderFormatDropdownOpen("family", open)
+                    }
+                    onSelect={applyFormatFontFamily}
+                    onPreviewFamily={previewFontFamilyOnSelection}
+                    onPreviewFamilyClear={clearTextColorLivePreview}
+                  />
                   <span className="text-[#cacaca]" aria-hidden="true">
                     |
                   </span>
-                  <div
-                    ref={headerFormatControlsRef}
-                    className="flex items-center gap-1"
-                    onMouseDown={(event) => {
-                      if (event.button !== 0) return;
-
-                      const editor = editorRef.current;
-                      if (!editor) return;
-
-                      const selection = window.getSelection();
-                      if (
-                        selection?.rangeCount &&
-                        !selection.isCollapsed &&
-                        selection.anchorNode &&
-                        editor.contains(selection.anchorNode)
-                      ) {
-                        rememberFormatSelection(editor, selection.getRangeAt(0));
-                      }
-                    }}
-                  >
-                    <DetailFontFamilyControl
-                      formatToolbar
-                      value={formatMenuFontFamily}
-                      open={openHeaderFormatDropdown === "family"}
-                      onOpenChange={(open) =>
-                        setHeaderFormatDropdownOpen("family", open)
-                      }
-                      onSelect={applyFormatFontFamily}
-                      onPreviewFamily={previewFontFamilyOnSelection}
-                      onPreviewFamilyClear={clearTextColorLivePreview}
-                    />
-                    <span className="text-[#cacaca]" aria-hidden="true">
-                      |
-                    </span>
-                    <DetailFontSizeControl
-                      formatToolbar
-                      value={formatMenuFontSize}
-                      open={openHeaderFormatDropdown === "size"}
-                      onOpenChange={(open) =>
-                        setHeaderFormatDropdownOpen("size", open)
-                      }
-                      onSelect={applyFormatFontSize}
-                    />
-                    {showHeaderClearFormatting ? (
-                      <>
-                        <span className="text-[#cacaca]" aria-hidden="true">
-                          |
+                  <DetailFontSizeControl
+                    formatToolbar
+                    value={formatMenuFontSize}
+                    open={openHeaderFormatDropdown === "size"}
+                    onOpenChange={(open) =>
+                      setHeaderFormatDropdownOpen("size", open)
+                    }
+                    onSelect={applyFormatFontSize}
+                  />
+                  {showHeaderClearFormatting ? (
+                    <>
+                      <span className="text-[#cacaca]" aria-hidden="true">
+                        |
+                      </span>
+                      <div className="group/clear-format relative">
+                        <button
+                          type="button"
+                          aria-label="Remove formatting"
+                          aria-describedby="task-details-clear-formatting-tooltip"
+                          onMouseDown={(event) => {
+                            event.preventDefault();
+                            captureFormatSelectionFromEditor();
+                            clearFormatting();
+                          }}
+                          className="flex h-10 min-w-[2.25rem] cursor-pointer items-center justify-center rounded-full px-2.5 text-zinc-500 transition-colors hover:bg-zinc-200 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                        >
+                          <LuRemoveFormatting className="size-[18px]" />
+                        </button>
+                        <span
+                          id="task-details-clear-formatting-tooltip"
+                          role="tooltip"
+                          className={TASK_DETAILS_TOOLTIP_CLASS}
+                        >
+                          Remove formatting
                         </span>
-                        <div className="group/clear-format relative">
-                          <button
-                            type="button"
-                            aria-label="Remove formatting"
-                            aria-describedby="task-details-clear-formatting-tooltip-note"
-                            onMouseDown={(event) => {
-                              event.preventDefault();
-                              captureFormatSelectionFromEditor();
-                              clearFormatting();
-                            }}
-                            className="flex h-10 min-w-[2.25rem] cursor-pointer items-center justify-center rounded-full px-2.5 text-zinc-500 transition-colors hover:bg-zinc-200 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
-                          >
-                            <LuRemoveFormatting className="size-[18px]" />
-                          </button>
-                          <span
-                            id="task-details-clear-formatting-tooltip-note"
-                            role="tooltip"
-                            className={TASK_DETAILS_TOOLTIP_CLASS}
-                          >
-                            Remove formatting
-                          </span>
-                        </div>
-                      </>
-                    ) : null}
+                      </div>
+                    </>
+                  ) : null}
+                </div>
               </div>
-                </>
-              ) : null}
             </>
           ) : (
             <span className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">

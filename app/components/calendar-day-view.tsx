@@ -39,6 +39,7 @@ import {
   isCalendarSlotWithinTimedGrid,
   type CalendarDropSlot,
 } from "@/lib/calendar-time-grid";
+import { useRecordCalendarTaskMove } from "./calendar-task-move-undo";
 import {
   bindCalendarTaskDrag,
   getActiveCalendarDropSlot,
@@ -206,6 +207,7 @@ export function CalendarDayView({
     updateDragPreview,
     endDragPreview,
   } = useCalendarTaskDragPreview();
+  const recordCalendarTaskMove = useRecordCalendarTaskMove();
   const canDragTasks = Boolean(onSetTaskDueDate || onSetTaskDueTime);
 
   useEffect(() => {
@@ -413,6 +415,7 @@ export function CalendarDayView({
           markTaskJustDropped(task.id);
         }
       },
+      onCalendarTaskMoved: recordCalendarTaskMove ?? undefined,
     });
   }
 

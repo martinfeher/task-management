@@ -1,6 +1,7 @@
 export type AppFont = "inter" | "sf-pro" | "euclid-circular";
 
 export const APP_FONT_STORAGE_KEY = "todolist-app-font";
+export const APP_FONT_CHANGE_EVENT = "todolist:app-font-change";
 
 export function parseAppFont(value: string | undefined | null): AppFont {
   if (value === "sf-pro") return "sf-pro";

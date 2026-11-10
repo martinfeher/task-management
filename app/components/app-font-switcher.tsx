@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type CSSProperties } from "react";
 import {
+  APP_FONT_CHANGE_EVENT,
   APP_FONT_STORAGE_KEY,
   appFontCookieValue,
   parseAppFont,
@@ -25,6 +26,9 @@ function persistAppFont(font: AppFont) {
   applyAppFont(font);
   localStorage.setItem(APP_FONT_STORAGE_KEY, font);
   document.cookie = appFontCookieValue(font);
+  window.dispatchEvent(
+    new CustomEvent<AppFont>(APP_FONT_CHANGE_EVENT, { detail: font }),
+  );
 }
 
 const FONT_OPTIONS: { value: AppFont; label: string }[] = [

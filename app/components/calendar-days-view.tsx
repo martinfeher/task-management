@@ -48,6 +48,7 @@ import {
   CALENDAR_DAYS_ALLDAY_STICKY_CLASS,
 } from "@/lib/calendar-layout";
 import { useCalendarTaskDefaultColor } from "@/lib/calendar-task-default-color-settings";
+import { useRecordCalendarTaskMove } from "./calendar-task-move-undo";
 import {
   bindCalendarTaskDrag,
   CALENDAR_ALL_DAY_TO_TIMED_DEFAULT_DURATION_MINUTES,
@@ -301,6 +302,7 @@ export function CalendarMultiDayView({
     updateDragPreview,
     endDragPreview,
   } = useCalendarTaskDragPreview();
+  const recordCalendarTaskMove = useRecordCalendarTaskMove();
   const handleCalendarTaskContextMenuCapture =
     useCalendarTaskColorMenuCaptureHandler(tasks);
   const canDragTasks = Boolean(onSetTaskDueDate || onSetTaskDueTime);
@@ -565,6 +567,7 @@ export function CalendarMultiDayView({
           markTaskJustDropped(task.id);
         }
       },
+      onCalendarTaskMoved: recordCalendarTaskMove ?? undefined,
     });
   }
 
@@ -668,7 +671,7 @@ export function CalendarMultiDayView({
               embeddedInCalendarModal
                 ? "relative z-20 flex shrink-0 items-center justify-start overflow-visible pl-1 pr-3 pt-1 pb-2"
                 : `flex shrink-0 items-center justify-start mb-[10px] ${
-                    fullWidth ? "pr-2 pl-0" : "px-3"
+                    fullWidth ? "px-2" : "pr-3 pl-1"
                   }`
             }
           >

@@ -33,6 +33,7 @@
     "ios": "expo run:ios"
   },
   "dependencies": {
+    "@better-auth/expo": "^1.7.19",
     "@heroui/react": "^3.2.2",
     "@heroui/styles": "^3.2.2",
     "@next/bundle-analyzer": "^16.3.5",

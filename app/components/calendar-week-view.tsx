@@ -66,6 +66,7 @@ import {
   CalendarTaskHoverButton,
   useCalendarTaskDragPreview,
 } from "./calendar-task-hover-preview";
+import { useRecordCalendarTaskMove } from "./calendar-task-move-undo";
 import {
   bindCalendarTaskDrag,
   getActiveCalendarDropSlot,
@@ -311,6 +312,7 @@ export function CalendarWeekView({
     updateDragPreview,
     endDragPreview,
   } = useCalendarTaskDragPreview();
+  const recordCalendarTaskMove = useRecordCalendarTaskMove();
   const canDragTasks = Boolean(onSetTaskDueDate || onSetTaskDueTime);
   const visibleWeekCount = Math.max(1, weekCount);
 
@@ -537,6 +539,7 @@ export function CalendarWeekView({
           markTaskJustDropped(task.id);
         }
       },
+      onCalendarTaskMoved: recordCalendarTaskMove ?? undefined,
     });
   }
 

@@ -149,6 +149,10 @@ export function getDetailFontFamilyValue(familyId: DetailFontFamilyId) {
     return undefined;
   }
 
+  if (familyId === getAppFontFamilyId()) {
+    return getDefaultAppFontFamily();
+  }
+
   return DETAIL_FONT_FAMILY_OPTIONS.find((option) => option.id === familyId)?.value;
 }
 
@@ -243,21 +247,7 @@ export function isDefaultDetailFontSize(fontSize: string) {
 }
 
 export function getDefaultAppFontFamily() {
-  if (typeof document === "undefined") {
-    return "var(--font-inter), sans-serif";
-  }
-
-  const appFont = document.documentElement.dataset.appFont;
-
-  if (appFont === "sf-pro") {
-    return "var(--font-sf-pro), sans-serif";
-  }
-
-  if (appFont === "euclid-circular") {
-    return "var(--font-euclid-circular), sans-serif";
-  }
-
-  return "var(--font-inter), sans-serif";
+  return "var(--font-app), ui-sans-serif, system-ui, sans-serif";
 }
 
 function normalizeFontFamilyName(value: string) {
@@ -275,10 +265,13 @@ function fontFamiliesMatch(left: string, right: string) {
   if (!normalizedLeft || !normalizedRight) return false;
   if (normalizedLeft === normalizedRight) return true;
 
-  const leftParts = normalizedLeft.split(",").map((part) => part.trim());
-  const rightParts = normalizedRight.split(",").map((part) => part.trim());
+  // Compare the primary family only; generic fallbacks (ui-sans-serif,
+  // sans-serif, ...) are shared by many options and caused the default app
+  // font to be reported as "Sans Serif".
+  const leftPrimary = normalizedLeft.split(",")[0]?.trim();
+  const rightPrimary = normalizedRight.split(",")[0]?.trim();
 
-  return leftParts.some((part) => rightParts.includes(part));
+  return Boolean(leftPrimary) && leftPrimary === rightPrimary;
 }
 
 function matchesDetailFontFamilyOption(
@@ -599,9 +592,40 @@ export function getDetailSelectionFontState(
   return { familyId, size };
 }
 
-function canApplyDetailFont(editor: HTMLElement) {
-  const activeLine = getActiveLineElement(editor);
-  return Boolean(activeLine) && !isCodeLine(activeLine);
+function getLineElementForRange(editor: HTMLElement, range: Range) {
+  let node: Node | null = range.commonAncestorContainer;
+  if (node.nodeType === Node.TEXT_NODE) {
+    node = node.parentNode;
+  }
+
+  while (node && node !== editor) {
+    if (
+      node instanceof HTMLElement &&
+      node.classList.contains(DETAIL_LINE_CLASS)
+    ) {
+      return node;
+    }
+    node = node.parentNode;
+  }
+
+  return null;
+}
+
+function canApplyDetailFont(editor: HTMLElement, range?: Range | null) {
+  if (!range) {
+    const activeLine = getActiveLineElement(editor);
+    return Boolean(activeLine) && !isCodeLine(activeLine);
+  }
+
+  const singleLine = getLineElementForRange(editor, range);
+  if (singleLine) {
+    return !isCodeLine(singleLine);
+  }
+
+  // Multi-line selections have the editor as common ancestor.
+  return getSelectedBlockLinesInRange(editor, range).some(
+    (line) => !isCodeLine(line),
+  );
 }
 
 function removeStylePropertyFromRange(
@@ -776,6 +800,7 @@ function getTextNodesInRange(range: Range, editor: HTMLElement) {
     if (!editor.contains(node)) return false;
     if (!range.intersectsNode(node)) return false;
     if (node.textContent === "\uFEFF") return false;
+    if (shouldSkipFontNormalization(node.parentElement ?? editor)) return false;
     return true;
   }
 
@@ -969,12 +994,12 @@ export function applyDetailFontFamily(
   editor.focus();
   restoreSelectionRange(range);
 
-  if (!canApplyDetailFont(editor)) return false;
+  if (!canApplyDetailFont(editor, range)) return false;
 
   if (familyId === "mixed") return false;
 
-  const option = DETAIL_FONT_FAMILY_OPTIONS.find((item) => item.id === familyId);
-  if (!option) return false;
+  const fontFamily = getDetailFontFamilyValue(familyId);
+  if (!fontFamily) return false;
 
   if (familyId === getAppFontFamilyId()) {
     removeStylePropertyFromRange(range.cloneRange(), "fontFamily");
@@ -982,7 +1007,20 @@ export function applyDetailFontFamily(
     return true;
   }
 
-  return applyStyleToSelection(editor, { fontFamily: option.value }, range);
+  return applyStyleToSelection(editor, { fontFamily }, range);
+}
+
+export function stripDefaultAppFontFamiliesInEditor(editor: HTMLElement) {
+  const styled = editor.querySelectorAll<HTMLElement>("[style]");
+  for (const element of styled) {
+    if (shouldSkipFontNormalization(element)) continue;
+
+    const family = element.style.fontFamily;
+    if (!family || !isDefaultAppFont(family)) continue;
+
+    element.style.removeProperty("font-family");
+    cleanupStyledElement(element);
+  }
 }
 
 export function applyDetailFontSize(
@@ -996,7 +1034,7 @@ export function applyDetailFontSize(
   editor.focus();
   restoreSelectionRange(range);
 
-  if (!canApplyDetailFont(editor)) return false;
+  if (!canApplyDetailFont(editor, range)) return false;
 
   if (size === getDefaultDetailFontSizePx()) {
     removeStylePropertyFromRange(range.cloneRange(), "fontSize");

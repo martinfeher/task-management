@@ -59,7 +59,7 @@ const greatVibes = Great_Vibes({
 });
 
 export const metadata: Metadata = {
-  title: "Todolist",
+  title: "Task management",
   description: "A simple todo list app",
 };
 

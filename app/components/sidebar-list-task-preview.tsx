@@ -57,7 +57,7 @@ export function SidebarListTaskPreview({
   return createPortal(
     <div
       aria-hidden="true"
-      className="pointer-events-none fixed z-[120] opacity-80"
+      className="pointer-events-none fixed z-[120]"
       style={{
         top: panelRect.top,
         left: panelRect.left,
@@ -66,7 +66,7 @@ export function SidebarListTaskPreview({
       }}
     >
       <div
-        className="box-border flex h-full flex-col overflow-hidden border border-[#67679b]/90 bg-[#75758f]/90 p-5 shadow-[0_10px_28px_rgba(0,0,0,0.22)] backdrop-blur-[2px]"
+        className="box-border flex h-full flex-col overflow-hidden border border-[#67679b]/92 bg-[#75758f]/92 p-5 shadow-[0_10px_28px_rgba(0,0,0,0.22)] backdrop-blur-[2px]"
         style={{
           borderRadius: PREVIEW_OUTER_RADIUS_PX,
           paddingTop: PREVIEW_FRAME_SIDE_PADDING_PX,
@@ -76,7 +76,7 @@ export function SidebarListTaskPreview({
         }}
       >
         <div
-          className={`min-h-0 w-full flex-1 overflow-hidden ${taskListBackground.className}`}
+          className={`sidebar-list-task-preview-surface min-h-0 w-full flex-1 overflow-hidden bg-white/92 backdrop-blur-[2px] dark:bg-zinc-950/92 ${taskListBackground.className}`}
           style={{
             borderRadius: PREVIEW_INNER_RADIUS_PX,
             ...taskListBackground.style,

@@ -132,10 +132,10 @@ export function TaskListEntityFilter({
                 aria-describedby={tooltipId}
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => onChange(tab.id)}
-                className={`flex h-[22px] min-w-[22px] cursor-pointer items-center justify-center gap-1 rounded-full px-1.5 py-[2px] text-[11px] leading-none transition-[color,font-weight] duration-[400ms] ease-in-out motion-reduce:transition-none ${
+                className={`flex h-[22px] min-w-[22px] cursor-pointer items-center justify-center gap-1 rounded-full px-1.5 py-[2px] leading-none transition-[color,font-size,font-weight] duration-[400ms] ease-in-out motion-reduce:transition-none ${
                   isSelected
-                    ? "font-medium text-[#4873c7] dark:text-[#7da2ff]"
-                    : "font-normal text-[#8b8f98] hover:bg-zinc-100 hover:text-[#5c616b] dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+                    ? "text-[11px] font-medium text-[#4873c7] dark:text-[#7da2ff]"
+                    : "text-[9px] font-normal text-[#8b8f98] hover:bg-zinc-100 hover:text-[#5c616b] dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
                 }`}
               >
                 <Icon className="size-3.5 shrink-0" aria-hidden="true" />

@@ -25,6 +25,7 @@ import {
 import { calendarTaskItemClassName, calendarTaskSecondaryTextClassName, CALENDAR_TASK_FONT_CLASS, CALENDAR_TASK_TIMED_COLUMN_INSET_CLASS, getCalendarTaskItemStyle } from "@/lib/calendar-layout";
 import { useCalendarTaskDefaultColor } from "@/lib/calendar-task-default-color-settings";
 import { useCalendarTaskDragPreview, useCalendarTaskHoverPreview } from "./calendar-task-hover-preview";
+import { useRecordCalendarTaskMove } from "./calendar-task-move-undo";
 import {
   CALENDAR_TASK_ID_DATA_ATTR,
   useCalendarTaskColorMenu,
@@ -738,6 +739,7 @@ export function CalendarTimedTaskBlock({
     updateDragPreview,
     endDragPreview,
   } = useCalendarTaskDragPreview();
+  const recordCalendarTaskMove = useRecordCalendarTaskMove();
 
   return (
     <div
@@ -828,6 +830,7 @@ export function CalendarTimedTaskBlock({
                     onDropped?.(task.id);
                   }
                 },
+                onCalendarTaskMoved: recordCalendarTaskMove ?? undefined,
               },
             );
           }}

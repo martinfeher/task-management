@@ -40,6 +40,9 @@ import {
 } from "./calendar-view-sidebar-layout";
 import { useListCalendarOverlapLayout } from "./list-calendar-overlap-shell";
 import { CalendarWeekView } from "./calendar-week-view";
+import { CalendarTaskMoveUndoProvider } from "./calendar-task-move-undo";
+import { buildCalendarAllDayTaskMoveSnapshot } from "@/lib/calendar-task-move-undo";
+import { useRecordCalendarTaskMove } from "./calendar-task-move-undo";
 import {
   CalendarTaskHoverButton,
   CalendarTaskHoverPreviewProvider,
@@ -57,6 +60,7 @@ import {
   CALENDAR_TASK_DRAG_CURSOR,
   CALENDAR_TASK_DRAG_THRESHOLD_PX,
   getCalendarTaskDragSurface,
+  type CalendarTaskDragState,
 } from "@/lib/calendar-task-drag";
 import { getCalendarShellClassName, calendarAllDayTaskClassName, getCalendarTaskItemStyle, isCalendarTaskPast, CALENDAR_WEEKDAY_LABELS, getCalendarDayColumnDividerClass, CALENDAR_TODAY_DATE_CIRCLE_CLASS, CALENDAR_CURRENT_MONTH_DAY_NUMBER_CLASS, CALENDAR_FOLLOWING_MONTH_DAY_NUMBER_CLASS, CALENDAR_GRID_SCROLL_CLASS } from "@/lib/calendar-layout";
 import { useCalendarTaskDefaultColor } from "@/lib/calendar-task-default-color-settings";
@@ -143,13 +147,6 @@ type CalendarPanelProps = {
   embeddedInCalendarModal?: boolean;
   periodLabelAction?: ReactNode;
   headerTrailingAction?: ReactNode;
-};
-
-type CalendarTaskDragState = {
-  taskId: string;
-  sourceDateKey: string;
-  pointerId: number;
-  captureTarget: HTMLElement;
 };
 
 function CalendarViewCounter({
@@ -505,6 +502,7 @@ export function CalendarMonthView({
   const suppressTaskClickRef = useRef(false);
   const lastSidebarJumpRequestIdRef = useRef<number | undefined>(undefined);
   const { beginTaskDrag, endDragPreview } = useCalendarTaskDragPreview();
+  const recordCalendarTaskMove = useRecordCalendarTaskMove();
   const { defaultColor: calendarTaskDefaultColor } =
     useCalendarTaskDefaultColor();
 
@@ -682,6 +680,14 @@ export function CalendarMonthView({
         targetDateKey &&
         targetDateKey !== dragState.sourceDateKey
       ) {
+        const moveSnapshot = buildCalendarAllDayTaskMoveSnapshot(
+          task,
+          dragState.sourceDateKey,
+          targetDateKey,
+        );
+        if (moveSnapshot) {
+          recordCalendarTaskMove?.(moveSnapshot);
+        }
         onSetTaskDueDate(dragState.taskId, targetDateKey);
         const targetDate = fromDateKey(targetDateKey);
         if (targetDate) {
@@ -712,6 +718,7 @@ export function CalendarMonthView({
         dragStateRef.current = {
           taskId: task.id,
           sourceDateKey,
+          sourceTimeMinutes: null,
           pointerId,
           captureTarget: taskButton,
         };
@@ -1328,6 +1335,11 @@ export function CalendarViewsPanel({
       cursorOffsetPx={50}
     >
     <CalendarTaskModalActionsProvider value={calendarTaskModalActions}>
+    <CalendarTaskMoveUndoProvider
+      onSetTaskDueDate={onSetTaskDueDate}
+      onSetTaskDueTime={onSetTaskDueTime}
+      onSetTaskDueDateAndTime={onSetTaskDueDateAndTime}
+    >
     <div
       className={`calendar-panel flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden pt-2 pb-3 pl-2 z-50! ${
         fullWidth ? "pr-2" : ""
@@ -1562,6 +1574,7 @@ export function CalendarViewsPanel({
           onToggleTask={onToggleTask}
         />
       ) : null}
+    </CalendarTaskMoveUndoProvider>
     </CalendarTaskModalActionsProvider>
     </CalendarTaskHoverPreviewProvider>
     </CalendarTaskColorMenuProvider>

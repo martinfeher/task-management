@@ -2242,7 +2242,7 @@ export function Sidebar({
               <button
                 type="button"
                 aria-expanded={isCompletedOpen}
-                className="group flex w-full items-center gap-1.5 rounded-md py-0.5 text-left text-[11px] transition-colors hover:bg-zinc-100/80 dark:hover:bg-zinc-800/50"
+                className="group flex w-full items-center gap-1.5 rounded-md py-0.5 text-left text-[10.5px] transition-colors hover:bg-zinc-100/80 dark:hover:bg-zinc-800/50"
                 onClick={() => {
                   setIsCompletedOpen((open) => !open);
                   setIsArchiveOpen(false);
@@ -2261,7 +2261,7 @@ export function Sidebar({
               </button>
               <button
                 type="button"
-                className="group flex w-full items-center gap-1.5 rounded-md py-0.5 text-left text-[11px] transition-colors hover:bg-zinc-100/80 dark:hover:bg-zinc-800/50"
+                className="group flex w-full items-center gap-1.5 rounded-md py-0.5 text-left text-[10.5px] transition-colors hover:bg-zinc-100/80 dark:hover:bg-zinc-800/50"
                 onClick={(event) => {
                   openArchiveModal({
                     x: event.clientX,
@@ -2284,7 +2284,7 @@ export function Sidebar({
         </nav>
 
         <div className="relative shrink-0 border-t border-zinc-200 dark:border-zinc-800">
-          <div className="flex flex-col gap-2 px-2 pb-2 pt-1.5">
+          <div className="flex flex-col gap-2 px-2 pb-2.5 pt-2">
             {session?.user ? (
               <SidebarAccountMenu
                 user={session.user}

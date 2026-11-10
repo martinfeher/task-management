@@ -316,7 +316,7 @@ export function CalendarAddTaskPopover({
               onChange={(event) => onNameChange(event.target.value)}
               placeholder="Task name"
               aria-label="Task name"
-              className="w-full shrink-0 border-0 bg-transparent py-2 text-[26px] font-bold leading-[36px] text-[#4B4B4B] outline-none placeholder:text-zinc-300 dark:text-[#F5F5F5] dark:placeholder:text-zinc-600"
+              className="w-full shrink-0 border-0 bg-transparent py-2 text-[26px] font-bold leading-[36px] text-[#4B4B4B] outline-none placeholder:text-zinc-300 dark:text-[#F5F5F5] dark:placeholder:text-zinc-600 [font-family:var(--font-app),ui-sans-serif,system-ui,sans-serif]"
             />
 
             <textarea
@@ -324,7 +324,7 @@ export function CalendarAddTaskPopover({
               onChange={(event) => setContent(event.target.value)}
               placeholder="Description"
               aria-label="Task description"
-              className="min-h-0 flex-1 resize-none border-0 bg-transparent pt-1 pb-4 text-sm leading-relaxed text-[#555555] outline-none placeholder:text-zinc-400 dark:text-zinc-300 dark:placeholder:text-zinc-600"
+              className="min-h-0 flex-1 resize-none border-0 bg-transparent pt-1 pb-4 text-sm leading-relaxed text-[#555555] outline-none placeholder:text-zinc-400 dark:text-zinc-300 dark:placeholder:text-zinc-600 [font-family:var(--font-app),ui-sans-serif,system-ui,sans-serif]"
             />
           </div>
 

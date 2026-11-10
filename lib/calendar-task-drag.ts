@@ -18,6 +18,10 @@ import {
   type TaskDueTime,
 } from "@/lib/task-due-time";
 import type { TaskListItem } from "@/app/components/todo-app";
+import {
+  buildCalendarTaskMoveSnapshot,
+  type CalendarTaskMoveSnapshot,
+} from "@/lib/calendar-task-move-undo";
 
 export const CALENDAR_TASK_DRAG_THRESHOLD_PX = 2;
 export const CALENDAR_ALL_DAY_TO_TIMED_DEFAULT_DURATION_MINUTES = 60;
@@ -242,6 +246,7 @@ type BindCalendarTaskDragOptions = {
     slot: CalendarDropSlot | null,
   ) => void;
   onDragEnd?: (didMove: boolean) => void;
+  onCalendarTaskMoved?: (snapshot: CalendarTaskMoveSnapshot) => void;
 };
 
 export function bindCalendarTaskDrag(
@@ -261,6 +266,7 @@ export function bindCalendarTaskDrag(
     onDragStart,
     onDragMove,
     onDragEnd,
+    onCalendarTaskMoved,
   }: BindCalendarTaskDragOptions,
 ) {
   if (
@@ -325,6 +331,14 @@ export function bindCalendarTaskDrag(
         targetSlot.dueTimeMinutes !== dragState.sourceTimeMinutes;
 
       if (movedToDifferentSlot) {
+        const moveSnapshot = buildCalendarTaskMoveSnapshot(
+          dragState,
+          targetSlot,
+          task,
+        );
+        if (moveSnapshot) {
+          onCalendarTaskMoved?.(moveSnapshot);
+        }
         applyCalendarTaskDrop(
           dragState,
           targetSlot,

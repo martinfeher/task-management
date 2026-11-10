@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { LiaTagSolid } from "react-icons/lia";
+import { MdDeleteOutline } from "react-icons/md";
 import { createLabel } from "@/app/actions/todo";
+import { APP_HOVER_TOOLTIP_ABOVE_CENTER } from "@/lib/app-hover-tooltip-classes";
 import { buildTodoPath } from "@/lib/todo-routes";
 import {
   isTaskPriorityLevel,
@@ -16,6 +18,10 @@ import { TaskPrioritySelector } from "./task-priority-selector";
 import type { TodoList } from "./todo-app";
 
 const MODAL_FOOTER_ACTION_COLOR = "#a4a4a4";
+
+const MODAL_FOOTER_DELETE_TOOLTIP_ID = "task-modal-footer-delete-tooltip";
+
+const MODAL_FOOTER_DELETE_TOOLTIP_CLASS = `add-task-date-tooltip ${APP_HOVER_TOOLTIP_ABOVE_CENTER} pointer-events-none absolute bottom-[calc(100%+8px)] z-50 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium`;
 
 type TaskModalFooterProps = {
   taskId: string;
@@ -40,6 +46,7 @@ type TaskModalFooterProps = {
   /** When true, assigned labels render as pills (still ordered before Move to / Copy link). */
   showLabelsAfterCopyLink?: boolean;
   hideDelete?: boolean;
+  deleteButtonVariant?: "text" | "icon";
 };
 
 function FooterTextButton({
@@ -78,6 +85,7 @@ export function TaskModalFooter({
   onDeleteTask,
   showLabelsAfterCopyLink = false,
   hideDelete = false,
+  deleteButtonVariant = "text",
 }: TaskModalFooterProps) {
   const [isPriorityMenuOpen, setIsPriorityMenuOpen] = useState(false);
   const [isLabelMenuOpen, setIsLabelMenuOpen] = useState(false);
@@ -360,9 +368,30 @@ export function TaskModalFooter({
       </FooterTextButton>
 
       {hasDeleteActions ? (
-        <FooterTextButton ariaLabel="Delete task" onClick={handleDelete}>
-          Delete
-        </FooterTextButton>
+        deleteButtonVariant === "icon" ? (
+          <div className="group/delete relative ml-auto shrink-0">
+            <button
+              type="button"
+              aria-label="Delete task"
+              aria-describedby={MODAL_FOOTER_DELETE_TOOLTIP_ID}
+              onClick={handleDelete}
+              className="flex size-8 cursor-pointer items-center justify-center rounded-md text-[#a4a4a4] transition-colors hover:bg-zinc-100 hover:text-red-600 dark:hover:bg-zinc-800 dark:hover:text-red-400"
+            >
+              <MdDeleteOutline className="size-5" aria-hidden="true" />
+            </button>
+            <span
+              id={MODAL_FOOTER_DELETE_TOOLTIP_ID}
+              role="tooltip"
+              className={MODAL_FOOTER_DELETE_TOOLTIP_CLASS}
+            >
+              Delete task
+            </span>
+          </div>
+        ) : (
+          <FooterTextButton ariaLabel="Delete task" onClick={handleDelete}>
+            Delete
+          </FooterTextButton>
+        )
       ) : null}
     </div>
   );

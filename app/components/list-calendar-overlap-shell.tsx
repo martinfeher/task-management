@@ -38,6 +38,7 @@ type ListCalendarOverlapShellProps = {
   taskListPanelRef: RefObject<HTMLElement | null>;
   children: ReactNode;
   className?: string;
+  onOverlapLayoutChange?: (active: boolean) => void;
 };
 
 type OverlapFrame = {
@@ -51,6 +52,7 @@ export function ListCalendarOverlapShell({
   taskListPanelRef,
   children,
   className = "",
+  onOverlapLayoutChange,
 }: ListCalendarOverlapShellProps) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const shellRef = useRef<HTMLDivElement>(null);
@@ -88,6 +90,16 @@ export function ListCalendarOverlapShell({
 
   const canToggleLayout = enabled && isNarrowViewport;
   const overlapActive = canToggleLayout && !isSlideExpanded;
+
+  useEffect(() => {
+    onOverlapLayoutChange?.(overlapActive);
+  }, [onOverlapLayoutChange, overlapActive]);
+
+  useEffect(() => {
+    if (!enabled) {
+      onOverlapLayoutChange?.(false);
+    }
+  }, [enabled, onOverlapLayoutChange]);
 
   const captureFlipStart = useCallback(() => {
     const shell = shellRef.current;
@@ -236,12 +248,13 @@ export function ListCalendarOverlapShell({
           left: overlapFrame.left,
           right: 0,
           bottom: overlapFrame.bottom,
-          zIndex: 2100,
+          zIndex: 2200,
         }
       : undefined;
 
   const shellClassName = [
     "list-calendar-overlap-shell flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-white rounded-l-[15px] dark:bg-zinc-950",
+    overlapActive ? "list-calendar-overlap-shell--docked" : "",
     overlapActive
       ? "shadow-[0_0_28px_rgba(15,23,42,0.14),12px_0_32px_-6px_rgba(15,23,42,0.22)] dark:shadow-[0_0_28px_rgba(0,0,0,0.4),12px_0_32px_-6px_rgba(0,0,0,0.55)]"
       : "",

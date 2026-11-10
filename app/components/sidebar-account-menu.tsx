@@ -19,6 +19,13 @@ import { MacCmdIcon } from "./mac-cmd-icon";
 const USER_AVATAR_COLOR = "#7c3aed";
 const TASK_USAGE_LIMIT = 200;
 
+/** Account popover button/shell spacing scaled to 88% (12% tighter). */
+const ACCOUNT_MENU_BTN_X = "px-[8.8px]";
+const ACCOUNT_MENU_BTN_Y = "py-[7px]";
+const ACCOUNT_MENU_SECTION_X = "px-[7px]";
+const ACCOUNT_MENU_SECTION_Y = "py-[7px]";
+const ACCOUNT_MENU_ROW_GAP = "gap-[8.8px]";
+
 type AccountUser = {
   name?: string | null;
   email?: string | null;
@@ -117,7 +124,7 @@ function AccountMenuRow({
     <button
       type="button"
       role="menuitem"
-      className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] text-zinc-800 transition-colors hover:bg-zinc-100 dark:text-zinc-100 dark:hover:bg-zinc-800/80 ${className}`}
+      className={`flex w-full items-center ${ACCOUNT_MENU_ROW_GAP} rounded-lg ${ACCOUNT_MENU_BTN_X} ${ACCOUNT_MENU_BTN_Y} text-left text-[13px] text-zinc-800 transition-colors hover:bg-zinc-100 dark:text-zinc-100 dark:hover:bg-zinc-800/80 ${className}`}
       onClick={onClick}
     >
       <span className="flex size-[18px] shrink-0 items-center justify-center text-zinc-500 dark:text-zinc-400">
@@ -184,7 +191,7 @@ export function SidebarAccountMenu({
           role="menu"
           aria-label="Account menu"
         >
-          <div className="flex items-start gap-3 border-b border-zinc-100 px-3.5 py-3 dark:border-zinc-800">
+          <div className="flex items-start gap-[10.5px] border-b border-zinc-100 px-[12.3px] py-[10.5px] dark:border-zinc-800">
             <div className="relative shrink-0">
               <UserAvatar user={user} sizeClass="size-11" />
               <span
@@ -205,16 +212,18 @@ export function SidebarAccountMenu({
             </span>
           </div>
 
-          <div className="border-b border-zinc-100 px-2 py-2 dark:border-zinc-800">
-            <p className="px-2 pb-1.5 text-[10px] font-semibold tracking-[0.08em] text-zinc-400">
+          <div
+            className={`border-b border-zinc-100 ${ACCOUNT_MENU_SECTION_X} ${ACCOUNT_MENU_SECTION_Y} dark:border-zinc-800`}
+          >
+            <p className="px-[7px] pb-[5.3px] text-[10px] font-semibold tracking-[0.08em] text-zinc-400">
               Workspaces
             </p>
-            <div className="flex flex-col gap-0.5">
+            <div className="flex flex-col gap-[1.8px]">
               {workspaces.map((workspace) => (
                 <button
                   key={workspace.id}
                   type="button"
-                  className={`flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors ${
+                  className={`flex w-full items-center ${ACCOUNT_MENU_ROW_GAP} rounded-lg ${ACCOUNT_MENU_SECTION_X} ${ACCOUNT_MENU_BTN_Y} text-left transition-colors ${
                     workspace.isActive
                       ? "bg-zinc-50 dark:bg-zinc-800/50"
                       : "hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
@@ -244,7 +253,7 @@ export function SidebarAccountMenu({
               ))}
               <button
                 type="button"
-                className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left text-[13px] text-zinc-600 transition-colors hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-zinc-800/40"
+                className={`flex w-full items-center ${ACCOUNT_MENU_ROW_GAP} rounded-lg ${ACCOUNT_MENU_SECTION_X} ${ACCOUNT_MENU_BTN_Y} text-left text-[13px] text-zinc-600 transition-colors hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-zinc-800/40`}
               >
                 <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-dashed border-zinc-300 text-zinc-400 dark:border-zinc-600">
                   <LuPlus className="size-4" aria-hidden="true" />
@@ -254,7 +263,9 @@ export function SidebarAccountMenu({
             </div>
           </div>
 
-          <div className="flex flex-col gap-0.5 px-2 py-2">
+          <div
+            className={`flex flex-col gap-[1.8px] ${ACCOUNT_MENU_SECTION_X} ${ACCOUNT_MENU_SECTION_Y}`}
+          >
             <AccountMenuRow
               icon={<LuCircleUser className="size-[17px]" aria-hidden="true" />}
               label="Profile"
@@ -327,14 +338,14 @@ export function SidebarAccountMenu({
             />
           </div>
 
-          <div className="mx-2 mb-2 rounded-xl bg-[#eef4ff] px-3 py-3 dark:bg-blue-950/40">
-            <div className="mb-2 flex items-center justify-between text-[12px] font-medium text-zinc-700 dark:text-zinc-200">
+          <div className="mx-[7px] mb-[7px] rounded-xl bg-[#eef4ff] px-[10.5px] py-[10.5px] dark:bg-blue-950/40">
+            <div className="mb-[7px] flex items-center justify-between text-[12px] font-medium text-zinc-700 dark:text-zinc-200">
               <span>
                 {activeTaskCount} / {TASK_USAGE_LIMIT} tasks used
               </span>
               <span>{usagePercent}%</span>
             </div>
-            <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-[#dbeafe] dark:bg-zinc-700">
+            <div className="mb-[10.5px] h-1.5 overflow-hidden rounded-full bg-[#dbeafe] dark:bg-zinc-700">
               <div
                 className="h-full rounded-full bg-[#3b82f6] transition-[width]"
                 style={{ width: `${usagePercent}%` }}
@@ -342,7 +353,7 @@ export function SidebarAccountMenu({
             </div>
             <button
               type="button"
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#3b82f6] px-3 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[#2563eb]"
+              className={`flex w-full items-center justify-center gap-[7px] rounded-xl bg-[#3b82f6] px-[10.5px] py-[8.8px] text-[13px] font-semibold text-white transition-colors hover:bg-[#2563eb]`}
               onClick={(event) => {
                 runMenuAction(() =>
                   onOpenSettings("account", {
@@ -357,11 +368,13 @@ export function SidebarAccountMenu({
             </button>
           </div>
 
-          <div className="border-t border-zinc-100 px-2 py-2 dark:border-zinc-800">
+          <div
+            className={`border-t border-zinc-100 ${ACCOUNT_MENU_SECTION_X} ${ACCOUNT_MENU_SECTION_Y} dark:border-zinc-800`}
+          >
             <button
               type="button"
               role="menuitem"
-              className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] font-medium text-[#ef4444] transition-colors hover:bg-red-50 dark:hover:bg-red-950/30"
+              className={`flex w-full items-center ${ACCOUNT_MENU_ROW_GAP} rounded-lg ${ACCOUNT_MENU_BTN_X} ${ACCOUNT_MENU_BTN_Y} text-left text-[13px] font-medium text-[#ef4444] transition-colors hover:bg-red-50 dark:hover:bg-red-950/30`}
               onClick={() => {
                 runMenuAction(() => {
                   void onSignOut();
@@ -375,33 +388,35 @@ export function SidebarAccountMenu({
         </div>
       ) : null}
 
-      <button
-        type="button"
-        className="flex w-full items-center gap-2.5 rounded-xl border border-[#e3e3e3] bg-white px-2.5 py-2 text-left shadow-sm transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:bg-zinc-800/80"
-        onClick={onToggle}
-        aria-expanded={isOpen}
-        aria-haspopup="menu"
-      >
-        <div className="relative shrink-0">
-          <UserAvatar user={user} sizeClass="size-9" />
-          <span
-            className="absolute bottom-0 right-0 size-2.5 rounded-full border-2 border-white bg-emerald-500 dark:border-zinc-900"
+      <div className="rounded-[12px] bg-[#dceff2] p-[0.5px] dark:bg-cyan-950/35 shadow-[0_7px_17px_rgba(0,0,0,0.06)] cursor-pointer">
+        <button
+          type="button"
+          className="flex w-full cursor-pointer items-center gap-3 rounded-[12px] border border-[#e8eaed] bg-white px-2.5 py-2 text-left shadow-[0_1px_4px_rgba(15,23,42,0.06)] transition-colors hover:bg-zinc-50/90 dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-[0_1px_4px_rgba(0,0,0,0.35)] dark:hover:bg-zinc-800/90"
+          onClick={onToggle}
+          aria-expanded={isOpen}
+          aria-haspopup="menu"
+        >
+          <div className="relative shrink-0">
+            <UserAvatar user={user} sizeClass="size-7 text-[14px]" />
+            <span
+              className="absolute bottom-0 right-0 size-2.5 rounded-full border-2 border-white bg-emerald-500 dark:border-zinc-900"
+              aria-hidden="true"
+            />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[11.5px] font-semibold leading-snug text-zinc-750 dark:text-zinc-50">
+              {displayName}
+            </p>
+            <p className="truncate text-[11px] font-normal leading-snug text-zinc-500 dark:text-zinc-400">
+              Personal workspace
+            </p>
+          </div>
+          <LuChevronsUpDown
+            className="size-[18px] shrink-0 text-[#9aa3ab] dark:text-zinc-500"
             aria-hidden="true"
           />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[13px] font-semibold leading-tight text-zinc-900 dark:text-zinc-50">
-            {displayName}
-          </p>
-          <p className="truncate text-[11px] text-zinc-500 dark:text-zinc-400">
-            Personal workspace
-          </p>
-        </div>
-        <LuChevronsUpDown
-          className="size-4 shrink-0 text-zinc-400"
-          aria-hidden="true"
-        />
-      </button>
+        </button>
+      </div>
     </div>
   );
 }
