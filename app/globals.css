@@ -494,7 +494,7 @@ body {
   )::before {
   font-family: var(--font-app), ui-sans-serif, system-ui, sans-serif !important;
   position: absolute;
-  left: 0;
+  left: 15px;
   top: 0;
 }
 
@@ -669,7 +669,7 @@ body {
   )::before {
   content: "start writing or press / to access commands";
   position: absolute;
-  left: 0;
+  left: 5px;
   top: 0;
   color: #d4d4d8;
   pointer-events: none;
@@ -881,8 +881,8 @@ body {
 
 .sidebar-search-border-wrap:hover::before,
 .sidebar-search-border-wrap:focus-within::before {
-  opacity: 1;
-  animation-play-state: running;
+  opacity: 0;
+  animation-play-state: paused;
 }
 
 @keyframes sidebar-search-border-spin {
@@ -899,18 +899,13 @@ body {
 
   .sidebar-search-border-wrap:hover::before,
   .sidebar-search-border-wrap:focus-within::before {
-    opacity: 1;
+    opacity: 0;
   }
 }
 
 .sidebar-search-trigger {
   position: relative;
   z-index: 1;
-}
-
-.sidebar-search-border-wrap:hover .sidebar-search-trigger,
-.sidebar-search-border-wrap:focus-within .sidebar-search-trigger {
-  border-color: transparent;
 }
 
 .search-modal-overlay {

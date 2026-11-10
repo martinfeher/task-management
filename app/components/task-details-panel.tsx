@@ -74,6 +74,7 @@ import {
   type LineBlockType,
   placeCaretInLine,
   placeCaretAtEndOfLine,
+  shouldPlaceCaretAtLineEnd,
   focusNoteAtEnd,
   focusTaskTitle,
   focusDetailLine,
@@ -1509,8 +1510,13 @@ function collapseEditorSelectionAtPoint(
     const probeLine = getDetailLineFromNode(probe.startContainer, editor);
     if (probeLine && shouldPlaceCaretAtLineStart(editor, probeLine)) {
       placeCaretInLine(probeLine);
-    return;
-  }
+      return;
+    }
+
+    if (probeLine && shouldPlaceCaretAtLineEnd(probeLine, clientX, clientY)) {
+      placeCaretAtEndOfLine(probeLine);
+      return;
+    }
 
     try {
       selection.removeAllRanges();
@@ -1528,9 +1534,7 @@ function collapseEditorSelectionAtPoint(
       return;
     }
 
-    const lineRect = line.getBoundingClientRect();
-    const midpoint = lineRect.left + lineRect.width / 2;
-    if (clientX >= midpoint) {
+    if (shouldPlaceCaretAtLineEnd(line, clientX, clientY)) {
       placeCaretAtEndOfLine(line);
     } else {
       placeCaretInLine(line);
@@ -2340,6 +2344,11 @@ export function TaskDetailsPanel({
   const hoveredLineRef = useRef<HTMLElement | null>(null);
   const clickedLineRef = useRef<HTMLElement | null>(null);
   const pendingClickLineRef = useRef<HTMLElement | null>(null);
+  const pendingLineEndClickRef = useRef<{
+    line: HTMLElement;
+    clientX: number;
+    clientY: number;
+  } | null>(null);
   const activeLineControlsRef = useRef<HTMLElement | null>(null);
   const isMouseOverEditorRef = useRef(false);
   const pointerInGutterRef = useRef(false);
@@ -3081,8 +3090,6 @@ export function TaskDetailsPanel({
       line = activeLineControlsRef.current;
     } else if (addBlockMenu && activeLineControlsRef.current) {
       line = activeLineControlsRef.current;
-    } else if (focusedEmptyBodyLine) {
-      line = focusedEmptyBodyLine;
     } else if (
       isMouseOverEditorRef.current &&
       hoveredLine &&
@@ -3091,6 +3098,8 @@ export function TaskDetailsPanel({
       !isCodeLine(hoveredLine)
     ) {
       line = hoveredLine;
+    } else if (focusedEmptyBodyLine) {
+      line = focusedEmptyBodyLine;
     } else {
       activeLineControlsRef.current = null;
       setLineControls([]);
@@ -6120,6 +6129,7 @@ export function TaskDetailsPanel({
     }
 
     beginEditorPointerInteraction();
+    pendingLineEndClickRef.current = null;
 
     const isMultiClick = isMultiClickMouseEvent(event);
 
@@ -6172,6 +6182,20 @@ export function TaskDetailsPanel({
     }
 
     if (isTitleLine(editor, line)) {
+      if (
+        !event.shiftKey &&
+        !isMultiClick &&
+        shouldPlaceCaretAtLineEnd(line, event.clientX, event.clientY)
+      ) {
+        pendingLineEndClickRef.current = {
+          line,
+          clientX: event.clientX,
+          clientY: event.clientY,
+        };
+        clickedLineRef.current = line;
+        pendingClickLineRef.current = line;
+        updateLineControls();
+      }
       return;
     }
 
@@ -6187,6 +6211,25 @@ export function TaskDetailsPanel({
     ) {
       event.preventDefault();
       focusDetailLine(editor, line);
+      clickedLineRef.current = line;
+      pendingClickLineRef.current = line;
+      updateLineControls();
+      requestAnimationFrame(() => {
+        updateLineControls();
+      });
+      return;
+    }
+
+    if (
+      !event.shiftKey &&
+      !isMultiClick &&
+      shouldPlaceCaretAtLineEnd(line, event.clientX, event.clientY)
+    ) {
+      pendingLineEndClickRef.current = {
+        line,
+        clientX: event.clientX,
+        clientY: event.clientY,
+      };
       clickedLineRef.current = line;
       pendingClickLineRef.current = line;
       updateLineControls();
@@ -6623,11 +6666,25 @@ export function TaskDetailsPanel({
     const editor = editorRef.current;
     const pendingLine = pendingClickLineRef.current;
     pendingClickLineRef.current = null;
+    const pendingLineEndClick = pendingLineEndClickRef.current;
+    pendingLineEndClickRef.current = null;
 
     finishEditorPointerInteraction();
     scheduleFormatMenuReveal();
 
     if (
+      editor &&
+      pendingLineEndClick &&
+      !editorHasLiveExtendedTextSelection(editor) &&
+      shouldPlaceCaretAtLineEnd(
+        pendingLineEndClick.line,
+        pendingLineEndClick.clientX,
+        pendingLineEndClick.clientY,
+      )
+    ) {
+      editor.focus();
+      placeCaretAtEndOfLine(pendingLineEndClick.line);
+    } else if (
       editor &&
       pendingLine &&
       !isTitleLine(editor, pendingLine) &&

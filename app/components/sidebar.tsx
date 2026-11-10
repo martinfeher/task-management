@@ -1849,7 +1849,7 @@ export function Sidebar({
             ) : (
               <div
                 key={item.label}
-                className="sidebar-search-border-wrap ml-[14px] mr-[6px] mt-2 mb-[4px] w-auto"
+                className="sidebar-search-border-wrap ml-[10px] mr-[3px] mt-2 mb-[4px] w-auto"
               >
                 <button
                   type="button"
@@ -1859,7 +1859,7 @@ export function Sidebar({
                       y: event.clientY,
                     })
                   }
-                  className={`sidebar-search-trigger flex w-full cursor-pointer items-center gap-2 rounded-[8px] border border-[#e3e3e9] bg-[#fcfbff] py-0 pl-[8px] pr-[3px] text-left text-sm ptxt-list-search transition-colors hover:bg-slate-50 dark:border-zinc-700 dark:bg-zinc-950 dark:hover:bg-zinc-800/60 ${SIDEBAR_NAV_ITEM_SIZE_CLASS}`}
+                  className={`sidebar-search-trigger flex w-full cursor-pointer items-center gap-2 rounded-[8px] border border-[#e3e3e9] bg-[#fcfbff] py-0 pl-[8px] pr-[3px] text-left text-sm ptxt-list-search transition-colors hover:border-[#d8d8e3] hover:bg-slate-50 dark:border-[#52525b] dark:bg-zinc-950 dark:hover:border-[#6c6c74] dark:hover:bg-zinc-800/60 ${SIDEBAR_NAV_ITEM_SIZE_CLASS}`}
                 >
                   <IoIosSearch
                     className="size-[18px] shrink-0 cursor-pointer"

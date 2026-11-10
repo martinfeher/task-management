@@ -11,7 +11,12 @@ import {
   type ReactNode,
 } from "react";
 import { BiSearch } from "react-icons/bi";
-import { LuArrowDown, LuArrowUp, LuCornerDownLeft } from "react-icons/lu";
+import {
+  LuArrowDown,
+  LuArrowUp,
+  LuCommand,
+  LuCornerDownLeft,
+} from "react-icons/lu";
 import { fetchTaskById } from "@/lib/task-details-api";
 import { buildTodoPath } from "@/lib/todo-routes";
 import { openInNewTabFromClick } from "@/lib/open-in-new-tab";
@@ -250,7 +255,7 @@ function highlightSearchMatch(text: string, query: string): ReactNode {
 
 function SearchModalShortcutKey({ children }: { children: ReactNode }) {
   return (
-    <kbd className="inline-flex min-w-[1.125rem] items-center justify-center rounded border border-zinc-200 bg-zinc-50 px-1 py-px text-[10px] font-medium leading-none text-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400">
+    <kbd className="inline-flex h-6 min-w-6 items-center justify-center rounded-md border border-zinc-200 bg-white px-1.5 text-zinc-500 shadow-[0_1px_0_#e4e4e7] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:shadow-[0_1px_0_#3f3f46]">
       {children}
     </kbd>
   );
@@ -264,33 +269,35 @@ function SearchModalFooterAction({
   children: ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex items-center gap-2">
       <span>{label}</span>
-      <div className="flex items-center">{children}</div>
+      <span className="flex items-center gap-0.5">{children}</span>
     </div>
   );
 }
 
 function SearchModalFooter() {
   return (
-    <div className="flex shrink-0 flex-wrap items-center gap-x-5 gap-y-2 rounded-b-[24px] border-t border-zinc-200 bg-white px-4 py-2.5 text-xs text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
+    <div className="flex shrink-0 flex-wrap items-center gap-x-8 gap-y-2 rounded-b-[24px] border-t border-zinc-200 bg-zinc-100/40 px-6 py-3.5 text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-800/40 dark:text-zinc-400">
       <SearchModalFooterAction label="Select">
         <SearchModalShortcutKey>
-          <LuArrowUp className="size-2.5" aria-hidden="true" />
+          <LuArrowUp className="h-3.5 w-3.5" aria-hidden="true" />
         </SearchModalShortcutKey>
         <SearchModalShortcutKey>
-          <LuArrowDown className="size-2.5" aria-hidden="true" />
+          <LuArrowDown className="h-3.5 w-3.5" aria-hidden="true" />
         </SearchModalShortcutKey>
       </SearchModalFooterAction>
       <SearchModalFooterAction label="Open">
         <SearchModalShortcutKey>
-          <LuCornerDownLeft className="size-3" aria-hidden="true" />
+          <LuCornerDownLeft className="h-3.5 w-3.5" aria-hidden="true" />
         </SearchModalShortcutKey>
       </SearchModalFooterAction>
       <SearchModalFooterAction label="Open in New Window">
-        <SearchModalShortcutKey>⌘</SearchModalShortcutKey>
         <SearchModalShortcutKey>
-          <LuCornerDownLeft className="size-3" aria-hidden="true" />
+          <LuCommand className="h-3 w-3" aria-hidden="true" />
+        </SearchModalShortcutKey>
+        <SearchModalShortcutKey>
+          <LuCornerDownLeft className="h-3.5 w-3.5" aria-hidden="true" />
         </SearchModalShortcutKey>
       </SearchModalFooterAction>
     </div>

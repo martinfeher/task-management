@@ -37,8 +37,8 @@ const SLASH_COMMAND_MENU_ROW_HEIGHT = 36;
 const SLASH_COMMAND_MENU_SEPARATOR_HEIGHT = 9;
 const TEXT_BLOCK_OPTION_COUNT = 4;
 
-/** Fixed height for the sample editor area in the slash-command hover preview (100–120px range). */
-export const SLASH_COMMAND_PREVIEW_CONTENT_HEIGHT_PX = 110;
+/** Fixed height for the sample editor area in the slash-command hover preview. */
+export const SLASH_COMMAND_PREVIEW_CONTENT_HEIGHT_PX = 125;
 
 export function getSlashCommandPreviewTopOffset(
   selectedIndex: number,
@@ -199,11 +199,11 @@ export function SlashCommandBlockPreview({
       className="w-[196px] shrink-0 overflow-hidden rounded-[14px] border-1 border-slate-800 bg-slate-700 p-1.5 shadow-[0_10px_28px_rgba(0,0,0,0.22)] dark:border-zinc-600"
     >
       <div
-        className="box-border overflow-hidden rounded-[10px] bg-white px-3 py-2 dark:bg-zinc-950"
+        className="box-border overflow-hidden rounded-[10px] bg-white dark:bg-zinc-950"
         style={{ height: SLASH_COMMAND_PREVIEW_CONTENT_HEIGHT_PX }}
       >
         <div
-          className="task-details-editor pointer-events-none h-full overflow-hidden text-[13px] leading-snug [&_.detail-line[data-line-type=h1]]:text-[18px] [&_.detail-line[data-line-type=h1]]:leading-[22px] [&_.detail-line[data-line-type=h2]]:text-[15px] [&_.detail-line[data-line-type=h2]]:leading-[19px] [&_.detail-line[data-line-type=h3]]:text-[14px] [&_.detail-line[data-line-type=h3]]:leading-[18px] [&_.detail-line[data-line-type=bullet]]:leading-[18px] [&_.detail-line[data-line-type=numbered]]:leading-[18px] [&_.detail-line[data-line-type=checklist]]:leading-[18px]"
+          className="task-details-editor pointer-events-none box-border h-full overflow-hidden p-[5px] text-[13px] leading-snug [&_.detail-line[data-line-type=h1]]:text-[18px] [&_.detail-line[data-line-type=h1]]:leading-[22px] [&_.detail-line[data-line-type=h2]]:text-[15px] [&_.detail-line[data-line-type=h2]]:leading-[19px] [&_.detail-line[data-line-type=h3]]:text-[14px] [&_.detail-line[data-line-type=h3]]:leading-[18px] [&_.detail-line[data-line-type=bullet]]:leading-[18px] [&_.detail-line[data-line-type=numbered]]:leading-[18px] [&_.detail-line[data-line-type=checklist]]:leading-[18px]"
           data-hide-body-placeholder="true"
         >
           <PreviewEditorContent type={type} />

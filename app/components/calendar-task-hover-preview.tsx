@@ -34,7 +34,7 @@ import type { TaskListItem } from "./todo-app";
 const PREVIEW_WIDTH = 280;
 const PREVIEW_ESTIMATED_HEIGHT = 240;
 const PREVIEW_SUBTITLE_CLASS =
-  "text-[12.5px] leading-[16px] text-[#bfbfbf] dark:text-[#bfbfbf]";
+  "text-[13.5px] leading-[16px] text-[#bfbfbf] dark:text-[#bfbfbf]";
 const TASK_GAP = 12;
 const TASK_EDGE_PREVIEW_UPWARD_OFFSET_PX = 10;
 const CURSOR_OFFSET_PX = 50;

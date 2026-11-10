@@ -2,6 +2,7 @@
 
 import {
   FormEvent,
+  Fragment,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -33,15 +34,10 @@ import { TaskLabelSelector, type Label } from "./task-label-selector";
 import { TaskPrioritySelector } from "./task-priority-selector";
 import { TaskPriorityFlagIcon } from "./task-priority-icon";
 import {
-  AddTaskKindSwitch,
-  type AddTaskKind,
-} from "./add-task-kind-switch";
-import {
   TaskListEntityFilter,
   taskMatchesEntityScope,
   type TaskListEntityScope,
 } from "./task-list-entity-filter";
-import { useAddTaskNoteSwitchEnabled } from "@/lib/add-task-note-switch-settings";
 import { APP_HOVER_TOOLTIP_ABOVE_CENTER } from "@/lib/app-hover-tooltip-classes";
 import {
   TaskRowContextMenu,
@@ -142,7 +138,7 @@ function measureTaskListTruncationOverflow(root: HTMLElement | null) {
   return maxOverflow;
 }
 
-type SortField = "date" | "title";
+type SortField = "date" | "title" | "kind";
 type SortDirection = "asc" | "desc";
 
 type SortOption = {
@@ -150,6 +146,20 @@ type SortOption = {
   direction: SortDirection;
   label: string;
 };
+
+type SortOrderHistoryEntry = {
+  activeSort: SortOption | null;
+  pinnedIds: string[];
+  unpinnedIds: string[];
+};
+
+const MAX_SORT_ORDER_HISTORY = 50;
+
+function sortOptionsEqual(a: SortOption | null, b: SortOption | null) {
+  if (a === null && b === null) return true;
+  if (a === null || b === null) return false;
+  return a.field === b.field && a.direction === b.direction;
+}
 
 type DropIndicatorState = {
   top: number;
@@ -288,6 +298,8 @@ const SORT_OPTIONS: SortOption[] = [
   { field: "date", direction: "desc", label: "Date (descending)" },
   { field: "title", direction: "asc", label: "Title (A-Z)" },
   { field: "title", direction: "desc", label: "Title (Z-A)" },
+  { field: "kind", direction: "asc", label: "Group: Notes first" },
+  { field: "kind", direction: "desc", label: "Group: Tasks first" },
 ];
 
 function shouldIgnoreAddTaskShortcut(target: EventTarget | null) {
@@ -295,6 +307,20 @@ function shouldIgnoreAddTaskShortcut(target: EventTarget | null) {
 
   if (target.closest("[data-task-details-panel]")) {
     return false;
+  }
+
+  return (
+    target.tagName === "INPUT" ||
+    target.tagName === "TEXTAREA" ||
+    target.isContentEditable
+  );
+}
+
+function shouldIgnoreListSortShortcut(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return true;
+
+  if (target.closest("[data-task-details-panel]")) {
+    return true;
   }
 
   return (
@@ -368,6 +394,16 @@ function sortTasks(
         sensitivity: "base",
       });
       return direction === "asc" ? comparison : -comparison;
+    }
+
+    if (field === "kind") {
+      const aRank = a.isNote ? 0 : 1;
+      const bRank = b.isNote ? 0 : 1;
+      if (aRank !== bRank) {
+        return direction === "asc" ? aRank - bRank : bRank - aRank;
+      }
+
+      return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
     }
 
     const aDate = getDueDateTimestamp(a.dueDate);
@@ -580,8 +616,6 @@ export function TaskListPanel({
   const isListCalendarToggleActive =
     (isListCalendarOpen && !listCalendarShowingDetails) || isListCalendarPreview;
   const [newTaskName, setNewTaskName] = useState("");
-  const [addTaskKind, setAddTaskKind] = useState<AddTaskKind>("task");
-  const { addTaskNoteSwitchEnabled } = useAddTaskNoteSwitchEnabled();
   const newTaskParsePreview = useMemo(() => {
     if (!newTaskName.trim()) return null;
     const parsed = parseNaturalLanguageTask(newTaskName, { lists });
@@ -617,6 +651,12 @@ export function TaskListPanel({
   const [orderedTasks, setOrderedTasks] = useState(tasks);
   const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
   const [activeSort, setActiveSort] = useState<SortOption | null>(null);
+  const sortUndoStackRef = useRef<SortOrderHistoryEntry[]>([]);
+  const sortRedoStackRef = useRef<SortOrderHistoryEntry[]>([]);
+  const orderedTasksRef = useRef(orderedTasks);
+  orderedTasksRef.current = orderedTasks;
+  const activeSortRef = useRef(activeSort);
+  activeSortRef.current = activeSort;
   const [isCompletedOpen, setIsCompletedOpen] = useState(false);
   const [entityScope, setEntityScope] = useState<TaskListEntityScope>("all");
   const [openDatePickerTaskId, setOpenDatePickerTaskId] = useState<string | null>(
@@ -962,6 +1002,8 @@ export function TaskListPanel({
     setNewTaskPriority(null);
     setAddTaskLabelIds(preselectedLabelId ? [preselectedLabelId] : []);
     setActiveSort(null);
+    sortUndoStackRef.current = [];
+    sortRedoStackRef.current = [];
     setIsCompletedOpen(false);
     setEntityScope("all");
     finishTitleEdit();
@@ -1285,7 +1327,6 @@ export function TaskListPanel({
   function resetNewTaskForm() {
     keepAddTaskOpenRef.current = false;
     setNewTaskName("");
-    setAddTaskKind("task");
     resetNewTaskSchedule();
     resetNewTaskMetadata();
   }
@@ -1371,11 +1412,8 @@ export function TaskListPanel({
         : {}),
       ...(parsed.recurrenceRule ? { recurrenceRule: parsed.recurrenceRule } : {}),
       ...(parsed.listId ? { listId: parsed.listId } : {}),
-      ...(parsed.subtasks.length > 0 && subtasksEnabled && addTaskKind !== "note"
+      ...(parsed.subtasks.length > 0 && subtasksEnabled
         ? { subtasks: parsed.subtasks }
-        : {}),
-      ...(addTaskNoteSwitchEnabled && addTaskKind === "note"
-        ? { isNote: true }
         : {}),
     };
 
@@ -1602,26 +1640,142 @@ export function TaskListPanel({
     scheduleTitleEditIdleExit(task);
   }
 
-  function applySort(field: SortField, direction: SortDirection) {
-    const pinned = orderedTasks.filter((task) => task.pinned);
-    const unpinned = orderedTasks.filter((task) => !task.pinned);
-    const sorted = sortTasks(unpinned, field, direction);
-    setOrderedTasks([...pinned, ...sorted]);
+  const captureSortOrderSnapshot = useCallback((): SortOrderHistoryEntry => {
+    const currentTasks = orderedTasksRef.current;
+    const pinned = currentTasks.filter((task) => task.pinned);
+    const unpinned = currentTasks.filter((task) => !task.pinned);
+    const currentSort = activeSortRef.current;
 
-    if (listId && onReorderTasks) {
-      onReorderTasks(
-        listId,
-        sorted.map((task) => task.id),
-        "unpinned",
-      );
+    return {
+      activeSort: currentSort ? { ...currentSort } : null,
+      pinnedIds: pinned.map((task) => task.id),
+      unpinnedIds: unpinned.map((task) => task.id),
+    };
+  }, []);
+
+  const restoreSortOrderSnapshot = useCallback(
+    (entry: SortOrderHistoryEntry) => {
+      const currentTasks = orderedTasksRef.current;
+      const tasksById = new Map(currentTasks.map((task) => [task.id, task]));
+
+      const pinned = entry.pinnedIds
+        .map((id) => tasksById.get(id))
+        .filter((task): task is TaskListItem => Boolean(task));
+      const unpinned = entry.unpinnedIds
+        .map((id) => tasksById.get(id))
+        .filter((task): task is TaskListItem => Boolean(task));
+
+      const restoredIds = new Set([
+        ...entry.pinnedIds,
+        ...entry.unpinnedIds,
+      ]);
+      const trailing = currentTasks.filter((task) => !restoredIds.has(task.id));
+
+      const nextPinned = [
+        ...pinned,
+        ...trailing.filter((task) => task.pinned),
+      ];
+      const nextUnpinned = [
+        ...unpinned,
+        ...trailing.filter((task) => !task.pinned),
+      ];
+
+      setOrderedTasks([...nextPinned, ...nextUnpinned]);
+      setActiveSort(entry.activeSort ? { ...entry.activeSort } : null);
+
+      if (listId && onReorderTasks) {
+        void onReorderTasks(listId, nextUnpinned.map((task) => task.id), "unpinned");
+      }
+    },
+    [listId, onReorderTasks],
+  );
+
+  const pushSortOrderUndoSnapshot = useCallback(() => {
+    sortUndoStackRef.current.push(captureSortOrderSnapshot());
+    if (sortUndoStackRef.current.length > MAX_SORT_ORDER_HISTORY) {
+      sortUndoStackRef.current.shift();
+    }
+    sortRedoStackRef.current = [];
+  }, [captureSortOrderSnapshot]);
+
+  const applySort = useCallback(
+    (field: SortField, direction: SortDirection) => {
+      const sortOption =
+        SORT_OPTIONS.find(
+          (option) => option.field === field && option.direction === direction,
+        ) ?? null;
+
+      if (sortOptionsEqual(activeSortRef.current, sortOption)) {
+        setIsSortMenuOpen(false);
+        return;
+      }
+
+      pushSortOrderUndoSnapshot();
+
+      const pinned = orderedTasksRef.current.filter((task) => task.pinned);
+      const unpinned = orderedTasksRef.current.filter((task) => !task.pinned);
+      const sorted = sortTasks(unpinned, field, direction);
+      setOrderedTasks([...pinned, ...sorted]);
+
+      if (listId && onReorderTasks) {
+        void onReorderTasks(
+          listId,
+          sorted.map((task) => task.id),
+          "unpinned",
+        );
+      }
+
+      setActiveSort(sortOption);
+      setIsSortMenuOpen(false);
+    },
+    [listId, onReorderTasks, pushSortOrderUndoSnapshot],
+  );
+
+  useEffect(() => {
+    if (!showSortButton) return;
+
+    function handleSortOrderUndoRedo(event: KeyboardEvent) {
+      if (!(event.metaKey || event.ctrlKey)) return;
+      if (shouldIgnoreListSortShortcut(event.target)) return;
+
+      const key = event.key.toLowerCase();
+      const isUndo = key === "z" && !event.shiftKey;
+      const isRedo = (key === "z" && event.shiftKey) || key === "y";
+      if (!isUndo && !isRedo) return;
+
+      if (isUndo) {
+        const previous = sortUndoStackRef.current.pop();
+        if (!previous) return;
+
+        event.preventDefault();
+        sortRedoStackRef.current.push(captureSortOrderSnapshot());
+        if (sortRedoStackRef.current.length > MAX_SORT_ORDER_HISTORY) {
+          sortRedoStackRef.current.shift();
+        }
+        restoreSortOrderSnapshot(previous);
+        return;
+      }
+
+      const next = sortRedoStackRef.current.pop();
+      if (!next) return;
+
+      event.preventDefault();
+      sortUndoStackRef.current.push(captureSortOrderSnapshot());
+      if (sortUndoStackRef.current.length > MAX_SORT_ORDER_HISTORY) {
+        sortUndoStackRef.current.shift();
+      }
+      restoreSortOrderSnapshot(next);
     }
 
-    const sortOption = SORT_OPTIONS.find(
-      (option) => option.field === field && option.direction === direction,
-    );
-    setActiveSort(sortOption ?? null);
-    setIsSortMenuOpen(false);
-  }
+    window.addEventListener("keydown", handleSortOrderUndoRedo);
+    return () => {
+      window.removeEventListener("keydown", handleSortOrderUndoRedo);
+    };
+  }, [
+    captureSortOrderSnapshot,
+    restoreSortOrderSnapshot,
+    showSortButton,
+  ]);
 
   function resetLabelMenuState() {
     setAssignedLabelIds([]);
@@ -2869,23 +3023,35 @@ export function TaskListPanel({
                   </button>
 
                   {isSortMenuOpen && (
-                    <div className="absolute right-0 top-full z-50 min-w-[180px] pt-1">
+                    <div className="absolute right-0 top-full z-50 min-w-[196px] pt-1">
                       <div
                         role="menu"
                         className="task-list-sort-menu py-1"
                       >
-                        {SORT_OPTIONS.map((option) => (
-                          <button
-                            key={`${option.field}-${option.direction}`}
-                            type="button"
-                            role="menuitem"
-                            onClick={() =>
-                              applySort(option.field, option.direction)
-                            }
-                            className="flex h-[32px] w-full cursor-pointer items-center px-3 text-left text-[13px] ptxt-650  hover:ptxt-800 transition-colors hover:bg-zinc-50 dark:ptxt-200 dark:hover:bg-zinc-800/80"
-                          >
-                            {option.label}
-                          </button>
+                        {SORT_OPTIONS.map((option, index) => (
+                          <Fragment key={`${option.field}-${option.direction}`}>
+                            {index === 4 ? (
+                              <div
+                                role="separator"
+                                className="mx-2 my-1 border-t border-zinc-200 dark:border-zinc-700"
+                              />
+                            ) : null}
+                            <button
+                              type="button"
+                              role="menuitem"
+                              onClick={() =>
+                                applySort(option.field, option.direction)
+                              }
+                              className={`flex h-[32px] w-full cursor-pointer items-center px-3 text-left text-[13px] ptxt-650 hover:ptxt-800 transition-colors hover:bg-zinc-50 dark:ptxt-200 dark:hover:bg-zinc-800/80 ${
+                                activeSort?.field === option.field &&
+                                activeSort.direction === option.direction
+                                  ? "bg-zinc-50 font-medium ptxt-800 dark:bg-zinc-800/80 dark:ptxt-100"
+                                  : ""
+                              }`}
+                            >
+                              {option.label}
+                            </button>
+                          </Fragment>
                         ))}
                       </div>
                     </div>
@@ -2916,19 +3082,9 @@ export function TaskListPanel({
                     value={newTaskName}
                     onChange={(event) => setNewTaskName(event.target.value)}
                     placeholder={
-                      addTaskNoteSwitchEnabled && addTaskKind === "note"
-                        ? title
-                          ? `New note in "${title}"`
-                          : "New note"
-                        : title
-                          ? `New task in "${title}"`
-                          : "New task"
+                      title ? `New task in "${title}"` : "New task"
                     }
-                    aria-label={
-                      addTaskNoteSwitchEnabled && addTaskKind === "note"
-                        ? "Note title"
-                        : "Task name"
-                    }
+                    aria-label="Task name"
                     title="Add task (Ctrl+Enter / Cmd+Enter)"
                     className="add-task-input min-w-0 flex-1 bg-transparent py-1.5 text-sm ptxt-700 outline-none dark:ptxt-50 placeholder:text-[14px]"
                
@@ -3136,13 +3292,6 @@ export function TaskListPanel({
                       </div>
                     ) : null}
                   </div>
-
-                  {addTaskNoteSwitchEnabled ? (
-                    <AddTaskKindSwitch
-                      value={addTaskKind}
-                      onChange={setAddTaskKind}
-                    />
-                  ) : null}
 
                   <button
                     type="submit"

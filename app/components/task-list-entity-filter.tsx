@@ -96,7 +96,7 @@ export function TaskListEntityFilter({
       {indicator ? (
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute rounded-full bg-[#e8f0fe] transition-[left,width,top,height] duration-200 ease-out motion-reduce:transition-none dark:bg-[#1e3a5f]"
+          className="pointer-events-none absolute rounded-full bg-[#e8f0fe] transition-[left,width,top,height] duration-[400ms] ease-in-out motion-reduce:transition-none dark:bg-[#1e3a5f]"
           style={{
             left: indicator.left,
             width: indicator.width,
@@ -107,21 +107,17 @@ export function TaskListEntityFilter({
       ) : null}
       {ENTITY_SCOPE_TABS.map((tab, index) => {
         const isSelected = value === tab.id;
-        const previousTab = index > 0 ? ENTITY_SCOPE_TABS[index - 1] : null;
-        const showDivider =
-          index > 0 &&
-          previousTab !== null &&
-          value !== previousTab.id &&
-          value !== tab.id;
         const { Icon } = tab;
 
         const tooltipId = `entity-filter-${tab.id}-tooltip`;
 
         return (
           <span key={tab.id} className="relative z-[1] flex items-center">
-            {showDivider ? (
+            {index > 0 ? (
               <span
-                className="mx-0.5 h-3.5 w-px shrink-0 bg-[#e3e6ec] dark:bg-zinc-600"
+                className={`mx-0.5 h-3.5 w-px shrink-0 bg-[#e3e6ec] transition-opacity duration-[400ms] ease-in-out motion-reduce:transition-none dark:bg-zinc-600 ${
+                  value === "all" ? "opacity-100" : "opacity-0"
+                }`}
                 aria-hidden="true"
               />
             ) : null}
@@ -136,14 +132,14 @@ export function TaskListEntityFilter({
                 aria-describedby={tooltipId}
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => onChange(tab.id)}
-                className={`flex cursor-pointer items-center justify-center leading-none transition-colors duration-200 ease-out motion-reduce:transition-none ${
+                className={`flex h-[22px] min-w-[22px] cursor-pointer items-center justify-center gap-1 rounded-full px-1.5 py-[2px] text-[11px] leading-none transition-[color,font-weight] duration-[400ms] ease-in-out motion-reduce:transition-none ${
                   isSelected
-                    ? "gap-1 rounded-full px-1.5 py-[2px] text-[11px] font-medium leading-none text-[#4873c7] dark:text-[#7da2ff]"
-                    : "size-[27px] rounded-full text-[#8b8f98] hover:bg-zinc-100 hover:text-[#5c616b] dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+                    ? "font-medium text-[#4873c7] dark:text-[#7da2ff]"
+                    : "font-normal text-[#8b8f98] hover:bg-zinc-100 hover:text-[#5c616b] dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
                 }`}
               >
                 <Icon className="size-3.5 shrink-0" aria-hidden="true" />
-                {isSelected ? <span>{tab.label}</span> : null}
+                <span className="whitespace-nowrap">{tab.label}</span>
               </button>
               <span
                 id={tooltipId}

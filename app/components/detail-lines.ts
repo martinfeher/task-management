@@ -2514,6 +2514,79 @@ export function placeCaretInLine(line: HTMLElement) {
   selection.addRange(range);
 }
 
+const LINE_END_CLICK_PADDING_PX = 2;
+
+function getLineEditableContentRoot(line: HTMLElement): HTMLElement {
+  if (isChecklistLine(line)) {
+    ensureChecklistTextWrapper(line);
+    const wrapper = line.querySelector(`:scope > .${CHECKLIST_TEXT_CLASS}`);
+    if (wrapper instanceof HTMLElement) {
+      return wrapper;
+    }
+  }
+
+  return line;
+}
+
+function getLineTextRowRectAtPoint(
+  line: HTMLElement,
+  clientY: number,
+): DOMRect | null {
+  if (isLineEmpty(line) || isCodeLine(line)) {
+    return null;
+  }
+
+  const root = getLineEditableContentRoot(line);
+  const range = document.createRange();
+  range.selectNodeContents(root);
+  const rects = Array.from(range.getClientRects());
+
+  if (rects.length === 0) {
+    const collapsed = range.getBoundingClientRect();
+    return collapsed.width > 0 || collapsed.height > 0 ? collapsed : null;
+  }
+
+  const rowRects = rects.filter(
+    (rect) =>
+      clientY >= rect.top - LINE_END_CLICK_PADDING_PX &&
+      clientY <= rect.bottom + LINE_END_CLICK_PADDING_PX,
+  );
+
+  if (rowRects.length > 0) {
+    return rowRects.reduce((rightmost, rect) =>
+      rect.right > rightmost.right ? rect : rightmost,
+    );
+  }
+
+  return rects[rects.length - 1] ?? null;
+}
+
+export function shouldPlaceCaretAtLineEnd(
+  line: HTMLElement,
+  clientX: number,
+  clientY: number,
+): boolean {
+  if (
+    isLineEmpty(line) ||
+    isCodeLine(line) ||
+    line.querySelector(".detail-image-wrapper")
+  ) {
+    return false;
+  }
+
+  const rowRect = getLineTextRowRectAtPoint(line, clientY);
+  if (!rowRect) {
+    return false;
+  }
+
+  const lineRect = line.getBoundingClientRect();
+  if (clientX <= rowRect.right + LINE_END_CLICK_PADDING_PX) {
+    return false;
+  }
+
+  return clientX <= lineRect.right;
+}
+
 export function placeCaretAtEndOfLine(line: HTMLElement) {
   const selection = window.getSelection();
   if (!selection) return;
@@ -3103,12 +3176,12 @@ export function syncEditorBodyPlaceholderVisibility(
 
   const hoveredLine = options?.hoveredLine ?? null;
 
-  if (editorHasFocus && selectionInEditor) {
-    const activeLine = getActiveLineElement(editor);
-    if (activeLine && isEmptyEditableBodyLine(editor, activeLine)) {
-      activeLine.dataset.showBodyPlaceholder = "true";
-    }
+  const hoverPlaceholderLine =
+    hoveredLine && isEmptyEditableBodyLine(editor, hoveredLine)
+      ? hoveredLine
+      : null;
 
+  if (editorHasFocus && selectionInEditor) {
     if (editorHasStartedBodyContent(editor)) {
       editor.dataset.hideBodyPlaceholder = "true";
     } else {
@@ -3118,11 +3191,16 @@ export function syncEditorBodyPlaceholderVisibility(
     delete editor.dataset.hideBodyPlaceholder;
   }
 
-  if (
-    hoveredLine &&
-    isEmptyBodyLineBetweenContent(editor, hoveredLine)
-  ) {
-    hoveredLine.dataset.showBodyPlaceholder = "true";
+  if (hoverPlaceholderLine) {
+    hoverPlaceholderLine.dataset.showBodyPlaceholder = "true";
+    return;
+  }
+
+  if (editorHasFocus && selectionInEditor) {
+    const activeLine = getActiveLineElement(editor);
+    if (activeLine && isEmptyEditableBodyLine(editor, activeLine)) {
+      activeLine.dataset.showBodyPlaceholder = "true";
+    }
   }
 }
 
