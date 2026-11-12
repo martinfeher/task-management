@@ -2,6 +2,8 @@
 
 @source inline("rounded-[8px]");
 @source inline("rounded-[14px]");
+@source inline("rounded-[15px]");
+@source inline("shadow-[0_10px_23px_rgba(0,0,0,0.09)]");
 @source inline("gap-[8px]");
 @source inline("text-[13.5px]");
 @source inline("text-[14px]");
@@ -337,6 +339,7 @@ html[data-app-font="inter"] {
   --size-21px: 21px;
   --size-22px: 22px;
   --size-24px: 24px;
+  --radius-15: 15px;
 
   /* Mid-tone gray/slate/zinc steps at 50-point increments (150, 250, …) */
   --color-gray-150: oklch(94.75% 0.0045 264.536);
@@ -423,6 +426,14 @@ body {
 
 .task-details-editor ::-moz-selection {
   background-color: #c2f1ff;
+}
+
+.task-details-editor[data-format-highlight-menu-open="true"] ::selection {
+  background-color: transparent;
+}
+
+.task-details-editor[data-format-highlight-menu-open="true"] ::-moz-selection {
+  background-color: transparent;
 }
 
 .dark .task-details-editor {
@@ -1808,11 +1819,16 @@ body {
 }
 
 .calendar-add-task-popover,
-.calendar-task-modal,
 .list-name-modal-panel {
   border-radius: 24px;
   border: 1px solid rgb(235 235 235);
   box-shadow: var(--calendar-task-surface-shadow);
+}
+
+.calendar-task-modal {
+  border-radius: 24px;
+  border: 1px solid rgb(235 235 235);
+  box-shadow: 0 10px 23px rgba(0, 0, 0, 0.09);
 }
 
 .calendar-task-hover-preview {

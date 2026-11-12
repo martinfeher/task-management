@@ -145,6 +145,11 @@ type SortOption = {
   field: SortField;
   direction: SortDirection;
   label: string;
+  /** Short row title shown in the menu. */
+  menuLabel: string;
+  /** Right-aligned secondary text (order). */
+  hint?: string;
+  section: "sort" | "group";
 };
 
 type SortOrderHistoryEntry = {
@@ -294,15 +299,15 @@ function ensureListDragVisuals(
 }
 
 const SORT_OPTIONS: SortOption[] = [
-  { field: "date", direction: "asc", label: "Date (ascending)" },
-  { field: "date", direction: "desc", label: "Date (descending)" },
-  { field: "title", direction: "asc", label: "Title (A-Z)" },
-  { field: "title", direction: "desc", label: "Title (Z-A)" },
-  { field: "kind", direction: "asc", label: "Group: Notes first" },
-  { field: "kind", direction: "desc", label: "Group: Tasks first" },
-  { field: "list", direction: "asc", label: "Group: List" },
-  { field: "groupDate", direction: "asc", label: "Group: Date" },
-  { field: "priority", direction: "asc", label: "Group: Priority" },
+  { field: "date", direction: "asc", label: "Date (ascending)", menuLabel: "Date", hint: "Earliest first", section: "sort" },
+  { field: "date", direction: "desc", label: "Date (descending)", menuLabel: "Date", hint: "Latest first", section: "sort" },
+  { field: "title", direction: "asc", label: "Title (A-Z)", menuLabel: "Title", hint: "A to Z", section: "sort" },
+  { field: "title", direction: "desc", label: "Title (Z-A)", menuLabel: "Title", hint: "Z to A", section: "sort" },
+  { field: "kind", direction: "asc", label: "Group: Notes first", menuLabel: "Type", hint: "Notes first", section: "group" },
+  { field: "kind", direction: "desc", label: "Group: Tasks first", menuLabel: "Type", hint: "Tasks first", section: "group" },
+  { field: "list", direction: "asc", label: "Group: List", menuLabel: "List", section: "group" },
+  { field: "groupDate", direction: "asc", label: "Group: Date", menuLabel: "Due date", section: "group" },
+  { field: "priority", direction: "asc", label: "Group: Priority", menuLabel: "Priority", section: "group" },
 ];
 
 function shouldIgnoreAddTaskShortcut(target: EventTarget | null) {
@@ -3056,36 +3061,75 @@ export function TaskListPanel({
                   </button>
 
                   {isSortMenuOpen && (
-                    <div className="absolute right-0 top-full z-50 min-w-[196px] pt-1">
+                    <div className="absolute right-0 top-full z-50 min-w-[248px] pt-1">
                       <div
                         role="menu"
-                        className="task-list-sort-menu py-1"
+                        className="task-list-sort-menu p-1.5"
                       >
-                        {SORT_OPTIONS.map((option, index) => (
-                          <Fragment key={`${option.field}-${option.direction}`}>
-                            {index === 4 ? (
-                              <div
-                                role="separator"
-                                className="mx-2 my-1 border-t border-zinc-200 dark:border-zinc-700"
-                              />
-                            ) : null}
-                            <button
-                              type="button"
-                              role="menuitem"
-                              onClick={() =>
-                                applySort(option.field, option.direction)
-                              }
-                              className={`flex h-[32px] w-full cursor-pointer items-center px-3 text-left text-[13px] ptxt-650 hover:ptxt-800 transition-colors hover:bg-zinc-50 dark:ptxt-200 dark:hover:bg-zinc-800/80 ${
-                                activeSort?.field === option.field &&
-                                activeSort.direction === option.direction
-                                  ? "bg-zinc-50 font-medium ptxt-800 dark:bg-zinc-800/80 dark:ptxt-100"
-                                  : ""
-                              }`}
+                        {SORT_OPTIONS.map((option, index) => {
+                          const isActive =
+                            activeSort?.field === option.field &&
+                            activeSort.direction === option.direction;
+                          const startsSection =
+                            index === 0 ||
+                            SORT_OPTIONS[index - 1].section !== option.section;
+
+                          return (
+                            <Fragment
+                              key={`${option.field}-${option.direction}`}
                             >
-                              {option.label}
-                            </button>
-                          </Fragment>
-                        ))}
+                              {startsSection ? (
+                                <>
+                                  {index > 0 ? (
+                                    <div
+                                      role="separator"
+                                      className="mx-2 my-1.5 border-t border-zinc-200 dark:border-zinc-700"
+                                    />
+                                  ) : null}
+                                  <div
+                                    role="presentation"
+                                    className="px-2.5 pb-1 pt-2 text-[11px] font-medium uppercase tracking-wide ptxt-400 dark:ptxt-500"
+                                  >
+                                    {option.section === "sort"
+                                      ? "Sort by"
+                                      : "Group by"}
+                                  </div>
+                                </>
+                              ) : null}
+                              <button
+                                type="button"
+                                role="menuitemradio"
+                                aria-checked={isActive}
+                                aria-label={option.label}
+                                onClick={() =>
+                                  applySort(option.field, option.direction)
+                                }
+                                className={`flex h-[32px] w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 text-left text-[13px] ptxt-650 transition-colors hover:bg-zinc-50 hover:ptxt-800 dark:ptxt-200 dark:hover:bg-zinc-800/80 ${
+                                  isActive
+                                    ? "bg-zinc-100 font-medium ptxt-800 dark:bg-zinc-800 dark:ptxt-100"
+                                    : ""
+                                }`}
+                              >
+                                <span className="min-w-0 flex-1 truncate">
+                                  {option.menuLabel}
+                                </span>
+                                {option.hint ? (
+                                  <span className="shrink-0 text-[12px] font-normal ptxt-400 dark:ptxt-500">
+                                    {option.hint}
+                                  </span>
+                                ) : null}
+                                <span className="flex size-[14px] shrink-0 items-center justify-center">
+                                  {isActive ? (
+                                    <LuCheck
+                                      className="size-[14px]"
+                                      aria-hidden="true"
+                                    />
+                                  ) : null}
+                                </span>
+                              </button>
+                            </Fragment>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -3310,7 +3354,7 @@ export function TaskListPanel({
                       priority
                     </span>
                     {isAddTaskPriorityMenuOpen ? (
-                      <div className="absolute left-1/2 top-full z-[100] mt-1 w-[180px] -translate-x-1/2 pb-[4px] overflow-hidden rounded-[19px] border border-zinc-200 bg-white shadow-[0_7px_17px_rgba(0,0,0,0.06)] dark:border-zinc-700 dark:bg-zinc-900">
+                      <div className="absolute left-1/2 top-full z-[1000] mt-1 w-[180px] -translate-x-1/2 overflow-visible rounded-[19px] border border-zinc-200 bg-white pb-[4px] shadow-[0_7px_17px_rgba(0,0,0,0.06)] dark:border-zinc-700 dark:bg-zinc-900">
                         <TaskPrioritySelector
                           selectedPriority={newTaskPriority}
                           onSelectPriority={(priority) => {

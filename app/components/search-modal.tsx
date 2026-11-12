@@ -255,7 +255,7 @@ function highlightSearchMatch(text: string, query: string): ReactNode {
 
 function SearchModalShortcutKey({ children }: { children: ReactNode }) {
   return (
-    <kbd className="inline-flex h-6 min-w-6 items-center justify-center rounded-md border border-zinc-200 bg-white px-1.5 text-zinc-500 shadow-[0_1px_0_#e4e4e7] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:shadow-[0_1px_0_#3f3f46]">
+    <kbd className="inline-flex h-5 min-w-5 items-center justify-center rounded-[5px] border border-zinc-200 bg-white px-1 text-zinc-500 shadow-[0_1px_0_#e4e4e7] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:shadow-[0_1px_0_#3f3f46]">
       {children}
     </kbd>
   );
@@ -271,7 +271,7 @@ function SearchModalFooterAction({
   return (
     <div className="flex items-center gap-2">
       <span>{label}</span>
-      <span className="flex items-center gap-0.5">{children}</span>
+      <span className="flex items-center">{children}</span>
     </div>
   );
 }
@@ -380,7 +380,7 @@ function SearchTaskPreviewPanel({
 
   if (!task) {
     return (
-      <div className="flex h-full items-center justify-center px-6 text-sm text-zinc-400 dark:text-zinc-500">
+      <div className="flex h-full items-center justify-center bg-[#fcfcfe] px-6 text-sm text-zinc-400 dark:bg-zinc-950/40 dark:text-zinc-500">
         Hover a task to preview its content
       </div>
     );
@@ -415,7 +415,7 @@ function SearchTaskPreviewPanel({
       <button
         type="button"
         onClick={(event) => handleOpenTask(event)}
-        className="border-b border-zinc-100 px-3 py-2.5 text-left transition-colors hover:bg-zinc-100/80 dark:border-zinc-800 dark:hover:bg-zinc-800/50 cursor-pointer"
+        className="border-b border-zinc-100 bg-[#fcfcfe] px-3 py-2.5 text-left transition-colors hover:bg-zinc-100/80 dark:border-zinc-800 dark:bg-zinc-950/40 dark:hover:bg-zinc-800/50 cursor-pointer"
       >
         <h3
           className={`text-lg font-semibold leading-snug ${
@@ -433,7 +433,7 @@ function SearchTaskPreviewPanel({
       <button
         type="button"
         onClick={(event) => handleOpenTask(event)}
-        className="min-h-0 flex-1 overflow-y-auto px-3.5 py-1.5 text-left transition-colors hover:bg-zinc-100/60 dark:hover:bg-zinc-800/30 cursor-pointer"
+        className="min-h-0 flex-1 overflow-y-auto bg-[#fafafc] px-3.5 py-1.5 text-left transition-colors hover:bg-zinc-100/60 dark:bg-zinc-950/40 dark:hover:bg-zinc-800/30 cursor-pointer"
       >
         {isLoading ? (
           <p className="text-sm text-zinc-400 dark:text-zinc-500">
@@ -955,7 +955,7 @@ export function SearchModal({
                   )}
                 </div>
 
-                <div className="min-h-0 min-w-0 flex-1 bg-zinc-50/60 dark:bg-zinc-950/40">
+                <div className="min-h-0 min-w-0 flex-1 bg-[#fefeff] dark:bg-zinc-950/40">
                   <SearchTaskPreviewPanel
                     task={previewTask}
                     onOpenTask={(task) => selectTask(task)}

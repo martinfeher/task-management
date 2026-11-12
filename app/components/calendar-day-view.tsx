@@ -73,6 +73,10 @@ import {
   calendarNowLineIntersectsAnyBlock,
   getCalendarTimedBlockBounds,
 } from "@/lib/calendar-now-line-overlap";
+import {
+  readStoredCalendarTimedGridScrollTop,
+  useCalendarTimedGridScrollSession,
+} from "@/lib/use-calendar-timed-grid-scroll-session";
 
 const HOUR_START = CALENDAR_HOUR_START;
 const HOUR_END = CALENDAR_HOUR_END;
@@ -209,11 +213,18 @@ export function CalendarDayView({
   } = useCalendarTaskDragPreview();
   const recordCalendarTaskMove = useRecordCalendarTaskMove();
   const canDragTasks = Boolean(onSetTaskDueDate || onSetTaskDueTime);
+  const isTimedGridReady = Boolean(selectedDay && today && now);
+  useCalendarTimedGridScrollSession(timeScrollRef, "day", isTimedGridReady);
 
   useEffect(() => {
     const current = startOfDay(new Date());
+    const initialDay =
+      sidebarFocusDate !== undefined
+        ? startOfDay(sidebarFocusDate)
+        : current;
     setToday(current);
-    setSelectedDay(current);
+    setSelectedDay(initialDay);
+    lastSyncedSidebarDateKeyRef.current = toDateKey(initialDay);
     setNow(new Date());
   }, []);
 
@@ -434,6 +445,10 @@ export function CalendarDayView({
   useLayoutEffect(() => {
     const scrollEl = timeScrollRef.current;
     if (!scrollEl || !selectedDay || !today || !now) return;
+
+    if (readStoredCalendarTimedGridScrollTop("day") !== null) {
+      return;
+    }
 
     const isSelectedToday = isSameDay(selectedDay, today);
     const currentTimeTop =

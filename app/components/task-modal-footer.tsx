@@ -1,10 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { CiLink } from "react-icons/ci";
 import { LiaTagSolid } from "react-icons/lia";
 import { MdDeleteOutline } from "react-icons/md";
 import { createLabel } from "@/app/actions/todo";
-import { APP_HOVER_TOOLTIP_ABOVE_CENTER } from "@/lib/app-hover-tooltip-classes";
+import {
+  APP_HOVER_TOOLTIP_ABOVE_CENTER,
+  APP_HOVER_TOOLTIP_SHOWN,
+} from "@/lib/app-hover-tooltip-classes";
 import { buildTodoPath } from "@/lib/todo-routes";
 import {
   isTaskPriorityLevel,
@@ -20,8 +25,19 @@ import type { TodoList } from "./todo-app";
 const MODAL_FOOTER_ACTION_COLOR = "#a4a4a4";
 
 const MODAL_FOOTER_DELETE_TOOLTIP_ID = "task-modal-footer-delete-tooltip";
+const MODAL_FOOTER_COPY_LINK_TOOLTIP_ID = "task-modal-footer-copy-link-tooltip";
+const MODAL_FOOTER_PRIORITY_TOOLTIP_ID = "task-modal-footer-priority-tooltip";
+const MODAL_FOOTER_MOVE_TOOLTIP_ID = "task-modal-footer-move-tooltip";
 
-const MODAL_FOOTER_DELETE_TOOLTIP_CLASS = `add-task-date-tooltip ${APP_HOVER_TOOLTIP_ABOVE_CENTER} pointer-events-none absolute bottom-[calc(100%+8px)] z-50 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium`;
+const MODAL_FOOTER_ICON_TOOLTIP_GAP_PX = 8;
+const MODAL_FOOTER_ICON_TOOLTIP_VIEWPORT_PADDING_PX = 8;
+/** Above calendar task modal (`z-[10050]`). */
+const MODAL_FOOTER_ICON_TOOLTIP_Z_CLASS = "z-[10060]";
+
+const MODAL_FOOTER_ICON_TOOLTIP_CLASS = `add-task-date-tooltip ${APP_HOVER_TOOLTIP_ABOVE_CENTER} pointer-events-none fixed whitespace-nowrap px-3 py-1.5 text-[11px] font-medium ${MODAL_FOOTER_ICON_TOOLTIP_Z_CLASS}`;
+
+const MODAL_FOOTER_ICON_BUTTON_CLASS =
+  "flex h-6 mr-1 shrink-0 cursor-pointer items-center justify-center rounded-md text-[#b9b8c4] transition-colors hover:bg-zinc-100 hover:text-slate-450 dark:hover:bg-zinc-800 dark:hover:text-zinc-200";
 
 type TaskModalFooterProps = {
   taskId: string;
@@ -48,6 +64,126 @@ type TaskModalFooterProps = {
   hideDelete?: boolean;
   deleteButtonVariant?: "text" | "icon";
 };
+
+function ModalFooterPortaledIconButton({
+  tooltipId,
+  ariaLabel,
+  tooltipText,
+  onClick,
+  className = MODAL_FOOTER_ICON_BUTTON_CLASS,
+  style,
+  ariaHaspopup,
+  ariaExpanded,
+  children,
+}: {
+  tooltipId: string;
+  ariaLabel: string;
+  tooltipText: string;
+  onClick: () => void;
+  className?: string;
+  style?: React.CSSProperties;
+  ariaHaspopup?: boolean | "dialog" | "menu";
+  ariaExpanded?: boolean;
+  children: React.ReactNode;
+}) {
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const tooltipRef = useRef<HTMLSpanElement>(null);
+  const [showTooltip, setShowTooltip] = useState(false);
+  const [tooltipStyle, setTooltipStyle] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
+
+  useLayoutEffect(() => {
+    if (!showTooltip) {
+      setTooltipStyle(null);
+      return;
+    }
+
+    let frameId = 0;
+
+    function updatePosition() {
+      const button = buttonRef.current;
+      const tooltip = tooltipRef.current;
+      if (!button || !tooltip) {
+        frameId = window.requestAnimationFrame(updatePosition);
+        return;
+      }
+
+      const anchorRect = button.getBoundingClientRect();
+      const tooltipRect = tooltip.getBoundingClientRect();
+      const anchorCenterX = anchorRect.left + anchorRect.width / 2;
+      const halfTooltipWidth = tooltipRect.width / 2;
+
+      const left = Math.max(
+        MODAL_FOOTER_ICON_TOOLTIP_VIEWPORT_PADDING_PX + halfTooltipWidth,
+        Math.min(
+          anchorCenterX,
+          window.innerWidth -
+            MODAL_FOOTER_ICON_TOOLTIP_VIEWPORT_PADDING_PX -
+            halfTooltipWidth,
+        ),
+      );
+
+      const top =
+        anchorRect.top - tooltipRect.height - MODAL_FOOTER_ICON_TOOLTIP_GAP_PX;
+
+      setTooltipStyle({ top, left });
+    }
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [showTooltip, tooltipText]);
+
+  return (
+    <>
+      <button
+        ref={buttonRef}
+        type="button"
+        aria-label={ariaLabel}
+        aria-haspopup={ariaHaspopup}
+        aria-expanded={ariaExpanded}
+        aria-describedby={showTooltip ? tooltipId : undefined}
+        style={style}
+        onClick={onClick}
+        onMouseEnter={() => setShowTooltip(true)}
+        onMouseLeave={() => setShowTooltip(false)}
+        onFocus={() => setShowTooltip(true)}
+        onBlur={() => setShowTooltip(false)}
+        className={className}
+      >
+        {children}
+      </button>
+      {showTooltip && typeof document !== "undefined"
+        ? createPortal(
+            <span
+              ref={tooltipRef}
+              id={tooltipId}
+              role="tooltip"
+              className={`${MODAL_FOOTER_ICON_TOOLTIP_CLASS} ${
+                tooltipStyle ? APP_HOVER_TOOLTIP_SHOWN : ""
+              }`}
+              style={
+                tooltipStyle
+                  ? { top: tooltipStyle.top, left: tooltipStyle.left }
+                  : { top: -9999, left: -9999 }
+              }
+            >
+              {tooltipText}
+            </span>,
+            document.body,
+          )
+        : null}
+    </>
+  );
+}
 
 function FooterTextButton({
   children,
@@ -294,11 +430,12 @@ export function TaskModalFooter({
     <div ref={footerRef} className="flex min-w-0 flex-1 items-center gap-4">
       {hasPriorityActions ? (
         <div className="relative shrink-0">
-          <button
-            type="button"
-            aria-label="Priority"
-            aria-haspopup="dialog"
-            aria-expanded={isPriorityMenuOpen}
+          <ModalFooterPortaledIconButton
+            tooltipId={MODAL_FOOTER_PRIORITY_TOOLTIP_ID}
+            ariaLabel="Priority"
+            tooltipText="Priority"
+            ariaHaspopup="dialog"
+            ariaExpanded={isPriorityMenuOpen}
             onClick={() => {
               setIsLabelMenuOpen(false);
               setIsMoveMenuOpen(false);
@@ -315,7 +452,7 @@ export function TaskModalFooter({
                   : "size-[15px]"
               }
             />
-          </button>
+          </ModalFooterPortaledIconButton>
 
           {isPriorityMenuOpen ? (
             <div className="absolute bottom-full left-0 z-50 mb-1 w-[196px] overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
@@ -337,16 +474,20 @@ export function TaskModalFooter({
 
       {hasMoveActions ? (
         <div className="relative shrink-0">
-          <FooterTextButton
+          <ModalFooterPortaledIconButton
+            tooltipId={MODAL_FOOTER_MOVE_TOOLTIP_ID}
             ariaLabel="Move to list"
+            tooltipText="Move to"
             onClick={() => {
               setIsPriorityMenuOpen(false);
               setIsLabelMenuOpen(false);
               setIsMoveMenuOpen((open) => !open);
             }}
+            className="cursor-pointer text-[13px] transition-opacity hover:opacity-80"
+            style={{ color: MODAL_FOOTER_ACTION_COLOR }}
           >
             Move to
-          </FooterTextButton>
+          </ModalFooterPortaledIconButton>
 
           {isMoveMenuOpen ? (
             <div className="absolute bottom-full left-0 z-50 mb-1">
@@ -363,30 +504,36 @@ export function TaskModalFooter({
         </div>
       ) : null}
 
-      <FooterTextButton ariaLabel="Copy task link" onClick={() => void handleCopyLink()}>
-        {copyLinkMessage ?? "Copy link"}
-      </FooterTextButton>
+      {deleteButtonVariant === "icon" ? (
+        <ModalFooterPortaledIconButton
+          tooltipId={MODAL_FOOTER_COPY_LINK_TOOLTIP_ID}
+          ariaLabel="Copy task link"
+          tooltipText={copyLinkMessage ?? "Copy Link"}
+          onClick={() => void handleCopyLink()}
+          className={`${MODAL_FOOTER_ICON_BUTTON_CLASS} w-7`}
+        >
+          <CiLink className="size-5 mt-0.5" strokeWidth={0.5} />
+        </ModalFooterPortaledIconButton>
+      ) : (
+        <FooterTextButton
+          ariaLabel="Copy task link"
+          onClick={() => void handleCopyLink()}
+        >
+          {copyLinkMessage ?? "Copy link"}
+        </FooterTextButton>
+      )}
 
       {hasDeleteActions ? (
         deleteButtonVariant === "icon" ? (
-          <div className="group/delete relative ml-auto shrink-0">
-            <button
-              type="button"
-              aria-label="Delete task"
-              aria-describedby={MODAL_FOOTER_DELETE_TOOLTIP_ID}
-              onClick={handleDelete}
-              className="flex size-8 cursor-pointer items-center justify-center rounded-md text-[#a4a4a4] transition-colors hover:bg-zinc-100 hover:text-red-600 dark:hover:bg-zinc-800 dark:hover:text-red-400"
-            >
-              <MdDeleteOutline className="size-5" aria-hidden="true" />
-            </button>
-            <span
-              id={MODAL_FOOTER_DELETE_TOOLTIP_ID}
-              role="tooltip"
-              className={MODAL_FOOTER_DELETE_TOOLTIP_CLASS}
-            >
-              Delete task
-            </span>
-          </div>
+          <ModalFooterPortaledIconButton
+            tooltipId={MODAL_FOOTER_DELETE_TOOLTIP_ID}
+            ariaLabel="Delete task"
+            tooltipText="Delete task"
+            onClick={handleDelete}
+            className={`${MODAL_FOOTER_ICON_BUTTON_CLASS} ml-auto w-5 -mr-1.5 hover:text-red-500 dark:hover:text-red-400`}
+          >
+            <MdDeleteOutline className="size-[18px]" />
+          </ModalFooterPortaledIconButton>
         ) : (
           <FooterTextButton ariaLabel="Delete task" onClick={handleDelete}>
             Delete

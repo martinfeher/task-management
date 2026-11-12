@@ -22,6 +22,7 @@ import {
   useCalendarTaskModalActions,
   useCalendarTaskModalTask,
 } from "./calendar-task-modal-actions";
+import { CALENDAR_SIDEBAR_HOVER_PREVIEW_TRANSITION_MS } from "@/lib/calendar-sidebar-hover-preview";
 
 export {
   getCalendarTaskClickAnchorRect,
@@ -63,6 +64,16 @@ type CalendarTaskModalProps = {
   taskSnapshot?: CalendarTaskSnapshot | null;
   anchorRect?: CalendarTaskModalAnchorRect | null;
   isNewTaskDraft?: boolean;
+  /** Sidebar hover: centered modal without blocking the rest of the calendar. */
+  isHoverPreview?: boolean;
+  hoverPreviewVisible?: boolean;
+  /** When false, no dimming overlay (e.g. calendar sidebar task list). */
+  showBackdrop?: boolean;
+  onHoverPreviewPointerEnter?: () => void;
+  onHoverPreviewPointerLeave?: () => void;
+  /** Schedule order (e.g. sidebar upcoming list) for header prev/next controls. */
+  navigableTaskIds?: string[];
+  onNavigateTask?: (taskId: string) => void;
   onNewTaskDraftComplete?: () => void;
   onClose: () => void;
 } & CalendarTaskEditorCallbacks;
@@ -72,6 +83,13 @@ export function CalendarTaskModal({
   taskSnapshot = null,
   anchorRect: _anchorRect = null,
   isNewTaskDraft = false,
+  isHoverPreview = false,
+  hoverPreviewVisible = true,
+  showBackdrop = true,
+  onHoverPreviewPointerEnter,
+  onHoverPreviewPointerLeave,
+  navigableTaskIds,
+  onNavigateTask,
   onNewTaskDraftComplete,
   onClose,
   onDetailsSaved,
@@ -126,6 +144,62 @@ export function CalendarTaskModal({
     [handleCreateNewTask, isNewTaskDraft],
   );
 
+  const navigableIndex =
+    navigableTaskIds?.indexOf(taskId) ?? -1;
+
+  const handleNavigateToTask = useCallback(
+    async (targetTaskId: string) => {
+      await detailsSaveControllerRef.current?.flushSave();
+      onNavigateTask?.(targetTaskId);
+    },
+    [onNavigateTask],
+  );
+
+  const modalTaskNavigation = useMemo(() => {
+    if (
+      isNewTaskDraft ||
+      !navigableTaskIds?.length ||
+      navigableIndex < 0 ||
+      !onNavigateTask
+    ) {
+      return null;
+    }
+
+    const canGoPrevious = navigableIndex > 0;
+    const canGoNext = navigableIndex < navigableTaskIds.length - 1;
+    const taskNameById = new Map(
+      modalActions?.tasks.map((task) => [task.id, task.name] as const) ?? [],
+    );
+    const previousTaskId = canGoPrevious
+      ? navigableTaskIds[navigableIndex - 1]
+      : null;
+    const nextTaskId = canGoNext
+      ? navigableTaskIds[navigableIndex + 1]
+      : null;
+
+    return {
+      canGoPrevious,
+      canGoNext,
+      previousTaskTitle: previousTaskId
+        ? (taskNameById.get(previousTaskId) ?? null)
+        : null,
+      nextTaskTitle: nextTaskId ? (taskNameById.get(nextTaskId) ?? null) : null,
+      onPrevious: canGoPrevious
+        ? () => void handleNavigateToTask(navigableTaskIds[navigableIndex - 1])
+        : undefined,
+      onNext: canGoNext
+        ? () => void handleNavigateToTask(navigableTaskIds[navigableIndex + 1])
+        : undefined,
+    };
+  }, [
+    handleNavigateToTask,
+    isNewTaskDraft,
+    modalActions?.tasks,
+    navigableIndex,
+    navigableTaskIds,
+    onNavigateTask,
+  ]);
+
   const modalFooterConfig = useMemo(
     () =>
       modalActions
@@ -158,6 +232,8 @@ export function CalendarTaskModal({
   }, [taskId]);
 
   useEffect(() => {
+    if (isHoverPreview || !showBackdrop) return;
+
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
@@ -173,31 +249,61 @@ export function CalendarTaskModal({
       document.body.style.overflow = previousOverflow;
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [handleClose]);
+  }, [handleClose, isHoverPreview, showBackdrop]);
+
+  const allowBackgroundInteraction = isHoverPreview || !showBackdrop;
 
   const dialogClassName =
     "calendar-task-modal relative z-10 flex max-h-[calc(100vh-48px)] flex-col overflow-hidden overflow-y-auto bg-white dark:bg-zinc-950";
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[10050] flex items-center justify-center"
+      className={`fixed inset-0 z-[10050] flex items-center justify-center ${
+        allowBackgroundInteraction ? "pointer-events-none" : ""
+      }`}
       style={{ padding: CALENDAR_TASK_MODAL_VIEWPORT_PADDING_PX }}
     >
-      <button
-        type="button"
-        aria-label="Close task editor"
-        className="fixed inset-0 bg-zinc-900/25 backdrop-brightness-[1.1]"
-        onClick={() => void handleClose()}
-      />
+      {showBackdrop ? (
+        isHoverPreview ? (
+          <div
+            className="pointer-events-none fixed inset-0 bg-zinc-900/15 backdrop-brightness-[1.05] dark:bg-zinc-950/40"
+            aria-hidden
+          />
+        ) : (
+          <button
+            type="button"
+            aria-label="Close task editor"
+            className="fixed inset-0 bg-zinc-900/25 backdrop-brightness-[1.1]"
+            onClick={() => void handleClose()}
+          />
+        )
+      ) : null}
 
       <div
         ref={dialogRef}
         role="dialog"
-        aria-modal="true"
-        aria-label="Edit task"
-        className={dialogClassName}
-        style={{ width: CALENDAR_TASK_MODAL_WIDTH_PX }}
+        aria-modal={allowBackgroundInteraction ? undefined : true}
+        aria-label={isHoverPreview ? "Task preview" : "Edit task"}
+        className={`${dialogClassName} ${
+          isHoverPreview
+            ? `${hoverPreviewVisible ? "pointer-events-auto" : "pointer-events-none"} shadow-[0_10px_23px_rgba(0,0,0,0.09)] ring-1 ring-zinc-200/80 transition-[opacity,transform] ease-[cubic-bezier(0.22,1,0.36,1)] dark:ring-zinc-800 ${
+                hoverPreviewVisible
+                  ? "scale-100 opacity-100"
+                  : "scale-[0.985] opacity-0"
+              }`
+            : ""
+        }`}
+        style={{
+          width: CALENDAR_TASK_MODAL_WIDTH_PX,
+          ...(isHoverPreview
+            ? {
+                transitionDuration: `${CALENDAR_SIDEBAR_HOVER_PREVIEW_TRANSITION_MS}ms`,
+              }
+            : undefined),
+        }}
         onMouseDown={(event) => event.stopPropagation()}
+        onMouseEnter={isHoverPreview ? onHoverPreviewPointerEnter : undefined}
+        onMouseLeave={isHoverPreview ? onHoverPreviewPointerLeave : undefined}
       >
         <div className="flex flex-col">
           <TaskDetailsPanel
@@ -219,6 +325,7 @@ export function CalendarTaskModal({
             onClose={() => void handleClose()}
             modalFooterConfig={modalFooterConfig}
             modalCreateAction={modalCreateAction}
+            modalTaskNavigation={modalTaskNavigation}
             hideModalFormatToggle
           />
         </div>

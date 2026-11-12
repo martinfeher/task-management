@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { BiLink, BiLeftArrowAlt, BiRedo, BiUndo } from "react-icons/bi";
+import { MdKeyboardArrowUp, MdOutlineKeyboardArrowDown } from "react-icons/md";
 import { LuCheck, LuCode, LuHeading1, LuHeading2, LuHeading3, LuHistory, LuPilcrow, LuRemoveFormatting, LuType, LuX } from "react-icons/lu";
 import { HiItalic } from "react-icons/hi2";
 import { VscChecklist } from "react-icons/vsc";
@@ -290,6 +291,14 @@ type TaskDetailsPanelProps = {
     disabled?: boolean;
   } | null;
   hideModalFormatToggle?: boolean;
+  modalTaskNavigation?: {
+    canGoPrevious: boolean;
+    canGoNext: boolean;
+    previousTaskTitle?: string | null;
+    nextTaskTitle?: string | null;
+    onPrevious?: () => void;
+    onNext?: () => void;
+  } | null;
   onClose?: () => void;
 };
 
@@ -918,49 +927,6 @@ function getSelectionHighlightColor(editor: HTMLElement) {
   }
 
   return colors[0] ?? DEFAULT_HIGHLIGHT_COLOR;
-}
-
-function getFormatSelectionPreviewText(range: Range | null) {
-  if (!range || range.collapsed) return "";
-
-  const normalized = range
-    .toString()
-    .replace(/\r\n/g, "\n")
-    .replace(/\r/g, "\n")
-    .split("\n")
-    .map((line) => line.replace(/\s+/g, " ").trim())
-    .join("\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-
-  if (!normalized) return "";
-
-  const maxLines = 6;
-  const lines = normalized.split("\n");
-  let preview = lines.slice(0, maxLines).join("\n");
-  if (lines.length > maxLines) {
-    preview += "\n…";
-  }
-
-  if (preview.length > 200) {
-    preview = `${preview.slice(0, 200)}…`;
-  }
-
-  return preview;
-}
-
-function getTextColorPreviewTypography(
-  fontFamilyId: DetailFontFamilyId,
-  fontSize: DetailFontSizeOption,
-  lineHeight: DetailLineHeightOption,
-) {
-  return {
-    fontFamily:
-      getDetailFontFamilyValue(fontFamilyId) ??
-      getDetailFontFamilyValue(getAppFontFamilyId()),
-    fontSize,
-    lineHeight,
-  };
 }
 
 function resolveTextColorOption(color: string) {
@@ -2188,6 +2154,7 @@ export function TaskDetailsPanel({
   modalFooterConfig = null,
   modalCreateAction = null,
   hideModalFormatToggle = false,
+  modalTaskNavigation = null,
   onClose,
 }: TaskDetailsPanelProps) {
   const isModalLayout = layout === "modal";
@@ -3369,7 +3336,11 @@ export function TaskDetailsPanel({
   >(null);
 
   const closeFormatDropdowns = useCallback(() => {
-    if (openFormatDropdownRef.current === "textColor") {
+    if (
+      openFormatDropdownRef.current === "textColor" ||
+      openFormatDropdownRef.current === "highlight" ||
+      openFormatDropdownRef.current === "fontFamily"
+    ) {
       clearTextColorLivePreviewRef.current?.();
     }
     setOpenFormatDropdown(null);
@@ -3524,6 +3495,13 @@ export function TaskDetailsPanel({
       } catch {
         captureFormatSelectionFromEditor();
       }
+
+      if (
+        !options?.keepContent &&
+        openFormatDropdownRef.current === "highlight"
+      ) {
+        setFormatMenuInlineFormats(getDetailSelectionInlineFormatState(editor));
+      }
     },
     [captureFormatSelectionFromEditor, rememberFormatSelection],
   );
@@ -3556,10 +3534,80 @@ export function TaskDetailsPanel({
     return contentRange;
   }, [rememberFormatSelection]);
 
-  const previewTextColorOnSelection = useCallback((_color: string) => {
-    // Swatch hover uses the floating tooltip preview. In-editor marker preview
-    // rewrote multiline selections and left blank lines above/below the range.
-  }, []);
+  const previewTextColorOnSelection = useCallback(
+    (color: string) => {
+      const editor = editorRef.current;
+      if (!editor) return;
+
+      const contentRange = ensureTextColorPreviewSetup();
+      if (!contentRange || !textColorPreviewBaselineRef.current) return;
+
+      contentRange.deleteContents();
+      contentRange.insertNode(
+        textColorPreviewBaselineRef.current.cloneNode(true),
+      );
+      normalizeTextColorPreviewEditorStructure(editor);
+
+      const previewRange = getTextColorPreviewContentRange(editor);
+      if (!previewRange || previewRange.collapsed) return;
+
+      const resolvedColor = resolveTextColorOption(color);
+      editor.focus({ preventScroll: true });
+      restoreEditorSelectionRange(previewRange);
+
+      document.execCommand("styleWithCSS", false, "true");
+      document.execCommand("foreColor", false, resolvedColor);
+      normalizeTextColorPreviewEditorStructure(editor);
+
+      const styledRange = getTextColorPreviewContentRange(editor);
+      if (styledRange) {
+        rememberFormatSelection(editor, styledRange);
+      }
+    },
+    [ensureTextColorPreviewSetup, rememberFormatSelection],
+  );
+
+  const previewHighlightColorOnSelection = useCallback(
+    (color: string) => {
+      const editor = editorRef.current;
+      if (!editor) return;
+
+      const contentRange = ensureTextColorPreviewSetup();
+      if (!contentRange || !textColorPreviewBaselineRef.current) return;
+
+      contentRange.deleteContents();
+      contentRange.insertNode(
+        textColorPreviewBaselineRef.current.cloneNode(true),
+      );
+      normalizeTextColorPreviewEditorStructure(editor);
+
+      const previewRange = getTextColorPreviewContentRange(editor);
+      if (!previewRange || previewRange.collapsed) return;
+
+      editor.focus({ preventScroll: true });
+      restoreEditorSelectionRange(previewRange);
+
+      if (normalizeColorValue(color) === "#ffffff") {
+        removeHighlightFromSelection(editor);
+      } else {
+        applyHighlight(editor, resolveHighlightColorOption(color));
+      }
+      normalizeTextColorPreviewEditorStructure(editor);
+
+      const styledRange = getTextColorPreviewContentRange(editor);
+      if (styledRange) {
+        rememberFormatSelection(editor, styledRange);
+      }
+
+      const resolvedColor = resolveHighlightColorOption(color);
+      setFormatMenuInlineFormats((current) => ({
+        ...current,
+        highlight: normalizeColorValue(color) !== "#ffffff",
+        highlightColor: resolvedColor,
+      }));
+    },
+    [ensureTextColorPreviewSetup, rememberFormatSelection],
+  );
 
   const previewFontFamilyOnSelection = useCallback(
     (familyId: DetailFontFamilyId) => {
@@ -3609,14 +3657,22 @@ export function TaskDetailsPanel({
           setFormatMenuInlineFormats(getDetailSelectionInlineFormatState(editor));
         }
 
-        if (dropdown === "fontFamily") {
+        if (
+          dropdown === "fontFamily" ||
+          dropdown === "textColor" ||
+          dropdown === "highlight"
+        ) {
           ensureTextColorPreviewSetup();
         }
 
         return;
       }
 
-      if (dropdown === "textColor" || dropdown === "fontFamily") {
+      if (
+        dropdown === "textColor" ||
+        dropdown === "fontFamily" ||
+        dropdown === "highlight"
+      ) {
         clearTextColorLivePreview();
       }
 
@@ -4512,6 +4568,8 @@ export function TaskDetailsPanel({
       const activeLine = getActiveLineElement(editor);
       if (isCodeLine(activeLine)) return;
 
+      clearTextColorLivePreview({ keepContent: true });
+
       captureFormatSelectionFromEditor();
       const savedRange = savedFormatSelectionRef.current?.cloneRange() ?? null;
 
@@ -4526,13 +4584,21 @@ export function TaskDetailsPanel({
       if (normalizeColorValue(color) === "#ffffff") {
         removeHighlightFromSelection(editor);
       } else {
-        applyHighlight(editor, color);
+        applyHighlight(editor, resolveHighlightColorOption(color));
       }
 
+      removeEmptyDetailLineBeforeFirstFormatLine(
+        editor,
+        savedFormatLineIdsRef.current,
+      );
+      removeEmptyDetailLinesAmongSavedFormatLines(
+        editor,
+        savedFormatLineIdsRef.current,
+      );
+      syncEditorLineEmptyState(editor);
       syncEditorContent();
       recordHistorySnapshot();
       scheduleAutoSave();
-      closeFormatDropdowns();
 
       const resolvedColor = resolveHighlightColorOption(color);
       const nextInlineFormats = getDetailSelectionInlineFormatState(editor);
@@ -4558,10 +4624,26 @@ export function TaskDetailsPanel({
           }),
         );
       }
+
+      const selection = window.getSelection();
+      if (
+        selection?.rangeCount &&
+        selection.anchorNode &&
+        editor.contains(selection.anchorNode) &&
+        !selection.isCollapsed
+      ) {
+        const range = selection.getRangeAt(0);
+        range.collapse(false);
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+
+      closeFormatMenu({ clearSavedSelection: true });
     },
     [
       captureFormatSelectionFromEditor,
-      closeFormatDropdowns,
+      clearTextColorLivePreview,
+      closeFormatMenu,
       recordHistorySnapshot,
       scheduleAutoSave,
       syncEditorContent,
@@ -7145,6 +7227,75 @@ export function TaskDetailsPanel({
     Boolean(task && !task.isNote) &&
     !hideModalFormatToggle;
 
+  function renderModalTaskNavigationButtons() {
+    if (!isModalLayout || !modalTaskNavigation) return null;
+
+    const {
+      canGoPrevious,
+      canGoNext,
+      previousTaskTitle,
+      nextTaskTitle,
+      onPrevious,
+      onNext,
+    } = modalTaskNavigation;
+
+    return (
+      <div className="ml-1 flex items-center">
+        <div className="group/prev-task relative">
+          <button
+            type="button"
+            aria-label={
+              previousTaskTitle
+                ? `Previous task: ${previousTaskTitle}`
+                : "Previous task"
+            }
+            disabled={!canGoPrevious}
+            onClick={() => onPrevious?.()}
+            className={`flex size-8 items-center justify-center rounded-full text-zinc-500 transition-colors hover:bg-zinc-200 hover:text-zinc-800 disabled:pointer-events-none disabled:opacity-35 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 ${
+              canGoPrevious ? "cursor-pointer" : "cursor-not-allowed"
+            }`}
+          >
+            <MdKeyboardArrowUp className="size-[22px]" aria-hidden="true" />
+          </button>
+          {canGoPrevious && previousTaskTitle ? (
+            <span
+              role="tooltip"
+              className={`${TASK_DETAILS_TOOLTIP_CLASS} max-w-[min(280px,calc(100vw-32px))] truncate`}
+            >
+              {previousTaskTitle}
+            </span>
+          ) : null}
+        </div>
+        <div className="group/next-task relative">
+          <button
+            type="button"
+            aria-label={
+              nextTaskTitle ? `Next task: ${nextTaskTitle}` : "Next task"
+            }
+            disabled={!canGoNext}
+            onClick={() => onNext?.()}
+            className={`flex size-8 items-center justify-center rounded-full text-zinc-500 transition-colors hover:bg-zinc-200 hover:text-zinc-800 disabled:pointer-events-none disabled:opacity-35 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 ${
+              canGoNext ? "cursor-pointer" : "cursor-not-allowed"
+            }`}
+          >
+            <MdOutlineKeyboardArrowDown
+              className="size-[22px]"
+              aria-hidden="true"
+            />
+          </button>
+          {canGoNext && nextTaskTitle ? (
+            <span
+              role="tooltip"
+              className={`${TASK_DETAILS_TOOLTIP_CLASS} max-w-[min(280px,calc(100vw-32px))] truncate`}
+            >
+              {nextTaskTitle}
+            </span>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
   function renderHeaderQuickFormatButtons() {
     if (!task) return null;
 
@@ -7477,7 +7628,7 @@ export function TaskDetailsPanel({
                       aria-haspopup="dialog"
                       aria-expanded={isDateMenuOpen}
                       onClick={handleDateButtonClick}
-                      className={`flex cursor-pointer gap-[2px] rounded-full bg-[#e9ecef] pl-3.5 pr-3 text-[12px] font-semibold uppercase tracking-wide text-zinc-600 transition-colors hover:bg-[#e0e2e5] dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700 ${
+                      className={`flex cursor-pointer shadow-[0_7px_17px_rgba(0,0,0,0.06)] gap-[2px] rounded-full bg-[#ebf1f7] pl-3.5 pr-3 text-[12px] font-semibold uppercase tracking-wide text-zinc-600 transition-colors hover:bg-[#e0e2e5] dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700 ${
                         isModalLayout
                           ? "h-[33px] items-center"
                           : dueDateLabel && dueTimeLabel
@@ -7490,8 +7641,8 @@ export function TaskDetailsPanel({
                       <div
                         className={
                           dueDateLabel
-                            ? `shrink-0 text-[12px] ${
-                                dueTimeLabel ? "mb-[6px]" : ""
+                            ? `shrink-0 text-[11.5px] ${
+                                dueTimeLabel ? "mb-[9px]" : ""
                               } ${isModalLayout ? "leading-none" : "leading-[13px]"}`
                             : undefined
                         }
@@ -7544,6 +7695,12 @@ export function TaskDetailsPanel({
                   </div>
                   <span className="text-[#cfcfcf] ml-2">|</span>
                 </>
+              ) : null}
+              {renderModalTaskNavigationButtons()}
+              {isModalLayout && modalTaskNavigation ? (
+                <span className="ml-1 text-[#cfcfcf]" aria-hidden="true">
+                  |
+                </span>
               ) : null}
               <div
                 ref={headerFormatActionsRef}
@@ -7729,6 +7886,9 @@ export function TaskDetailsPanel({
 
             <div
               ref={editorRef}
+              data-format-highlight-menu-open={
+                openFormatDropdown === "highlight" ? "true" : undefined
+              }
               contentEditable
               suppressContentEditableWarning
               onInput={handleEditorInput}
@@ -8126,14 +8286,6 @@ export function TaskDetailsPanel({
                   onPreviewTextColorChange={previewTextColorOnSelection}
                   onPreviewTextColorClear={clearTextColorLivePreview}
                   recentColors={recentFormatColors}
-                  previewText={getFormatSelectionPreviewText(
-                    savedFormatSelectionRef.current,
-                  )}
-                  previewTypography={getTextColorPreviewTypography(
-                    formatMenuFontFamily,
-                    formatMenuFontSize,
-                    formatMenuLineHeight,
-                  )}
                 />
 
                 <DetailFormatHighlightColorDropdown
@@ -8145,6 +8297,8 @@ export function TaskDetailsPanel({
                   highlightColorOptions={HIGHLIGHT_COLOR_OPTIONS}
                   isHighlightActive={formatMenuInlineFormats.highlight}
                   onSelectHighlightColor={applyHighlightColor}
+                  onPreviewHighlightColorChange={previewHighlightColorOnSelection}
+                  onPreviewHighlightColorClear={clearTextColorLivePreview}
                   recentColors={recentFormatColors}
                 />
 

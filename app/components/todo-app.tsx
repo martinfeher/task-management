@@ -90,8 +90,11 @@ import type { CalendarViewTab } from "@/lib/calendar-view-settings";
 import {
   readCalendarViewSession,
   resolveCalendarViewSession,
+  patchCalendarViewSession,
   saveCalendarViewSession,
 } from "@/lib/calendar-view-settings";
+import { readCalendarDefaultViewPreferenceFromStorage } from "@/lib/calendar-default-view-settings";
+import { resolveCalendarEntryActiveView } from "@/lib/resolve-calendar-entry-view";
 import { Sidebar } from "./sidebar";
 import { CalendarPanel, CalendarViewsPanel } from "./calendar-panel";
 import {
@@ -1637,14 +1640,17 @@ export function TodoApp({
     setSelectedLabelId(nextState.selectedLabelId);
     setSelectedTaskId(nextState.selectedTaskId);
     setIsListCalendarOpen(nextState.isListCalendarOpen);
-    setListCalendarView(nextState.listCalendarView);
-    setListCalendarMultiDayCount(nextState.listCalendarMultiDayCount);
-    setListCalendarMultiWeekCount(nextState.listCalendarMultiWeekCount);
-    setListCalendarPanelView(nextState.listCalendarView);
-    setCalendarView(nextState.calendarView);
-    setCalendarMultiDayCount(nextState.calendarMultiDayCount);
-    setCalendarMultiWeekCount(nextState.calendarMultiWeekCount);
-    setCalendarPanelView(nextState.calendarView);
+    if (route.kind === "calendar") {
+      setCalendarView(nextState.calendarView);
+      setCalendarMultiDayCount(nextState.calendarMultiDayCount);
+      setCalendarMultiWeekCount(nextState.calendarMultiWeekCount);
+      setCalendarPanelView(nextState.calendarView);
+    } else if (route.kind === "listCalendar") {
+      setListCalendarView(nextState.listCalendarView);
+      setListCalendarMultiDayCount(nextState.listCalendarMultiDayCount);
+      setListCalendarMultiWeekCount(nextState.listCalendarMultiWeekCount);
+      setListCalendarPanelView(nextState.listCalendarView);
+    }
   }, [pathname, searchParamsKey, lists, labels]);
 
   useEffect(() => {
@@ -1754,6 +1760,18 @@ export function TodoApp({
     setListCalendarMultiWeekCount(session.multiWeekCount);
   }, []);
 
+  const resolveCalendarSessionForEntry = useCallback(
+    (session: ReturnType<typeof resolveCalendarViewSession>) => {
+      const activeView = resolveCalendarEntryActiveView(
+        readCalendarDefaultViewPreferenceFromStorage(),
+        calendarTasks,
+        session,
+      );
+      return { ...session, activeView };
+    },
+    [calendarTasks],
+  );
+
   const openCalendarShortcutModal = useCallback(() => {
     setSidebarHoverPreview(null);
     setIsCalendarShortcutModalOpen(true);
@@ -1765,7 +1783,7 @@ export function TodoApp({
 
   const expandCalendarShortcutModal = useCallback(
     (session: ReturnType<typeof resolveCalendarViewSession>) => {
-      applyCalendarViewSession(session);
+      applyCalendarViewSession(resolveCalendarSessionForEntry(session));
       setIsCalendarShortcutModalOpen(false);
       setIsListCalendarOpen(false);
       setIsListCalendarPreview(false);
@@ -1775,7 +1793,7 @@ export function TodoApp({
       setSelectedListId(null);
       setSelectedTaskId(null);
     },
-    [applyCalendarViewSession],
+    [applyCalendarViewSession, resolveCalendarSessionForEntry],
   );
 
   const openCalendarWithLastView = useCallback(() => {
@@ -1783,13 +1801,15 @@ export function TodoApp({
     setIsListCalendarPreview(false);
     setSidebarHoverPreview(null);
     applyCalendarViewSession(
-      resolveCalendarViewSession(readCalendarViewSession()),
+      resolveCalendarSessionForEntry(
+        resolveCalendarViewSession(readCalendarViewSession()),
+      ),
     );
     setActiveView("calendar");
     setSelectedLabelId(null);
     setSelectedListId(null);
     setSelectedTaskId(null);
-  }, [applyCalendarViewSession]);
+  }, [applyCalendarViewSession, resolveCalendarSessionForEntry]);
 
   useEffect(() => {
     const route = parseTodoPath(pathname, searchParams);
@@ -1804,7 +1824,7 @@ export function TodoApp({
 
   useEffect(() => {
     if (activeView === "calendar") {
-      saveCalendarViewSession({
+      patchCalendarViewSession({
         activeView: calendarPanelView,
         multiDayCount: calendarMultiDayCount,
         multiWeekCount: calendarMultiWeekCount,
@@ -1813,7 +1833,7 @@ export function TodoApp({
     }
 
     if (isListCalendarOpen) {
-      saveCalendarViewSession({
+      patchCalendarViewSession({
         activeView: listCalendarPanelView,
         multiDayCount: listCalendarMultiDayCount,
         multiWeekCount: listCalendarMultiWeekCount,
@@ -3754,6 +3774,13 @@ export function TodoApp({
 
     setIsListCalendarOpen(true);
     setListCalendarShowingDetails(false);
+    const listCalendarEntrySession = resolveCalendarSessionForEntry(
+      resolveCalendarViewSession(readCalendarViewSession()),
+    );
+    setListCalendarPanelView(listCalendarEntrySession.activeView);
+    setListCalendarView(listCalendarEntrySession.activeView);
+    setListCalendarMultiDayCount(listCalendarEntrySession.multiDayCount);
+    setListCalendarMultiWeekCount(listCalendarEntrySession.multiWeekCount);
 
     if (isNarrowDesktop && !hasResizedTaskList) {
       setTaskListWidth(
@@ -3764,6 +3791,7 @@ export function TodoApp({
     cancelListCalendarPreviewClose,
     clampTaskListWidth,
     closeListCalendar,
+    resolveCalendarSessionForEntry,
     hasResizedTaskList,
     isListCalendarOpen,
     isNarrowDesktop,
@@ -4554,6 +4582,7 @@ export function TodoApp({
         open={isCalendarShortcutModalOpen}
         onClose={closeCalendarShortcutModal}
         onExpandToFullPage={expandCalendarShortcutModal}
+        calendarEntryTasks={calendarTasks}
         {...calendarPanelSharedProps}
       />
       <UndoButton

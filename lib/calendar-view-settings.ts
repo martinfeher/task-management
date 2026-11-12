@@ -9,6 +9,14 @@ export type CalendarViewSession = {
   activeView: CalendarViewTab;
   multiDayCount: number;
   multiWeekCount: number;
+  /** Sidebar / timed view focus (`YYYY-MM-DD`). */
+  focusDateKey?: string;
+  /** Multi-day view visible range start (`YYYY-MM-DD`). */
+  daysRangeStartKey?: string;
+  /** Sidebar mini-month month anchor (`YYYY-MM-DD`, first of month). */
+  sidebarMonthKey?: string;
+  /** Last vertical scroll offsets for timed grids, keyed by calendar view tab. */
+  timedGridScrollTopByView?: Partial<Record<CalendarViewTab, number>>;
 };
 
 export const DEFAULT_CALENDAR_VIEW: CalendarViewTab = "week";
@@ -24,12 +32,39 @@ const VALID_VIEWS = new Set<CalendarViewTab>([
   "weeks",
 ]);
 
+const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
 const DEFAULT_MULTI_DAY_COUNT = 3;
 const DEFAULT_MULTI_WEEK_COUNT = 2;
 
 function clampCount(value: unknown, min: number, max: number, fallback: number) {
   if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
   return Math.min(max, Math.max(min, Math.round(value)));
+}
+
+function parseOptionalDateKey(value: unknown): string | undefined {
+  if (typeof value !== "string" || !DATE_KEY_PATTERN.test(value)) {
+    return undefined;
+  }
+
+  return value;
+}
+
+function parseTimedGridScrollTopByView(
+  value: unknown,
+): Partial<Record<CalendarViewTab, number>> | undefined {
+  if (!value || typeof value !== "object") return undefined;
+
+  const result: Partial<Record<CalendarViewTab, number>> = {};
+  for (const view of VALID_VIEWS) {
+    const scrollTop = (value as Record<string, unknown>)[view];
+    if (typeof scrollTop !== "number" || !Number.isFinite(scrollTop) || scrollTop < 0) {
+      continue;
+    }
+    result[view] = Math.round(scrollTop);
+  }
+
+  return Object.keys(result).length > 0 ? result : undefined;
 }
 
 function parseCalendarViewSession(raw: string | null): CalendarViewSession | null {
@@ -54,6 +89,12 @@ function parseCalendarViewSession(raw: string | null): CalendarViewSession | nul
         2,
         12,
         DEFAULT_MULTI_WEEK_COUNT,
+      ),
+      focusDateKey: parseOptionalDateKey(parsed.focusDateKey),
+      daysRangeStartKey: parseOptionalDateKey(parsed.daysRangeStartKey),
+      sidebarMonthKey: parseOptionalDateKey(parsed.sidebarMonthKey),
+      timedGridScrollTopByView: parseTimedGridScrollTopByView(
+        parsed.timedGridScrollTopByView,
       ),
     };
   } catch {
@@ -106,4 +147,11 @@ export function saveCalendarViewSession(session: CalendarViewSession) {
   } catch {
     // Ignore quota / privacy mode errors.
   }
+}
+
+export function patchCalendarViewSession(patch: Partial<CalendarViewSession>) {
+  saveCalendarViewSession({
+    ...resolveCalendarViewSession(readCalendarViewSession()),
+    ...patch,
+  });
 }

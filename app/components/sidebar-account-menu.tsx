@@ -9,7 +9,6 @@ import {
   LuCircleUser,
   LuKeyboard,
   LuLogOut,
-  LuMoon,
   LuPlus,
   LuSparkles,
 } from "react-icons/lu";
@@ -59,11 +58,6 @@ function getAccountUserInitials(
   if (parts.length === 0) return "?";
   if (parts.length === 1) return parts[0]!.slice(0, 1).toUpperCase();
   return (parts[0]![0] + parts[parts.length - 1]![0]).toUpperCase();
-}
-
-function getAppearanceLabel() {
-  if (typeof document === "undefined") return "Light";
-  return document.documentElement.classList.contains("dark") ? "Dark" : "Light";
 }
 
 type WorkspaceRow = {
@@ -193,17 +187,17 @@ export function SidebarAccountMenu({
         >
           <div className="flex items-start gap-[10.5px] border-b border-zinc-100 px-[12.3px] py-[10.5px] dark:border-zinc-800">
             <div className="relative shrink-0">
-              <UserAvatar user={user} sizeClass="size-11" />
+              <UserAvatar user={user} sizeClass="size-8" />
               <span
                 className="absolute bottom-0 right-0 size-3 rounded-full border-2 border-white bg-emerald-500 dark:border-zinc-900"
                 aria-hidden="true"
               />
             </div>
             <div className="min-w-0 flex-1 pt-0.5">
-              <p className="truncate text-[15px] font-semibold leading-tight text-zinc-900 dark:text-zinc-50">
+              <p className="truncate text-[13px] font-semibold leading-tight text-zinc-900 dark:text-zinc-50">
                 {displayName}
               </p>
-              <p className="truncate text-[12px] text-zinc-500 dark:text-zinc-400">
+              <p className="truncate text-[11px] text-zinc-500 dark:text-zinc-400">
                 {user.email}
               </p>
             </div>
@@ -230,7 +224,7 @@ export function SidebarAccountMenu({
                   }`}
                 >
                   <span
-                    className="flex size-8 shrink-0 items-center justify-center rounded-lg text-sm font-semibold text-white"
+                    className="flex size-6 shrink-0 items-center justify-center rounded-lg text-sm font-semibold text-white"
                     style={{ backgroundColor: workspace.color }}
                   >
                     {workspace.initial}
@@ -321,14 +315,6 @@ export function SidebarAccountMenu({
               }}
             />
             <AccountMenuRow
-              icon={<LuMoon className="size-[17px]" aria-hidden="true" />}
-              label="Appearance"
-              trailing={getAppearanceLabel()}
-              onClick={() => {
-                onCloseMenu();
-              }}
-            />
-            <AccountMenuRow
               icon={<LuCircleHelp className="size-[17px]" aria-hidden="true" />}
               label="Help & feedback"
               onClick={() => {
@@ -338,8 +324,8 @@ export function SidebarAccountMenu({
             />
           </div>
 
-          <div className="mx-[7px] mb-[7px] rounded-xl bg-[#eef4ff] px-[10.5px] py-[10.5px] dark:bg-blue-950/40">
-            <div className="mb-[7px] flex items-center justify-between text-[12px] font-medium text-zinc-700 dark:text-zinc-200">
+          {/* <div className="mx-[7px] mb-[7px] rounded-xl bg-[#eef4ff] px-[10.5px] py-[10.5px] dark:bg-blue-950/40">
+            <div className="mb-[7px] flex items-center justify-between text-[11px] font-medium text-zinc-700 dark:text-zinc-200">
               <span>
                 {activeTaskCount} / {TASK_USAGE_LIMIT} tasks used
               </span>
@@ -353,7 +339,7 @@ export function SidebarAccountMenu({
             </div>
             <button
               type="button"
-              className={`flex w-full items-center justify-center gap-[7px] rounded-xl bg-[#3b82f6] px-[10.5px] py-[8.8px] text-[13px] font-semibold text-white transition-colors hover:bg-[#2563eb]`}
+              className={`flex w-[130px] ml-[20px] items-center justify-center gap-[7px] rounded-xl bg-[#839fcd] px-[10.5px] py-[8px] text-[11.5px] font-semibold text-white transition-colors hover:bg-[#2563eb]`}
               onClick={(event) => {
                 runMenuAction(() =>
                   onOpenSettings("account", {
@@ -366,7 +352,7 @@ export function SidebarAccountMenu({
               <LuSparkles className="size-4" aria-hidden="true" />
               Upgrade to Pro
             </button>
-          </div>
+          </div> */}
 
           <div
             className={`border-t border-zinc-100 ${ACCOUNT_MENU_SECTION_X} ${ACCOUNT_MENU_SECTION_Y} dark:border-zinc-800`}
@@ -407,7 +393,7 @@ export function SidebarAccountMenu({
             <p className="truncate text-[11.5px] font-semibold leading-snug text-zinc-750 dark:text-zinc-50">
               {displayName}
             </p>
-            <p className="truncate text-[11px] font-normal leading-snug text-zinc-500 dark:text-zinc-400">
+            <p className="truncate text-[10.5px] font-normal leading-snug text-zinc-500 dark:text-zinc-400">
               Personal workspace
             </p>
           </div>

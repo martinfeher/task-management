@@ -25,6 +25,11 @@ import {
   useTaskEditorDefaults,
 } from "@/lib/task-editor-defaults-settings";
 import { useCalendarTaskDefaultColor } from "@/lib/calendar-task-default-color-settings";
+import {
+  CALENDAR_DEFAULT_VIEW_PREFERENCE_OPTIONS,
+  useCalendarDefaultViewPreference,
+  type CalendarDefaultViewPreference,
+} from "@/lib/calendar-default-view-settings";
 
 export type SettingsSection = "account" | "general" | "tasks" | "labels" | "calendar";
 
@@ -308,6 +313,49 @@ function GeneralSettingsContent() {
   );
 }
 
+function SettingsSelectField<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: T;
+  options: { value: T; label: string; description?: string }[];
+  onChange: (value: T) => void;
+}) {
+  const id = label.toLowerCase().replace(/\s+/g, "-");
+  const selected = options.find((option) => option.value === value);
+
+  return (
+    <div className="flex flex-col gap-2">
+      <label
+        htmlFor={id}
+        className="text-sm text-zinc-900 dark:text-zinc-50"
+      >
+        {label}
+      </label>
+      <select
+        id={id}
+        value={value}
+        onChange={(event) => onChange(event.target.value as T)}
+        className="w-full max-w-md rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition-colors focus:border-zinc-400 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50 dark:focus:border-zinc-500"
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+      {selected?.description ? (
+        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+          {selected.description}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function SettingsNumberField({
   label,
   value,
@@ -425,6 +473,10 @@ function SettingsColorOptions({
 function CalendarSettingsContent() {
   const { defaultColor, setDefaultColor, colorOptions } =
     useCalendarTaskDefaultColor();
+  const {
+    calendarDefaultViewPreference,
+    setCalendarDefaultViewPreference,
+  } = useCalendarDefaultViewPreference();
 
   return (
     <div className="space-y-4">
@@ -436,6 +488,12 @@ function CalendarSettingsContent() {
           Calendar view preferences.
         </p>
       </div>
+      <SettingsSelectField<CalendarDefaultViewPreference>
+        label="Default calendar view"
+        value={calendarDefaultViewPreference}
+        options={CALENDAR_DEFAULT_VIEW_PREFERENCE_OPTIONS}
+        onChange={setCalendarDefaultViewPreference}
+      />
       <SettingsColorOptions
         label="Calendar task default color"
         value={defaultColor}

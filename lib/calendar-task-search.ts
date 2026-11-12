@@ -142,6 +142,14 @@ export function getCalendarSidebarUpcomingTasks(
   return [...upcoming].sort(compareCalendarTaskSchedule);
 }
 
+/** Ordered task ids for prev/next navigation in the calendar task modal. */
+export function getCalendarModalNavigableTaskIds(
+  tasks: TaskListItem[],
+  fromDate: Date,
+) {
+  return getCalendarSidebarUpcomingTasks(tasks, fromDate).map((task) => task.id);
+}
+
 export type CalendarSidebarTaskGroup = {
   dateKey: string;
   label: string;

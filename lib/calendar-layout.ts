@@ -248,7 +248,7 @@ export function getCalendarDayColumnDividerClass(
 }
 
 export const CALENDAR_TODAY_DATE_CIRCLE_CLASS =
-  "bg-[#5363b5] text-white";
+  "bg-[#7782BA] text-white";
 
 /** Base month day number color (#b2b6bf) darkened by 15%. */
 export const CALENDAR_CURRENT_MONTH_DAY_NUMBER_CLASS =

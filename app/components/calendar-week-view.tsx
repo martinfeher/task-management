@@ -53,6 +53,7 @@ import {
   getCalendarDesktopDisplayHours,
   useCalendarViewportHourHeight,
 } from "@/lib/use-calendar-viewport-hour-height";
+import { useCalendarTimedGridScrollSession } from "@/lib/use-calendar-timed-grid-scroll-session";
 import {
   CalendarTimedTaskBlock,
   CalendarTaskCompletionCheckbox,
@@ -299,10 +300,17 @@ export function CalendarWeekView({
   const suppressTaskClickRef = useRef(false);
   const hourColumnRef = useRef<HTMLDivElement>(null);
   const timeScrollRef = useRef<HTMLDivElement>(null);
+  const visibleWeekCount = Math.max(1, weekCount);
   const isTimedGridReady = Boolean(weekStart && today && now);
   const hourHeightPx = useCalendarViewportHourHeight(
     timeScrollRef,
     hourColumnRef,
+    isTimedGridReady,
+  );
+  const timedGridScrollView = visibleWeekCount > 1 ? "weeks" : "week";
+  useCalendarTimedGridScrollSession(
+    timeScrollRef,
+    timedGridScrollView,
     isTimedGridReady,
   );
   const [nowLineTop, setNowLineTop] = useState<number | null>(null);
@@ -314,12 +322,15 @@ export function CalendarWeekView({
   } = useCalendarTaskDragPreview();
   const recordCalendarTaskMove = useRecordCalendarTaskMove();
   const canDragTasks = Boolean(onSetTaskDueDate || onSetTaskDueTime);
-  const visibleWeekCount = Math.max(1, weekCount);
 
   useEffect(() => {
     const current = startOfDay(new Date());
+    const focusDay =
+      sidebarFocusDate !== undefined
+        ? startOfDay(sidebarFocusDate)
+        : current;
     setToday(current);
-    setWeekStart(getWeekStart(current));
+    setWeekStart(getWeekStart(focusDay));
     setNow(new Date());
   }, []);
 

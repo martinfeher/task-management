@@ -61,21 +61,21 @@ export const FORMAT_TOOLBAR_DROPDOWN_TRIGGER_CLASS =
 export const FORMAT_TOOLBAR_DROPDOWN_MENU_CLASS =
   "overflow-hidden rounded-[12px] border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900 min-w-[168px] cursor-pointer";
 
-/** List + heading menus: +3px vs default dropdown padding. */
+/** List, heading, and font-family menus: 8px inset on all sides. */
 export const FORMAT_TOOLBAR_LIST_BLOCK_MENU_CLASS =
-  "overflow-hidden rounded-[12px] border border-zinc-200 bg-white py-[7px] shadow-lg dark:border-zinc-700 dark:bg-zinc-900 min-w-[168px] cursor-pointer";
+  "overflow-hidden rounded-[12px] border border-zinc-200 bg-white p-2 shadow-lg dark:border-zinc-700 dark:bg-zinc-900 min-w-[168px] cursor-pointer";
 
 export const FORMAT_TOOLBAR_DROPDOWN_ITEM_CLASS =
   "flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm text-zinc-900 transition-colors hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800";
 
 export const FORMAT_TOOLBAR_LIST_BLOCK_MENU_ITEM_CLASS =
-  "flex w-full items-center gap-2 px-[11px] py-[9px] text-left text-sm text-zinc-900 transition-colors hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800";
+  FORMAT_TOOLBAR_DROPDOWN_ITEM_CLASS;
 
 export const FORMAT_TOOLBAR_FONT_FAMILY_TRIGGER_CLASS =
   `flex h-8 cursor-pointer items-center gap-0.5 rounded-lg px-1 text-[13px] ${FORMAT_TOOLBAR_ICON_COLOR} transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800`;
 
 export const FORMAT_TOOLBAR_FONT_FAMILY_ITEM_CLASS =
-  "flex w-full items-center px-3 py-1.5 text-left text-[14px] text-[#48484a] hover:text-[#292929] transition-colors hover:bg-zinc-100 dark:text-[#fbfbfb] dark:hover:bg-zinc-800 cursor-pointer";
+  "flex w-full items-center px-2 py-1.5 text-left text-[14px] text-[#48484a] hover:text-[#292929] transition-colors hover:bg-zinc-100 dark:text-[#fbfbfb] dark:hover:bg-zinc-800 cursor-pointer";
 
 export const FORMAT_TOOLBAR_FONT_SIZE_TEXT_CLASS = "text-[14px] px-0";
 /** 15% brighter than #83a1e0 / Tailwind blue-300 (#93c5fd) */
@@ -89,7 +89,7 @@ const FORMAT_TOOLBAR_OVERFLOW_MENU_ICON_CLASS =
   `inline-flex h-[18px] w-[22px] shrink-0 items-center justify-center leading-none ${FORMAT_TOOLBAR_ICON_COLOR}`;
 
 const FORMAT_TOOLBAR_OVERFLOW_MENU_BASE_CLASS =
-  "rounded-[12px] border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900 w-[151px] min-w-[151px]";
+  "rounded-[12px] border border-zinc-200 bg-white p-2 shadow-lg dark:border-zinc-700 dark:bg-zinc-900 w-[151px] min-w-[151px]";
 
 const FORMAT_TOOLBAR_OVERFLOW_MENU_CLASS =
   `${FORMAT_TOOLBAR_OVERFLOW_MENU_BASE_CLASS} overflow-hidden`;
@@ -101,7 +101,7 @@ const FORMAT_TOOLBAR_OVERFLOW_MENU_TRIGGER_CLASS =
   "flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800";
 
 const FORMAT_TOOLBAR_OVERFLOW_MENU_ITEM_CLASS =
-  "flex w-full items-center gap-2 px-[10.8px] py-1.5 text-left text-sm text-zinc-900 transition-colors hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800";
+  "flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm text-zinc-900 transition-colors hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800";
 
 /** Where the format toolbar sits relative to the text selection. */
 export type FormatToolbarAnchorPlacement = "above" | "below";
@@ -561,10 +561,12 @@ function HighlightColorSwatchButton({
   option,
   selected,
   onSelect,
+  onPreviewHover,
 }: {
   option: { label: string; value: string };
   selected: boolean;
   onSelect: () => void;
+  onPreviewHover?: (option: { label: string; value: string }) => void;
 }) {
   return (
     <button
@@ -583,6 +585,7 @@ function HighlightColorSwatchButton({
       }`}
       style={{ backgroundColor: option.value }}
       onMouseDown={(event) => event.preventDefault()}
+      onMouseEnter={() => onPreviewHover?.(option)}
       onClick={onSelect}
     />
   );
@@ -639,6 +642,8 @@ export function DetailFormatTextColorDropdown({
 
   function handlePreviewHover(option: DetailTextColorOption) {
     onPreviewTextColorChange?.(option.value);
+
+    if (onPreviewTextColorChange) return;
 
     if (!previewContent) return;
 
@@ -785,6 +790,8 @@ type DetailFormatHighlightColorDropdownProps = {
   highlightColorOptions: readonly { label: string; value: string }[];
   isHighlightActive?: boolean;
   onSelectHighlightColor: (color: string) => void;
+  onPreviewHighlightColorChange?: (color: string) => void;
+  onPreviewHighlightColorClear?: () => void;
   recentColors?: RecentFormatColor[];
 };
 
@@ -795,6 +802,8 @@ export function DetailFormatHighlightColorDropdown({
   highlightColorOptions,
   isHighlightActive = false,
   onSelectHighlightColor,
+  onPreviewHighlightColorChange,
+  onPreviewHighlightColorClear,
   recentColors = [],
 }: DetailFormatHighlightColorDropdownProps) {
   const menuSelectedHighlightColor = isHighlightActive
@@ -803,6 +812,14 @@ export function DetailFormatHighlightColorDropdown({
   const recentHighlightColors = recentColors.filter(
     (entry) => entry.kind === "highlight",
   );
+
+  function handlePreviewHover(option: { label: string; value: string }) {
+    onPreviewHighlightColorChange?.(option.value);
+  }
+
+  function clearPreview() {
+    onPreviewHighlightColorClear?.();
+  }
 
   return (
     <FormatToolbarDropdownShell
@@ -833,7 +850,7 @@ export function DetailFormatHighlightColorDropdown({
         </>
       }
     >
-      <div className="space-y-3 px-3 py-2">
+      <div className="space-y-3 px-3 py-2" onMouseLeave={clearPreview}>
         {recentHighlightColors.length > 0 ? (
           <section>
             <p className={FORMAT_COLOR_MENU_SECTION_TITLE_CLASS}>Recently Used</p>
@@ -846,6 +863,7 @@ export function DetailFormatHighlightColorDropdown({
                     entry.color,
                     menuSelectedHighlightColor,
                   )}
+                  onPreviewHover={handlePreviewHover}
                   onSelect={() => {
                     onSelectHighlightColor(entry.color);
                     onOpenChange(false);
@@ -864,6 +882,7 @@ export function DetailFormatHighlightColorDropdown({
                 key={option.value}
                 option={option}
                 selected={colorsEquivalent(option.value, menuSelectedHighlightColor)}
+                onPreviewHover={handlePreviewHover}
                 onSelect={() => {
                   onSelectHighlightColor(option.value);
                   onOpenChange(false);
@@ -1022,7 +1041,7 @@ export function DetailFormatFontFamilyDropdown({
       tooltipId="format-toolbar-font-family-tooltip"
       tooltipLabel="Font family"
       triggerClassName={FORMAT_TOOLBAR_FONT_FAMILY_TRIGGER_CLASS}
-      menuClassName={`${FORMAT_TOOLBAR_DROPDOWN_MENU_CLASS} max-h-72 overflow-y-auto`}
+      menuClassName={`${FORMAT_TOOLBAR_LIST_BLOCK_MENU_CLASS} max-h-72 overflow-y-auto`}
       menuStyle={{ minWidth: "128px" }}
       trigger={
         <>

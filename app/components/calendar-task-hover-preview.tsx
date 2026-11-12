@@ -33,6 +33,8 @@ import type { TaskListItem } from "./todo-app";
 
 const PREVIEW_WIDTH = 280;
 const PREVIEW_ESTIMATED_HEIGHT = 240;
+const PREVIEW_TITLE_CLASS =
+  "line-clamp-2 text-[15px] font-semibold leading-5 text-[#3C3C3E]";
 const PREVIEW_SUBTITLE_CLASS =
   "text-[13.5px] leading-[16px] text-[#bfbfbf] dark:text-[#bfbfbf]";
 const TASK_GAP = 12;
@@ -61,6 +63,8 @@ type PreviewState = {
 };
 
 type CalendarTaskHoverPreviewContextValue = {
+  /** Task currently hovered in the calendar grid (drives sidebar row highlight). */
+  hoveredTaskId: string | null;
   show: (
     task: TaskListItem,
     element: HTMLElement,
@@ -223,11 +227,9 @@ function CalendarTaskHoverPreviewCard({ task }: { task: TaskListItem }) {
   );
 
   return (
-    <div className="flex flex-col gap-2.5 px-3.5 py-[15px]">
+    <div className="flex flex-col gap-2.5 p-[12px]">
       <div className="flex flex-col gap-1">
-        <p className="line-clamp-2 text-[15px] font-semibold leading-5 text-zinc-900 dark:text-zinc-50">
-          {task.name}
-        </p>
+        <p className={PREVIEW_TITLE_CLASS}>{task.name}</p>
 
         {descriptionLines.length > 0 ? (
           <div className="flex flex-col gap-0.5">
@@ -439,8 +441,11 @@ export function CalendarTaskHoverPreviewProvider({
     };
   }, [preview, repositionPreview]);
 
+  const hoveredTaskId = preview?.task.id ?? null;
+
   const contextValue = useMemo(
     () => ({
+      hoveredTaskId,
       show,
       move,
       hide,
@@ -450,7 +455,16 @@ export function CalendarTaskHoverPreviewProvider({
       beginTaskDrag,
       isDragPreviewActive: () => dragPreviewActiveRef.current,
     }),
-    [show, move, hide, startDragPreview, updateDragPreview, endDragPreview, beginTaskDrag],
+    [
+      hoveredTaskId,
+      show,
+      move,
+      hide,
+      startDragPreview,
+      updateDragPreview,
+      endDragPreview,
+      beginTaskDrag,
+    ],
   );
 
   return (
@@ -475,6 +489,11 @@ export function CalendarTaskHoverPreviewProvider({
         : null}
     </CalendarTaskHoverPreviewContext.Provider>
   );
+}
+
+export function useCalendarHoveredTaskId() {
+  const context = useContext(CalendarTaskHoverPreviewContext);
+  return context?.hoveredTaskId ?? null;
 }
 
 export function useCalendarTaskHoverPreview(task: TaskListItem) {

@@ -6,10 +6,13 @@ import { LuX } from "react-icons/lu";
 import {
   readCalendarViewSession,
   resolveCalendarViewSession,
-  saveCalendarViewSession,
+  patchCalendarViewSession,
   type CalendarViewSession,
   type CalendarViewTab,
 } from "@/lib/calendar-view-settings";
+import { readCalendarDefaultViewPreferenceFromStorage } from "@/lib/calendar-default-view-settings";
+import { resolveCalendarEntryActiveView } from "@/lib/resolve-calendar-entry-view";
+import type { TaskListItem } from "./todo-app";
 import { CalendarPanel } from "./calendar-panel";
 import { CalendarExpandIcon } from "./calendar-expand-icon";
 import type { ComponentProps } from "react";
@@ -20,6 +23,7 @@ type CalendarShortcutModalProps = {
   open: boolean;
   onClose: () => void;
   onExpandToFullPage?: (session: CalendarViewSession) => void;
+  calendarEntryTasks?: TaskListItem[];
 } & Omit<
   CalendarPanelProps,
   | "view"
@@ -36,6 +40,7 @@ export function CalendarShortcutModal({
   open,
   onClose,
   onExpandToFullPage,
+  calendarEntryTasks = [],
   ...calendarPanelProps
 }: CalendarShortcutModalProps) {
   const [view, setView] = useState<CalendarViewTab>("week");
@@ -46,13 +51,18 @@ export function CalendarShortcutModal({
     if (!open) return;
 
     const session = resolveCalendarViewSession(readCalendarViewSession());
-    setView(session.activeView);
+    const activeView = resolveCalendarEntryActiveView(
+      readCalendarDefaultViewPreferenceFromStorage(),
+      calendarEntryTasks,
+      session,
+    );
+    setView(activeView);
     setMultiDayCount(session.multiDayCount);
     setMultiWeekCount(session.multiWeekCount);
-  }, [open]);
+  }, [calendarEntryTasks, open]);
 
   const handleClose = useCallback(() => {
-    saveCalendarViewSession({
+    patchCalendarViewSession({
       activeView: view,
       multiDayCount,
       multiWeekCount,
@@ -66,8 +76,10 @@ export function CalendarShortcutModal({
       multiDayCount,
       multiWeekCount,
     };
-    saveCalendarViewSession(session);
-    onExpandToFullPage?.(session);
+    patchCalendarViewSession(session);
+    onExpandToFullPage?.(
+      resolveCalendarViewSession(readCalendarViewSession()),
+    );
     onClose();
   }, [multiDayCount, multiWeekCount, onClose, onExpandToFullPage, view]);
 

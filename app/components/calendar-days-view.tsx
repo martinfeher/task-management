@@ -72,6 +72,7 @@ import {
   useCalendarDaysQuarterHourGridLines,
   useCalendarViewportHourHeight,
 } from "@/lib/use-calendar-viewport-hour-height";
+import { useCalendarTimedGridScrollSession } from "@/lib/use-calendar-timed-grid-scroll-session";
 import type { CalendarSidebarSyncProps } from "./calendar-view-sidebar-layout";
 import {
   CalendarTimedTaskBlock,
@@ -314,6 +315,7 @@ export function CalendarMultiDayView({
     hourColumnRef,
     isTimedGridReady,
   );
+  useCalendarTimedGridScrollSession(timeScrollRef, "days", isTimedGridReady);
   const showQuarterHourGridLines = useCalendarDaysQuarterHourGridLines();
   const [nowLineTop, setNowLineTop] = useState<number | null>(null);
 
