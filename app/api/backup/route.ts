@@ -1,20 +1,21 @@
 import { resolveCorsHeaders } from "@/lib/api-cors";
 import {
-  createBackupZipStream,
+  createBackupZipBuffer,
   getBackupDownloadFilename,
 } from "@/lib/app-backup";
 import { requireUser, UnauthorizedError } from "@/lib/require-user";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   const corsHeaders = await resolveCorsHeaders();
   try {
     const { id: userId } = await requireUser();
     const filename = getBackupDownloadFilename();
-    const body = createBackupZipStream(userId);
+    const body = await createBackupZipBuffer(userId);
 
-    return new Response(body, {
+    return new Response(new Uint8Array(body), {
       headers: {
         ...corsHeaders,
         "Content-Type": "application/zip",

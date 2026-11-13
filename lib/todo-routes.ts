@@ -13,7 +13,7 @@ const LIST_CALENDAR_VIEWS = new Set<ListCalendarView>([
   "weeks",
 ]);
 
-export const LIST_CALENDAR_MULTI_DAY_DEFAULT = 3;
+export const LIST_CALENDAR_MULTI_DAY_DEFAULT = 4;
 export const LIST_CALENDAR_MULTI_DAY_MIN = 2;
 export const LIST_CALENDAR_MULTI_DAY_MAX = 30;
 export const LIST_CALENDAR_MULTI_WEEK_DEFAULT = 2;

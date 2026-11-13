@@ -1,3 +1,5 @@
+import { LIST_CALENDAR_MULTI_DAY_DEFAULT } from "./todo-routes";
+
 export type CalendarViewTab =
   | "day"
   | "week"
@@ -34,7 +36,6 @@ const VALID_VIEWS = new Set<CalendarViewTab>([
 
 const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
-const DEFAULT_MULTI_DAY_COUNT = 3;
 const DEFAULT_MULTI_WEEK_COUNT = 2;
 
 function clampCount(value: unknown, min: number, max: number, fallback: number) {
@@ -82,7 +83,7 @@ function parseCalendarViewSession(raw: string | null): CalendarViewSession | nul
         parsed.multiDayCount,
         2,
         30,
-        DEFAULT_MULTI_DAY_COUNT,
+        LIST_CALENDAR_MULTI_DAY_DEFAULT,
       ),
       multiWeekCount: clampCount(
         parsed.multiWeekCount,
@@ -105,7 +106,7 @@ function parseCalendarViewSession(raw: string | null): CalendarViewSession | nul
 export function getDefaultCalendarViewSession(): CalendarViewSession {
   return {
     activeView: DEFAULT_CALENDAR_VIEW,
-    multiDayCount: DEFAULT_MULTI_DAY_COUNT,
+    multiDayCount: LIST_CALENDAR_MULTI_DAY_DEFAULT,
     multiWeekCount: DEFAULT_MULTI_WEEK_COUNT,
   };
 }

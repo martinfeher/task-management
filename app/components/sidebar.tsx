@@ -2290,7 +2290,6 @@ export function Sidebar({
                 onToggle={() => setIsProfileMenuOpen((open) => !open)}
                 onCloseMenu={() => setIsProfileMenuOpen(false)}
                 menuRef={profileMenuRef}
-                activeTaskCount={getTotalActiveTaskCount(taskCountByListId)}
                 onOpenSettings={(section, pointer) =>
                   openSettingsModal(pointer, section)
                 }

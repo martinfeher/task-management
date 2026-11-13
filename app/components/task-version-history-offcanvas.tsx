@@ -16,6 +16,7 @@ import {
   restoreTaskVersion,
   type TaskVersionDetail,
 } from "@/lib/task-versions-api";
+import { TASK_DETAILS_HEADER_ICON_HOVER_CLASS } from "@/lib/task-details-header-icon-hover";
 
 type TaskVersionHistoryOffcanvasProps = {
   open: boolean;
@@ -205,11 +206,11 @@ export function TaskVersionHistoryOffcanvas({
           </div>
           <button
             type="button"
-            aria-label="Close"
+            aria-label="Close version history"
             onClick={onClose}
-            className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+            className={`flex size-[29px] -mt-[2px] shrink-0 cursor-pointer items-center justify-center rounded-full text-zinc-500 transition-colors bg-zinc-200/30 hover:text-zinc-600 dark:text-zinc-400 dark:hover:text-zinc-100 ${TASK_DETAILS_HEADER_ICON_HOVER_CLASS}`}
           >
-            <LuX className="size-4" />
+            <LuX className="size-[15px]" aria-hidden="true" />
           </button>
         </div>
 

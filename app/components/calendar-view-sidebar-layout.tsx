@@ -37,8 +37,38 @@ import {
 import type { ToggleTaskOptions } from "@/lib/toggle-task-options";
 import { useListCalendarOverlapLayout } from "./list-calendar-overlap-shell";
 import type { CalendarDateNavigationSnapshot } from "@/lib/calendar-date-navigation-undo";
+import type { CalendarViewTab } from "@/lib/calendar-view-settings";
+import {
+  CALENDAR_SIDEBAR_SEARCH_HIGHLIGHT_CLASS,
+  highlightSearchMatch,
+} from "@/lib/highlight-search-match";
 
 const CALENDAR_SIDEBAR_COMPLETE_UNDO_MS = 5000;
+
+/** Month view keeps the task sidebar closed by default below this width. */
+export const CALENDAR_MONTH_SIDEBAR_DEFAULT_MIN_VIEWPORT_PX = 1700;
+
+export function shouldDefaultCalendarSidebarOpen(
+  activeView: CalendarViewTab,
+  viewportWidth: number,
+) {
+  if (
+    activeView === "month" &&
+    viewportWidth < CALENDAR_MONTH_SIDEBAR_DEFAULT_MIN_VIEWPORT_PX
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+export function getInitialCalendarSidebarOpen(activeView: CalendarViewTab) {
+  if (typeof window === "undefined") {
+    return true;
+  }
+
+  return shouldDefaultCalendarSidebarOpen(activeView, window.innerWidth);
+}
 
 const CALENDAR_SIDEBAR_TASK_ROW_BUTTON_CLASS =
   "outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0";
@@ -335,7 +365,11 @@ function CalendarSidebarSearchResults({
                     ) : null}
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm leading-5 text-zinc-650 dark:text-zinc-100">
-                        {task.name}
+                        {highlightSearchMatch(
+                          task.name,
+                          trimmedQuery,
+                          CALENDAR_SIDEBAR_SEARCH_HIGHLIGHT_CLASS,
+                        )}
                       </span>
                       {scheduleLabel ? (
                         <span className="mt-0.5 block truncate text-[11px] leading-none tabular-nums text-zinc-400 dark:text-zinc-500">

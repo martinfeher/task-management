@@ -155,6 +155,41 @@ async function getOwnedTaskIds(userId: string) {
   return new Set(tasks.map((task) => task.id));
 }
 
+async function populateBackupArchive(archive: Archiver, userId: string) {
+  const manifest: AppBackupManifest = {
+    formatVersion: APP_BACKUP_FORMAT_VERSION,
+    exportedAt: new Date().toISOString(),
+    app: "todolistWeb",
+    ownerUserId: userId,
+  };
+  const database = await loadAppBackupDatabase(userId);
+  const ownedTaskIds = new Set(database.tasks.map((task) => task.id));
+
+  archive.append(JSON.stringify(manifest, null, 2), {
+    name: APP_BACKUP_MANIFEST_NAME,
+  });
+  archive.append(JSON.stringify(database, null, 2), {
+    name: APP_BACKUP_DATABASE_NAME,
+  });
+
+  const uploadEntries = [
+    ...(await collectUploadFiles(
+      UPLOAD_TASKS_DIR,
+      `${APP_BACKUP_UPLOADS_PREFIX}tasks/`,
+      ownedTaskIds,
+    )),
+    ...(await collectUploadFiles(
+      UPLOAD_AUDIO_DIR,
+      `${APP_BACKUP_UPLOADS_PREFIX}task-audio/`,
+      ownedTaskIds,
+    )),
+  ];
+
+  for (const entry of uploadEntries) {
+    archive.file(entry.absolutePath, { name: entry.archivePath });
+  }
+}
+
 export function createBackupZipStream(userId: string) {
   const archive = createZipArchive({ zlib: { level: 6 } });
   const output = new PassThrough();
@@ -162,39 +197,7 @@ export function createBackupZipStream(userId: string) {
 
   void (async () => {
     try {
-      const manifest: AppBackupManifest = {
-        formatVersion: APP_BACKUP_FORMAT_VERSION,
-        exportedAt: new Date().toISOString(),
-        app: "todolistWeb",
-        ownerUserId: userId,
-      };
-      const database = await loadAppBackupDatabase(userId);
-      const ownedTaskIds = new Set(database.tasks.map((task) => task.id));
-
-      archive.append(JSON.stringify(manifest, null, 2), {
-        name: APP_BACKUP_MANIFEST_NAME,
-      });
-      archive.append(JSON.stringify(database, null, 2), {
-        name: APP_BACKUP_DATABASE_NAME,
-      });
-
-      const uploadEntries = [
-        ...(await collectUploadFiles(
-          UPLOAD_TASKS_DIR,
-          `${APP_BACKUP_UPLOADS_PREFIX}tasks/`,
-          ownedTaskIds,
-        )),
-        ...(await collectUploadFiles(
-          UPLOAD_AUDIO_DIR,
-          `${APP_BACKUP_UPLOADS_PREFIX}task-audio/`,
-          ownedTaskIds,
-        )),
-      ];
-
-      for (const entry of uploadEntries) {
-        archive.file(entry.absolutePath, { name: entry.archivePath });
-      }
-
+      await populateBackupArchive(archive, userId);
       await archive.finalize();
     } catch (error) {
       archive.destroy(error instanceof Error ? error : new Error(String(error)));
@@ -202,6 +205,31 @@ export function createBackupZipStream(userId: string) {
   })();
 
   return Readable.toWeb(output) as ReadableStream<Uint8Array>;
+}
+
+/** Fully buffered zip for HTTP download (errors surface before the response is sent). */
+export async function createBackupZipBuffer(userId: string): Promise<Buffer> {
+  const archive = createZipArchive({ zlib: { level: 6 } });
+  const chunks: Buffer[] = [];
+
+  await new Promise<void>((resolve, reject) => {
+    archive.on("data", (chunk: Buffer) => {
+      chunks.push(chunk);
+    });
+    archive.on("end", () => resolve());
+    archive.on("error", reject);
+
+    void (async () => {
+      try {
+        await populateBackupArchive(archive, userId);
+        await archive.finalize();
+      } catch (error) {
+        reject(error instanceof Error ? error : new Error(String(error)));
+      }
+    })();
+  });
+
+  return Buffer.concat(chunks);
 }
 
 export function getBackupDownloadFilename(exportedAt = new Date()) {
@@ -509,39 +537,7 @@ export async function writeBackupZipToFile(outputPath: string, userId: string) {
   const stream = createWriteStream(outputPath);
   archive.pipe(stream);
 
-  const manifest: AppBackupManifest = {
-    formatVersion: APP_BACKUP_FORMAT_VERSION,
-    exportedAt: new Date().toISOString(),
-    app: "todolistWeb",
-    ownerUserId: userId,
-  };
-  const database = await loadAppBackupDatabase(userId);
-  const ownedTaskIds = new Set(database.tasks.map((task) => task.id));
-
-  archive.append(JSON.stringify(manifest, null, 2), {
-    name: APP_BACKUP_MANIFEST_NAME,
-  });
-  archive.append(JSON.stringify(database, null, 2), {
-    name: APP_BACKUP_DATABASE_NAME,
-  });
-
-  const uploadEntries = [
-    ...(await collectUploadFiles(
-      UPLOAD_TASKS_DIR,
-      `${APP_BACKUP_UPLOADS_PREFIX}tasks/`,
-      ownedTaskIds,
-    )),
-    ...(await collectUploadFiles(
-      UPLOAD_AUDIO_DIR,
-      `${APP_BACKUP_UPLOADS_PREFIX}task-audio/`,
-      ownedTaskIds,
-    )),
-  ];
-
-  for (const entry of uploadEntries) {
-    archive.file(entry.absolutePath, { name: entry.archivePath });
-  }
-
+  await populateBackupArchive(archive, userId);
   await archive.finalize();
   await finished(stream);
 }

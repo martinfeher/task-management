@@ -832,7 +832,7 @@ body {
   width: fit-content;
   max-width: 100%;
   margin-bottom: 0.35rem;
-  cursor: grab;
+  cursor: pointer;
   touch-action: none;
 }
 
@@ -845,9 +845,15 @@ body {
   max-width: 100%;
   height: auto;
   border-radius: 0.5rem;
-  cursor: grab;
+  cursor: pointer;
   -webkit-user-drag: none;
   user-select: none;
+}
+
+.task-detail-image-lightbox {
+  background: transparent;
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
 }
 
 .detail-image-wrapper[data-dragging="true"] .detail-image {

@@ -10,6 +10,10 @@ import {
   type CalendarViewSession,
   type CalendarViewTab,
 } from "@/lib/calendar-view-settings";
+import {
+  LIST_CALENDAR_MULTI_DAY_DEFAULT,
+  LIST_CALENDAR_MULTI_WEEK_DEFAULT,
+} from "@/lib/todo-routes";
 import { readCalendarDefaultViewPreferenceFromStorage } from "@/lib/calendar-default-view-settings";
 import { resolveCalendarEntryActiveView } from "@/lib/resolve-calendar-entry-view";
 import type { TaskListItem } from "./todo-app";
@@ -44,8 +48,12 @@ export function CalendarShortcutModal({
   ...calendarPanelProps
 }: CalendarShortcutModalProps) {
   const [view, setView] = useState<CalendarViewTab>("week");
-  const [multiDayCount, setMultiDayCount] = useState(3);
-  const [multiWeekCount, setMultiWeekCount] = useState(2);
+  const [multiDayCount, setMultiDayCount] = useState(
+    LIST_CALENDAR_MULTI_DAY_DEFAULT,
+  );
+  const [multiWeekCount, setMultiWeekCount] = useState(
+    LIST_CALENDAR_MULTI_WEEK_DEFAULT,
+  );
 
   useEffect(() => {
     if (!open) return;

@@ -123,6 +123,7 @@ import {
   getImageResizeHandle,
   startImageResize,
 } from "./detail-image-resize";
+import { TaskDetailImageLightbox } from "./task-detail-image-lightbox";
 import {
   applyLinkToSelection,
   findDetailLinkFromTarget,
@@ -2253,6 +2254,10 @@ export function TaskDetailsPanel({
   const [lineControls, setLineControls] = useState<LineControlItem[]>([]);
   const [dropIndicator, setDropIndicator] = useState<DropIndicatorState | null>(null);
   const [isImageDropActive, setIsImageDropActive] = useState(false);
+  const [imageLightbox, setImageLightbox] = useState<{
+    src: string;
+    alt: string;
+  } | null>(null);
   const [addBlockMenu, setAddBlockMenu] = useState<AddBlockMenuState | null>(null);
   const [slashCommandMenu, setSlashCommandMenu] =
     useState<SlashCommandMenuState | null>(null);
@@ -7090,7 +7095,38 @@ export function TaskDetailsPanel({
     );
   }
 
-  function handleEditorDoubleClick() {
+  function handleEditorDoubleClick(event: React.MouseEvent<HTMLDivElement>) {
+    const target = event.target as HTMLElement;
+    if (
+      target.closest(".detail-image-delete") ||
+      target.closest("[data-resize]")
+    ) {
+      scheduleFormatMenuReveal();
+      updateLineControls();
+      return;
+    }
+
+    const image =
+      target instanceof HTMLImageElement &&
+      target.classList.contains("detail-image")
+        ? target
+        : target
+            .closest(".detail-image-wrapper")
+            ?.querySelector("img.detail-image");
+
+    if (image instanceof HTMLImageElement) {
+      const src = image.currentSrc || image.getAttribute("src") || "";
+      if (src) {
+        event.preventDefault();
+        event.stopPropagation();
+        setImageLightbox({
+          src,
+          alt: image.alt?.trim() || "Task image",
+        });
+        return;
+      }
+    }
+
     scheduleFormatMenuReveal();
     updateLineControls();
   }
@@ -8733,6 +8769,13 @@ export function TaskDetailsPanel({
             ) : null}
           </span>
                 </div>
+      ) : null}
+      {imageLightbox ? (
+        <TaskDetailImageLightbox
+          src={imageLightbox.src}
+          alt={imageLightbox.alt}
+          onClose={() => setImageLightbox(null)}
+        />
       ) : null}
     </section>
   );

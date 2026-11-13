@@ -17,7 +17,11 @@ export function TemplateDataBackupSection() {
     setIsDownloading(true);
 
     try {
-      const response = await fetch("/api/backup");
+      const response = await fetch("/api/backup", {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store",
+      });
       if (!response.ok) {
         const payload = (await response.json().catch(() => null)) as {
           error?: string;
@@ -37,11 +41,13 @@ export function TemplateDataBackupSection() {
       link.click();
       URL.revokeObjectURL(url);
     } catch (downloadError) {
-      setError(
+      const message =
         downloadError instanceof Error
-          ? downloadError.message
-          : "Download failed",
-      );
+          ? downloadError.message === "Failed to fetch"
+            ? "Could not reach the backup server. Check that you are signed in and the app is running."
+            : downloadError.message
+          : "Download failed";
+      setError(message);
     } finally {
       setIsDownloading(false);
     }
@@ -58,6 +64,7 @@ export function TemplateDataBackupSection() {
 
       const response = await fetch("/api/backup/restore", {
         method: "POST",
+        credentials: "include",
         body: formData,
       });
 

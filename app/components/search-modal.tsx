@@ -16,7 +16,9 @@ import {
   LuArrowUp,
   LuCommand,
   LuCornerDownLeft,
+  LuX,
 } from "react-icons/lu";
+import { TASK_DETAILS_HEADER_ICON_HOVER_CLASS } from "@/lib/task-details-header-icon-hover";
 import { fetchTaskById } from "@/lib/task-details-api";
 import { buildTodoPath } from "@/lib/todo-routes";
 import { openInNewTabFromClick } from "@/lib/open-in-new-tab";
@@ -26,6 +28,7 @@ import {
   saveLastSearchQuery,
 } from "@/lib/search-settings-api";
 import { TaskCompletionCheckbox } from "./task-completion-checkbox";
+import { highlightSearchMatch } from "@/lib/highlight-search-match";
 import type { SearchTask } from "./todo-app";
 
 type SearchModalProps = {
@@ -216,41 +219,6 @@ function filterTasks(
   );
 
   return [...openMatches, ...completedMatches].slice(0, SEARCH_RESULT_LIMIT);
-}
-
-function highlightSearchMatch(text: string, query: string): ReactNode {
-  const trimmed = query.trim();
-  if (!trimmed) return text;
-
-  const lowerText = text.toLowerCase();
-  const lowerQuery = trimmed.toLowerCase();
-  const parts: ReactNode[] = [];
-  let lastIndex = 0;
-  let matchIndex = lowerText.indexOf(lowerQuery, lastIndex);
-
-  while (matchIndex !== -1) {
-    if (matchIndex > lastIndex) {
-      parts.push(text.slice(lastIndex, matchIndex));
-    }
-
-    parts.push(
-      <span
-        key={matchIndex}
-        className="rounded-[2px] bg-[#f5fcd0] dark:bg-zinc-700"
-      >
-        {text.slice(matchIndex, matchIndex + lowerQuery.length)}
-      </span>,
-    );
-
-    lastIndex = matchIndex + lowerQuery.length;
-    matchIndex = lowerText.indexOf(lowerQuery, lastIndex);
-  }
-
-  if (lastIndex < text.length) {
-    parts.push(text.slice(lastIndex));
-  }
-
-  return parts;
 }
 
 function SearchModalShortcutKey({ children }: { children: ReactNode }) {
@@ -789,12 +757,22 @@ export function SearchModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="search-modal-title"
-        className={`search-modal-panel flex max-h-[min(75vh,600px)] w-full max-w-4xl flex-col overflow-hidden bg-white dark:bg-zinc-900 ${
+        className={`search-modal-panel relative flex max-h-[min(75vh,600px)] w-full max-w-4xl flex-col overflow-hidden bg-white dark:bg-zinc-900 ${
           isEntered ? "is-entered" : ""
         }`}
         style={revealStyle}
       >
-        <div className="shrink-0 border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
+        <div className="absolute right-2 top-2 z-20">
+          <button
+            type="button"
+            aria-label="Close search"
+            onClick={onClose}
+            className={`flex size-[29px] -mt-[2px] -mr-[2px] cursor-pointer items-center justify-center rounded-full text-zinc-500 transition-colors bg-zinc-200/30 hover:text-zinc-600 dark:text-zinc-400 dark:hover:text-zinc-100 ${TASK_DETAILS_HEADER_ICON_HOVER_CLASS}`}
+          >
+            <LuX className="size-[15px]" aria-hidden="true" />
+          </button>
+        </div>
+        <div className="shrink-0 border-b border-zinc-200 px-4 py-3 pr-12 dark:border-zinc-800">
           <h2 id="search-modal-title" className="sr-only">
             Search tasks
           </h2>
@@ -807,7 +785,7 @@ export function SearchModal({
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search tasks and notes"
-              className="h-[35px] w-full bg-transparent text-[16px] text-zinc-900 outline-none placeholder:text-zinc-400 dark:text-zinc-50"
+              className="h-[35px] w-full appearance-none bg-transparent text-[16px] text-zinc-900 outline-none placeholder:text-zinc-400 dark:text-zinc-50 [&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-decoration]:appearance-none"
             />
           </div>
           <div

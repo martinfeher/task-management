@@ -9,20 +9,17 @@ import {
 } from "react";
 import {
   LuBell,
-  LuCheck,
   LuChevronsUpDown,
   LuCircleHelp,
   LuCircleUser,
   LuKeyboard,
   LuLogOut,
-  LuPlus,
   LuSparkles,
 } from "react-icons/lu";
 import { FiSettings } from "react-icons/fi";
 import { MacCmdIcon } from "./mac-cmd-icon";
 
 const USER_AVATAR_COLOR = "#7c3aed";
-const TASK_USAGE_LIMIT = 200;
 
 /** Account popover button/shell spacing scaled to 88% (12% tighter). */
 const ACCOUNT_MENU_BTN_X = "px-[8.8px]";
@@ -45,7 +42,6 @@ type SidebarAccountMenuProps = {
   isOpen: boolean;
   onToggle: () => void;
   menuRef: RefObject<HTMLDivElement | null>;
-  activeTaskCount: number;
   onOpenSettings: (
     section: "account" | "general",
     pointer: ModalPointer,
@@ -79,15 +75,6 @@ function getAccountUserInitial(
   if (!firstName) return "?";
   return firstName.slice(0, 1).toUpperCase();
 }
-
-type WorkspaceRow = {
-  id: string;
-  name: string;
-  initial: string;
-  color: string;
-  taskCount: number;
-  isActive: boolean;
-};
 
 function UserAvatar({
   user,
@@ -151,7 +138,6 @@ export function SidebarAccountMenu({
   isOpen,
   onToggle,
   menuRef,
-  activeTaskCount,
   onOpenSettings,
   onOpenKeyboardShortcuts,
   onSignOut,
@@ -194,29 +180,6 @@ export function SidebarAccountMenu({
   }, [openOnHover, scheduleHoverClose]);
 
   const displayName = user.name?.trim() || "Account";
-  const usagePercent = Math.min(
-    100,
-    Math.round((activeTaskCount / TASK_USAGE_LIMIT) * 100),
-  );
-
-  const workspaces: WorkspaceRow[] = [
-    {
-      id: "personal",
-      name: "Personal",
-      initial: getAccountUserInitial(user.name, user.email),
-      color: USER_AVATAR_COLOR,
-      taskCount: activeTaskCount,
-      isActive: true,
-    },
-    {
-      id: "work",
-      name: "Práca",
-      initial: "P",
-      color: "#22c55e",
-      taskCount: 38,
-      isActive: false,
-    },
-  ];
 
   function runMenuAction(action: () => void) {
     action();
@@ -257,57 +220,6 @@ export function SidebarAccountMenu({
             <span className="mt-0.5 shrink-0 rounded-md bg-[#ffedd5] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#c2410c]">
               Free
             </span>
-          </div>
-
-          <div
-            className={`border-b border-zinc-100 ${ACCOUNT_MENU_SECTION_X} ${ACCOUNT_MENU_SECTION_Y} dark:border-zinc-800`}
-          >
-            <p className="px-[7px] pb-[5.3px] text-[10px] font-semibold tracking-[0.08em] text-zinc-400">
-              Workspaces
-            </p>
-            <div className="flex flex-col gap-[1.8px]">
-              {workspaces.map((workspace) => (
-                <button
-                  key={workspace.id}
-                  type="button"
-                  className={`flex w-full items-center ${ACCOUNT_MENU_ROW_GAP} rounded-lg ${ACCOUNT_MENU_SECTION_X} ${ACCOUNT_MENU_BTN_Y} text-left transition-colors ${
-                    workspace.isActive
-                      ? "bg-zinc-50 dark:bg-zinc-800/50"
-                      : "hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
-                  }`}
-                >
-                  <span
-                    className="flex size-6 shrink-0 items-center justify-center rounded-lg text-sm font-semibold text-white"
-                    style={{ backgroundColor: workspace.color }}
-                  >
-                    {workspace.initial}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-[13px] font-medium text-zinc-900 dark:text-zinc-50">
-                      {workspace.name}
-                    </span>
-                    <span className="block text-[11px] text-zinc-500 dark:text-zinc-400">
-                      {workspace.taskCount} tasks
-                    </span>
-                  </span>
-                  {workspace.isActive ? (
-                    <LuCheck
-                      className="size-4 shrink-0 text-[#3b82f6]"
-                      aria-hidden="true"
-                    />
-                  ) : null}
-                </button>
-              ))}
-              <button
-                type="button"
-                className={`flex w-full items-center ${ACCOUNT_MENU_ROW_GAP} rounded-lg ${ACCOUNT_MENU_SECTION_X} ${ACCOUNT_MENU_BTN_Y} text-left text-[13px] text-zinc-600 transition-colors hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-zinc-800/40`}
-              >
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-dashed border-zinc-300 text-zinc-400 dark:border-zinc-600">
-                  <LuPlus className="size-4" aria-hidden="true" />
-                </span>
-                <span>New workspace</span>
-              </button>
-            </div>
           </div>
 
           <div
@@ -447,9 +359,11 @@ export function SidebarAccountMenu({
             <p className="truncate text-[11.5px] font-semibold leading-snug text-zinc-750 dark:text-zinc-50">
               {displayName}
             </p>
-            <p className="truncate text-[10.5px] font-normal leading-snug text-zinc-500 dark:text-zinc-400">
-              Personal workspace
-            </p>
+            {user.email ? (
+              <p className="truncate text-[10.5px] font-normal leading-snug text-zinc-500 dark:text-zinc-400">
+                {user.email}
+              </p>
+            ) : null}
           </div>
           <LuChevronsUpDown
             className="size-[17px] shrink-0 text-[#b8bfc4] dark:text-zinc-500"

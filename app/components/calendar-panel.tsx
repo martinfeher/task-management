@@ -41,10 +41,13 @@ import { getCalendarTaskKey } from "@/lib/calendar-recurring-tasks";
 import { getCalendarModalNavigableTaskIds } from "@/lib/calendar-task-search";
 import { CalendarMultiWeekView } from "./calendar-weeks-view";
 import {
+  CALENDAR_MONTH_SIDEBAR_DEFAULT_MIN_VIEWPORT_PX,
   CALENDAR_SIDEBAR_WIDTH_CLASS,
   CalendarViewSidebarLayout,
   getCalendarSidebarVisibilityClass,
   getCalendarSidebarWidthClass,
+  getInitialCalendarSidebarOpen,
+  shouldDefaultCalendarSidebarOpen,
   type CalendarSidebarSyncProps,
 } from "./calendar-view-sidebar-layout";
 import { useListCalendarOverlapLayout } from "./list-calendar-overlap-shell";
@@ -83,13 +86,17 @@ import {
   getCalendarTaskDragSurface,
   type CalendarTaskDragState,
 } from "@/lib/calendar-task-drag";
-import { getCalendarShellClassName, calendarAllDayTaskClassName, getCalendarTaskItemStyle, isCalendarTaskPast, CALENDAR_WEEKDAY_LABELS, getCalendarDayColumnDividerClass, CALENDAR_TODAY_DATE_CIRCLE_CLASS, CALENDAR_CURRENT_MONTH_DAY_NUMBER_CLASS, CALENDAR_FOLLOWING_MONTH_DAY_NUMBER_CLASS, CALENDAR_GRID_SCROLL_CLASS, CALENDAR_MONTH_CELL_TASKS_SCROLL_CLASS } from "@/lib/calendar-layout";
+import { getCalendarShellClassName, calendarAllDayTaskClassName, getCalendarTaskItemStyle, isCalendarTaskPast, CALENDAR_WEEKDAY_LABELS, getCalendarMonthDayColumnDividerClass, CALENDAR_MONTH_CELL_BORDER_CLASS, CALENDAR_MONTH_SELECTED_CELL_CLASS, CALENDAR_TODAY_DATE_CIRCLE_CLASS, CALENDAR_CURRENT_MONTH_DAY_NUMBER_CLASS, CALENDAR_FOLLOWING_MONTH_DAY_NUMBER_CLASS, getCalendarTimedGridScrollClassName, CALENDAR_MONTH_CELL_TASKS_SCROLL_CLASS } from "@/lib/calendar-layout";
 import { useCalendarTaskDefaultColor } from "@/lib/calendar-task-default-color-settings";
 import {
   patchCalendarViewSession,
   readCalendarViewSession,
   type CalendarViewTab,
 } from "@/lib/calendar-view-settings";
+import {
+  LIST_CALENDAR_MULTI_DAY_DEFAULT,
+  LIST_CALENDAR_MULTI_WEEK_DEFAULT,
+} from "@/lib/todo-routes";
 
 export type { CalendarViewTab };
 
@@ -141,8 +148,20 @@ const MULTI_CALENDAR_VIEW_OPTIONS: Array<{
   max: number;
   defaultValue: number;
 }> = [
-  { id: "days", label: "Days", min: 2, max: 30, defaultValue: 3 },
-  { id: "weeks", label: "Weeks", min: 2, max: 12, defaultValue: 2 },
+  {
+    id: "days",
+    label: "Days",
+    min: 2,
+    max: 30,
+    defaultValue: LIST_CALENDAR_MULTI_DAY_DEFAULT,
+  },
+  {
+    id: "weeks",
+    label: "Weeks",
+    min: 2,
+    max: 12,
+    defaultValue: LIST_CALENDAR_MULTI_WEEK_DEFAULT,
+  },
 ];
 
 const CALENDAR_VIEW_TABS = [
@@ -346,7 +365,7 @@ function CalendarViewTabs({
                       type="button"
                       aria-label="Previous month"
                       onClick={monthNavigation.goToPreviousMonth}
-                      className="flex size-8 items-center justify-center rounded-md text-zinc-600 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                      className="flex size-[27px] items-center justify-center cursor-pointer rounded-full bg-[#f7f7f9] text-zinc-600 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
                     >
                       <BiChevronLeft className="size-5" />
                     </button>
@@ -354,7 +373,7 @@ function CalendarViewTabs({
                       type="button"
                       aria-label="Next month"
                       onClick={monthNavigation.goToNextMonth}
-                      className="flex size-8 items-center justify-center rounded-md text-zinc-600 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                      className="flex size-[27px] items-center justify-center cursor-pointer rounded-full bg-[#f7f7f9] text-zinc-600 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
                     >
                       <BiChevronRight className="size-5" />
                     </button>
@@ -930,7 +949,7 @@ export function CalendarMonthView({
   if (!monthDate || !selectedDate || !today) {
     return (
       <div className="flex min-h-0 flex-1 flex-col">
-        <div className="grid shrink-0 grid-cols-7 border-b border-zinc-200 pb-2 dark:border-zinc-800">
+        <div className={`grid shrink-0 grid-cols-7 pb-2 ${CALENDAR_MONTH_CELL_BORDER_CLASS}`}>
           <div className="col-span-7 h-4 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
         </div>
         <div className="min-h-0 flex-1 animate-pulse bg-zinc-50 dark:bg-zinc-900/40" />
@@ -938,25 +957,28 @@ export function CalendarMonthView({
     );
   }
 
+  const monthGridScrollClassName = getCalendarTimedGridScrollClassName(fullWidth);
+
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="grid shrink-0 grid-cols-7 border-b border-zinc-200 bg-white pb-2 dark:border-zinc-800 dark:bg-zinc-950">
-        {CALENDAR_WEEKDAY_LABELS.map((label, dayIndex) => (
-          <div
-            key={label}
-            className={`px-2 text-center text-[14px] font-medium uppercase tracking-wide text-[#505c6e]! ${getCalendarDayColumnDividerClass(dayIndex, CALENDAR_WEEKDAY_LABELS.length)}`}
-          >
-            {label}
-          </div>
-        ))}
-      </div>
-
       <div className={getCalendarShellClassName(fullWidth)}>
-        <div className={CALENDAR_GRID_SCROLL_CLASS}>
+        <div className={monthGridScrollClassName}>
           <div className="relative min-h-full">
             <div
+              className={`sticky top-0 z-10 grid shrink-0 grid-cols-7 bg-white pb-2 dark:bg-zinc-950 ${CALENDAR_MONTH_CELL_BORDER_CLASS} ${fullWidth ? "min-w-0" : ""}`}
+            >
+              {CALENDAR_WEEKDAY_LABELS.map((label, dayIndex) => (
+                <div
+                  key={label}
+                  className={`min-w-0 px-2 text-center text-[14px] font-medium uppercase tracking-wide text-[#505c6e]! ${getCalendarMonthDayColumnDividerClass(dayIndex, CALENDAR_WEEKDAY_LABELS.length)}`}
+                >
+                  {label}
+                </div>
+              ))}
+            </div>
+            <div
               ref={monthGridRef}
-              className="grid h-full min-h-full grid-cols-7 "
+              className="grid h-full min-h-full grid-cols-7"
               style={{
                 gridTemplateRows: `repeat(${monthRowCount}, minmax(96px, 140px))`,
               }}
@@ -990,16 +1012,16 @@ export function CalendarMonthView({
                       handleDaySelect(day);
                     }
                   }}
-                  className={`flex h-full min-h-0 cursor-pointer flex-col border-b border-zinc-200 py-[2px] pl-[2px] pr-[4px] text-left transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900/60 ${getCalendarDayColumnDividerClass(index % 7, 7)} ${
+                  className={`flex h-full min-h-0 cursor-pointer flex-col py-[5px] pl-[5px] pr-[5px] text-left transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-900/60 ${CALENDAR_MONTH_CELL_BORDER_CLASS} ${getCalendarMonthDayColumnDividerClass(index % 7, 7)} ${
                     isDropTarget
-                      ? "bg-blue-50 ring-1 ring-inset ring-blue-400 dark:bg-blue-950/30 dark:ring-blue-500"
+                      ? "bg-blue-50 dark:bg-blue-950/30 dark:ring-blue-500"
                       : isSelected
-                          ? "bg-zinc-100 shadow-[inset_0_0_0_1px_#d4d4d8] dark:bg-zinc-900 dark:shadow-[inset_0_0_0_1px_#52525b]"
+                          ? CALENDAR_MONTH_SELECTED_CELL_CLASS
                           : "bg-white dark:bg-zinc-950"
                   }`}
                 >
                   <span
-                    className={`inline-flex w-7 h-6 shrink-0 items-center justify-center rounded-full text-sm ${
+                    className={`inline-flex w-6.5 h-6.5 shrink-0 items-center justify-center rounded-full text-sm ${
                       isToday
                         ? CALENDAR_TODAY_DATE_CIRCLE_CLASS
                         : isCurrentMonth
@@ -1201,11 +1223,11 @@ export function CalendarViewsPanel({
   );
   const [internalMultiDayCount, setInternalMultiDayCount] = useState(
     MULTI_CALENDAR_VIEW_OPTIONS.find((option) => option.id === "days")
-      ?.defaultValue ?? 3,
+      ?.defaultValue ?? LIST_CALENDAR_MULTI_DAY_DEFAULT,
   );
   const [internalMultiWeekCount, setInternalMultiWeekCount] = useState(
     MULTI_CALENDAR_VIEW_OPTIONS.find((option) => option.id === "weeks")
-      ?.defaultValue ?? 2,
+      ?.defaultValue ?? LIST_CALENDAR_MULTI_WEEK_DEFAULT,
   );
   const multiDayCount = controlledMultiDayCount ?? internalMultiDayCount;
   const multiWeekCount = controlledMultiWeekCount ?? internalMultiWeekCount;
@@ -1270,9 +1292,37 @@ export function CalendarViewsPanel({
     sidebarMonthKey: toDateKey(sidebarMonthDate),
     daysRangeStartKey: null,
   });
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() =>
+    getInitialCalendarSidebarOpen(
+      view ??
+        readCalendarViewSession()?.activeView ??
+        defaultView,
+    ),
+  );
   const [searchQuery, setSearchQuery] = useState("");
-  const sidebarMinViewportWidth = activeView === "week" ? 1950 : 1800;
+  const previousActiveViewRef = useRef<CalendarViewTab | null>(null);
+  const sidebarMinViewportWidth =
+    activeView === "week"
+      ? 1950
+      : activeView === "month"
+        ? CALENDAR_MONTH_SIDEBAR_DEFAULT_MIN_VIEWPORT_PX
+        : 1800;
+
+  useEffect(() => {
+    const previousView = previousActiveViewRef.current;
+    previousActiveViewRef.current = activeView;
+
+    if (previousView === null || previousView === activeView) {
+      return;
+    }
+
+    if (
+      activeView === "month" &&
+      !shouldDefaultCalendarSidebarOpen("month", window.innerWidth)
+    ) {
+      setSidebarOpen(false);
+    }
+  }, [activeView]);
 
   const calendarTaskModalActions = useMemo(
     () => ({
