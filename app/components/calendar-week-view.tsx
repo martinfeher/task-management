@@ -74,10 +74,15 @@ import {
   CALENDAR_ALL_DAY_TO_TIMED_DEFAULT_DURATION_MINUTES,
   getCalendarTaskDragPreviewDuration,
   isCalendarTaskAtDragSource,
+  shouldHideCalendarAllDayTaskDuringInternalDrag,
+  shouldShowCalendarAllDayExternalDropPreview,
+  shouldShowCalendarAllDayInternalDropPreview,
+  shouldShowCalendarAllDaySourcePlaceholderDuringInternalDrag,
   shouldShowCalendarInternalDragSlotMarker,
   useCalendarTaskDropRevealMask,
   type CalendarTaskDragState,
 } from "@/lib/calendar-task-drag";
+import { CalendarAllDayTaskPreview } from "./calendar-all-day-task-preview";
 import {
   buildCalendarNowLineDimmedColumns,
   getCalendarTimedBlockBounds,
@@ -758,9 +763,20 @@ export function CalendarWeekView({
                             externalDropTargetDateKey,
                             externalDropTargetTimeMinutes,
                           );
-                          const isDropTarget =
-                            activeDropSlot?.dateKey === dateKey &&
-                            activeDropSlot.dueTimeMinutes === null;
+                          const showAllDayInternalDropPreview =
+                            shouldShowCalendarAllDayInternalDropPreview(
+                              activeDropSlot,
+                              dateKey,
+                              draggingTask,
+                              draggingTaskPreview,
+                            );
+                          const showAllDayExternalDropPreview =
+                            shouldShowCalendarAllDayExternalDropPreview(
+                              activeDropSlot,
+                              dateKey,
+                              externalDraggingTaskId,
+                              draggingTaskPreview,
+                            );
                           const isSelectedDay = isSelectedWeekDay(day);
 
                           return (
@@ -770,59 +786,122 @@ export function CalendarWeekView({
                               onClick={(event) => handleAllDayClick(event, day)}
                               className={calendarAllDayCellClassName(
                                 `cursor-pointer transition-colors ${getWeekDayColumnDividerClass(dayIndex, weekDays, isSelectedWeekDay)} ${
-                                  isDropTarget
-                                    ? "border-b border-zinc-200 bg-blue-50 ring-1 ring-inset ring-blue-400 dark:border-zinc-800 dark:bg-blue-950/30"
-                                    : isSelectedDay
-                                        ? `${SELECTED_WEEK_DAY_COLUMN_CLASS} ${SELECTED_WEEK_DAY_ROW_BORDER_CLASS}`
-                                        : `${SELECTED_WEEK_DAY_ROW_BORDER_CLASS} bg-white hover:bg-zinc-50 dark:bg-zinc-950 dark:hover:bg-zinc-900/60`
+                                  isSelectedDay
+                                    ? `${SELECTED_WEEK_DAY_COLUMN_CLASS} ${SELECTED_WEEK_DAY_ROW_BORDER_CLASS}`
+                                    : `${SELECTED_WEEK_DAY_ROW_BORDER_CLASS} bg-white hover:bg-zinc-50 dark:bg-zinc-950 dark:hover:bg-zinc-900/60`
                                 }`,
                               )}
                               style={{ height: allDayRowHeightPx }}
                             >
-                              {dayTasks.map((task) => (
-                                <CalendarTaskHoverButton
-                                  key={getCalendarTaskKey(task)}
-                                  task={task}
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    handleCalendarTaskClick(event, task);
-                                  }}
-                                  onPointerDown={(event) => {
-                                    event.stopPropagation();
-                                    handleCalendarTaskPointerDown(event, task, day);
-                                  }}
-                                  className={`${calendarAllDayTaskClassName(
-                                    task.id === selectedTaskId,
-                                    canDragTasks,
-                                  )} calendar-task-row--single-line gap-1 overflow-hidden`}
-                                  style={{
-                                    ...getCalendarTaskItemStyle(
-                                      task.priority,
-                                      task.calendarColor,
-                                      calendarTaskDefaultColor,
-                                      {
-                                        past:
-                                          now !== null &&
-                                          isCalendarTaskPast(day, now, task),
-                                      },
-                                    ),
-                                    opacity: isTaskMaskedForDrop(task.id) ? 0 : undefined,
-                                  }}
-                                >
-                                  <CalendarTaskTitle
-                                    name={task.name}
-                                    recurrenceRule={task.recurrenceRule}
-                                    priority={task.priority}
-                                  />
-                                  <CalendarTaskCompletionCheckbox
+                              {dayTasks.map((task) => {
+                                const hideDuringDrag =
+                                  shouldHideCalendarAllDayTaskDuringInternalDrag(
+                                    task,
+                                    dateKey,
+                                    draggingTaskPreview,
+                                    activeDropSlot,
+                                  );
+                                const showSourcePlaceholder =
+                                  shouldShowCalendarAllDaySourcePlaceholderDuringInternalDrag(
+                                    task,
+                                    dateKey,
+                                    draggingTaskPreview,
+                                    activeDropSlot,
+                                  );
+
+                                if (hideDuringDrag && showSourcePlaceholder) {
+                                  return (
+                                    <CalendarAllDayTaskPreview
+                                      key={getCalendarTaskKey(task)}
+                                      variant="source"
+                                      taskName={task.name}
+                                      priority={task.priority}
+                                      calendarColor={task.calendarColor}
+                                      recurrenceRule={task.recurrenceRule}
+                                    />
+                                  );
+                                }
+
+                                if (hideDuringDrag) {
+                                  return null;
+                                }
+
+                                return (
+                                  <CalendarTaskHoverButton
+                                    key={getCalendarTaskKey(task)}
                                     task={task}
-                                    onToggleTask={onToggleTask}
-                                    isCompleting={completingTaskIds?.has(task.id)}
-                                    isCheckAnimating={checkAnimatingTaskIds?.has(task.id)}
-                                    className="calendar-task-checkbox"
-                                  />
-                                </CalendarTaskHoverButton>
-                              ))}
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      handleCalendarTaskClick(event, task);
+                                    }}
+                                    onPointerDown={(event) => {
+                                      event.stopPropagation();
+                                      handleCalendarTaskPointerDown(
+                                        event,
+                                        task,
+                                        day,
+                                      );
+                                    }}
+                                    className={`${calendarAllDayTaskClassName(
+                                      task.id === selectedTaskId,
+                                      canDragTasks,
+                                    )} calendar-task-row--single-line gap-1 overflow-hidden`}
+                                    style={{
+                                      ...getCalendarTaskItemStyle(
+                                        task.priority,
+                                        task.calendarColor,
+                                        calendarTaskDefaultColor,
+                                        {
+                                          past:
+                                            now !== null &&
+                                            isCalendarTaskPast(day, now, task),
+                                        },
+                                      ),
+                                      opacity: isTaskMaskedForDrop(task.id)
+                                        ? 0
+                                        : undefined,
+                                    }}
+                                  >
+                                    <CalendarTaskTitle
+                                      name={task.name}
+                                      recurrenceRule={task.recurrenceRule}
+                                      priority={task.priority}
+                                    />
+                                    <CalendarTaskCompletionCheckbox
+                                      task={task}
+                                      onToggleTask={onToggleTask}
+                                      isCompleting={completingTaskIds?.has(
+                                        task.id,
+                                      )}
+                                      isCheckAnimating={checkAnimatingTaskIds?.has(
+                                        task.id,
+                                      )}
+                                      className="calendar-task-checkbox"
+                                    />
+                                  </CalendarTaskHoverButton>
+                                );
+                              })}
+                              {showAllDayInternalDropPreview && draggingTask ? (
+                                <CalendarAllDayTaskPreview
+                                  taskName={draggingTask.name}
+                                  priority={draggingTask.priority}
+                                  calendarColor={draggingTask.calendarColor}
+                                  recurrenceRule={draggingTask.recurrenceRule}
+                                />
+                              ) : null}
+                              {showAllDayExternalDropPreview &&
+                              externalDraggingTaskName ? (
+                                <CalendarAllDayTaskPreview
+                                  taskName={externalDraggingTaskName}
+                                  priority={externalDraggingTask?.priority}
+                                  calendarColor={
+                                    externalDraggingTask?.calendarColor
+                                  }
+                                  recurrenceRule={
+                                    externalDraggingTask?.recurrenceRule
+                                  }
+                                />
+                              ) : null}
                             </div>
                           );
                         })}
@@ -985,6 +1064,8 @@ export function CalendarWeekView({
                           durationMinutes={sourcePlaceholderDuration}
                           priority={task.priority}
                           calendarColor={task.calendarColor}
+                          completed={task.completed}
+                          taskId={task.id}
                         />
                       ) : null;
 
@@ -1084,6 +1165,8 @@ export function CalendarWeekView({
                           durationMinutes={dragPreviewDuration}
                           priority={draggingTask.priority}
                           calendarColor={draggingTask.calendarColor}
+                          completed={draggingTask.completed}
+                          taskId={draggingTask.id}
                         />
                       ) : showDragSlotMarker &&
                         externalDraggingTaskId &&
@@ -1102,6 +1185,8 @@ export function CalendarWeekView({
                           }
                           priority={externalDraggingTask?.priority ?? null}
                           calendarColor={externalDraggingTask?.calendarColor ?? null}
+                          completed={externalDraggingTask?.completed ?? false}
+                          taskId={externalDraggingTaskId}
                         />
                       ) : null}
                     </>

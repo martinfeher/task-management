@@ -22,7 +22,7 @@ import {
   normalizeDueTimeZone,
   type TaskDueTime,
 } from "@/lib/task-due-time";
-import { calendarTaskItemClassName, calendarTaskSecondaryTextClassName, CALENDAR_TASK_FONT_CLASS, CALENDAR_TASK_TIMED_COLUMN_INSET_CLASS, getCalendarTaskItemStyle } from "@/lib/calendar-layout";
+import { calendarTaskItemClassName, calendarTaskTimeRangeClassName, CALENDAR_TASK_FONT_CLASS, CALENDAR_TASK_TIMED_COLUMN_INSET_CLASS, getCalendarTaskItemStyle } from "@/lib/calendar-layout";
 import { useCalendarTaskDefaultColor } from "@/lib/calendar-task-default-color-settings";
 import { useCalendarTaskDragPreview, useCalendarTaskHoverPreview } from "./calendar-task-hover-preview";
 import { useRecordCalendarTaskMove } from "./calendar-task-move-undo";
@@ -39,6 +39,10 @@ export const CALENDAR_TASK_CONTENT_PADDING_PX = 5;
 export const CALENDAR_TASK_HORIZONTAL_PADDING_START_PX = 7;
 export const CALENDAR_TASK_HORIZONTAL_PADDING_END_PX = 6;
 export const CALENDAR_TASK_INNER_RADIUS_PX = 5;
+export const CALENDAR_TASK_OUTER_RADIUS_PX = 10;
+export const CALENDAR_TASK_DRAG_RADIUS_INCREASE_PX = 2;
+export const CALENDAR_TASK_OUTER_RADIUS_DRAG_PX =
+  CALENDAR_TASK_OUTER_RADIUS_PX + CALENDAR_TASK_DRAG_RADIUS_INCREASE_PX;
 export const CALENDAR_TASK_TIME_ROW_HEIGHT_PX = 14;
 export const CALENDAR_TASK_TITLE_LINE_HEIGHT_PX = 16;
 export const CALENDAR_TASK_MIN_HEIGHT_FOR_TIME_PX = 27;
@@ -147,6 +151,8 @@ export function CalendarTaskDropPreview({
   durationMinutes,
   priority = null,
   calendarColor = null,
+  completed = false,
+  taskId = "calendar-task-preview",
   variant = "drop",
 }: {
   top: number;
@@ -156,6 +162,8 @@ export function CalendarTaskDropPreview({
   durationMinutes?: number;
   priority?: number | null;
   calendarColor?: string | null;
+  completed?: boolean;
+  taskId?: string;
   variant?: "drop" | "source";
 }) {
   const { defaultColor: calendarTaskDefaultColor } =
@@ -168,6 +176,7 @@ export function CalendarTaskDropPreview({
     startMinutes !== undefined &&
     durationMinutes !== undefined &&
     showTime;
+  const isSingleLineOnly = !showTimeRange && titleMaxLines === 1;
   const previewClassName =
     variant === "source"
       ? "calendar-task-drag-source-placeholder"
@@ -186,7 +195,7 @@ export function CalendarTaskDropPreview({
           calendarTaskDefaultColor,
         ),
       }}
-      className={`${previewClassName} pointer-events-none absolute ${horizontalInsetClass} overflow-hidden rounded-[5px] select-none ${calendarTaskItemClassName()}`}
+      className={`${previewClassName} pointer-events-none absolute ${horizontalInsetClass} overflow-hidden rounded-[12px] select-none ${calendarTaskItemClassName()}`}
     >
       <div
         className={`flex h-full flex-col py-0.5 text-left leading-tight ${CALENDAR_TASK_FONT_CLASS}`}
@@ -197,26 +206,50 @@ export function CalendarTaskDropPreview({
           paddingRight: CALENDAR_TASK_HORIZONTAL_PADDING_END_PX,
         }}
       >
-        <span
-          className={`flex min-w-0 gap-0.5 ${
-            titleMaxLines === 1 ? "items-center" : "items-start"
+        <div
+          className={`flex min-h-0 w-full gap-1 ${
+            isSingleLineOnly
+              ? "calendar-task-row--single-line shrink-0 items-center"
+              : "min-w-0 flex-1 items-start"
           }`}
         >
-          <span
-            className={`${getCalendarTaskTitleClassName(titleMaxLines)} min-w-0 flex-1`}
-            style={getCalendarTaskTitleStyle(titleMaxLines)}
-          >
-            {taskName}
-          </span>
-          <CalendarTaskPriorityFlag priority={priority} />
-        </span>
-        {showTimeRange ? (
-          <span
-            className={`mt-0.5 shrink-0 truncate text-[10px] ${calendarTaskSecondaryTextClassName()}`}
-          >
-            {formatCalendarTaskTimeRange(startMinutes, durationMinutes)}
-          </span>
-        ) : null}
+          <div className="flex min-w-0 flex-1 mr-[2px] mb-px flex-col justify-start overflow-hidden">
+            <span
+              className={`flex min-w-0 gap-0.5 ${
+                isSingleLineOnly ? "items-center" : "items-start"
+              }`}
+            >
+              <span
+                className={`${getCalendarTaskTitleClassName(titleMaxLines)} min-w-0 flex-1`}
+                style={getCalendarTaskTitleStyle(titleMaxLines)}
+              >
+                {taskName}
+              </span>
+              <CalendarTaskPriorityFlag priority={priority} />
+            </span>
+            {showTimeRange ? (
+              <span
+                className={`mt-[3px] truncate ${calendarTaskTimeRangeClassName()}`}
+              >
+                {formatCalendarTaskTimeRange(startMinutes, durationMinutes)}
+              </span>
+            ) : null}
+          </div>
+          <div className="pointer-events-none shrink-0" aria-hidden>
+            <TaskCompletionCheckbox
+              variant="box"
+              checkKey={taskId}
+              checked={completed}
+              className={
+                isSingleLineOnly
+                  ? "calendar-task-checkbox"
+                  : "calendar-task-checkbox mt-px"
+              }
+              onChange={() => {}}
+              aria-label={`Mark ${taskName} complete`}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -230,6 +263,8 @@ export function CalendarTaskDragSourcePlaceholder({
   durationMinutes,
   priority = null,
   calendarColor = null,
+  completed = false,
+  taskId,
 }: {
   top: number;
   height: number;
@@ -238,6 +273,8 @@ export function CalendarTaskDragSourcePlaceholder({
   durationMinutes: number;
   priority?: number | null;
   calendarColor?: string | null;
+  completed?: boolean;
+  taskId?: string;
 }) {
   return (
     <CalendarTaskDropPreview
@@ -249,6 +286,8 @@ export function CalendarTaskDragSourcePlaceholder({
       durationMinutes={durationMinutes}
       priority={priority}
       calendarColor={calendarColor}
+      completed={completed}
+      taskId={taskId}
     />
   );
 }
@@ -319,7 +358,7 @@ export function CalendarTimedTaskContent({
     getCalendarTaskContentLayout(availableHeight);
   const isSingleLineOnly = !showTime && titleMaxLines === 1;
   const timeLabel = formatCalendarTaskTimeRange(startMinutes, durationMinutes);
-  const timeClassName = `shrink-0 text-[11px] leading-none ${calendarTaskSecondaryTextClassName()}`;
+  const timeClassName = calendarTaskTimeRangeClassName();
 
   return (
     <div
@@ -834,7 +873,7 @@ export function CalendarTimedTaskBlock({
               },
             );
           }}
-          className={`flex h-full flex-col justify-start overflow-hidden py-0.5 text-left leading-tight ${CALENDAR_TASK_FONT_CLASS} ${
+          className={`flex h-full flex-col justify-start overflow-hidden py-0.5 pr-4 text-left leading-tight ${CALENDAR_TASK_FONT_CLASS} ${
             canInteract ? "cursor-pointer touch-none" : "cursor-pointer"
           }`}
           style={{

@@ -95,6 +95,11 @@ import {
 } from "@/lib/calendar-view-settings";
 import { readCalendarDefaultViewPreferenceFromStorage } from "@/lib/calendar-default-view-settings";
 import { resolveCalendarEntryActiveView } from "@/lib/resolve-calendar-entry-view";
+import {
+  readTaskListPanelWidthCustomizedFromStorage,
+  readTaskListPanelWidthFromStorage,
+  saveTaskListPanelWidth,
+} from "@/lib/task-list-panel-width-settings";
 import { Sidebar } from "./sidebar";
 import { CalendarPanel, CalendarViewsPanel } from "./calendar-panel";
 import {
@@ -970,10 +975,14 @@ export function TodoApp({
   const listCalendarButtonRef = useRef<HTMLButtonElement>(null);
   const listCalendarReturnTaskIdRef = useRef<string | null>(null);
   const listCalendarPreviewCloseTimerRef = useRef<number | null>(null);
-  const [taskListWidth, setTaskListWidth] = useState(
-    TASK_LIST_PANEL_DEFAULT_WIDTH,
+  const [taskListWidth, setTaskListWidth] = useState(() => {
+    const stored = readTaskListPanelWidthFromStorage();
+    return stored ?? TASK_LIST_PANEL_DEFAULT_WIDTH;
+  });
+  const [hasResizedTaskList, setHasResizedTaskList] = useState(() =>
+    readTaskListPanelWidthCustomizedFromStorage(),
   );
-  const [hasResizedTaskList, setHasResizedTaskList] = useState(false);
+  const [taskListWidthHydrated, setTaskListWidthHydrated] = useState(false);
   const splitContainerRef = useRef<HTMLDivElement>(null);
   const taskListWidthRef = useRef(taskListWidth);
   const pendingPathRef = useRef<string | null>(null);
@@ -1093,6 +1102,25 @@ export function TodoApp({
     return () => observer.disconnect();
   }, [clampTaskListWidth]);
 
+  useEffect(() => {
+    const stored = readTaskListPanelWidthFromStorage();
+    const customized = readTaskListPanelWidthCustomizedFromStorage();
+    if (stored !== null) {
+      setTaskListWidth((currentWidth) =>
+        clampTaskListWidth(stored ?? currentWidth),
+      );
+    }
+    if (customized) {
+      setHasResizedTaskList(true);
+    }
+    setTaskListWidthHydrated(true);
+  }, [clampTaskListWidth]);
+
+  useEffect(() => {
+    if (!taskListWidthHydrated || !hasResizedTaskList) return;
+    saveTaskListPanelWidth(taskListWidth, true);
+  }, [hasResizedTaskList, taskListWidth, taskListWidthHydrated]);
+
   const displayedListId = selectedListId;
   const displayedActiveView: ActiveView = activeView;
   const displayedLabelId = selectedLabelId;
@@ -1104,16 +1132,7 @@ export function TodoApp({
   useEffect(() => {
     if (hasResizedTaskList) return;
     setTaskListWidth(clampTaskListWidth(taskListDefaultWidth));
-  }, [
-    clampTaskListWidth,
-    displayedListId,
-    displayedLabelId,
-    displayedActiveView,
-    hasResizedTaskList,
-    isListCalendarOpen,
-    isNarrowDesktop,
-    taskListDefaultWidth,
-  ]);
+  }, [clampTaskListWidth, hasResizedTaskList, isNarrowDesktop, taskListDefaultWidth]);
 
   const listHoverPreview =
     listPreviewEnabled &&

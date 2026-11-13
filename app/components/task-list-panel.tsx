@@ -781,6 +781,7 @@ export function TaskListPanel({
   const [embeddedAutoWidth, setEmbeddedAutoWidth] = useState(
     TASK_LIST_PANEL_DEFAULT_WIDTH,
   );
+  const autoExpandViewKeyRef = useRef<string | null>(null);
   const dragStateRef = useRef<TaskDragState | null>(null);
   const suppressRowClickRef = useRef(false);
   const selectedTaskIdRef = useRef(selectedTaskId);
@@ -1056,7 +1057,7 @@ export function TaskListPanel({
   useEffect(() => {
     if (panelWidth != null) return;
     setEmbeddedAutoWidth(defaultPanelWidth);
-  }, [defaultPanelWidth, panelWidth, viewResetKey, listId, isLabelFilter]);
+  }, [defaultPanelWidth, panelWidth, isLabelFilter]);
 
   const resolvedPanelWidth = panelWidth ?? embeddedAutoWidth;
   const resolvedPanelWidthRef = useRef(resolvedPanelWidth);
@@ -1085,6 +1086,12 @@ export function TaskListPanel({
     const root = taskListScrollRef.current;
     if (!root || !title) return;
 
+    const viewKey = viewResetKey ?? "";
+    if (autoExpandViewKeyRef.current !== viewKey) {
+      autoExpandViewKeyRef.current = viewKey;
+      return;
+    }
+
     const measureAndExpand = () => {
       const overflow = measureTaskListTruncationOverflow(root);
       if (overflow <= 1) return;
@@ -1111,6 +1118,7 @@ export function TaskListPanel({
     pinnedVisibleTasks,
     title,
     unpinnedVisibleTasks,
+    viewResetKey,
   ]);
 
   useLayoutEffect(() => {

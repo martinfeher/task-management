@@ -1,5 +1,6 @@
 @import "tailwindcss";
 
+@source inline("rounded-[5px]");
 @source inline("rounded-[8px]");
 @source inline("rounded-[14px]");
 @source inline("rounded-[15px]");
@@ -302,13 +303,24 @@
     0 1px 2px rgba(0, 0, 0, 0.05),
     0 2px 7px rgba(0, 0, 0, 0.08),
     0 3px 10px rgba(0, 0, 0, 0.06);
-  --calendar-task-drag-width-extra: 4px;
+  --calendar-task-drag-width-extra: 5px;
+  --calendar-task-hover-width-extra: calc(
+    var(--calendar-task-drag-width-extra) - 3px
+  );
+  --calendar-task-column-right-inset: calc(2% + 5px);
+  --calendar-task-all-day-radius: 5px;
+  --calendar-task-all-day-radius-drag: 7px;
+  --calendar-task-block-radius: 10px;
+  --calendar-task-block-radius-drag: 12px;
+  --calendar-task-block-inner-radius: 5px;
+  --calendar-task-block-inner-radius-drag: 7px;
   --app-tooltip-shadow:
     0 1px 2px rgba(0, 0, 0, 0.05),
     0 3px 8px rgba(0, 0, 0, 0.08),
     0 8px 16px rgba(0, 0, 0, 0.1);
   --calendar-task-time-color: #D3D3D3;
   --calendar-task-title-brightness: 0.3;
+  --calendar-task-modal-content-switch-ms: 250ms;
 }
 
 html[data-app-font="sf-pro"] {
@@ -1611,16 +1623,25 @@ body {
   transition: width 10ms ease;
 }
 
+.calendar-task-timed-column-inset {
+  left: 1px;
+  right: var(--calendar-task-column-right-inset);
+}
+
 .calendar-timed-task-block {
-  transition: box-shadow 150ms ease;
+  transition:
+    box-shadow 150ms ease,
+    border-radius 80ms ease,
+    right 10ms ease;
 }
 
 .calendar-task-dragging:not(.calendar-timed-task-block) {
   position: relative;
   z-index: 40;
   width: calc(100% + var(--calendar-task-drag-width-extra));
+  border-radius: var(--calendar-task-all-day-radius-drag);
   cursor: move;
-  overflow: visible !important;
+  overflow: hidden !important;
   user-select: none;
   box-shadow:
     0 6px 13px -4px rgba(15, 23, 42, 0.179),
@@ -1630,14 +1651,27 @@ body {
 .calendar-timed-task-block.calendar-task-dragging {
   opacity: 0.3;
   z-index: 40;
+  border-radius: var(--calendar-task-block-radius-drag);
+  right: calc(
+    var(--calendar-task-column-right-inset) - var(--calendar-task-drag-width-extra)
+  );
   pointer-events: none;
-  overflow: visible !important;
+  overflow: hidden !important;
   cursor: move;
   user-select: none;
 }
 
+.calendar-timed-task-block.calendar-task-dragging > div.relative {
+  border-radius: var(--calendar-task-block-inner-radius-drag) !important;
+}
+
 .calendar-task-drop-preview {
   z-index: 15;
+  border-radius: var(--calendar-task-block-radius-drag);
+  overflow: hidden;
+  right: calc(
+    var(--calendar-task-column-right-inset) - var(--calendar-task-drag-width-extra)
+  );
   box-shadow:
     0 0 0 1px rgba(15, 23, 42, 0.038),
     0 0 11px rgba(15, 23, 42, 0.128);
@@ -1670,6 +1704,11 @@ body {
 
 .calendar-task-drag-source-placeholder {
   z-index: 8;
+  border-radius: var(--calendar-task-block-radius-drag);
+  overflow: hidden;
+  right: calc(
+    var(--calendar-task-column-right-inset) - var(--calendar-task-drag-width-extra)
+  );
   opacity: 0.57;
 }
 
@@ -1679,11 +1718,21 @@ body {
   box-shadow: var(--calendar-task-item-shadow);
 }
 
-.calendar-timed-task-block:hover:not(.calendar-task-dragging),
-.calendar-task-item:hover:not(.calendar-task-dragging) {
+.calendar-timed-task-block:hover:not(.calendar-task-dragging) {
   z-index: 12;
   box-shadow: var(--calendar-task-item-shadow);
-  transition: box-shadow 150ms ease;
+  right: calc(
+    var(--calendar-task-column-right-inset) -
+      var(--calendar-task-hover-width-extra)
+  );
+}
+
+.calendar-task-item:not(.calendar-timed-task-block):hover:not(
+    .calendar-task-dragging
+  ) {
+  z-index: 12;
+  box-shadow: var(--calendar-task-item-shadow);
+  width: calc(100% + var(--calendar-task-hover-width-extra));
 }
 
 .calendar-timed-task-block:hover:not(.calendar-task-dragging) .calendar-task-title,
@@ -1831,6 +1880,51 @@ body {
   box-shadow: 0 10px 23px rgba(0, 0, 0, 0.09);
 }
 
+.calendar-task-modal-content-transition {
+  transition:
+    opacity var(--calendar-task-modal-content-switch-ms)
+      cubic-bezier(0.4, 0, 0.2, 1),
+    filter var(--calendar-task-modal-content-switch-ms)
+      cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: opacity, filter;
+}
+
+.calendar-task-modal-content-transition--out {
+  opacity: 0;
+  filter: blur(7px);
+}
+
+.calendar-task-modal-content-transition--in {
+  opacity: 0;
+  filter: blur(7px);
+  animation: calendar-task-modal-content-reveal
+    var(--calendar-task-modal-content-switch-ms, 250ms)
+    cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes calendar-task-modal-content-reveal {
+  from {
+    opacity: 0;
+    filter: blur(7px);
+  }
+
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .calendar-task-modal-content-transition,
+  .calendar-task-modal-content-transition--out,
+  .calendar-task-modal-content-transition--in {
+    transition: none !important;
+    animation: none !important;
+    opacity: 1 !important;
+    filter: none !important;
+  }
+}
+
 .calendar-task-hover-preview {
   border-radius: 24px;
   border: 1px solid rgb(235 235 235);
@@ -1971,6 +2065,41 @@ body {
 .dark .calendar-grid-scroll::-webkit-scrollbar-thumb:hover,
 .dark .calendar-timed-grid-scroll::-webkit-scrollbar-thumb:hover {
   background-color: rgb(113 113 122 / 0.95);
+}
+
+.calendar-month-cell-tasks-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(212 212 216 / 0.45) transparent;
+}
+
+.calendar-month-cell-tasks-scroll::-webkit-scrollbar {
+  width: 1px;
+  height: 1px;
+}
+
+.calendar-month-cell-tasks-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.calendar-month-cell-tasks-scroll::-webkit-scrollbar-thumb {
+  background-color: rgb(212 212 216 / 0.55);
+  border-radius: 9999px;
+}
+
+.calendar-month-cell-tasks-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(161 161 170 / 0.75);
+}
+
+.dark .calendar-month-cell-tasks-scroll {
+  scrollbar-color: rgb(82 82 91 / 0.55) transparent;
+}
+
+.dark .calendar-month-cell-tasks-scroll::-webkit-scrollbar-thumb {
+  background-color: rgb(82 82 91 / 0.65);
+}
+
+.dark .calendar-month-cell-tasks-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(113 113 122 / 0.85);
 }
 
 .task-picker-duration-scroll {

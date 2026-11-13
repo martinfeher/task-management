@@ -64,7 +64,7 @@ import {
   getCalendarTaskDragSurface,
   type CalendarTaskDragState,
 } from "@/lib/calendar-task-drag";
-import { getCalendarShellClassName, calendarAllDayTaskClassName, getCalendarTaskItemStyle, isCalendarTaskPast, CALENDAR_WEEKDAY_LABELS, getCalendarDayColumnDividerClass, CALENDAR_TODAY_DATE_CIRCLE_CLASS, CALENDAR_CURRENT_MONTH_DAY_NUMBER_CLASS, CALENDAR_FOLLOWING_MONTH_DAY_NUMBER_CLASS, CALENDAR_GRID_SCROLL_CLASS } from "@/lib/calendar-layout";
+import { getCalendarShellClassName, calendarAllDayTaskClassName, getCalendarTaskItemStyle, isCalendarTaskPast, CALENDAR_WEEKDAY_LABELS, getCalendarDayColumnDividerClass, CALENDAR_TODAY_DATE_CIRCLE_CLASS, CALENDAR_CURRENT_MONTH_DAY_NUMBER_CLASS, CALENDAR_FOLLOWING_MONTH_DAY_NUMBER_CLASS, CALENDAR_GRID_SCROLL_CLASS, CALENDAR_MONTH_CELL_TASKS_SCROLL_CLASS } from "@/lib/calendar-layout";
 import { useCalendarTaskDefaultColor } from "@/lib/calendar-task-default-color-settings";
 import {
   patchCalendarViewSession,
@@ -868,7 +868,7 @@ export function CalendarMonthView({
                       handleDaySelect(day);
                     }
                   }}
-                  className={`flex h-full min-h-0 cursor-pointer flex-col border-b border-zinc-200 p-[2px] text-left transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900/60 ${getCalendarDayColumnDividerClass(index % 7, 7)} ${
+                  className={`flex h-full min-h-0 cursor-pointer flex-col border-b border-zinc-200 py-[2px] pl-[2px] pr-[4px] text-left transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900/60 ${getCalendarDayColumnDividerClass(index % 7, 7)} ${
                     isDropTarget
                       ? "bg-blue-50 ring-1 ring-inset ring-blue-400 dark:bg-blue-950/30 dark:ring-blue-500"
                       : isSelected
@@ -877,7 +877,7 @@ export function CalendarMonthView({
                   }`}
                 >
                   <span
-                    className={`inline-flex size-7 shrink-0 items-center justify-center rounded-full text-sm ${
+                    className={`inline-flex w-7 h-6 shrink-0 items-center justify-center rounded-full text-sm ${
                       isToday
                         ? CALENDAR_TODAY_DATE_CIRCLE_CLASS
                         : isCurrentMonth
@@ -899,7 +899,9 @@ export function CalendarMonthView({
                     )}
                   </span>
 
-                  <div className="mt-1 min-h-0 flex-1 space-y-0.5 overflow-y-auto">
+                  <div
+                    className={`mt-1 min-h-0 flex-1 space-y-0.5 overflow-auto ${CALENDAR_MONTH_CELL_TASKS_SCROLL_CLASS}`}
+                  >
                     {dayTasks.map((task) => (
                       <CalendarTaskHoverButton
                         key={getCalendarTaskKey(task)}

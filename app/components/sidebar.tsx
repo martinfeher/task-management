@@ -26,7 +26,7 @@ import {
 import { PiCalendarDots, PiDotsThreeBold } from "react-icons/pi";
 import { LuCalendarDays } from "react-icons/lu";
 import { BsCalendar2 } from "react-icons/bs";
-import { IoCalendarClearOutline } from "react-icons/io5";
+import { CiCalendar } from "react-icons/ci";
 
 import { useSidebarBackground } from "@/lib/sidebar-background";
 import { useImportantEnabled } from "@/lib/important-settings";
@@ -1796,14 +1796,12 @@ export function Sidebar({
               ) : item.action === "important" ? (
                 <LuStar
                   className={`size-[16px] shrink-0 ${navIconColor}`}
-                  aria-hidden="true"
                   strokeWidth={1}
                 />
               ) : (
-                <IoCalendarClearOutline
-                  className={`size-[16px] mb-[1px] shrink-0 ${navIconColor}`}
-                  aria-hidden="true"
-                  strokeWidth={1.2}
+                <CiCalendar
+                  className={`size-[17px] mb-[1px] shrink-0 ${navIconColor}`}
+                  strokeWidth={0.2}
                 />
               )}
               <span

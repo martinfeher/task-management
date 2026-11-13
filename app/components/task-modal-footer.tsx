@@ -63,7 +63,11 @@ type TaskModalFooterProps = {
   showLabelsAfterCopyLink?: boolean;
   hideDelete?: boolean;
   deleteButtonVariant?: "text" | "icon";
+  /** Calendar task modal: open priority / labels / move menus on footer control hover. */
+  openMenusOnHover?: boolean;
 };
+
+const FOOTER_MENU_HOVER_CLOSE_MS = 120;
 
 function ModalFooterPortaledIconButton({
   tooltipId,
@@ -222,6 +226,7 @@ export function TaskModalFooter({
   showLabelsAfterCopyLink = false,
   hideDelete = false,
   deleteButtonVariant = "text",
+  openMenusOnHover = false,
 }: TaskModalFooterProps) {
   const [isPriorityMenuOpen, setIsPriorityMenuOpen] = useState(false);
   const [isLabelMenuOpen, setIsLabelMenuOpen] = useState(false);
@@ -232,6 +237,7 @@ export function TaskModalFooter({
   const [copyLinkMessage, setCopyLinkMessage] = useState<string | null>(null);
   const footerRef = useRef<HTMLDivElement>(null);
   const copyLinkTimerRef = useRef<number | null>(null);
+  const footerMenuHoverCloseTimerRef = useRef<number | null>(null);
 
   const priorityLevel =
     priority !== null && isTaskPriorityLevel(priority) ? priority : null;
@@ -252,8 +258,53 @@ export function TaskModalFooter({
       if (copyLinkTimerRef.current !== null) {
         window.clearTimeout(copyLinkTimerRef.current);
       }
+      if (footerMenuHoverCloseTimerRef.current !== null) {
+        window.clearTimeout(footerMenuHoverCloseTimerRef.current);
+      }
     };
   }, []);
+
+  function cancelFooterMenuHoverClose() {
+    if (footerMenuHoverCloseTimerRef.current !== null) {
+      window.clearTimeout(footerMenuHoverCloseTimerRef.current);
+      footerMenuHoverCloseTimerRef.current = null;
+    }
+  }
+
+  function scheduleFooterMenuHoverClose(
+    close: () => void,
+  ) {
+    if (!openMenusOnHover) return;
+    cancelFooterMenuHoverClose();
+    footerMenuHoverCloseTimerRef.current = window.setTimeout(() => {
+      footerMenuHoverCloseTimerRef.current = null;
+      close();
+    }, FOOTER_MENU_HOVER_CLOSE_MS);
+  }
+
+  function openPriorityMenuFromHover() {
+    if (!openMenusOnHover) return;
+    cancelFooterMenuHoverClose();
+    setIsLabelMenuOpen(false);
+    setIsMoveMenuOpen(false);
+    setIsPriorityMenuOpen(true);
+  }
+
+  function openLabelMenuFromHover() {
+    if (!openMenusOnHover) return;
+    cancelFooterMenuHoverClose();
+    setIsPriorityMenuOpen(false);
+    setIsMoveMenuOpen(false);
+    setIsLabelMenuOpen(true);
+  }
+
+  function openMoveMenuFromHover() {
+    if (!openMenusOnHover) return;
+    cancelFooterMenuHoverClose();
+    setIsPriorityMenuOpen(false);
+    setIsLabelMenuOpen(false);
+    setIsMoveMenuOpen(true);
+  }
 
   useEffect(() => {
     function handlePointerDown(event: MouseEvent) {
@@ -358,6 +409,7 @@ export function TaskModalFooter({
   }
 
   function openLabelMenu() {
+    cancelFooterMenuHoverClose();
     setIsPriorityMenuOpen(false);
     setIsMoveMenuOpen(false);
     setIsLabelMenuOpen((open) => !open);
@@ -372,7 +424,13 @@ export function TaskModalFooter({
     if (!hasLabelActions) return null;
 
     return (
-      <div className={`relative shrink-0 ${anchorClassName}`}>
+      <div
+        className={`relative shrink-0 ${anchorClassName}`}
+        onMouseEnter={openLabelMenuFromHover}
+        onMouseLeave={() =>
+          scheduleFooterMenuHoverClose(() => setIsLabelMenuOpen(false))
+        }
+      >
         {showLabelsAfterCopyLink ? (
           assignedLabels.length > 0 ? (
             <TaskLabelPills
@@ -407,7 +465,7 @@ export function TaskModalFooter({
         )}
 
         {isLabelMenuOpen ? (
-          <div className="absolute bottom-full left-0 z-50 mb-1 w-fit">
+          <div className="absolute bottom-full left-0 z-50 mb-px w-fit pb-1">
             <TaskLabelSelector
               labels={sortedLabels}
               assignedLabelIds={assignedLabelIds}
@@ -429,7 +487,13 @@ export function TaskModalFooter({
   return (
     <div ref={footerRef} className="flex min-w-0 flex-1 items-center gap-4">
       {hasPriorityActions ? (
-        <div className="relative shrink-0">
+        <div
+          className="relative shrink-0"
+          onMouseEnter={openPriorityMenuFromHover}
+          onMouseLeave={() =>
+            scheduleFooterMenuHoverClose(() => setIsPriorityMenuOpen(false))
+          }
+        >
           <ModalFooterPortaledIconButton
             tooltipId={MODAL_FOOTER_PRIORITY_TOOLTIP_ID}
             ariaLabel="Priority"
@@ -455,12 +519,14 @@ export function TaskModalFooter({
           </ModalFooterPortaledIconButton>
 
           {isPriorityMenuOpen ? (
-            <div className="absolute bottom-full left-0 z-50 mb-1 w-[196px] overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
-              <TaskPrioritySelector
-                selectedPriority={priorityLevel}
-                onSelectPriority={handleSelectPriority}
-                onClearPriority={handleClearPriority}
-              />
+            <div className="absolute bottom-full left-0 z-50 mb-px pb-1">
+              <div className="w-[196px] overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+                <TaskPrioritySelector
+                  selectedPriority={priorityLevel}
+                  onSelectPriority={handleSelectPriority}
+                  onClearPriority={handleClearPriority}
+                />
+              </div>
             </div>
           ) : null}
         </div>
@@ -473,7 +539,13 @@ export function TaskModalFooter({
         : null}
 
       {hasMoveActions ? (
-        <div className="relative shrink-0">
+        <div
+          className="relative shrink-0"
+          onMouseEnter={openMoveMenuFromHover}
+          onMouseLeave={() =>
+            scheduleFooterMenuHoverClose(() => setIsMoveMenuOpen(false))
+          }
+        >
           <ModalFooterPortaledIconButton
             tooltipId={MODAL_FOOTER_MOVE_TOOLTIP_ID}
             ariaLabel="Move to list"
@@ -490,7 +562,7 @@ export function TaskModalFooter({
           </ModalFooterPortaledIconButton>
 
           {isMoveMenuOpen ? (
-            <div className="absolute bottom-full left-0 z-50 mb-1">
+            <div className="absolute bottom-full left-0 z-50 mb-px pb-1">
               <TaskMoveToSelector
                 lists={lists}
                 currentListId={listId}

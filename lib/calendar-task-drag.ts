@@ -23,7 +23,7 @@ import {
   type CalendarTaskMoveSnapshot,
 } from "@/lib/calendar-task-move-undo";
 
-export const CALENDAR_TASK_DRAG_THRESHOLD_PX = 2;
+export const CALENDAR_TASK_DRAG_THRESHOLD_PX = 3;
 export const CALENDAR_ALL_DAY_TO_TIMED_DEFAULT_DURATION_MINUTES = 60;
 export const CALENDAR_TASK_DRAGGING_CLASS = "calendar-task-dragging";
 export const CALENDAR_TASK_DRAG_CURSOR = "move";
@@ -97,6 +97,7 @@ export type CalendarTaskDragState = {
 };
 
 export type CalendarTaskDragPreviewState = {
+  taskId: string;
   sourceDateKey: string;
   sourceTimeMinutes: number | null;
 };
@@ -147,6 +148,84 @@ export function shouldShowCalendarInternalDragSlotMarker(
   if (!draggingTask || !draggingTaskPreview) return true;
 
   return isCalendarTaskAtDragSource(draggingTask, draggingTaskPreview);
+}
+
+export function isCalendarAllDayDropSlot(
+  slot: CalendarDropSlot | null,
+  dateKey: string,
+): boolean {
+  return slot?.dateKey === dateKey && slot.dueTimeMinutes === null;
+}
+
+export function isCalendarDragOverDifferentSlot(
+  activeDropSlot: CalendarDropSlot,
+  source: CalendarTaskDragPreviewState,
+): boolean {
+  return (
+    activeDropSlot.dateKey !== source.sourceDateKey ||
+    activeDropSlot.dueTimeMinutes !== source.sourceTimeMinutes
+  );
+}
+
+export function shouldShowCalendarAllDayInternalDropPreview(
+  activeDropSlot: CalendarDropSlot | null,
+  dateKey: string,
+  draggingTask: Pick<TaskListItem, "id"> | null,
+  draggingTaskPreview: CalendarTaskDragPreviewState | null,
+): boolean {
+  if (!draggingTask || !draggingTaskPreview || !activeDropSlot) return false;
+  if (!isCalendarAllDayDropSlot(activeDropSlot, dateKey)) return false;
+
+  return isCalendarDragOverDifferentSlot(activeDropSlot, draggingTaskPreview);
+}
+
+export function shouldShowCalendarAllDayExternalDropPreview(
+  activeDropSlot: CalendarDropSlot | null,
+  dateKey: string,
+  externalDraggingTaskId: string | null,
+  draggingTaskPreview: CalendarTaskDragPreviewState | null,
+): boolean {
+  if (!externalDraggingTaskId || draggingTaskPreview) return false;
+  return isCalendarAllDayDropSlot(activeDropSlot, dateKey);
+}
+
+export function shouldHideCalendarAllDayTaskDuringInternalDrag(
+  task: Pick<TaskListItem, "id" | "dueDate" | "dueTimeMinutes"> & {
+    calendarOccurrenceDateKey?: string;
+  },
+  dayDateKey: string,
+  draggingTaskPreview: CalendarTaskDragPreviewState | null,
+  activeDropSlot: CalendarDropSlot | null,
+): boolean {
+  if (!draggingTaskPreview || draggingTaskPreview.taskId !== task.id) {
+    return false;
+  }
+
+  if (!isCalendarTaskAtDragSource(task, draggingTaskPreview)) {
+    return true;
+  }
+
+  if (!activeDropSlot) return false;
+
+  if (getCalendarTaskDisplayDateKey(task) !== dayDateKey) return false;
+
+  return isCalendarDragOverDifferentSlot(activeDropSlot, draggingTaskPreview);
+}
+
+export function shouldShowCalendarAllDaySourcePlaceholderDuringInternalDrag(
+  task: Pick<TaskListItem, "id" | "dueDate" | "dueTimeMinutes"> & {
+    calendarOccurrenceDateKey?: string;
+  },
+  dayDateKey: string,
+  draggingTaskPreview: CalendarTaskDragPreviewState | null,
+  activeDropSlot: CalendarDropSlot | null,
+): boolean {
+  return shouldHideCalendarAllDayTaskDuringInternalDrag(
+    task,
+    dayDateKey,
+    draggingTaskPreview,
+    activeDropSlot,
+  );
 }
 
 export function getActiveCalendarDropSlot(

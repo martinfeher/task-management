@@ -155,7 +155,7 @@ function CalendarSidebarDayTasks({
                           onClick={() => onOpenTask?.(task.id)}
                           onMouseEnter={() => onHoverTaskStart?.(task.id)}
                           onMouseLeave={() => onHoverTaskEnd?.()}
-                          className={`flex w-full items-center gap-2 rounded-[15px] px-2.5 py-1 text-left transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-900 cursor-pointer ${getCalendarSidebarTaskRowClassName(
+                          className={`flex w-full items-center gap-2 rounded-[15px] min-h-[40px] px-2.5 py-1 text-left transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-900 cursor-pointer ${getCalendarSidebarTaskRowClassName(
                             {
                               isActiveInModal,
                               isSelected,
@@ -283,7 +283,7 @@ function CalendarSidebarSearchResults({
                     }}
                     onMouseEnter={() => onHoverTaskStart?.(task.id)}
                     onMouseLeave={() => onHoverTaskEnd?.()}
-                    className={`flex w-full items-center gap-2 rounded-[15px] px-2.5 py-1 text-left transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-900 cursor-pointer ${getCalendarSidebarTaskRowClassName(
+                    className={`flex w-full items-center gap-2 rounded-[15px] min-h-[39px] px-2.5 py-1 text-left transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-900 cursor-pointer ${getCalendarSidebarTaskRowClassName(
                       {
                         isActiveInModal,
                         isSelected,

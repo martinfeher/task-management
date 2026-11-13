@@ -181,6 +181,10 @@ import {
   type TaskModalFooterConfig,
 } from "./task-modal-footer";
 import {
+  CALENDAR_TASK_MODAL_EDITOR_MIN_HEIGHT_EXTRA_PX,
+  CALENDAR_TASK_MODAL_MIN_HEIGHT_PX,
+} from "@/lib/calendar-task-modal-position";
+import {
   TaskDetailsSubtasksSection,
   type TaskDetailsSubtask,
 } from "./task-details-subtasks-section";
@@ -1976,6 +1980,7 @@ const FORMAT_MENU_VIEWPORT_PADDING = 8;
 const TASK_DETAILS_LINE_CONTROLS_GUTTER_PX = 30;
 
 const TASK_DETAILS_EDITOR_MIN_HEIGHT_PX = 500;
+const TASK_DETAILS_EDITOR_MODAL_MIN_HEIGHT_PX = 88;
 const TASK_DETAILS_EDITOR_BOTTOM_INSET_PX = 30;
 const TASK_DETAILS_EDITOR_MODAL_MAX_HEIGHT_PX = 560;
 const TASK_DETAILS_EDITOR_MODAL_MAX_HEIGHT_VH = 0.6;
@@ -2008,6 +2013,20 @@ function getEditorReservedBelowSpacePx(
   return reserved;
 }
 
+function getModalEditorChromeHeightPx(
+  editor: HTMLElement,
+  panel: HTMLElement | null,
+) {
+  const dialog = panel?.closest<HTMLElement>(".calendar-task-modal");
+  const chromeOriginTop = dialog?.getBoundingClientRect().top ?? panel?.getBoundingClientRect().top ?? editor.getBoundingClientRect().top;
+
+  return (
+    editor.getBoundingClientRect().top -
+    chromeOriginTop +
+    getEditorReservedBelowSpacePx(editor, panel, true)
+  );
+}
+
 function getEditorMaxHeightPx(
   editor: HTMLElement,
   panel: HTMLElement | null,
@@ -2020,8 +2039,11 @@ function getEditorMaxHeightPx(
     panel,
     isModalLayout,
   );
+  const minHeightFloor = isModalLayout
+    ? TASK_DETAILS_EDITOR_MODAL_MIN_HEIGHT_PX
+    : TASK_DETAILS_EDITOR_MIN_HEIGHT_PX;
   const viewportMax = Math.max(
-    TASK_DETAILS_EDITOR_MIN_HEIGHT_PX,
+    minHeightFloor,
     viewportHeight - editorTop - reservedBelow,
   );
 
@@ -2035,7 +2057,7 @@ function getEditorMaxHeightPx(
   );
 
   return Math.max(
-    TASK_DETAILS_EDITOR_MIN_HEIGHT_PX,
+    TASK_DETAILS_EDITOR_MODAL_MIN_HEIGHT_PX,
     Math.min(viewportMax, modalCap),
   );
 }
@@ -3186,10 +3208,25 @@ export function TaskDetailsPanel({
       editor.style.height = "auto";
       const contentHeight = editor.scrollHeight;
       const maxHeight = getEditorMaxHeightPx(editor, panel, isModalLayout);
-      const nextHeight = Math.max(
-        TASK_DETAILS_EDITOR_MIN_HEIGHT_PX,
+      const minEditorHeight = isModalLayout
+        ? TASK_DETAILS_EDITOR_MODAL_MIN_HEIGHT_PX
+        : TASK_DETAILS_EDITOR_MIN_HEIGHT_PX;
+      let nextHeight = Math.max(
+        minEditorHeight,
         Math.min(contentHeight, maxHeight),
       );
+
+      if (isModalLayout) {
+        const modalChromeHeight = getModalEditorChromeHeightPx(editor, panel);
+        const modalMinEditorHeight = Math.max(
+          TASK_DETAILS_EDITOR_MODAL_MIN_HEIGHT_PX,
+          CALENDAR_TASK_MODAL_MIN_HEIGHT_PX -
+            modalChromeHeight +
+            CALENDAR_TASK_MODAL_EDITOR_MIN_HEIGHT_EXTRA_PX,
+        );
+        const contentCappedHeight = Math.min(contentHeight, maxHeight);
+        nextHeight = Math.max(contentCappedHeight, modalMinEditorHeight);
+      }
 
       editor.style.height = `${nextHeight}px`;
       const isScrollable = contentHeight > nextHeight + 1;
@@ -4877,7 +4914,10 @@ export function TaskDetailsPanel({
 
   useEffect(() => {
     setIsVersionHistoryOpen(false);
-  }, [taskId]);
+    setIsModalFormatToolbarOpen(false);
+    setOpenHeaderFormatDropdown(null);
+    closeFormatMenu();
+  }, [taskId, closeFormatMenu]);
 
   useLayoutEffect(() => {
     if (!isReadyRef.current || !task?.id) return;
@@ -4903,11 +4943,13 @@ export function TaskDetailsPanel({
     detailsRef.current = normalizeDetails(editor.innerHTML);
     previousTextRef.current = editor.textContent ?? "";
     hydratedTaskIdRef.current = task.id;
+    editor.scrollTop = 0;
     resetHistory(readEditorContent());
 
     requestAnimationFrame(() => {
       updateLineControls();
       syncEditorHeight();
+      editor.scrollTop = 0;
       if (task.isNote) {
         syncFormatMenuFontState();
       }
@@ -7260,9 +7302,9 @@ export function TaskDetailsPanel({
           {canGoPrevious && previousTaskTitle ? (
             <span
               role="tooltip"
-              className={`${TASK_DETAILS_TOOLTIP_CLASS} max-w-[min(280px,calc(100vw-32px))] truncate`}
+              className={`${TASK_DETAILS_TOOLTIP_CLASS} max-w-[min(280px,calc(100vw-32px))] overflow-visible`}
             >
-              {previousTaskTitle}
+              <span className="block max-w-full truncate">{previousTaskTitle}</span>
             </span>
           ) : null}
         </div>
@@ -7286,9 +7328,9 @@ export function TaskDetailsPanel({
           {canGoNext && nextTaskTitle ? (
             <span
               role="tooltip"
-              className={`${TASK_DETAILS_TOOLTIP_CLASS} max-w-[min(280px,calc(100vw-32px))] truncate`}
+              className={`${TASK_DETAILS_TOOLTIP_CLASS} max-w-[min(280px,calc(100vw-32px))] overflow-visible`}
             >
-              {nextTaskTitle}
+              <span className="block max-w-full truncate">{nextTaskTitle}</span>
             </span>
           ) : null}
         </div>
@@ -7566,23 +7608,28 @@ export function TaskDetailsPanel({
       ref={panelRef}
       data-task-details-panel
       data-task-details-layout={layout}
-      className={`task-details-panel-background relative flex min-w-[300px] flex-col ${
-        isModalLayout ? "" : "min-h-0 flex-1"
-      }`}
+      className="task-details-panel-background relative flex min-h-0 min-w-[300px] flex-1 flex-col"
       aria-busy={saveStatus === "loading" ? true : undefined}
     >
-      {renderModalHeaderActions()}
       <div
-        className={`relative flex shrink-0 ${
-          task?.isNote ? "h-[41px]" : "h-[47px]"
-        } items-center justify-between overflow-visible ml-[6px] px-2.5 pt-[8px] pb-[8px] ${
+        className={
           isModalLayout
-            ? isModalFormatToolbarOpen
-              ? "pr-[22rem]"
-              : "pr-48"
-            : ""
-        }`}
+            ? "sticky top-0 z-30 shrink-0 bg-white dark:bg-zinc-950"
+            : undefined
+        }
       >
+        {renderModalHeaderActions()}
+        <div
+          className={`relative flex shrink-0 ${
+            task?.isNote ? "h-[41px]" : "h-[47px]"
+          } items-center justify-between overflow-visible ml-[6px] px-2.5 pt-[8px] pb-[8px] ${
+            isModalLayout
+              ? isModalFormatToolbarOpen
+                ? "pr-[22rem]"
+                : "pr-48"
+              : ""
+          }`}
+        >
         <div className="flex items-center gap-1">
           {onBack ? (
             <button
@@ -7854,6 +7901,7 @@ export function TaskDetailsPanel({
             ) : null}
           </div>
         ) : null}
+        </div>
       </div>
 
       {taskId && saveStatus === "loading" && !task ? (
@@ -7865,12 +7913,14 @@ export function TaskDetailsPanel({
         <div
           data-task-details-content
           className={`flex flex-col px-4 ${
-            isModalLayout ? "pb-0" : "min-h-0 flex-1"
+            isModalLayout ? "min-h-0 flex-1 pb-0" : "min-h-0 flex-1"
           }`}
         >
           <div
             ref={editorWrapperRef}
-            className="relative text-[#555555]"
+            className={`relative text-[#555555] ${
+              isModalLayout ? "flex min-h-0 flex-1 flex-col" : ""
+            }`}
             onMouseEnter={handleEditorWrapperMouseEnter}
             onMouseLeave={handleEditorWrapperMouseLeave}
             onMouseMove={handleEditorWrapperMouseMove}
@@ -7908,7 +7958,7 @@ export function TaskDetailsPanel({
               onScroll={updateLineControls}
               className={`task-details-editor w-full resize-none rounded-xl pt-[8px] pl-[25px] pr-3 pb-4! text-[#555555] outline-none transition-colors focus:border-[#7f7f7f] dark:text-zinc-300 [&_.detail-line[data-line-type=bullet]]:pl-1 [&_.detail-line[data-line-type=checklist]]:cursor-pointer [&_.detail-line[data-line-type=checklist]]:pl-1 [&_.detail-line[data-line-type=h1]]:text-[26px] [&_.detail-line[data-line-type=h1]]:font-bold [&_.detail-line[data-line-type=h1]]:leading-[36px] [&_.detail-line[data-line-type=h1]]:text-[#4B4B4B] dark:[&_.detail-line[data-line-type=h1]]:text-[#F5F5F5] [&_.detail-line[data-line-type=h2]]:text-[23px] [&_.detail-line[data-line-type=h2]]:font-semibold [&_.detail-line[data-line-type=h2]]:leading-[30px] [&_.detail-line[data-line-type=h3]]:text-[19px] [&_.detail-line[data-line-type=h3]]:font-semibold [&_.detail-line[data-line-type=h3]]:leading-[26px] [&_.detail-line[data-line-type=numbered]]:pl-1 [&_mark]:bg-yellow-200 dark:[&_mark]:bg-yellow-300/30 [&_s]:line-through [&_strike]:line-through [&_u]:underline ${
                 isModalLayout
-                  ? "min-h-0 max-h-[min(60vh,560px)] overflow-auto"
+                  ? "min-h-0 shrink-0 overflow-hidden"
                   : "min-h-[500px] overflow-auto"
               }`}
             />

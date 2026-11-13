@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -14,6 +15,8 @@ import {
 } from "./task-details-panel";
 import type { TaskRecurrenceRule } from "@/lib/task-recurrence";
 import {
+  CALENDAR_TASK_MODAL_CONTENT_SWITCH_MS,
+  CALENDAR_TASK_MODAL_MIN_HEIGHT_PX,
   CALENDAR_TASK_MODAL_VIEWPORT_PADDING_PX,
   CALENDAR_TASK_MODAL_WIDTH_PX,
   type CalendarTaskModalAnchorRect,
@@ -103,8 +106,24 @@ export function CalendarTaskModal({
   const [focusNoteAtEndRequest, setFocusNoteAtEndRequest] = useState(0);
   const detailsSaveControllerRef = useRef<TaskDetailsSaveController | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
+  const skipTaskContentSwitchAnimationRef = useRef(true);
   const modalActions = useCalendarTaskModalActions();
-  const modalTask = useCalendarTaskModalTask(taskId);
+  const shouldAnimateTaskContentSwitch = !isHoverPreview && !isNewTaskDraft;
+  const [displayedTaskId, setDisplayedTaskId] = useState(taskId);
+  const [contentSwitchPhase, setContentSwitchPhase] = useState<
+    "idle" | "out" | "in"
+  >("idle");
+  const modalTask = useCalendarTaskModalTask(displayedTaskId);
+  const displayedTaskSnapshot = useMemo(() => {
+    const fromTasks = getCalendarTaskSnapshot(
+      displayedTaskId,
+      modalActions?.tasks ?? [],
+    );
+    if (fromTasks) return fromTasks;
+    if (displayedTaskId === taskId) return taskSnapshot;
+    return taskSnapshot;
+  }, [displayedTaskId, modalActions?.tasks, taskId, taskSnapshot]);
+  const isTaskContentSwitching = contentSwitchPhase !== "idle";
 
   const registerDetailsSaveController = useCallback(
     (controller: TaskDetailsSaveController | null) => {
@@ -184,16 +203,19 @@ export function CalendarTaskModal({
         ? (taskNameById.get(previousTaskId) ?? null)
         : null,
       nextTaskTitle: nextTaskId ? (taskNameById.get(nextTaskId) ?? null) : null,
-      onPrevious: canGoPrevious
-        ? () => void handleNavigateToTask(navigableTaskIds[navigableIndex - 1])
-        : undefined,
-      onNext: canGoNext
-        ? () => void handleNavigateToTask(navigableTaskIds[navigableIndex + 1])
-        : undefined,
+      onPrevious:
+        canGoPrevious && !isTaskContentSwitching
+          ? () => void handleNavigateToTask(navigableTaskIds[navigableIndex - 1])
+          : undefined,
+      onNext:
+        canGoNext && !isTaskContentSwitching
+          ? () => void handleNavigateToTask(navigableTaskIds[navigableIndex + 1])
+          : undefined,
     };
   }, [
     handleNavigateToTask,
     isNewTaskDraft,
+    isTaskContentSwitching,
     modalActions?.tasks,
     navigableIndex,
     navigableTaskIds,
@@ -220,6 +242,7 @@ export function CalendarTaskModal({
                 }
               : undefined,
             showLabelsAfterCopyLink: true,
+            openMenusOnHover: true,
             hideDelete: isNewTaskDraft,
             deleteButtonVariant: "icon" as const,
           }
@@ -228,8 +251,55 @@ export function CalendarTaskModal({
   );
 
   useEffect(() => {
+    if (skipTaskContentSwitchAnimationRef.current) {
+      skipTaskContentSwitchAnimationRef.current = false;
+      setDisplayedTaskId(taskId);
+      setContentSwitchPhase("idle");
+      return;
+    }
+
+    if (!shouldAnimateTaskContentSwitch) {
+      setDisplayedTaskId(taskId);
+      setContentSwitchPhase("idle");
+      return;
+    }
+
+    if (taskId === displayedTaskId) return;
+
+    if (contentSwitchPhase !== "idle") return;
+
+    setContentSwitchPhase("out");
+  }, [
+    contentSwitchPhase,
+    displayedTaskId,
+    shouldAnimateTaskContentSwitch,
+    taskId,
+  ]);
+
+  useEffect(() => {
+    if (contentSwitchPhase !== "out") return;
+
+    const timer = window.setTimeout(() => {
+      setDisplayedTaskId(taskId);
+      setContentSwitchPhase("in");
+    }, CALENDAR_TASK_MODAL_CONTENT_SWITCH_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [contentSwitchPhase, taskId]);
+
+  useEffect(() => {
+    if (contentSwitchPhase !== "in") return;
+
+    const timer = window.setTimeout(() => {
+      setContentSwitchPhase("idle");
+    }, CALENDAR_TASK_MODAL_CONTENT_SWITCH_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [contentSwitchPhase]);
+
+  useEffect(() => {
     setFocusNoteAtEndRequest((current) => current + 1);
-  }, [taskId]);
+  }, [displayedTaskId]);
 
   useEffect(() => {
     if (isHoverPreview || !showBackdrop) return;
@@ -254,7 +324,11 @@ export function CalendarTaskModal({
   const allowBackgroundInteraction = isHoverPreview || !showBackdrop;
 
   const dialogClassName =
-    "calendar-task-modal relative z-10 flex max-h-[calc(100vh-48px)] flex-col overflow-hidden overflow-y-auto bg-white dark:bg-zinc-950";
+    "calendar-task-modal relative z-10 flex h-auto min-h-0 max-h-[calc(100vh-48px)] flex-col overflow-hidden bg-white dark:bg-zinc-950";
+
+  useLayoutEffect(() => {
+    dialogRef.current?.scrollTo({ top: 0 });
+  }, [taskId]);
 
   return createPortal(
     <div
@@ -295,6 +369,7 @@ export function CalendarTaskModal({
         }`}
         style={{
           width: CALENDAR_TASK_MODAL_WIDTH_PX,
+          minHeight: CALENDAR_TASK_MODAL_MIN_HEIGHT_PX,
           ...(isHoverPreview
             ? {
                 transitionDuration: `${CALENDAR_SIDEBAR_HOVER_PREVIEW_TRANSITION_MS}ms`,
@@ -305,10 +380,21 @@ export function CalendarTaskModal({
         onMouseEnter={isHoverPreview ? onHoverPreviewPointerEnter : undefined}
         onMouseLeave={isHoverPreview ? onHoverPreviewPointerLeave : undefined}
       >
-        <div className="flex flex-col">
+        <div
+          className={`calendar-task-modal-content-transition flex min-h-0 flex-1 flex-col ${
+            contentSwitchPhase === "out"
+              ? "calendar-task-modal-content-transition--out"
+              : contentSwitchPhase === "in"
+                ? "calendar-task-modal-content-transition--in"
+                : ""
+          }`}
+          style={
+            isTaskContentSwitching ? { pointerEvents: "none" } : undefined
+          }
+        >
           <TaskDetailsPanel
-            taskId={taskId}
-            taskSnapshot={taskSnapshot}
+            taskId={displayedTaskId}
+            taskSnapshot={displayedTaskSnapshot}
             layout="modal"
             focusNoteAtEndRequest={focusNoteAtEndRequest}
             registerSaveController={registerDetailsSaveController}

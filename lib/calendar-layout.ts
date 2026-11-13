@@ -47,7 +47,8 @@ export const CALENDAR_ALL_DAY_ROW_HEIGHT_PX = 54;
 export const CALENDAR_ALL_DAY_ROW_MIN_HEIGHT_PX = CALENDAR_ALL_DAY_ROW_HEIGHT_PX;
 export const CALENDAR_ALL_DAY_ROW_MAX_HEIGHT_PX = CALENDAR_ALL_DAY_ROW_HEIGHT_PX;
 export const CALENDAR_HOUR_COLUMN_WIDTH_PX = 49;
-export const CALENDAR_ALL_DAY_CELL_PADDING_CLASS = "p-1.5";
+export const CALENDAR_ALL_DAY_CELL_PADDING_CLASS =
+  "pt-1.5 pr-[11px] pb-1.5 pl-1.5";
 export const CALENDAR_ALL_DAY_TASK_HEIGHT_PX = 19;
 
 export function getCalendarAllDayRowHeightPx(_maxStackedItemCount = 1) {
@@ -66,13 +67,13 @@ export function calendarAllDayTaskClassName(
   selected = false,
   draggable = false,
 ) {
-  return `flex h-[24px] w-full shrink-0 items-center truncate rounded-[8px] px-[5px] text-left leading-none transition-colors ${
+  return `flex h-[24px] w-full shrink-0 items-center truncate rounded-[5px] px-[5px] text-left leading-none transition-colors ${
     draggable ? "cursor-move touch-none" : ""
   } ${calendarTaskItemClassName(selected)}`;
 }
 
 export function calendarAllDayDraftClassName() {
-  return "flex h-[24px] w-full shrink-0 items-center truncate rounded-[8px] bg-zinc-200/50 px-[5px] text-[11px] text-zinc-400 dark:bg-zinc-700";
+  return "flex h-[24px] w-full shrink-0 items-center truncate rounded-[5px] bg-zinc-200/50 px-[5px] text-[11px] text-zinc-400 dark:bg-zinc-700";
 }
 
 export function calendarTaskItemClassName(selected = false) {
@@ -164,6 +165,10 @@ export function calendarTaskSecondaryTextClassName() {
   return CALENDAR_TASK_TIME_TEXT_CLASS;
 }
 
+export function calendarTaskTimeRangeClassName(extra = "") {
+  return `shrink-0 text-[11px] leading-none ${CALENDAR_TASK_TIME_TEXT_CLASS} ${extra}`.trim();
+}
+
 export function getCalendarShellClassName(
   _fullWidth = true,
   _maxWidthClass?: string,
@@ -201,6 +206,10 @@ export const CALENDAR_DAYS_ALLDAY_STICKY_CLASS =
   "sticky z-20 bg-white dark:bg-zinc-950";
 export const CALENDAR_GRID_SCROLL_CLASS =
   "calendar-grid-scroll min-h-0 flex-1 overflow-auto mb-[40px]";
+
+/** Month grid day cells: many stacked tasks scroll inside the cell. */
+export const CALENDAR_MONTH_CELL_TASKS_SCROLL_CLASS =
+  "calendar-month-cell-tasks-scroll";
 
 export const KANBAN_BOARD_SCROLL_CLASS =
   "kanban-board-scroll min-h-0 min-w-0 w-full flex-1 overflow-x-auto overflow-y-hidden";
@@ -258,4 +267,5 @@ export const CALENDAR_CURRENT_MONTH_DAY_NUMBER_CLASS =
 export const CALENDAR_FOLLOWING_MONTH_DAY_NUMBER_CLASS = "text-[#afafb7]";
 
 /** Horizontal placement for timed tasks inside a day column. */
-export const CALENDAR_TASK_TIMED_COLUMN_INSET_CLASS = "left-px right-[2%]";
+export const CALENDAR_TASK_TIMED_COLUMN_INSET_CLASS =
+  "calendar-task-timed-column-inset";
