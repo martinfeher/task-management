@@ -1,6 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { BiChevronLeft, BiChevronRight } from "react-icons/bi";
 import { IoIosSearch } from "react-icons/io";
 import {
@@ -13,8 +21,6 @@ import {
   toCalendarDueDateKey,
 } from "@/lib/calendar-start-task";
 import {
-  CalendarTaskModal,
-  getCalendarTaskSnapshot,
   type CalendarTaskEditorCallbacks,
 } from "./calendar-task-modal";
 import { CalendarTaskModalActionsProvider } from "./calendar-task-modal-actions";
@@ -38,11 +44,24 @@ import {
   CALENDAR_SIDEBAR_WIDTH_CLASS,
   CalendarViewSidebarLayout,
   getCalendarSidebarVisibilityClass,
+  getCalendarSidebarWidthClass,
   type CalendarSidebarSyncProps,
 } from "./calendar-view-sidebar-layout";
 import { useListCalendarOverlapLayout } from "./list-calendar-overlap-shell";
 import { CalendarWeekView } from "./calendar-week-view";
+import { CalendarMonthCellCurrentTimeLine } from "./calendar-current-time-line";
 import { CalendarTaskMoveUndoProvider } from "./calendar-task-move-undo";
+import {
+  CalendarDateNavigationUndoProvider,
+  parseCalendarDateNavigationAnchor,
+  useApplyCalendarDateNavigationRestore,
+  useRecordCalendarDateNavigation,
+  useSyncCalendarDateNavigationAnchor,
+} from "./calendar-date-navigation-undo";
+import type {
+  CalendarDateNavigationPanelState,
+  CalendarDateNavigationSnapshot,
+} from "@/lib/calendar-date-navigation-undo";
 import { buildCalendarAllDayTaskMoveSnapshot } from "@/lib/calendar-task-move-undo";
 import { useRecordCalendarTaskMove } from "./calendar-task-move-undo";
 import {
@@ -266,6 +285,9 @@ function CalendarViewTabs({
   onSidebarOpenChange: (open: boolean) => void;
 }) {
   const listCalendarOverlap = useListCalendarOverlapLayout();
+  const sidebarWidthClass = getCalendarSidebarWidthClass(
+    listCalendarOverlap?.isOverlapLayout ?? false,
+  );
   const sidebarSearchVisibilityClass = sidebarOpen
     ? getCalendarSidebarVisibilityClass(sidebarMinViewportWidth)
     : "hidden";
@@ -291,7 +313,7 @@ function CalendarViewTabs({
             : "Dock calendar over task list"
         }
         onClick={listCalendarOverlap.toggleLayout}
-        className="flex size-7 shrink-0 cursor-pointer items-center justify-center self-center rounded-full bg-slate-100 text-zinc-600 transition-colors hover:bg-zinc-100 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+        className="flex size-6.5 -mt-[15px] -ml-2 shrink-0 cursor-pointer items-center justify-center self-center rounded-full bg-slate-100 text-zinc-600 transition-colors hover:bg-zinc-100 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
       >
         {listCalendarOverlap.isOverlapLayout ? (
           <BiChevronRight className="size-5" aria-hidden="true" />
@@ -416,16 +438,16 @@ function CalendarViewTabs({
         })}
       </div>
       <div
-        className={`ml-auto flex items-center justify-end gap-2 ${
-          sidebarOpen ? CALENDAR_SIDEBAR_WIDTH_CLASS : ""
+        className={`ml-auto flex min-w-0 items-center justify-end gap-2 -mt-[2px] pl-[7px] ${
+          sidebarOpen ? sidebarWidthClass : ""
         }`}
       >
         {sidebarOpen ? (
           <label
-            className={`relative flex ${sidebarSearchVisibilityClass} h-9 min-w-0 flex-1 items-center rounded-full border border-zinc-200 bg-[#fafafd] px-3 dark:border-zinc-700 dark:bg-zinc-900`}
+            className={`relative flex ${sidebarSearchVisibilityClass} h-[33px] min-w-0 flex-1 items-center rounded-full border border-zinc-200 bg-[#fafafd] px-3 dark:border-zinc-700 dark:bg-zinc-900`}
           >
             <IoIosSearch
-              className="size-4 shrink-0 text-zinc-400 dark:text-zinc-500"
+              className="size-[15px] shrink-0 text-zinc-400 dark:text-zinc-500"
               aria-hidden="true"
             />
             <input
@@ -434,7 +456,7 @@ function CalendarViewTabs({
               onChange={(event) => onSearchQueryChange(event.target.value)}
               placeholder="Search"
               aria-label="Search calendar tasks"
-              className="h-9 min-w-0 flex-1 appearance-none bg-transparent py-0 pl-2 text-sm leading-9 text-zinc-800 outline-none placeholder:text-zinc-400 dark:text-zinc-100 dark:placeholder:text-zinc-500 [&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-decoration]:appearance-none"
+              className="h-[32px] min-w-0 flex-1 appearance-none bg-transparent py-0 pl-2 text-[14.5px] leading-9 text-zinc-800 outline-none placeholder:text-zinc-400 dark:text-zinc-100 dark:placeholder:text-zinc-500 [&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-decoration]:appearance-none"
             />
           </label>
         ) : null}
@@ -442,12 +464,12 @@ function CalendarViewTabs({
           type="button"
           aria-label={sidebarOpen ? "Close calendar sidebar" : "Open calendar sidebar"}
           onClick={() => onSidebarOpenChange(!sidebarOpen)}
-          className="group flex size-9 shrink-0 cursor-pointer items-center mb-2 justify-center rounded-full text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+          className="group flex size-7.5 shrink-0 cursor-pointer items-center -mt-4 justify-center rounded-full text-zinc-450 transition-colors hover:bg-zinc-100 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
         >
           {sidebarOpen ? (
-            <MdKeyboardDoubleArrowRight className="size-5" aria-hidden="true" />
+            <MdKeyboardDoubleArrowRight className="size-4" aria-hidden="true" />
           ) : (
-            <MdKeyboardDoubleArrowLeft className="size-5" aria-hidden="true" />
+            <MdKeyboardDoubleArrowLeft className="size-4" aria-hidden="true" />
           )}
         </button>
         {headerTrailingAction}
@@ -494,6 +516,8 @@ export function CalendarMonthView({
   sidebarFocusDate,
   sidebarJumpRequestId,
   onSidebarFocusDateChange,
+  dateNavigationRestoreRequestId,
+  dateNavigationRestoreSnapshot,
 }: {
   tasks: TaskListItem[];
   lists: TodoList[];
@@ -537,8 +561,31 @@ export function CalendarMonthView({
   const lastSidebarJumpRequestIdRef = useRef<number | undefined>(undefined);
   const { beginTaskDrag, endDragPreview } = useCalendarTaskDragPreview();
   const recordCalendarTaskMove = useRecordCalendarTaskMove();
+  const recordCalendarDateNavigation = useRecordCalendarDateNavigation();
   const { defaultColor: calendarTaskDefaultColor } =
     useCalendarTaskDefaultColor();
+
+  useSyncCalendarDateNavigationAnchor(monthDate);
+
+  const applyDateNavigationRestore = useCallback(
+    (snapshot: CalendarDateNavigationSnapshot) => {
+      const anchor = parseCalendarDateNavigationAnchor(snapshot);
+      const focus = fromDateKey(snapshot.focusDateKey);
+      if (anchor) {
+        setMonthDate(anchor);
+      }
+      if (focus) {
+        setSelectedDate(startOfDay(focus));
+      }
+    },
+    [],
+  );
+
+  useApplyCalendarDateNavigationRestore(
+    dateNavigationRestoreSnapshot,
+    dateNavigationRestoreRequestId,
+    applyDateNavigationRestore,
+  );
 
   useEffect(() => {
     const currentDay = startOfDay(new Date());
@@ -594,6 +641,63 @@ export function CalendarMonthView({
     return getFullMonthDays(monthDate.getFullYear(), monthDate.getMonth());
   }, [monthDate]);
   const monthRowCount = Math.max(1, Math.ceil(monthDays.length / 7));
+  const monthGridRef = useRef<HTMLDivElement>(null);
+  const [monthNowLineLayout, setMonthNowLineLayout] = useState<{
+    top: number;
+    left: number;
+    width: number;
+  } | null>(null);
+  const monthTodayIndex = useMemo(() => {
+    if (!today) return -1;
+    return monthDays.findIndex((day) => isSameDay(day, today));
+  }, [monthDays, today]);
+
+  const updateMonthNowLineTop = useCallback(() => {
+    const grid = monthGridRef.current;
+    if (!grid || !now || monthTodayIndex < 0) {
+      setMonthNowLineLayout(null);
+      return;
+    }
+
+    const todayKey = toDateKey(today!);
+    const cell = grid.querySelector<HTMLElement>(
+      `[data-calendar-day="${todayKey}"]`,
+    );
+    if (!cell) {
+      setMonthNowLineLayout(null);
+      return;
+    }
+
+    const dayProgress =
+      (now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60) /
+      (24 * 60);
+    const dateHeaderReservePx = 28;
+    const contentHeight = Math.max(0, cell.offsetHeight - dateHeaderReservePx - 4);
+    setMonthNowLineLayout({
+      top: cell.offsetTop + dateHeaderReservePx + contentHeight * dayProgress,
+      left: cell.offsetLeft,
+      width: cell.offsetWidth,
+    });
+  }, [monthTodayIndex, now, today]);
+
+  useLayoutEffect(() => {
+    updateMonthNowLineTop();
+  }, [monthDays, monthRowCount, updateMonthNowLineTop]);
+
+  useEffect(() => {
+    const grid = monthGridRef.current;
+    if (!grid) return;
+
+    const scrollParent = grid.closest<HTMLElement>(".calendar-grid-scroll");
+    const handle = () => updateMonthNowLineTop();
+    window.addEventListener("resize", handle);
+    scrollParent?.addEventListener("scroll", handle, { passive: true });
+
+    return () => {
+      window.removeEventListener("resize", handle);
+      scrollParent?.removeEventListener("scroll", handle);
+    };
+  }, [updateMonthNowLineTop]);
 
   function syncSidebarFocusForMonth(nextMonthDate: Date) {
     if (!onSidebarFocusDateChange) return;
@@ -610,21 +714,33 @@ export function CalendarMonthView({
 
   const handleGoToPreviousMonth = useCallback(() => {
     if (!monthDate) return;
+    recordCalendarDateNavigation?.();
     const nextMonthDate = startOfDay(
       new Date(monthDate.getFullYear(), monthDate.getMonth() - 1, 1),
     );
     setMonthDate(nextMonthDate);
     syncSidebarFocusForMonth(nextMonthDate);
-  }, [monthDate, onSidebarFocusDateChange, selectedDate]);
+  }, [
+    monthDate,
+    onSidebarFocusDateChange,
+    recordCalendarDateNavigation,
+    selectedDate,
+  ]);
 
   const handleGoToNextMonth = useCallback(() => {
     if (!monthDate) return;
+    recordCalendarDateNavigation?.();
     const nextMonthDate = startOfDay(
       new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 1),
     );
     setMonthDate(nextMonthDate);
     syncSidebarFocusForMonth(nextMonthDate);
-  }, [monthDate, onSidebarFocusDateChange, selectedDate]);
+  }, [
+    monthDate,
+    onSidebarFocusDateChange,
+    recordCalendarDateNavigation,
+    selectedDate,
+  ]);
 
   useEffect(() => {
     if (!onMonthNavigationChange || !monthDate) return;
@@ -642,6 +758,10 @@ export function CalendarMonthView({
 
   function handleDaySelect(day: Date) {
     const normalized = startOfDay(day);
+    const focusDate = sidebarFocusDate ?? selectedDate;
+    if (!focusDate || !isSameDay(focusDate, normalized)) {
+      recordCalendarDateNavigation?.();
+    }
     setSelectedDate(normalized);
     onSidebarFocusDateChange?.(normalized);
     closeTaskModal();
@@ -833,7 +953,9 @@ export function CalendarMonthView({
 
       <div className={getCalendarShellClassName(fullWidth)}>
         <div className={CALENDAR_GRID_SCROLL_CLASS}>
+          <div className="relative min-h-full">
             <div
+              ref={monthGridRef}
               className="grid h-full min-h-full grid-cols-7"
               style={{
                 gridTemplateRows: `repeat(${monthRowCount}, minmax(96px, 140px))`,
@@ -872,7 +994,7 @@ export function CalendarMonthView({
                     isDropTarget
                       ? "bg-blue-50 ring-1 ring-inset ring-blue-400 dark:bg-blue-950/30 dark:ring-blue-500"
                       : isSelected
-                          ? "bg-zinc-100 ring-[1px] ring-inset ring-zinc-300 dark:bg-zinc-900 dark:ring-zinc-600"
+                          ? "bg-zinc-100 shadow-[inset_0_0_0_1px_#d4d4d8] dark:bg-zinc-900 dark:shadow-[inset_0_0_0_1px_#52525b]"
                           : "bg-white dark:bg-zinc-950"
                   }`}
                 >
@@ -900,7 +1022,7 @@ export function CalendarMonthView({
                   </span>
 
                   <div
-                    className={`mt-1 min-h-0 flex-1 space-y-0.5 overflow-auto ${CALENDAR_MONTH_CELL_TASKS_SCROLL_CLASS}`}
+                    className={`mt-1 min-h-0 flex-1 space-y-0.5 overflow-x-hidden overflow-y-auto ${CALENDAR_MONTH_CELL_TASKS_SCROLL_CLASS}`}
                   >
                     {dayTasks.map((task) => (
                       <CalendarTaskHoverButton
@@ -949,7 +1071,15 @@ export function CalendarMonthView({
               );
             })}
             </div>
+            {monthTodayIndex >= 0 && monthNowLineLayout ? (
+              <CalendarMonthCellCurrentTimeLine
+                top={monthNowLineLayout.top}
+                left={monthNowLineLayout.left}
+                width={monthNowLineLayout.width}
+              />
+            ) : null}
           </div>
+        </div>
         </div>
 
     </div>
@@ -1056,6 +1186,7 @@ export function CalendarViewsPanel({
   periodLabelAction,
   headerTrailingAction,
 }: CalendarViewsPanelProps) {
+  const listCalendarOverlap = useListCalendarOverlapLayout();
   const [internalActiveView, setInternalActiveView] =
     useState<CalendarViewTab>(defaultView);
   const activeView = view ?? internalActiveView;
@@ -1129,6 +1260,16 @@ export function CalendarViewsPanel({
     readStoredCalendarDaysRangeStart,
   );
   const [sidebarJumpRequestId, setSidebarJumpRequestId] = useState(0);
+  const [dateNavigationRestoreRequestId, setDateNavigationRestoreRequestId] =
+    useState(0);
+  const [dateNavigationRestoreSnapshot, setDateNavigationRestoreSnapshot] =
+    useState<CalendarDateNavigationSnapshot | null>(null);
+  const recordCalendarDateNavigationRef = useRef<(() => void) | null>(null);
+  const panelNavigationStateRef = useRef<CalendarDateNavigationPanelState>({
+    focusDateKey: toDateKey(sidebarFocusDate),
+    sidebarMonthKey: toDateKey(sidebarMonthDate),
+    daysRangeStartKey: null,
+  });
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const sidebarMinViewportWidth = activeView === "week" ? 1950 : 1800;
@@ -1192,14 +1333,6 @@ export function CalendarViewsPanel({
     },
     [defaultListId, handleCalendarSelectTask, lists, onStartCalendarTask],
   );
-  const taskEditorModalSnapshot = useMemo(
-    () =>
-      taskEditorModalId
-        ? getCalendarTaskSnapshot(taskEditorModalId, tasks)
-        : null,
-    [taskEditorModalId, tasks],
-  );
-
   const calendarModalNavigableTaskIds = useMemo(
     () => getCalendarModalNavigableTaskIds(tasks, sidebarFocusDate),
     [sidebarFocusDate, tasks],
@@ -1275,6 +1408,47 @@ export function CalendarViewsPanel({
         : (CALENDAR_VIEW_TABS.find((tab) => tab.id === activeView)?.label ??
           activeView);
 
+  panelNavigationStateRef.current = {
+    focusDateKey: toDateKey(sidebarFocusDate),
+    sidebarMonthKey: toDateKey(sidebarMonthDate),
+    daysRangeStartKey: daysViewRangeStart
+      ? toDateKey(daysViewRangeStart)
+      : null,
+  };
+
+  const handleRestoreCalendarDateNavigation = useCallback(
+    (snapshot: CalendarDateNavigationSnapshot) => {
+      const focus = fromDateKey(snapshot.focusDateKey);
+      if (focus) {
+        setSidebarFocusDate(startOfDay(focus));
+      }
+
+      const month = fromDateKey(snapshot.sidebarMonthKey);
+      if (month) {
+        setSidebarMonthDate(
+          startOfDay(new Date(month.getFullYear(), month.getMonth(), 1)),
+        );
+      }
+
+      if (snapshot.daysRangeStartKey) {
+        const rangeStart = fromDateKey(snapshot.daysRangeStartKey);
+        if (rangeStart) {
+          setDaysViewRangeStart(startOfDay(rangeStart));
+        }
+      } else {
+        setDaysViewRangeStart(null);
+      }
+
+      setDateNavigationRestoreSnapshot(snapshot);
+      setDateNavigationRestoreRequestId((requestId) => requestId + 1);
+    },
+    [],
+  );
+
+  function recordCalendarDateNavigation() {
+    recordCalendarDateNavigationRef.current?.();
+  }
+
   const handleSidebarFocusDateChange = useCallback((date: Date) => {
     const normalized = startOfDay(date);
     setSidebarFocusDate((previous) =>
@@ -1299,6 +1473,7 @@ export function CalendarViewsPanel({
       if (task.dueDate) {
         const focusDate = fromDateKey(task.dueDate);
         if (focusDate) {
+          recordCalendarDateNavigation();
           handleSidebarFocusDateChange(focusDate);
           setSidebarJumpRequestId((requestId) => requestId + 1);
         }
@@ -1310,11 +1485,13 @@ export function CalendarViewsPanel({
   );
 
   function handleSidebarSelectDate(date: Date) {
+    recordCalendarDateNavigation();
     handleSidebarFocusDateChange(date);
     setSidebarJumpRequestId((requestId) => requestId + 1);
   }
 
   const handleSidebarGoToToday = useCallback(() => {
+    recordCalendarDateNavigation();
     const today = startOfDay(new Date());
     handleSidebarFocusDateChange(today);
     setSidebarJumpRequestId((requestId) => requestId + 1);
@@ -1341,6 +1518,8 @@ export function CalendarViewsPanel({
     sidebarFocusDate,
     sidebarJumpRequestId,
     onSidebarFocusDateChange: handleSidebarFocusDateChange,
+    dateNavigationRestoreRequestId,
+    dateNavigationRestoreSnapshot,
   };
 
   function wrapViewWithSidebar(
@@ -1379,6 +1558,11 @@ export function CalendarViewsPanel({
         sidebarMinViewportWidth={sidebarMinViewportWidth}
         sidebarOpen={sidebarOpen}
         centerModalTaskId={taskEditorModalId}
+        centerModalIsNewTaskDraft={taskEditorModalId === newCalendarTaskDraftId}
+        onCenterModalNewTaskDraftComplete={() => setNewCalendarTaskDraftId(null)}
+        onCloseCenterModal={closeTaskEditorModal}
+        centerModalNavigableTaskIds={calendarModalNavigableTaskIds}
+        onCenterModalNavigateTask={handleCalendarModalNavigateTask}
       >
         {view}
       </CalendarViewSidebarLayout>
@@ -1399,10 +1583,15 @@ export function CalendarViewsPanel({
       onSetTaskDueTime={onSetTaskDueTime}
       onSetTaskDueDateAndTime={onSetTaskDueDateAndTime}
     >
+    <CalendarDateNavigationUndoProvider
+      getPanelNavigationState={() => panelNavigationStateRef.current}
+      onRestore={handleRestoreCalendarDateNavigation}
+      recordRef={recordCalendarDateNavigationRef}
+    >
     <div
       className={`calendar-panel flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden pt-1.5 pb-3 pl-2 z-50! ${
         fullWidth ? "pr-2" : ""
-      }`}
+      } ${listCalendarOverlap?.isOverlapLayout ? "min-w-0" : ""}`}
     >
       <CalendarViewTabs
         activeView={activeView}
@@ -1423,7 +1612,11 @@ export function CalendarViewsPanel({
         sidebarMinViewportWidth={sidebarMinViewportWidth}
         onSidebarOpenChange={setSidebarOpen}
       />
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div
+        className={`flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden ${
+          listCalendarOverlap?.isOverlapLayout ? "w-full" : ""
+        }`}
+      >
       {activeView === "month" ? (
         wrapViewWithSidebar(
           <CalendarMonthView
@@ -1617,24 +1810,7 @@ export function CalendarViewsPanel({
       </div>
     </div>
 
-      {taskEditorModalId ? (
-        <CalendarTaskModal
-          taskId={taskEditorModalId}
-          taskSnapshot={taskEditorModalSnapshot}
-          isNewTaskDraft={taskEditorModalId === newCalendarTaskDraftId}
-          onNewTaskDraftComplete={() => setNewCalendarTaskDraftId(null)}
-          onClose={closeTaskEditorModal}
-          onDetailsSaved={onDetailsSaved}
-          onTaskHasDetailsKnown={onTaskHasDetailsKnown}
-          onTaskRenamed={onTaskRenamed}
-          onDueDateUpdated={onDueDateUpdated}
-          onRecurrenceUpdated={onRecurrenceUpdated}
-          onSaveTaskRecurrence={onSaveTaskRecurrence}
-          onToggleTask={onToggleTask}
-          navigableTaskIds={calendarModalNavigableTaskIds}
-          onNavigateTask={handleCalendarModalNavigateTask}
-        />
-      ) : null}
+    </CalendarDateNavigationUndoProvider>
     </CalendarTaskMoveUndoProvider>
     </CalendarTaskModalActionsProvider>
     </CalendarTaskHoverPreviewProvider>

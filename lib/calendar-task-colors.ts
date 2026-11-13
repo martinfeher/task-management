@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import {
   mixHexColors,
+  mixHexWithWhite,
   normalizeHexColor,
 } from "@/lib/sidebar-background-types";
 import {
@@ -34,6 +35,30 @@ export const CALENDAR_TASK_TITLE_BRIGHTNESS_CSS_VAR =
 
 /** Title lightness multiplier applied to the task swatch (0.3 = 70% darker). */
 export const DEFAULT_CALENDAR_TASK_TITLE_BRIGHTNESS = 0.3;
+
+/** Hover brightening for task title text (mix toward white). */
+export const CALENDAR_TASK_TITLE_HOVER_BRIGHTEN_RATIO = 0.15;
+
+export const CALENDAR_TASK_TITLE_HOVER_COLOR_CSS_VAR =
+  "--calendar-task-title-hover-color";
+
+export function getCalendarTaskTitleHoverColor(titleColorHex: string) {
+  return mixHexWithWhite(titleColorHex, CALENDAR_TASK_TITLE_HOVER_BRIGHTEN_RATIO);
+}
+
+export function appendCalendarTaskTitleColorVars(
+  style: CSSProperties,
+  backgroundHex: string,
+): CSSProperties {
+  const titleColor = getCalendarTaskTitleColorFromBackground(backgroundHex);
+  const titleHoverColor = getCalendarTaskTitleHoverColor(titleColor);
+
+  return {
+    ...style,
+    ["--calendar-task-title-color" as string]: titleColor,
+    [CALENDAR_TASK_TITLE_HOVER_COLOR_CSS_VAR as string]: titleHoverColor,
+  };
+}
 
 function hexToRgb(hex: string): [number, number, number] | null {
   const normalized = hex.replace("#", "").trim();
@@ -190,10 +215,13 @@ export function getCalendarTaskColorItemStyle(
   if (!normalized) return undefined;
 
   const surface = getCalendarTaskColorSurface(normalized);
-  return {
-    backgroundColor: surface.background,
-    ["--calendar-task-item-background" as string]: surface.background,
-    ["--calendar-task-title-source-color" as string]: surface.background,
-    ["--calendar-task-time-color" as string]: DEFAULT_CALENDAR_TASK_TIME_COLOR,
-  };
+  return appendCalendarTaskTitleColorVars(
+    {
+      backgroundColor: surface.background,
+      ["--calendar-task-item-background" as string]: surface.background,
+      ["--calendar-task-title-source-color" as string]: surface.background,
+      ["--calendar-task-time-color" as string]: DEFAULT_CALENDAR_TASK_TIME_COLOR,
+    },
+    surface.background,
+  );
 }

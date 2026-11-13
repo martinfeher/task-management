@@ -27,7 +27,6 @@ const MODAL_FOOTER_ACTION_COLOR = "#a4a4a4";
 const MODAL_FOOTER_DELETE_TOOLTIP_ID = "task-modal-footer-delete-tooltip";
 const MODAL_FOOTER_COPY_LINK_TOOLTIP_ID = "task-modal-footer-copy-link-tooltip";
 const MODAL_FOOTER_PRIORITY_TOOLTIP_ID = "task-modal-footer-priority-tooltip";
-const MODAL_FOOTER_MOVE_TOOLTIP_ID = "task-modal-footer-move-tooltip";
 
 const MODAL_FOOTER_ICON_TOOLTIP_GAP_PX = 8;
 const MODAL_FOOTER_ICON_TOOLTIP_VIEWPORT_PADDING_PX = 8;
@@ -37,7 +36,7 @@ const MODAL_FOOTER_ICON_TOOLTIP_Z_CLASS = "z-[10060]";
 const MODAL_FOOTER_ICON_TOOLTIP_CLASS = `add-task-date-tooltip ${APP_HOVER_TOOLTIP_ABOVE_CENTER} pointer-events-none fixed whitespace-nowrap px-3 py-1.5 text-[11px] font-medium ${MODAL_FOOTER_ICON_TOOLTIP_Z_CLASS}`;
 
 const MODAL_FOOTER_ICON_BUTTON_CLASS =
-  "flex h-6 mr-1 shrink-0 cursor-pointer items-center justify-center rounded-md text-[#b9b8c4] transition-colors hover:bg-zinc-100 hover:text-slate-450 dark:hover:bg-zinc-800 dark:hover:text-zinc-200";
+  "flex h-6 mr-1 shrink-0 cursor-pointer items-center justify-center rounded-md text-[#C6C5D1] transition-colors hover:bg-zinc-100 hover:text-slate-450 dark:hover:bg-zinc-800 dark:hover:text-zinc-200";
 
 type TaskModalFooterProps = {
   taskId: string;
@@ -78,6 +77,7 @@ function ModalFooterPortaledIconButton({
   style,
   ariaHaspopup,
   ariaExpanded,
+  showTooltip = true,
   children,
 }: {
   tooltipId: string;
@@ -88,18 +88,19 @@ function ModalFooterPortaledIconButton({
   style?: React.CSSProperties;
   ariaHaspopup?: boolean | "dialog" | "menu";
   ariaExpanded?: boolean;
+  showTooltip?: boolean;
   children: React.ReactNode;
 }) {
   const buttonRef = useRef<HTMLButtonElement>(null);
   const tooltipRef = useRef<HTMLSpanElement>(null);
-  const [showTooltip, setShowTooltip] = useState(false);
+  const [tooltipVisible, setTooltipVisible] = useState(false);
   const [tooltipStyle, setTooltipStyle] = useState<{
     top: number;
     left: number;
   } | null>(null);
 
   useLayoutEffect(() => {
-    if (!showTooltip) {
+    if (!tooltipVisible) {
       setTooltipStyle(null);
       return;
     }
@@ -144,7 +145,7 @@ function ModalFooterPortaledIconButton({
       window.removeEventListener("resize", updatePosition);
       window.removeEventListener("scroll", updatePosition, true);
     };
-  }, [showTooltip, tooltipText]);
+  }, [tooltipText, tooltipVisible]);
 
   return (
     <>
@@ -154,18 +155,22 @@ function ModalFooterPortaledIconButton({
         aria-label={ariaLabel}
         aria-haspopup={ariaHaspopup}
         aria-expanded={ariaExpanded}
-        aria-describedby={showTooltip ? tooltipId : undefined}
+        aria-describedby={showTooltip && tooltipVisible ? tooltipId : undefined}
         style={style}
         onClick={onClick}
-        onMouseEnter={() => setShowTooltip(true)}
-        onMouseLeave={() => setShowTooltip(false)}
-        onFocus={() => setShowTooltip(true)}
-        onBlur={() => setShowTooltip(false)}
+        onMouseEnter={() => {
+          if (showTooltip) setTooltipVisible(true);
+        }}
+        onMouseLeave={() => setTooltipVisible(false)}
+        onFocus={() => {
+          if (showTooltip) setTooltipVisible(true);
+        }}
+        onBlur={() => setTooltipVisible(false)}
         className={className}
       >
         {children}
       </button>
-      {showTooltip && typeof document !== "undefined"
+      {showTooltip && tooltipVisible && typeof document !== "undefined"
         ? createPortal(
             <span
               ref={tooltipRef}
@@ -203,7 +208,7 @@ function FooterTextButton({
       type="button"
       aria-label={ariaLabel}
       onClick={onClick}
-      className="cursor-pointer text-[13px] transition-opacity hover:opacity-80"
+      className="cursor-pointer text-[13px] mb-[1px] transition-opacity hover:opacity-80"
       style={{ color: MODAL_FOOTER_ACTION_COLOR }}
     >
       {children}
@@ -471,6 +476,7 @@ export function TaskModalFooter({
               assignedLabelIds={assignedLabelIds}
               query={labelQuery}
               isSubmitting={isLabelSubmitting}
+              listMaxHeightPx={270}
               onQueryChange={setLabelQuery}
               onToggleLabel={(labelId) => void handleToggleLabel(labelId)}
               onCreateLabel={(label, color) =>
@@ -498,6 +504,7 @@ export function TaskModalFooter({
             tooltipId={MODAL_FOOTER_PRIORITY_TOOLTIP_ID}
             ariaLabel="Priority"
             tooltipText="Priority"
+            showTooltip={!openMenusOnHover}
             ariaHaspopup="dialog"
             ariaExpanded={isPriorityMenuOpen}
             onClick={() => {
@@ -520,11 +527,15 @@ export function TaskModalFooter({
 
           {isPriorityMenuOpen ? (
             <div className="absolute bottom-full left-0 z-50 mb-px pb-1">
-              <div className="w-[196px] overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+              <div className="w-[196px] overflow-visible rounded-lg border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+                {openMenusOnHover ? (
+                  <p className="px-3 pt-1 text-[10px] text-[#dedede]">Priority</p>
+                ) : null}
                 <TaskPrioritySelector
                   selectedPriority={priorityLevel}
                   onSelectPriority={handleSelectPriority}
                   onClearPriority={handleClearPriority}
+                  portaledOptionTooltips={openMenusOnHover}
                 />
               </div>
             </div>
@@ -546,20 +557,16 @@ export function TaskModalFooter({
             scheduleFooterMenuHoverClose(() => setIsMoveMenuOpen(false))
           }
         >
-          <ModalFooterPortaledIconButton
-            tooltipId={MODAL_FOOTER_MOVE_TOOLTIP_ID}
+          <FooterTextButton
             ariaLabel="Move to list"
-            tooltipText="Move to"
             onClick={() => {
               setIsPriorityMenuOpen(false);
               setIsLabelMenuOpen(false);
               setIsMoveMenuOpen((open) => !open);
             }}
-            className="cursor-pointer text-[13px] transition-opacity hover:opacity-80"
-            style={{ color: MODAL_FOOTER_ACTION_COLOR }}
           >
             Move to
-          </ModalFooterPortaledIconButton>
+          </FooterTextButton>
 
           {isMoveMenuOpen ? (
             <div className="absolute bottom-full left-0 z-50 mb-px pb-1">

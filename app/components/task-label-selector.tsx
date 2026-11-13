@@ -30,6 +30,8 @@ type TaskLabelSelectorProps = {
   onCreateLabel: (label: string, color: string) => void;
   onCancel: () => void;
   tone?: "default" | "contextMenu";
+  /** Scrollable label list max height in px (default 260). */
+  listMaxHeightPx?: number;
 };
 
 function hasExactLabelMatch(labels: Label[], query: string) {
@@ -117,6 +119,7 @@ export function TaskLabelSelector({
   onCreateLabel,
   onCancel,
   tone = "default",
+  listMaxHeightPx = 260,
 }: TaskLabelSelectorProps) {
   const isContextMenuTone = tone === "contextMenu";
   const inputRef = useRef<HTMLInputElement>(null);
@@ -351,7 +354,8 @@ export function TaskLabelSelector({
       </div>
 
       <div
-        className="max-h-[260px] overflow-y-auto py-1 pr-1 [scrollbar-gutter:stable]"
+        className="overflow-y-auto py-1 pr-1 [scrollbar-gutter:stable]"
+        style={{ maxHeight: listMaxHeightPx }}
         role="listbox"
         aria-label="Labels"
         aria-activedescendant={

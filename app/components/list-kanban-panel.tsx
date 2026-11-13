@@ -972,7 +972,7 @@ export function ListKanbanPanel({
                             ? undefined
                             : (event) => handleTaskContextMenu(event, task)
                         }
-                        className={`group relative touch-none rounded-[12px] border border-zinc-200 hover:border-slate-350 bg-[#f8f8fb] px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950 ${
+                        className={`group relative touch-none rounded-[12px] border border-zinc-200 hover:border-gray-250 bg-[#f8f8fb] px-3 py-2 hover:shadow-[0_6px_14px_rgba(0,0,0,0.05)] text-sm dark:border-zinc-700 dark:bg-zinc-950 ${
                           isCompleting
                             ? showCompletionBackground
                               ? "task-row-completing"

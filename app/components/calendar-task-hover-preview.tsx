@@ -31,7 +31,8 @@ import {
 } from "./calendar-task-color-menu";
 import type { TaskListItem } from "./todo-app";
 
-const PREVIEW_WIDTH = 280;
+export const CALENDAR_TASK_HOVER_PREVIEW_WIDTH_PX = 280;
+const PREVIEW_WIDTH = CALENDAR_TASK_HOVER_PREVIEW_WIDTH_PX;
 const PREVIEW_ESTIMATED_HEIGHT = 240;
 const PREVIEW_TITLE_CLASS =
   "line-clamp-2 text-[15px] font-semibold leading-5 text-[#3C3C3E]";
@@ -133,6 +134,17 @@ function taskWithResolvedDetails(task: TaskListItem): TaskListItem {
   return { ...task, details: cached };
 }
 
+export async function resolveCalendarTaskPreviewTask(
+  task: TaskListItem,
+): Promise<TaskListItem> {
+  const initial = taskWithResolvedDetails(task);
+  if (taskDetailsHasContent(initial.details) || !initial.hasDetails) {
+    return initial;
+  }
+  const details = await loadTaskDetailsForPreview(task);
+  return { ...initial, details };
+}
+
 async function loadTaskDetailsForPreview(task: TaskListItem): Promise<string> {
   if (taskDetailsHasContent(task.details)) return task.details;
 
@@ -220,7 +232,7 @@ function PreviewMetaRow({
   );
 }
 
-function CalendarTaskHoverPreviewCard({ task }: { task: TaskListItem }) {
+export function CalendarTaskHoverPreviewCard({ task }: { task: TaskListItem }) {
   const descriptionLines = getTaskPreviewDescriptionLines(
     task.details,
     task.name,

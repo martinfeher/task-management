@@ -89,7 +89,7 @@ export function TaskListEntityFilter({
   return (
     <div
       ref={containerRef}
-      className="pointer-events-auto relative flex h-[26px] items-center rounded-full border border-[#e3e6ec] bg-white/90 px-[4px] py-0 shadow-sm backdrop-blur-[2px] dark:border-zinc-700 dark:bg-zinc-900/90"
+      className="pointer-events-auto relative flex h-[26px] items-center rounded-full border border-[#e3e6ec] px-[4px] py-0 shadow-sm  bg-white/[0.6] backdrop-blur-[4px] dark:border-zinc-700 dark:bg-zinc-900/[0.83]"
       role="group"
       aria-label="Filter tasks and notes"
     >

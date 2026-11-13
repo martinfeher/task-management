@@ -1,6 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import { createPortal } from "react-dom";
 import { BiLink, BiLeftArrowAlt, BiRedo, BiUndo } from "react-icons/bi";
 import { MdKeyboardArrowUp, MdOutlineKeyboardArrowDown } from "react-icons/md";
@@ -9,6 +17,7 @@ import { HiItalic } from "react-icons/hi2";
 import { VscChecklist } from "react-icons/vsc";
 import { renameTask, updateTaskDueDate, updateTaskDueTime, updateTaskRecurrence } from "@/app/actions/todo";
 import type { TaskRecurrenceRule } from "@/lib/task-recurrence";
+import type { TaskListItem } from "./todo-app";
 import { serializeRecurrenceRule } from "@/lib/task-recurrence";
 import type { TaskReminderOptionId } from "@/lib/task-reminder";
 import {
@@ -176,6 +185,16 @@ import {
   computeTaskDatePickerMenuPosition,
 } from "./task-date-picker";
 import { TaskVersionHistoryOffcanvas } from "./task-version-history-offcanvas";
+import { TASK_DETAILS_HEADER_ICON_HOVER_CLASS } from "@/lib/task-details-header-icon-hover";
+import {
+  blockTypeHistoryLabel,
+  EDITOR_HISTORY_DEFAULT_LABEL,
+  EDITOR_HISTORY_OPEN_TASK_LABEL,
+  formatRedoTooltipLabel,
+  formatUndoTooltipLabel,
+  inlineFormatHistoryLabel,
+  type EditorHistoryEntry,
+} from "@/lib/editor-history-labels";
 import {
   TaskModalFooter,
   type TaskModalFooterConfig,
@@ -300,6 +319,14 @@ type TaskDetailsPanelProps = {
     canGoNext: boolean;
     previousTaskTitle?: string | null;
     nextTaskTitle?: string | null;
+    previousTaskId?: string | null;
+    nextTaskId?: string | null;
+    previousTask?: TaskListItem | null;
+    nextTask?: TaskListItem | null;
+    onNavigationPreviewChange?: (
+      taskId: string | null,
+      anchor?: DOMRect,
+    ) => void;
     onPrevious?: () => void;
     onNext?: () => void;
   } | null;
@@ -371,11 +398,61 @@ const TASK_DETAILS_DATE_MENU_HOVER_CLOSE_MS = 120;
 /** Above `calendar-task-modal` overlay (`z-[10050]`). */
 const TASK_DETAILS_MODAL_DATE_MENU_Z_CLASS = "z-[10060]";
 
+type FormatMenuClampBounds = {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+};
+
+function getDefaultFormatMenuClampBounds(): FormatMenuClampBounds {
+  const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+  const viewportWidth = window.innerWidth;
+
+  return {
+    left: FORMAT_MENU_VIEWPORT_PADDING,
+    right: viewportWidth - FORMAT_MENU_VIEWPORT_PADDING,
+    top: FORMAT_MENU_VIEWPORT_PADDING,
+    bottom: viewportHeight - FORMAT_MENU_VIEWPORT_PADDING,
+  };
+}
+
+function getModalFormatMenuClampBounds(
+  panel: HTMLElement | null,
+): FormatMenuClampBounds | null {
+  if (!panel) return null;
+
+  const dialog = panel.closest<HTMLElement>(".calendar-task-modal");
+  if (!dialog) return null;
+
+  const rect = dialog.getBoundingClientRect();
+
+  return {
+    left: rect.left + FORMAT_MENU_VIEWPORT_PADDING,
+    right: rect.right - FORMAT_MENU_VIEWPORT_PADDING,
+    top: rect.top + FORMAT_MENU_VIEWPORT_PADDING,
+    bottom: rect.bottom - FORMAT_MENU_VIEWPORT_PADDING,
+  };
+}
+
+function FormatMenuPortal({
+  children,
+  isModal,
+}: {
+  children: ReactNode;
+  isModal: boolean;
+}) {
+  if (isModal && typeof document !== "undefined") {
+    return createPortal(children, document.body);
+  }
+
+  return <>{children}</>;
+}
+
 const FORMAT_TOOLBAR_BOLD_ITALIC_ACTIVE_CLASS =
   "bg-[#E8EAEF] text-zinc-800 dark:text-zinc-900";
 
-const HEADER_QUICK_FORMAT_BUTTON_CLASS =
-  "inline-flex h-8 w-7 cursor-pointer items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100";
+const HEADER_QUICK_FORMAT_BUTTON_CLASS = `inline-flex h-8 w-7 cursor-pointer items-center justify-center rounded-md text-zinc-500 transition-colors hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-100 ${TASK_DETAILS_HEADER_ICON_HOVER_CLASS}`;
 
 type FormatMenuInlineFormats = {
   bold: boolean;
@@ -2086,47 +2163,34 @@ function clampFormatMenuPosition(
   position: FormatMenuState,
   menuWidth: number,
   menuHeight: number,
+  bounds: FormatMenuClampBounds = getDefaultFormatMenuClampBounds(),
 ): FormatMenuState {
-  const viewportWidth = window.innerWidth;
-  const viewportHeight = window.innerHeight;
   const { alignLeft, anchorBottom } = position;
   let { x, y } = position;
   let placement = position.placement ?? "above";
 
   if (alignLeft) {
-    x = Math.max(
-      FORMAT_MENU_VIEWPORT_PADDING,
-      Math.min(x, viewportWidth - menuWidth - FORMAT_MENU_VIEWPORT_PADDING),
-    );
+    x = Math.max(bounds.left, Math.min(x, bounds.right - menuWidth));
   } else {
     const half = menuWidth / 2;
-    x = Math.max(
-      FORMAT_MENU_VIEWPORT_PADDING + half,
-      Math.min(x, viewportWidth - FORMAT_MENU_VIEWPORT_PADDING - half),
-    );
+    x = Math.max(bounds.left + half, Math.min(x, bounds.right - half));
   }
 
   const aboveTop = y - menuHeight;
-  if (placement === "above" && aboveTop < FORMAT_MENU_VIEWPORT_PADDING) {
+  if (placement === "above" && aboveTop < bounds.top) {
     placement = "below";
     y =
       (anchorBottom ?? y + menuHeight + 16) + FORMAT_MENU_BELOW_SELECTION_GAP;
-  } else if (
-    placement === "below" &&
-    y + menuHeight > viewportHeight - FORMAT_MENU_VIEWPORT_PADDING
-  ) {
+  } else if (placement === "below" && y + menuHeight > bounds.bottom) {
     if (
       !position.preferBelow &&
       (anchorBottom ?? y) - menuHeight - FORMAT_MENU_ABOVE_SELECTION_GAP >=
-        FORMAT_MENU_VIEWPORT_PADDING
+        bounds.top
     ) {
       placement = "above";
       y = (anchorBottom ?? y) - FORMAT_MENU_ABOVE_SELECTION_GAP;
     } else {
-      y = Math.min(
-        y,
-        viewportHeight - menuHeight - FORMAT_MENU_VIEWPORT_PADDING,
-      );
+      y = Math.min(y, bounds.bottom - menuHeight);
     }
   }
 
@@ -2206,6 +2270,8 @@ export function TaskDetailsPanel({
   const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
+  const [undoActionLabel, setUndoActionLabel] = useState<string | null>(null);
+  const [redoActionLabel, setRedoActionLabel] = useState<string | null>(null);
   const [openFormatDropdown, setOpenFormatDropdown] =
     useState<FormatToolbarDropdown | null>(null);
   const [openHeaderFormatDropdown, setOpenHeaderFormatDropdown] =
@@ -2358,8 +2424,9 @@ export function TaskDetailsPanel({
   const saveAbortRef = useRef(false);
   const lastSaveCompletedAtRef = useRef(0);
   const historyTimerRef = useRef<number | null>(null);
-  const historyRef = useRef<string[]>([]);
+  const historyRef = useRef<EditorHistoryEntry[]>([]);
   const historyIndexRef = useRef(-1);
+  const pendingHistoryLabelRef = useRef(EDITOR_HISTORY_DEFAULT_LABEL);
   const isApplyingHistoryRef = useRef(false);
   const isReadyRef = useRef(false);
   const imageDropDepthRef = useRef(0);
@@ -2664,8 +2731,21 @@ export function TaskDetailsPanel({
   }, []);
 
   const updateHistoryAvailability = useCallback(() => {
-    setCanUndo(historyIndexRef.current > 0);
-    setCanRedo(historyIndexRef.current < historyRef.current.length - 1);
+    const index = historyIndexRef.current;
+    const history = historyRef.current;
+    const canUndoNow = index > 0;
+    const canRedoNow = index < history.length - 1;
+
+    setCanUndo(canUndoNow);
+    setCanRedo(canRedoNow);
+    setUndoActionLabel(
+      canUndoNow ? (history[index]?.label ?? EDITOR_HISTORY_DEFAULT_LABEL) : null,
+    );
+    setRedoActionLabel(
+      canRedoNow
+        ? (history[index + 1]?.label ?? EDITOR_HISTORY_DEFAULT_LABEL)
+        : null,
+    );
   }, []);
 
   const resetHistory = useCallback(
@@ -2675,8 +2755,9 @@ export function TaskDetailsPanel({
         historyTimerRef.current = null;
       }
 
-      historyRef.current = [html];
+      historyRef.current = [{ html, label: EDITOR_HISTORY_OPEN_TASK_LABEL }];
       historyIndexRef.current = 0;
+      pendingHistoryLabelRef.current = EDITOR_HISTORY_DEFAULT_LABEL;
       updateHistoryAvailability();
     },
     [updateHistoryAvailability],
@@ -2686,12 +2767,15 @@ export function TaskDetailsPanel({
     if (isApplyingHistoryRef.current) return;
 
     const snapshot = readEditorContent();
-    const current = historyRef.current[historyIndexRef.current];
+    const current = historyRef.current[historyIndexRef.current]?.html;
 
     if (snapshot === current) return;
 
+    const label = pendingHistoryLabelRef.current;
+    pendingHistoryLabelRef.current = EDITOR_HISTORY_DEFAULT_LABEL;
+
     const nextHistory = historyRef.current.slice(0, historyIndexRef.current + 1);
-    nextHistory.push(snapshot);
+    nextHistory.push({ html: snapshot, label });
 
     const historyLimit = isLargeContentRef.current
       ? LARGE_CONTENT_HISTORY_LIMIT
@@ -2732,9 +2816,15 @@ export function TaskDetailsPanel({
     pushHistorySnapshot();
   }, [pushHistorySnapshot]);
 
-  const recordHistorySnapshot = useCallback(() => {
-    flushHistorySnapshot();
-  }, [flushHistorySnapshot]);
+  const recordHistorySnapshot = useCallback(
+    (label?: string) => {
+      if (label) {
+        pendingHistoryLabelRef.current = label;
+      }
+      flushHistorySnapshot();
+    },
+    [flushHistorySnapshot],
+  );
 
   const persistTaskContent = useCallback(
     async (
@@ -3895,7 +3985,7 @@ export function TaskDetailsPanel({
       syncEditorLineEmptyState(editor);
     }
     syncEditorContent();
-    recordHistorySnapshot();
+    recordHistorySnapshot("Font");
     scheduleAutoSave();
     updateLineControls();
   }, [
@@ -4072,7 +4162,7 @@ export function TaskDetailsPanel({
       setFormatMenuBlockType(type);
       syncEditorLineEmptyState(editor);
         syncEditorContent();
-        recordHistorySnapshot();
+        recordHistorySnapshot(blockTypeHistoryLabel(type));
         scheduleAutoSave();
       updateLineControls();
       closeFormatDropdowns();
@@ -4119,7 +4209,7 @@ export function TaskDetailsPanel({
     syncEditorLineEmptyState(editor);
     syncEditorContent();
     syncTitleToTaskList();
-    recordHistorySnapshot();
+    recordHistorySnapshot("Paste");
     requestSave("immediate");
     updateLineControls();
     scheduleEditorHeightSync();
@@ -4348,7 +4438,7 @@ export function TaskDetailsPanel({
       }
 
       syncEditorContent();
-      recordHistorySnapshot();
+      recordHistorySnapshot(inlineFormatHistoryLabel(command));
       scheduleAutoSave();
       closeFormatMenu();
     },
@@ -4402,7 +4492,7 @@ export function TaskDetailsPanel({
 
     syncEditorLineEmptyState(editor);
     syncEditorContent();
-    recordHistorySnapshot();
+    recordHistorySnapshot("Clear formatting");
     scheduleAutoSave();
     closeFormatDropdowns();
     setFormatMenuBlockType(getActiveTextBlockType(editor));
@@ -4491,7 +4581,7 @@ export function TaskDetailsPanel({
     if (!applied) return;
 
     syncEditorContent();
-    recordHistorySnapshot();
+    recordHistorySnapshot("Insert link");
     scheduleAutoSave();
     closeFormatMenu();
   }, [
@@ -4514,7 +4604,7 @@ export function TaskDetailsPanel({
     if (!removeLinkFromSelection(editor)) return;
 
     syncEditorContent();
-    recordHistorySnapshot();
+    recordHistorySnapshot("Remove link");
     scheduleAutoSave();
     closeFormatMenu();
   }, [
@@ -4559,7 +4649,7 @@ export function TaskDetailsPanel({
       );
       syncEditorLineEmptyState(editor);
       syncEditorContent();
-      recordHistorySnapshot();
+      recordHistorySnapshot("Text color");
       scheduleAutoSave();
       setRecentFormatColors((current) =>
         rememberRecentFormatColor(current, {
@@ -4634,7 +4724,7 @@ export function TaskDetailsPanel({
       );
       syncEditorLineEmptyState(editor);
       syncEditorContent();
-      recordHistorySnapshot();
+      recordHistorySnapshot("Highlight color");
       scheduleAutoSave();
 
       const resolvedColor = resolveHighlightColorOption(color);
@@ -4735,7 +4825,7 @@ export function TaskDetailsPanel({
         selectedLines.length > 0 ? selectedLines : undefined,
       );
       syncEditorContent();
-      recordHistorySnapshot();
+      recordHistorySnapshot(blockTypeHistoryLabel(type));
       scheduleAutoSave();
       closeFormatMenu();
       updateLineControls();
@@ -4784,12 +4874,12 @@ export function TaskDetailsPanel({
   const restoreHistorySnapshot = useCallback(
     (index: number) => {
       const editor = editorRef.current;
-      const html = historyRef.current[index];
+      const entry = historyRef.current[index];
 
-      if (!editor || html === undefined) return;
+      if (!editor || entry === undefined) return;
 
       isApplyingHistoryRef.current = true;
-      editor.innerHTML = html;
+      editor.innerHTML = entry.html;
       ensureBlockLines(editor);
       ensureTitleLine(editor);
       syncEditorLineEmptyState(editor);
@@ -5553,7 +5643,16 @@ export function TaskDetailsPanel({
     if (!formatMenu || !formatMenuRef.current) return;
 
     const rect = formatMenuRef.current.getBoundingClientRect();
-    const clamped = clampFormatMenuPosition(formatMenu, rect.width, rect.height);
+    const clampBounds = isModalLayout
+      ? getModalFormatMenuClampBounds(panelRef.current) ??
+        getDefaultFormatMenuClampBounds()
+      : getDefaultFormatMenuClampBounds();
+    const clamped = clampFormatMenuPosition(
+      formatMenu,
+      rect.width,
+      rect.height,
+      clampBounds,
+    );
 
     if (
       clamped.x !== formatMenu.x ||
@@ -5564,6 +5663,7 @@ export function TaskDetailsPanel({
     }
   }, [
     formatMenu,
+    isModalLayout,
     openFormatDropdown,
     showLinkMenu,
   ]);
@@ -5774,7 +5874,7 @@ export function TaskDetailsPanel({
     setSlashCommandMenu(null);
     syncEditorContent();
     syncEditorLineEmptyState(editor);
-    recordHistorySnapshot();
+    recordHistorySnapshot(blockTypeHistoryLabel(type));
     scheduleAutoSave();
     updateLineControls();
     scheduleEditorHeightSync();
@@ -5891,7 +5991,9 @@ export function TaskDetailsPanel({
         fromClipboard: options?.fromClipboard,
       });
       syncEditorContent();
-      recordHistorySnapshot();
+      recordHistorySnapshot(
+        options?.fromClipboard ? "Paste image" : "Insert image",
+      );
       if (options?.fromClipboard) {
         showClipboardSaveNotice();
       }
@@ -5948,7 +6050,7 @@ export function TaskDetailsPanel({
     selection.getRangeAt(0).deleteContents();
     syncEditorLineEmptyState(editor);
     syncEditorContent();
-    recordHistorySnapshot();
+    recordHistorySnapshot("Cut");
     scheduleAutoSave();
     updateLineControls();
   }
@@ -6356,7 +6458,7 @@ export function TaskDetailsPanel({
     if (clickResult) {
       if (clickResult === "inserted") {
         syncEditorContent();
-        recordHistorySnapshot();
+        recordHistorySnapshot("New line");
         scheduleAutoSave();
       }
       syncEditorLineEmptyState(editor);
@@ -6497,7 +6599,7 @@ export function TaskDetailsPanel({
     hoveredLineRef.current = line;
     setAddBlockMenu(null);
     syncEditorContent();
-    recordHistorySnapshot();
+    recordHistorySnapshot(blockTypeHistoryLabel(type));
     scheduleAutoSave();
     updateLineControls();
     scheduleEditorHeightSync();
@@ -6555,7 +6657,7 @@ export function TaskDetailsPanel({
 
       if (changed) {
         syncEditorContent();
-        recordHistorySnapshot();
+        recordHistorySnapshot("Move line");
         scheduleAutoSave();
       }
 
@@ -6763,7 +6865,7 @@ export function TaskDetailsPanel({
         renumberNumberedLines(editor);
         syncEditorLineEmptyState(editor);
         syncEditorContent();
-        recordHistorySnapshot();
+        recordHistorySnapshot("List indent");
         scheduleAutoSave();
         updateLineControls();
         scheduleEditorHeightSync();
@@ -6791,7 +6893,7 @@ export function TaskDetailsPanel({
 
       syncEditorLineEmptyState(editor);
       syncEditorContent();
-      recordHistorySnapshot();
+      recordHistorySnapshot("Insert tab");
       scheduleAutoSave();
       updateLineControls();
       scheduleEditorHeightSync();
@@ -6806,7 +6908,7 @@ export function TaskDetailsPanel({
         event.preventDefault();
         syncEditorLineEmptyState(editor);
         syncEditorContent();
-        recordHistorySnapshot();
+        recordHistorySnapshot("Delete line");
         scheduleAutoSave();
         updateLineControls();
         scheduleEditorHeightSync();
@@ -6858,7 +6960,7 @@ export function TaskDetailsPanel({
       syncEditorLineEmptyState(editor);
       logEditorEnterDebug("Enter keydown: after syncEditorLineEmptyState", editor);
       syncEditorContent();
-      recordHistorySnapshot();
+      recordHistorySnapshot("New line");
       scheduleAutoSave();
       updateLineControls();
       scheduleEditorHeightSync();
@@ -6959,7 +7061,7 @@ export function TaskDetailsPanel({
 
       startImageResize(event.nativeEvent, handle, wrapper, () => {
         syncEditorContent();
-        recordHistorySnapshot();
+        recordHistorySnapshot("Resize image");
         requestSave("flush");
         scheduleEditorHeightSync();
       });
@@ -6981,7 +7083,7 @@ export function TaskDetailsPanel({
       editor,
       () => {
         syncEditorContent();
-        recordHistorySnapshot();
+        recordHistorySnapshot("Move image");
         requestSave("flush");
         scheduleEditorHeightSync();
       },
@@ -7005,7 +7107,7 @@ export function TaskDetailsPanel({
       event.preventDefault();
       toggleChecklistLine(clickedLine);
       syncEditorContent();
-      recordHistorySnapshot();
+      recordHistorySnapshot("Checklist item");
       scheduleAutoSave();
       return;
     }
@@ -7040,7 +7142,7 @@ export function TaskDetailsPanel({
       if (!removed) return;
 
       syncEditorContent();
-      recordHistorySnapshot();
+      recordHistorySnapshot("Remove image");
       requestSave("flush");
       updateLineControls();
 
@@ -7268,6 +7370,9 @@ export function TaskDetailsPanel({
     isModalLayout &&
     Boolean(task && !task.isNote) &&
     !hideModalFormatToggle;
+  const showTaskDatePickerHeader = Boolean(
+    task && (!task.isNote || isModalLayout),
+  );
 
   function renderModalTaskNavigationButtons() {
     if (!isModalLayout || !modalTaskNavigation) return null;
@@ -7277,13 +7382,35 @@ export function TaskDetailsPanel({
       canGoNext,
       previousTaskTitle,
       nextTaskTitle,
+      previousTaskId,
+      nextTaskId,
+      onNavigationPreviewChange,
       onPrevious,
       onNext,
     } = modalTaskNavigation;
 
+    function showNavigationPreview(
+      targetTaskId: string | null,
+      anchorElement: HTMLElement,
+    ) {
+      if (!targetTaskId || !onNavigationPreviewChange) return;
+      onNavigationPreviewChange(
+        targetTaskId,
+        anchorElement.getBoundingClientRect(),
+      );
+    }
+
     return (
       <div className="ml-1 flex items-center">
-        <div className="group/prev-task relative">
+        <div
+          className="group/prev-task relative"
+          onPointerEnter={(event) => {
+            if (canGoPrevious && previousTaskId) {
+              showNavigationPreview(previousTaskId, event.currentTarget);
+            }
+          }}
+          onPointerLeave={() => onNavigationPreviewChange?.(null)}
+        >
           <button
             type="button"
             aria-label={
@@ -7293,22 +7420,33 @@ export function TaskDetailsPanel({
             }
             disabled={!canGoPrevious}
             onClick={() => onPrevious?.()}
-            className={`flex size-8 items-center justify-center rounded-full text-zinc-500 transition-colors hover:bg-zinc-200 hover:text-zinc-800 disabled:pointer-events-none disabled:opacity-35 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 ${
+            onMouseEnter={(event) => {
+              if (canGoPrevious && previousTaskId) {
+                showNavigationPreview(previousTaskId, event.currentTarget);
+              }
+            }}
+            onFocus={(event) => {
+              if (canGoPrevious && previousTaskId) {
+                showNavigationPreview(previousTaskId, event.currentTarget);
+              }
+            }}
+            onBlur={() => onNavigationPreviewChange?.(null)}
+            className={`flex size-7 items-center justify-center rounded-full text-zinc-500 transition-colors hover:text-zinc-800 disabled:pointer-events-none disabled:opacity-35 dark:text-zinc-400 dark:hover:text-zinc-100 ${TASK_DETAILS_HEADER_ICON_HOVER_CLASS} ${
               canGoPrevious ? "cursor-pointer" : "cursor-not-allowed"
             }`}
           >
-            <MdKeyboardArrowUp className="size-[22px]" aria-hidden="true" />
+            <MdKeyboardArrowUp className="size-[21px] text-[#858585]"/>
           </button>
-          {canGoPrevious && previousTaskTitle ? (
-            <span
-              role="tooltip"
-              className={`${TASK_DETAILS_TOOLTIP_CLASS} max-w-[min(280px,calc(100vw-32px))] overflow-visible`}
-            >
-              <span className="block max-w-full truncate">{previousTaskTitle}</span>
-            </span>
-          ) : null}
         </div>
-        <div className="group/next-task relative">
+        <div
+          className="group/next-task relative"
+          onPointerEnter={(event) => {
+            if (canGoNext && nextTaskId) {
+              showNavigationPreview(nextTaskId, event.currentTarget);
+            }
+          }}
+          onPointerLeave={() => onNavigationPreviewChange?.(null)}
+        >
           <button
             type="button"
             aria-label={
@@ -7316,23 +7454,26 @@ export function TaskDetailsPanel({
             }
             disabled={!canGoNext}
             onClick={() => onNext?.()}
-            className={`flex size-8 items-center justify-center rounded-full text-zinc-500 transition-colors hover:bg-zinc-200 hover:text-zinc-800 disabled:pointer-events-none disabled:opacity-35 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 ${
+            onMouseEnter={(event) => {
+              if (canGoNext && nextTaskId) {
+                showNavigationPreview(nextTaskId, event.currentTarget);
+              }
+            }}
+            onFocus={(event) => {
+              if (canGoNext && nextTaskId) {
+                showNavigationPreview(nextTaskId, event.currentTarget);
+              }
+            }}
+            onBlur={() => onNavigationPreviewChange?.(null)}
+            className={`flex size-7 items-center justify-center rounded-full text-zinc-500 transition-colors hover:text-zinc-800 disabled:pointer-events-none disabled:opacity-35 dark:text-zinc-400 dark:hover:text-zinc-100 ${TASK_DETAILS_HEADER_ICON_HOVER_CLASS} ${
               canGoNext ? "cursor-pointer" : "cursor-not-allowed"
             }`}
           >
             <MdOutlineKeyboardArrowDown
-              className="size-[22px]"
+              className="size-[21px] text-[#858585]"
               aria-hidden="true"
             />
           </button>
-          {canGoNext && nextTaskTitle ? (
-            <span
-              role="tooltip"
-              className={`${TASK_DETAILS_TOOLTIP_CLASS} max-w-[min(280px,calc(100vw-32px))] overflow-visible`}
-            >
-              <span className="block max-w-full truncate">{nextTaskTitle}</span>
-            </span>
-          ) : null}
         </div>
       </div>
     );
@@ -7389,7 +7530,7 @@ export function TaskDetailsPanel({
     if (!isModalLayout || !task) return null;
 
     return (
-      <div className="absolute right-2 top-2 z-20 flex items-center gap-2">
+      <div className="absolute right-2 top-2 z-20 flex items-center gap-3.5">
         {showModalMarkComplete ? (
           <button
             type="button"
@@ -7423,7 +7564,7 @@ export function TaskDetailsPanel({
               className={`flex size-8 cursor-pointer items-center justify-center rounded-full transition-colors ${
                 isModalFormatToolbarOpen
                   ? "bg-zinc-200 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100"
-                  : "text-zinc-500 hover:bg-zinc-200/80 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                  : `text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-100 ${TASK_DETAILS_HEADER_ICON_HOVER_CLASS}`
               }`}
             >
               <LuType className="size-[18px]" aria-hidden="true" />
@@ -7458,7 +7599,7 @@ export function TaskDetailsPanel({
                   className={`flex size-8 cursor-pointer items-center justify-center rounded-full text-[15px] font-bold transition-colors ${
                     formatMenuInlineFormats.bold
                       ? FORMAT_TOOLBAR_BOLD_ITALIC_ACTIVE_CLASS
-                      : "text-zinc-600 hover:bg-zinc-200 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                      : `text-zinc-600 dark:text-zinc-300 ${TASK_DETAILS_HEADER_ICON_HOVER_CLASS}`
                   }`}
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => handleModalInlineFormatApply("bold")}
@@ -7472,7 +7613,7 @@ export function TaskDetailsPanel({
                   className={`flex size-8 cursor-pointer items-center justify-center rounded-full transition-colors ${
                     formatMenuInlineFormats.italic
                       ? FORMAT_TOOLBAR_BOLD_ITALIC_ACTIVE_CLASS
-                      : "text-zinc-600 hover:bg-zinc-200 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                      : `text-zinc-600 dark:text-zinc-300 ${TASK_DETAILS_HEADER_ICON_HOVER_CLASS}`
                   }`}
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => handleModalInlineFormatApply("italic")}
@@ -7486,7 +7627,7 @@ export function TaskDetailsPanel({
                   className={`flex size-8 cursor-pointer items-center justify-center rounded-full text-[15px] underline transition-colors ${
                     formatMenuInlineFormats.underline
                       ? "bg-[#c3eaff] text-[#2563eb] dark:text-blue-300"
-                      : "text-zinc-600 hover:bg-zinc-200 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                      : `text-zinc-600 dark:text-zinc-300 ${TASK_DETAILS_HEADER_ICON_HOVER_CLASS}`
                   }`}
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => handleModalInlineFormatApply("underline")}
@@ -7529,9 +7670,9 @@ export function TaskDetailsPanel({
             type="button"
             aria-label="Close task editor"
             onClick={() => void onClose()}
-            className="flex size-8 cursor-pointer items-center justify-center rounded-full text-zinc-500 transition-colors bg-zinc-200/50 hover:bg-zinc-200/80 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+            className={`flex size-[29px] -mt-[2px] -mr-[2px] cursor-pointer items-center justify-center rounded-full text-zinc-500 transition-colors bg-zinc-200/30 hover:text-zinc-600 dark:text-zinc-400 dark:hover:text-zinc-100 ${TASK_DETAILS_HEADER_ICON_HOVER_CLASS}`}
           >
-            <LuX className="size-4" aria-hidden="true" />
+            <LuX className="size-[15px]" aria-hidden="true" />
           </button>
         ) : null}
       </div>
@@ -7621,7 +7762,7 @@ export function TaskDetailsPanel({
         {renderModalHeaderActions()}
         <div
           className={`relative flex shrink-0 ${
-            task?.isNote ? "h-[41px]" : "h-[47px]"
+            task?.isNote && !isModalLayout ? "h-[41px]" : "h-[47px]"
           } items-center justify-between overflow-visible ml-[6px] px-2.5 pt-[8px] pb-[8px] ${
             isModalLayout
               ? isModalFormatToolbarOpen
@@ -7637,7 +7778,7 @@ export function TaskDetailsPanel({
               aria-label="Back to task list"
               title="Back to task list"
               onClick={onBack}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-zinc-600 transition-colors hover:bg-zinc-200 dark:text-zinc-300 dark:hover:bg-zinc-800 lg:hidden"
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-zinc-600 transition-colors dark:text-zinc-300 lg:hidden ${TASK_DETAILS_HEADER_ICON_HOVER_CLASS}`}
             >
               <BiLeftArrowAlt className="size-6" />
             </button>
@@ -7653,7 +7794,7 @@ export function TaskDetailsPanel({
             </div>
           ) : task ? (
             <>
-              {!task.isNote ? (
+              {showTaskDatePickerHeader ? (
                 <>
                   <div
                     className="relative"
@@ -7757,7 +7898,14 @@ export function TaskDetailsPanel({
                 <button
                   type="button"
                   onClick={handleUndo}
-                    className={`flex h-[34px] items-center justify-center rounded-full px-[5px] text-slate-450 transition-colors hover:bg-zinc-200 hover:text-zinc-550 disabled:pointer-events-none dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 cursor-pointer ${
+                  aria-label={
+                    canUndo && undoActionLabel
+                      ? formatUndoTooltipLabel(undoActionLabel)
+                      : "Undo"
+                  }
+                  aria-describedby="task-details-undo-tooltip"
+                  disabled={!canUndo}
+                    className={`flex h-[34px] items-center justify-center rounded-full px-[5px] text-slate-450 transition-colors hover:text-zinc-550 disabled:pointer-events-none dark:text-zinc-400 dark:hover:text-zinc-100 cursor-pointer ${TASK_DETAILS_HEADER_ICON_HOVER_CLASS} ${
                     canUndo ? "cursor-pointer" : "cursor-not-allowed"
                   } disabled:opacity-40`}
                 >
@@ -7767,20 +7915,28 @@ export function TaskDetailsPanel({
                   <span
                     id="task-details-undo-tooltip"
                     role="tooltip"
-                    className={TASK_DETAILS_TOOLTIP_CLASS}
+                    className={`${TASK_DETAILS_TOOLTIP_CLASS} max-w-[min(220px,calc(100vw-32px))]`}
                   >
-                    Undo
+                    <span className="block max-w-full truncate">
+                      {canUndo && undoActionLabel
+                        ? formatUndoTooltipLabel(undoActionLabel)
+                        : "Undo"}
+                    </span>
                   </span>
                 </div>
                 
                 <div className="group/redo relative">
                 <button
                   type="button"
-                  aria-label="Redo"
+                  aria-label={
+                    canRedo && redoActionLabel
+                      ? formatRedoTooltipLabel(redoActionLabel)
+                      : "Redo"
+                  }
                     aria-describedby="task-details-redo-tooltip"
                   disabled={!canRedo}
                   onClick={handleRedo}
-                    className={`flex h-[34px] min-w-[2.25rem] items-center justify-center rounded-full px-[7px] text-zinc-450 transition-colors hover:bg-zinc-200 hover:text-zinc-800 disabled:pointer-events-none dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 ${
+                    className={`flex h-[34px] min-w-[2.25rem] items-center justify-center rounded-full px-[7px] text-zinc-450 transition-colors hover:text-zinc-800 disabled:pointer-events-none dark:text-zinc-400 dark:hover:text-zinc-100 ${TASK_DETAILS_HEADER_ICON_HOVER_CLASS} ${
                     canRedo ? "cursor-pointer" : "cursor-not-allowed"
                   } disabled:opacity-40`}
                 >
@@ -7789,9 +7945,13 @@ export function TaskDetailsPanel({
                   <span
                     id="task-details-redo-tooltip"
                     role="tooltip"
-                    className={TASK_DETAILS_TOOLTIP_CLASS}
+                    className={`${TASK_DETAILS_TOOLTIP_CLASS} max-w-[min(220px,calc(100vw-32px))]`}
                   >
-                    Redo
+                    <span className="block max-w-full truncate">
+                      {canRedo && redoActionLabel
+                        ? formatRedoTooltipLabel(redoActionLabel)
+                        : "Redo"}
+                    </span>
                   </span>
               </div>
                 {renderHeaderQuickFormatButtons()}
@@ -7841,7 +8001,7 @@ export function TaskDetailsPanel({
                             captureFormatSelectionFromEditor();
                             clearFormatting();
                           }}
-                          className="flex h-10 min-w-[2.25rem] cursor-pointer items-center justify-center rounded-full px-2.5 text-zinc-500 transition-colors hover:bg-zinc-200 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                          className={`flex h-10 min-w-[2.25rem] cursor-pointer items-center justify-center rounded-full px-2.5 text-zinc-500 transition-colors hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-100 ${TASK_DETAILS_HEADER_ICON_HOVER_CLASS}`}
                         >
                           <LuRemoveFormatting className="size-[18px]" />
                         </button>
@@ -7886,7 +8046,7 @@ export function TaskDetailsPanel({
                   aria-label="Version history"
                   aria-describedby="task-details-history-tooltip"
                   onClick={() => setIsVersionHistoryOpen(true)}
-                  className="flex h-10 min-w-[2.25rem] cursor-pointer items-center justify-center rounded-full px-1 text-slate-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                  className={`flex h-10 min-w-[2.25rem] cursor-pointer items-center justify-center rounded-full px-1 text-slate-400 transition-colors hover:text-zinc-600 dark:text-zinc-400 dark:hover:text-zinc-100 ${TASK_DETAILS_HEADER_ICON_HOVER_CLASS}`}
                 >
                   <LuHistory className="size-[16px] text-[#b6b6b6]" />
                 </button>
@@ -8195,9 +8355,12 @@ export function TaskDetailsPanel({
       })()}
 
       {formatMenu && (
+        <FormatMenuPortal isModal={isModalLayout}>
         <div
           ref={formatMenuRef}
-          className={getFormatToolbarPopoverClass(formatMenu)}
+          className={`${getFormatToolbarPopoverClass(formatMenu)} ${
+            isModalLayout ? TASK_DETAILS_MODAL_DATE_MENU_Z_CLASS : ""
+          }`}
           style={{ left: formatMenu.x, top: formatMenu.y }}
         >
           <FormatToolbarAnchorPlacementProvider
@@ -8462,6 +8625,7 @@ export function TaskDetailsPanel({
           </div>
           </FormatToolbarAnchorPlacementProvider>
         </div>
+        </FormatMenuPortal>
       )}
 
       <TaskVersionHistoryOffcanvas

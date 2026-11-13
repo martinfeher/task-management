@@ -1,9 +1,13 @@
 "use client";
 
-import type {
-  CSSProperties,
-  MutableRefObject,
-  PointerEvent as ReactPointerEvent,
+import {
+  useCallback,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type MutableRefObject,
+  type PointerEvent as ReactPointerEvent,
 } from "react";
 import {
   bindCalendarTaskDrag,
@@ -38,6 +42,8 @@ export const CALENDAR_MIN_DURATION_MINUTES = 15;
 export const CALENDAR_TASK_CONTENT_PADDING_PX = 5;
 export const CALENDAR_TASK_HORIZONTAL_PADDING_START_PX = 7;
 export const CALENDAR_TASK_HORIZONTAL_PADDING_END_PX = 6;
+export const CALENDAR_TASK_GRID_EXTRA_PADDING_START_PX = 4;
+export const CALENDAR_TASK_CONTENT_PADDING_LEFT = `var(--calendar-task-content-padding-start, ${CALENDAR_TASK_HORIZONTAL_PADDING_START_PX}px)`;
 export const CALENDAR_TASK_INNER_RADIUS_PX = 5;
 export const CALENDAR_TASK_OUTER_RADIUS_PX = 10;
 export const CALENDAR_TASK_DRAG_RADIUS_INCREASE_PX = 2;
@@ -127,13 +133,111 @@ function getCalendarTaskTitleClampStyle(titleMaxLines: number): CSSProperties {
   };
 }
 
-function getCalendarTaskTitleClassName(titleMaxLines: number) {
+function getCalendarTaskTitleClassName(
+  titleMaxLines: number,
+  reserveInlineTimeSpace = false,
+) {
   const isSingleLine = titleMaxLines === 1;
   return `calendar-task-title min-w-0 font-medium leading-tight${
     isSingleLine
-      ? " calendar-task-title--single-line block w-full truncate"
+      ? reserveInlineTimeSpace
+        ? " calendar-task-title--single-line block min-w-0 flex-1 truncate"
+        : " calendar-task-title--single-line block w-full truncate"
       : ""
   }`;
+}
+
+function CalendarTaskTimedTitleSection({
+  title,
+  timeLabel,
+  timeClassName,
+  titleMaxLines,
+  showTimeBelow,
+  priority = null,
+}: {
+  title: string;
+  timeLabel: string;
+  timeClassName: string;
+  titleMaxLines: number;
+  showTimeBelow: boolean;
+  priority?: number | null;
+}) {
+  const rowRef = useRef<HTMLSpanElement>(null);
+  const measureRef = useRef<HTMLSpanElement>(null);
+  const [showInlineTime, setShowInlineTime] = useState(false);
+  const canTryInlineTime = !showTimeBelow && timeLabel.length > 0;
+
+  const updateInlineTimeVisibility = useCallback(() => {
+    if (!canTryInlineTime) {
+      setShowInlineTime(false);
+      return;
+    }
+
+    const row = rowRef.current;
+    const measure = measureRef.current;
+    if (!row || !measure) return;
+
+    setShowInlineTime(measure.offsetWidth <= row.clientWidth);
+  }, [canTryInlineTime, title, timeLabel, priority]);
+
+  useLayoutEffect(() => {
+    updateInlineTimeVisibility();
+
+    const row = rowRef.current;
+    if (!row) return;
+
+    const observer = new ResizeObserver(() => {
+      updateInlineTimeVisibility();
+    });
+    observer.observe(row);
+    return () => observer.disconnect();
+  }, [updateInlineTimeVisibility]);
+
+  const inlineTimeVisible = canTryInlineTime && showInlineTime;
+  const isSingleLineRow = !showTimeBelow && titleMaxLines === 1;
+
+  return (
+    <div className="flex min-w-0 flex-1 mr-[2px] mb-px flex-col justify-start overflow-hidden">
+      <span
+        ref={rowRef}
+        className={`relative flex min-w-0 gap-0.5 ${
+          isSingleLineRow ? "items-center" : "items-start"
+        }`}
+      >
+        <span
+          className={`${getCalendarTaskTitleClassName(
+            titleMaxLines,
+            inlineTimeVisible,
+          )}${titleMaxLines > 1 ? " min-w-0 flex-1" : ""}`}
+          style={getCalendarTaskTitleStyle(titleMaxLines)}
+        >
+          {title}
+        </span>
+        {inlineTimeVisible ? (
+          <span className={`ml-0.5 truncate ${timeClassName}`}>
+            {timeLabel}
+          </span>
+        ) : null}
+        <CalendarTaskPriorityFlag priority={priority} />
+        {canTryInlineTime ? (
+          <span
+            ref={measureRef}
+            className={`pointer-events-none absolute top-0 left-0 flex max-w-none items-center gap-0.5 whitespace-nowrap opacity-0 ${CALENDAR_TASK_FONT_CLASS}`}
+            aria-hidden
+          >
+            <span className="calendar-task-title font-medium leading-tight">
+              {title}
+            </span>
+            <span className={`ml-0.5 ${timeClassName}`}>{timeLabel}</span>
+            <CalendarTaskPriorityFlag priority={priority} />
+          </span>
+        ) : null}
+      </span>
+      {showTimeBelow ? (
+        <span className={`mt-[3px] truncate ${timeClassName}`}>{timeLabel}</span>
+      ) : null}
+    </div>
+  );
 }
 
 function getCalendarTaskTitleStyle(
@@ -182,6 +286,11 @@ export function CalendarTaskDropPreview({
       ? "calendar-task-drag-source-placeholder"
       : "calendar-task-drop-preview";
   const horizontalInsetClass = CALENDAR_TASK_TIMED_COLUMN_INSET_CLASS;
+  const taskItemStyle = getCalendarTaskItemStyle(
+    priority,
+    calendarColor,
+    calendarTaskDefaultColor,
+  );
 
   return (
     <div
@@ -189,11 +298,8 @@ export function CalendarTaskDropPreview({
       style={{
         top,
         height,
-        ...getCalendarTaskItemStyle(
-          priority,
-          calendarColor,
-          calendarTaskDefaultColor,
-        ),
+        ...taskItemStyle,
+        ...(variant === "source" ? { backgroundColor: "transparent" } : null),
       }}
       className={`${previewClassName} pointer-events-none absolute ${horizontalInsetClass} overflow-hidden rounded-[12px] select-none ${calendarTaskItemClassName()}`}
     >
@@ -202,7 +308,7 @@ export function CalendarTaskDropPreview({
         style={{
           paddingTop: CALENDAR_TASK_CONTENT_PADDING_PX,
           paddingBottom: CALENDAR_TASK_CONTENT_PADDING_PX,
-          paddingLeft: CALENDAR_TASK_HORIZONTAL_PADDING_START_PX,
+          paddingLeft: CALENDAR_TASK_CONTENT_PADDING_LEFT,
           paddingRight: CALENDAR_TASK_HORIZONTAL_PADDING_END_PX,
         }}
       >
@@ -213,28 +319,18 @@ export function CalendarTaskDropPreview({
               : "min-w-0 flex-1 items-start"
           }`}
         >
-          <div className="flex min-w-0 flex-1 mr-[2px] mb-px flex-col justify-start overflow-hidden">
-            <span
-              className={`flex min-w-0 gap-0.5 ${
-                isSingleLineOnly ? "items-center" : "items-start"
-              }`}
-            >
-              <span
-                className={`${getCalendarTaskTitleClassName(titleMaxLines)} min-w-0 flex-1`}
-                style={getCalendarTaskTitleStyle(titleMaxLines)}
-              >
-                {taskName}
-              </span>
-              <CalendarTaskPriorityFlag priority={priority} />
-            </span>
-            {showTimeRange ? (
-              <span
-                className={`mt-[3px] truncate ${calendarTaskTimeRangeClassName()}`}
-              >
-                {formatCalendarTaskTimeRange(startMinutes, durationMinutes)}
-              </span>
-            ) : null}
-          </div>
+          <CalendarTaskTimedTitleSection
+            title={taskName}
+            timeLabel={
+              startMinutes !== undefined && durationMinutes !== undefined
+                ? formatCalendarTaskTimeRange(startMinutes, durationMinutes)
+                : ""
+            }
+            timeClassName={calendarTaskTimeRangeClassName()}
+            titleMaxLines={titleMaxLines}
+            showTimeBelow={Boolean(showTimeRange)}
+            priority={priority}
+          />
           <div className="pointer-events-none shrink-0" aria-hidden>
             <TaskCompletionCheckbox
               variant="box"
@@ -368,24 +464,14 @@ export function CalendarTimedTaskContent({
           : "min-w-0 flex-1 items-start"
       }`}
     >
-      <div className="flex min-w-0 flex-1 mr-[2px] mb-px flex-col justify-start overflow-hidden">
-        <span
-          className={`flex min-w-0 gap-0.5 ${
-            isSingleLineOnly ? "items-center" : "items-start"
-          }`}
-        >
-          <span
-            className={`${getCalendarTaskTitleClassName(titleMaxLines)} min-w-0 flex-1`}
-            style={getCalendarTaskTitleStyle(titleMaxLines)}
-          >
-            {task.name}
-          </span>
-          <CalendarTaskPriorityFlag priority={task.priority} />
-        </span>
-        {showTime ? (
-          <span className={`mt-[3px] truncate ${timeClassName}`}>{timeLabel}</span>
-        ) : null}
-      </div>
+      <CalendarTaskTimedTitleSection
+        title={task.name}
+        timeLabel={timeLabel}
+        timeClassName={timeClassName}
+        titleMaxLines={titleMaxLines}
+        showTimeBelow={showTime}
+        priority={task.priority}
+      />
       <CalendarTaskCompletionCheckbox
         task={task}
         onToggleTask={onToggleTask}
@@ -879,7 +965,7 @@ export function CalendarTimedTaskBlock({
           style={{
             paddingTop: contentPaddingTop,
             paddingBottom: contentPaddingBottom,
-            paddingLeft: CALENDAR_TASK_HORIZONTAL_PADDING_START_PX,
+            paddingLeft: CALENDAR_TASK_CONTENT_PADDING_LEFT,
             paddingRight: CALENDAR_TASK_HORIZONTAL_PADDING_END_PX,
           }}
         >

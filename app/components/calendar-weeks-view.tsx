@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CalendarTaskPriorityFlag } from "./calendar-task-title";
 import type { CalendarStartTaskOptions } from "@/lib/calendar-start-task";
 import { CalendarPeriodNavigation } from "./calendar-period-navigation";
@@ -28,6 +28,13 @@ import {
 } from "@/lib/calendar-layout";
 import { useCalendarTaskDefaultColor } from "@/lib/calendar-task-default-color-settings";
 import type { CalendarSidebarSyncProps } from "./calendar-view-sidebar-layout";
+import {
+  parseCalendarDateNavigationAnchor,
+  useApplyCalendarDateNavigationRestore,
+  useRecordCalendarDateNavigation,
+  useSyncCalendarDateNavigationAnchor,
+} from "./calendar-date-navigation-undo";
+import type { CalendarDateNavigationSnapshot } from "@/lib/calendar-date-navigation-undo";
 import {
   CalendarTaskHoverButton,
   useCalendarTaskDragPreview,
@@ -178,6 +185,8 @@ export function CalendarMultiWeekView({
   sidebarFocusDate,
   sidebarJumpRequestId,
   onSidebarFocusDateChange,
+  dateNavigationRestoreRequestId,
+  dateNavigationRestoreSnapshot,
 }: CalendarMultiWeekViewProps) {
   const [today, setToday] = useState<Date | null>(null);
   const [now, setNow] = useState<Date | null>(null);
@@ -194,6 +203,25 @@ export function CalendarMultiWeekView({
   const { beginTaskDrag, endDragPreview } = useCalendarTaskDragPreview();
   const { defaultColor: calendarTaskDefaultColor } =
     useCalendarTaskDefaultColor();
+  const recordCalendarDateNavigation = useRecordCalendarDateNavigation();
+
+  useSyncCalendarDateNavigationAnchor(rangeStart);
+
+  const applyDateNavigationRestore = useCallback(
+    (snapshot: CalendarDateNavigationSnapshot) => {
+      const anchor = parseCalendarDateNavigationAnchor(snapshot);
+      if (anchor) {
+        setRangeStart(anchor);
+      }
+    },
+    [],
+  );
+
+  useApplyCalendarDateNavigationRestore(
+    dateNavigationRestoreSnapshot,
+    dateNavigationRestoreRequestId,
+    applyDateNavigationRestore,
+  );
 
   useEffect(() => {
     const current = startOfDay(new Date());
@@ -256,6 +284,7 @@ export function CalendarMultiWeekView({
 
   function goToPreviousRange() {
     if (!rangeStart) return;
+    recordCalendarDateNavigation?.();
     const nextRangeStart = startOfDay(
       new Date(
         rangeStart.getFullYear(),
@@ -269,6 +298,7 @@ export function CalendarMultiWeekView({
 
   function goToNextRange() {
     if (!rangeStart) return;
+    recordCalendarDateNavigation?.();
     const nextRangeStart = startOfDay(
       new Date(
         rangeStart.getFullYear(),
@@ -281,6 +311,7 @@ export function CalendarMultiWeekView({
   }
 
   function goToToday() {
+    recordCalendarDateNavigation?.();
     const current = startOfDay(new Date());
     const nextRangeStart = getWeekStart(current);
     setRangeStart(nextRangeStart);
@@ -436,7 +467,7 @@ export function CalendarMultiWeekView({
   }
 
   return (
-    <div className={CALENDAR_VIEW_WRAPPER_CLASS}>
+    <div className={CALENDAR_VIEW_WRAPPER_CLASS} data-calendar-grid-view="weeks">
       <div className={getCalendarShellClassName(fullWidth)}>
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <div className="flex shrink-0 items-center justify-end px-1 py-2">
@@ -522,7 +553,7 @@ export function CalendarMultiWeekView({
                           event.stopPropagation();
                           handleCalendarTaskPointerDown(event, task, day);
                         }}
-                        className={`block w-full truncate rounded px-2 py-0.5 text-left transition-colors touch-none ${
+                        className={`block w-full truncate rounded py-0.5 pr-2 pl-3 text-left transition-colors touch-none ${
                           onSetTaskDueDate
                             ? "cursor-move"
                             : ""

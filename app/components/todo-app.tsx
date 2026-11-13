@@ -50,6 +50,7 @@ import {
 } from "@/app/actions/todo";
 import type { TaskParentUpdate } from "@/app/actions/todo";
 import { normalizeDueTimeZone, type TaskDueTime } from "@/lib/task-due-time";
+import type { ToggleTaskOptions } from "@/lib/toggle-task-options";
 import type { TaskRecurrenceRule } from "@/lib/task-recurrence";
 import {
   getRecurrenceUndoMessage,
@@ -1424,7 +1425,7 @@ export function TodoApp({
   );
 
   const scheduleUndo = useCallback(
-    (undo: PendingUndo) => {
+    (undo: PendingUndo, visibleMs: number = UNDO_VISIBLE_MS) => {
       clearUndoTimer();
       dismissRecurrenceUndo();
       setPendingUndo(undo);
@@ -1432,7 +1433,7 @@ export function TodoApp({
       undoTimerRef.current = window.setTimeout(() => {
         setPendingUndo(null);
         undoTimerRef.current = null;
-      }, UNDO_VISIBLE_MS);
+      }, visibleMs);
     },
     [clearUndoTimer, dismissRecurrenceUndo],
   );
@@ -2938,7 +2939,7 @@ export function TodoApp({
     return task.id;
   }
 
-  async function toggleTask(taskId: string) {
+  async function toggleTask(taskId: string, options?: ToggleTaskOptions) {
     let listId = selectedListId;
 
     if (!listId) {
@@ -3006,11 +3007,14 @@ export function TodoApp({
           next.delete(taskId);
           return next;
         });
-        scheduleUndo({
-          taskId,
-          listId,
-          taskName: task.name,
-        });
+        scheduleUndo(
+          {
+            taskId,
+            listId,
+            taskName: task.name,
+          },
+          options?.undoVisibleMs,
+        );
 
         completionTimerRef.current[taskId] = window.setTimeout(() => {
           void finalizeTaskCompletion(taskId, listId);

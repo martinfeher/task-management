@@ -39,7 +39,9 @@ export function CalendarTaskTitle({
           aria-label="Repeats"
         />
       ) : null}
-      <span className="min-w-0 flex-1 truncate">{name}</span>
+      <span className="calendar-task-title min-w-0 flex-1 truncate">
+        {name}
+      </span>
       <CalendarTaskPriorityFlag priority={priority} />
     </span>
   );

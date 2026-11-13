@@ -2282,7 +2282,7 @@ export function Sidebar({
         </nav>
 
         <div className="relative shrink-0 border-t border-zinc-200 dark:border-zinc-800">
-          <div className="flex flex-col gap-2 px-2 pb-2.5 pt-2">
+          <div className="flex flex-col gap-2 px-2 pb-1.5 pt-1.5">
             {session?.user ? (
               <SidebarAccountMenu
                 user={session.user}

@@ -9,6 +9,7 @@ import {
   type DetailFontFamilyId,
 } from "./detail-fonts";
 import { FORMAT_TOOLBAR_FONT_FAMILY_ITEM_CLASS } from "./detail-format-toolbar-menus";
+import { TASK_DETAILS_HEADER_ICON_HOVER_CLASS } from "@/lib/task-details-header-icon-hover";
 
 type DetailFontFamilyControlProps = {
   value: DetailFontFamilyId;
@@ -45,7 +46,7 @@ export function DetailFontFamilyControl({
   const selectedFontFamily = getDetailFontFamilyValue(value);
 
   const buttonClassName = formatToolbar
-    ? "flex h-8 min-w-[80px] cursor-pointer items-center justify-center rounded-lg text-[13px] text-zinc-700 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-zinc-200 dark:hover:bg-zinc-800"
+    ? `flex h-8 min-w-[80px] cursor-pointer items-center justify-center rounded-lg text-[13px] text-zinc-700 transition-colors disabled:cursor-not-allowed disabled:opacity-50 dark:text-zinc-200 ${TASK_DETAILS_HEADER_ICON_HOVER_CLASS}`
     : "flex h-8 min-w-[125px] cursor-pointer items-center justify-between gap-1 rounded-md border border-zinc-200 bg-white px-2.5 text-sm text-zinc-800 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800";
 
   function clearCloseTimer() {

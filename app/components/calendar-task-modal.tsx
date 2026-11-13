@@ -7,7 +7,14 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
+  type RefObject,
 } from "react";
+import { getCalendarSidebarBackdropClipStyle } from "@/lib/calendar-sidebar-backdrop-clip";
+import {
+  CALENDAR_TASK_MODAL_HOVER_BACKDROP_CLASS,
+  CALENDAR_TASK_MODAL_PINNED_BACKDROP_CLASS,
+} from "@/lib/calendar-task-modal-backdrop";
 import { createPortal } from "react-dom";
 import {
   TaskDetailsPanel,
@@ -25,7 +32,12 @@ import {
   useCalendarTaskModalActions,
   useCalendarTaskModalTask,
 } from "./calendar-task-modal-actions";
-import { CALENDAR_SIDEBAR_HOVER_PREVIEW_TRANSITION_MS } from "@/lib/calendar-sidebar-hover-preview";
+import {
+  CALENDAR_SIDEBAR_HOVER_PREVIEW_CLEAR_MS,
+  CALENDAR_SIDEBAR_HOVER_PREVIEW_TRANSITION_MS,
+} from "@/lib/calendar-sidebar-hover-preview";
+import { CalendarModalNavigationTaskPreview } from "./calendar-modal-navigation-task-preview";
+import type { TaskListItem } from "./todo-app";
 
 export {
   getCalendarTaskClickAnchorRect,
@@ -35,6 +47,7 @@ export {
 export type CalendarTaskSnapshot = {
   name: string;
   completed: boolean;
+  isNote?: boolean;
   dueDate: string | null;
   dueTimeMinutes: number | null;
   dueDurationMinutes: number | null;
@@ -72,6 +85,12 @@ type CalendarTaskModalProps = {
   hoverPreviewVisible?: boolean;
   /** When false, no dimming overlay (e.g. calendar sidebar task list). */
   showBackdrop?: boolean;
+  /** Clip the dimming layer so an open task sidebar stays undimmed. */
+  sidebarBackdropClip?: {
+    enabled: boolean;
+    sidebarRef: RefObject<HTMLElement | null>;
+    sidebarPosition: "left" | "right";
+  };
   onHoverPreviewPointerEnter?: () => void;
   onHoverPreviewPointerLeave?: () => void;
   /** Schedule order (e.g. sidebar upcoming list) for header prev/next controls. */
@@ -89,6 +108,7 @@ export function CalendarTaskModal({
   isHoverPreview = false,
   hoverPreviewVisible = true,
   showBackdrop = true,
+  sidebarBackdropClip,
   onHoverPreviewPointerEnter,
   onHoverPreviewPointerLeave,
   navigableTaskIds,
@@ -114,6 +134,11 @@ export function CalendarTaskModal({
     "idle" | "out" | "in"
   >("idle");
   const modalTask = useCalendarTaskModalTask(displayedTaskId);
+  const navPreviewClearTimerRef = useRef<number | null>(null);
+  const [navigationPreview, setNavigationPreview] = useState<{
+    task: TaskListItem;
+    anchorRect: DOMRect;
+  } | null>(null);
   const displayedTaskSnapshot = useMemo(() => {
     const fromTasks = getCalendarTaskSnapshot(
       displayedTaskId,
@@ -174,6 +199,66 @@ export function CalendarTaskModal({
     [onNavigateTask],
   );
 
+  const cancelNavigationPreviewClear = useCallback(() => {
+    if (navPreviewClearTimerRef.current !== null) {
+      window.clearTimeout(navPreviewClearTimerRef.current);
+      navPreviewClearTimerRef.current = null;
+    }
+  }, []);
+
+  const handleNavigationPreviewChange = useCallback(
+    (previewTaskId: string | null, anchor?: DOMRect) => {
+      cancelNavigationPreviewClear();
+      if (previewTaskId && anchor) {
+        const task =
+          modalActions?.tasks.find((item) => item.id === previewTaskId) ??
+          null;
+        if (!task) {
+          setNavigationPreview(null);
+          return;
+        }
+        setNavigationPreview({
+          task,
+          anchorRect: DOMRect.fromRect(anchor),
+        });
+        return;
+      }
+
+      navPreviewClearTimerRef.current = window.setTimeout(() => {
+        setNavigationPreview(null);
+        navPreviewClearTimerRef.current = null;
+      }, CALENDAR_SIDEBAR_HOVER_PREVIEW_CLEAR_MS);
+    },
+    [cancelNavigationPreviewClear, modalActions?.tasks],
+  );
+
+  const handleNavigationPreviewPointerEnter = useCallback(() => {
+    cancelNavigationPreviewClear();
+  }, [cancelNavigationPreviewClear]);
+
+  const handleNavigationPreviewPointerLeave = useCallback(() => {
+    handleNavigationPreviewChange(null);
+  }, [handleNavigationPreviewChange]);
+
+  const handleNavigationPreviewOpen = useCallback(
+    (targetTaskId: string) => {
+      cancelNavigationPreviewClear();
+      setNavigationPreview(null);
+      void handleNavigateToTask(targetTaskId);
+    },
+    [cancelNavigationPreviewClear, handleNavigateToTask],
+  );
+
+  useEffect(() => {
+    return () => {
+      cancelNavigationPreviewClear();
+    };
+  }, [cancelNavigationPreviewClear]);
+
+  useEffect(() => {
+    setNavigationPreview(null);
+  }, [taskId]);
+
   const modalTaskNavigation = useMemo(() => {
     if (
       isNewTaskDraft ||
@@ -186,8 +271,8 @@ export function CalendarTaskModal({
 
     const canGoPrevious = navigableIndex > 0;
     const canGoNext = navigableIndex < navigableTaskIds.length - 1;
-    const taskNameById = new Map(
-      modalActions?.tasks.map((task) => [task.id, task.name] as const) ?? [],
+    const taskById = new Map(
+      modalActions?.tasks.map((task) => [task.id, task] as const) ?? [],
     );
     const previousTaskId = canGoPrevious
       ? navigableTaskIds[navigableIndex - 1]
@@ -195,14 +280,21 @@ export function CalendarTaskModal({
     const nextTaskId = canGoNext
       ? navigableTaskIds[navigableIndex + 1]
       : null;
+    const previousTask = previousTaskId
+      ? (taskById.get(previousTaskId) ?? null)
+      : null;
+    const nextTask = nextTaskId ? (taskById.get(nextTaskId) ?? null) : null;
 
     return {
       canGoPrevious,
       canGoNext,
-      previousTaskTitle: previousTaskId
-        ? (taskNameById.get(previousTaskId) ?? null)
-        : null,
-      nextTaskTitle: nextTaskId ? (taskNameById.get(nextTaskId) ?? null) : null,
+      previousTaskId,
+      nextTaskId,
+      previousTaskTitle: previousTask?.name ?? null,
+      nextTaskTitle: nextTask?.name ?? null,
+      previousTask,
+      nextTask,
+      onNavigationPreviewChange: handleNavigationPreviewChange,
       onPrevious:
         canGoPrevious && !isTaskContentSwitching
           ? () => void handleNavigateToTask(navigableTaskIds[navigableIndex - 1])
@@ -214,6 +306,7 @@ export function CalendarTaskModal({
     };
   }, [
     handleNavigateToTask,
+    handleNavigationPreviewChange,
     isNewTaskDraft,
     isTaskContentSwitching,
     modalActions?.tasks,
@@ -321,7 +414,17 @@ export function CalendarTaskModal({
     };
   }, [handleClose, isHoverPreview, showBackdrop]);
 
+  const clipSidebarBackdrop =
+    showBackdrop &&
+    !isHoverPreview &&
+    sidebarBackdropClip?.enabled === true;
+
+  const [backdropClipStyle, setBackdropClipStyle] =
+    useState<CSSProperties | null>(null);
+
   const allowBackgroundInteraction = isHoverPreview || !showBackdrop;
+  const leaveSidebarInteractive =
+    clipSidebarBackdrop && !allowBackgroundInteraction;
 
   const dialogClassName =
     "calendar-task-modal relative z-10 flex h-auto min-h-0 max-h-[calc(100vh-48px)] flex-col overflow-hidden bg-white dark:bg-zinc-950";
@@ -330,24 +433,67 @@ export function CalendarTaskModal({
     dialogRef.current?.scrollTo({ top: 0 });
   }, [taskId]);
 
+  useLayoutEffect(() => {
+    const clipConfig = sidebarBackdropClip;
+    if (!clipSidebarBackdrop || !clipConfig) {
+      setBackdropClipStyle(null);
+      return;
+    }
+
+    const { sidebarRef, sidebarPosition } = clipConfig;
+
+    function updateBackdropClip() {
+      setBackdropClipStyle(
+        getCalendarSidebarBackdropClipStyle(
+          sidebarRef.current,
+          sidebarPosition,
+        ),
+      );
+    }
+
+    updateBackdropClip();
+
+    const observer =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(() => updateBackdropClip())
+        : null;
+    if (observer && sidebarRef.current) {
+      observer.observe(sidebarRef.current);
+    }
+
+    window.addEventListener("resize", updateBackdropClip);
+    window.addEventListener("scroll", updateBackdropClip, true);
+
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", updateBackdropClip);
+      window.removeEventListener("scroll", updateBackdropClip, true);
+    };
+  }, [clipSidebarBackdrop, sidebarBackdropClip]);
+
   return createPortal(
     <div
       className={`fixed inset-0 z-[10050] flex items-center justify-center ${
-        allowBackgroundInteraction ? "pointer-events-none" : ""
+        allowBackgroundInteraction || leaveSidebarInteractive
+          ? "pointer-events-none"
+          : ""
       }`}
       style={{ padding: CALENDAR_TASK_MODAL_VIEWPORT_PADDING_PX }}
     >
       {showBackdrop ? (
         isHoverPreview ? (
           <div
-            className="pointer-events-none fixed inset-0 bg-zinc-900/15 backdrop-brightness-[1.05] dark:bg-zinc-950/40"
+            className={`pointer-events-none fixed inset-0 ${CALENDAR_TASK_MODAL_HOVER_BACKDROP_CLASS}`}
             aria-hidden
           />
         ) : (
           <button
             type="button"
             aria-label="Close task editor"
-            className="fixed inset-0 bg-zinc-900/25 backdrop-brightness-[1.1]"
+            className={`fixed ${CALENDAR_TASK_MODAL_PINNED_BACKDROP_CLASS} ${
+              leaveSidebarInteractive ? "pointer-events-auto" : ""
+            } ${backdropClipStyle ? "" : "inset-0"}`}
+            style={backdropClipStyle ?? undefined}
             onClick={() => void handleClose()}
           />
         )
@@ -365,7 +511,9 @@ export function CalendarTaskModal({
                   ? "scale-100 opacity-100"
                   : "scale-[0.985] opacity-0"
               }`
-            : ""
+            : leaveSidebarInteractive
+              ? "pointer-events-auto"
+              : ""
         }`}
         style={{
           width: CALENDAR_TASK_MODAL_WIDTH_PX,
@@ -416,6 +564,16 @@ export function CalendarTaskModal({
           />
         </div>
       </div>
+
+      {navigationPreview ? (
+        <CalendarModalNavigationTaskPreview
+          task={navigationPreview.task}
+          anchorRect={navigationPreview.anchorRect}
+          onPointerEnter={handleNavigationPreviewPointerEnter}
+          onPointerLeave={handleNavigationPreviewPointerLeave}
+          onOpenTask={handleNavigationPreviewOpen}
+        />
+      ) : null}
     </div>,
     document.body,
   );
@@ -427,6 +585,7 @@ export function getCalendarTaskSnapshot(
     id: string;
     name: string;
     completed: boolean;
+    isNote?: boolean;
     dueDate: string | null;
     dueTimeMinutes: number | null;
     dueDurationMinutes: number | null;
@@ -439,6 +598,7 @@ export function getCalendarTaskSnapshot(
   return {
     name: task.name,
     completed: task.completed,
+    isNote: task.isNote,
     dueDate: task.dueDate,
     dueTimeMinutes: task.dueTimeMinutes,
     dueDurationMinutes: task.dueDurationMinutes,

@@ -13,6 +13,7 @@ import {
   FORMAT_TOOLBAR_ICON_COLOR,
   FORMAT_TOOLBAR_TRIGGER_LABEL_COLOR,
 } from "./detail-format-toolbar-menus";
+import { TASK_DETAILS_HEADER_ICON_HOVER_CLASS } from "@/lib/task-details-header-icon-hover";
 
 type DetailFontSizeControlProps = {
   value: DetailFontSizeOption;
@@ -47,8 +48,10 @@ export function DetailFontSizeControl({
   const closeTimerRef = useRef<number | null>(null);
 
   const buttonClassName = formatToolbar
-    ? `flex h-8 min-w-[28px] text-[14px]! cursor-pointer items-center justify-center rounded-lg px-2 ${FORMAT_TOOLBAR_FONT_SIZE_TEXT_CLASS} ${FORMAT_TOOLBAR_ICON_COLOR} transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-zinc-800 ${
-        open ? "bg-zinc-100 dark:bg-zinc-800" : ""
+    ? `flex h-8 min-w-[28px] text-[14px]! cursor-pointer items-center justify-center rounded-lg px-2 ${FORMAT_TOOLBAR_FONT_SIZE_TEXT_CLASS} ${FORMAT_TOOLBAR_ICON_COLOR} transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${TASK_DETAILS_HEADER_ICON_HOVER_CLASS} ${
+        open
+          ? "bg-[var(--panel-text-task-detail-header-icon-hover-background)] dark:bg-zinc-800"
+          : ""
       }`
     : compact
       ? "flex h-[30px] min-w-[44px] cursor-pointer items-center justify-between gap-0.5 rounded border border-zinc-200 bg-white px-1.5 text-sm text-zinc-800 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"

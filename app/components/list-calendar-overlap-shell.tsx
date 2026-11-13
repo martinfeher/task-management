@@ -247,13 +247,16 @@ export function ListCalendarOverlapShell({
           top: overlapFrame.top,
           left: overlapFrame.left,
           right: 0,
+          // `w-full` on the shell would otherwise make it viewport-wide and push
+          // its right edge (calendar sidebar) off-screen when offset by `left`.
+          width: "auto",
           bottom: overlapFrame.bottom,
           zIndex: 2200,
         }
       : undefined;
 
   const shellClassName = [
-    "list-calendar-overlap-shell flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-white rounded-l-[15px] dark:bg-zinc-950",
+    "list-calendar-overlap-shell flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden bg-white rounded-l-[15px] dark:bg-zinc-950",
     overlapActive ? "list-calendar-overlap-shell--docked" : "",
     overlapActive
       ? "shadow-[0_0_28px_rgba(15,23,42,0.14),12px_0_32px_-6px_rgba(15,23,42,0.22)] dark:shadow-[0_0_28px_rgba(0,0,0,0.4),12px_0_32px_-6px_rgba(0,0,0,0.55)]"
@@ -297,7 +300,7 @@ export function ListCalendarOverlapShell({
         : null}
       <div
         ref={wrapperRef}
-        className="relative flex min-h-0 flex-1 flex-col self-stretch"
+        className="relative flex min-h-0 min-w-0 flex-1 flex-col self-stretch"
         style={{ minWidth: TASK_LIST_PANEL_MIN_WIDTH }}
       >
         <div ref={shellRef} className={shellClassName} style={overlapStyle}>

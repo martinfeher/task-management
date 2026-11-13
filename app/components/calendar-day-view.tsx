@@ -41,6 +41,13 @@ import {
 } from "@/lib/calendar-time-grid";
 import { useRecordCalendarTaskMove } from "./calendar-task-move-undo";
 import {
+  parseCalendarDateNavigationAnchor,
+  useApplyCalendarDateNavigationRestore,
+  useRecordCalendarDateNavigation,
+  useSyncCalendarDateNavigationAnchor,
+} from "./calendar-date-navigation-undo";
+import type { CalendarDateNavigationSnapshot } from "@/lib/calendar-date-navigation-undo";
+import {
   bindCalendarTaskDrag,
   getActiveCalendarDropSlot,
   CALENDAR_ALL_DAY_TO_TIMED_DEFAULT_DURATION_MINUTES,
@@ -182,6 +189,8 @@ export function CalendarDayView({
   sidebarFocusDate,
   sidebarJumpRequestId,
   onSidebarFocusDateChange,
+  dateNavigationRestoreRequestId,
+  dateNavigationRestoreSnapshot,
 }: CalendarDayViewProps) {
   const [today, setToday] = useState<Date | null>(null);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
@@ -217,7 +226,27 @@ export function CalendarDayView({
     endDragPreview,
   } = useCalendarTaskDragPreview();
   const recordCalendarTaskMove = useRecordCalendarTaskMove();
+  const recordCalendarDateNavigation = useRecordCalendarDateNavigation();
   const canDragTasks = Boolean(onSetTaskDueDate || onSetTaskDueTime);
+
+  useSyncCalendarDateNavigationAnchor(selectedDay);
+
+  const applyDateNavigationRestore = useCallback(
+    (snapshot: CalendarDateNavigationSnapshot) => {
+      const anchor = parseCalendarDateNavigationAnchor(snapshot);
+      if (anchor) {
+        setSelectedDay(anchor);
+        lastSyncedSidebarDateKeyRef.current = snapshot.focusDateKey;
+      }
+    },
+    [],
+  );
+
+  useApplyCalendarDateNavigationRestore(
+    dateNavigationRestoreSnapshot,
+    dateNavigationRestoreRequestId,
+    applyDateNavigationRestore,
+  );
   const isTimedGridReady = Boolean(selectedDay && today && now);
   useCalendarTimedGridScrollSession(timeScrollRef, "day", isTimedGridReady);
 
@@ -267,6 +296,7 @@ export function CalendarDayView({
       : (now.getHours() + now.getMinutes() / 60 - HOUR_START) * HOUR_HEIGHT_PX;
 
   const goToPreviousDay = useCallback(() => {
+    recordCalendarDateNavigation?.();
     setSelectedDay((current) => {
       if (!current) return current;
       return startOfDay(
@@ -277,9 +307,10 @@ export function CalendarDayView({
         ),
       );
     });
-  }, []);
+  }, [recordCalendarDateNavigation]);
 
   const goToNextDay = useCallback(() => {
+    recordCalendarDateNavigation?.();
     setSelectedDay((current) => {
       if (!current) return current;
       return startOfDay(
@@ -290,11 +321,12 @@ export function CalendarDayView({
         ),
       );
     });
-  }, []);
+  }, [recordCalendarDateNavigation]);
 
   const goToToday = useCallback(() => {
+    recordCalendarDateNavigation?.();
     setSelectedDay(startOfDay(new Date()));
-  }, []);
+  }, [recordCalendarDateNavigation]);
 
   useEffect(() => {
     if (!selectedDay) return;

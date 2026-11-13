@@ -1,5 +1,8 @@
 import type { CSSProperties } from "react";
-import { getCalendarTaskColorItemStyle } from "@/lib/calendar-task-colors";
+import {
+  appendCalendarTaskTitleColorVars,
+  getCalendarTaskColorItemStyle,
+} from "@/lib/calendar-task-colors";
 import { getCalendarTaskDefaultColor } from "@/lib/calendar-task-default-color";
 import { mixHexWithWhite } from "@/lib/sidebar-background-types";
 import { normalizeDueTimeMinutes } from "@/lib/task-due-time";
@@ -154,11 +157,15 @@ export function getCalendarTaskItemStyle(
   if (!background) return style;
 
   const pastBackground = withPastCalendarTaskBackgroundBrightness(background);
-  return {
-    ...style,
-    backgroundColor: pastBackground,
-    ["--calendar-task-item-background" as string]: pastBackground,
-  };
+  return appendCalendarTaskTitleColorVars(
+    {
+      ...style,
+      backgroundColor: pastBackground,
+      ["--calendar-task-item-background" as string]: pastBackground,
+      ["--calendar-task-title-source-color" as string]: pastBackground,
+    },
+    pastBackground,
+  );
 }
 
 export function calendarTaskSecondaryTextClassName() {
@@ -166,7 +173,7 @@ export function calendarTaskSecondaryTextClassName() {
 }
 
 export function calendarTaskTimeRangeClassName(extra = "") {
-  return `shrink-0 text-[11px] leading-none ${CALENDAR_TASK_TIME_TEXT_CLASS} ${extra}`.trim();
+  return `shrink-0 leading-none ${CALENDAR_TASK_TIME_TEXT_CLASS} ${extra}`.trim();
 }
 
 export function getCalendarShellClassName(

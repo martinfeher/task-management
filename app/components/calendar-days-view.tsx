@@ -50,6 +50,13 @@ import {
 import { useCalendarTaskDefaultColor } from "@/lib/calendar-task-default-color-settings";
 import { useRecordCalendarTaskMove } from "./calendar-task-move-undo";
 import {
+  parseCalendarDateNavigationAnchor,
+  useApplyCalendarDateNavigationRestore,
+  useRecordCalendarDateNavigation,
+  useSyncCalendarDateNavigationAnchor,
+} from "./calendar-date-navigation-undo";
+import type { CalendarDateNavigationSnapshot } from "@/lib/calendar-date-navigation-undo";
+import {
   bindCalendarTaskDrag,
   CALENDAR_ALL_DAY_TO_TIMED_DEFAULT_DURATION_MINUTES,
   getActiveCalendarDropSlot,
@@ -86,6 +93,8 @@ import {
   CalendarTaskDragSourcePlaceholder,
   getCalendarTaskDragPreviewTop,
   getTaskTiming,
+  CALENDAR_TASK_GRID_EXTRA_PADDING_START_PX,
+  CALENDAR_TASK_HORIZONTAL_PADDING_START_PX,
   type CalendarTaskResizePreview,
 } from "./calendar-timed-task-block";
 import {
@@ -93,6 +102,7 @@ import {
   useCalendarTaskDragPreview,
 } from "./calendar-task-hover-preview";
 import { useCalendarTaskColorMenuCaptureHandler } from "./calendar-task-color-menu";
+import { MdKeyboardArrowLeft } from "react-icons/md";
 import {
   buildCalendarNowLineDimmedColumns,
   getCalendarTimedBlockBounds,
@@ -260,6 +270,8 @@ export function CalendarMultiDayView({
   sidebarFocusDate,
   sidebarJumpRequestId,
   onSidebarFocusDateChange,
+  dateNavigationRestoreRequestId,
+  dateNavigationRestoreSnapshot,
 }: CalendarMultiDayViewProps) {
   const { defaultColor: calendarTaskDefaultColor } =
     useCalendarTaskDefaultColor();
@@ -309,6 +321,26 @@ export function CalendarMultiDayView({
     endDragPreview,
   } = useCalendarTaskDragPreview();
   const recordCalendarTaskMove = useRecordCalendarTaskMove();
+  const recordCalendarDateNavigation = useRecordCalendarDateNavigation();
+
+  useSyncCalendarDateNavigationAnchor(rangeStart);
+
+  const applyDateNavigationRestore = useCallback(
+    (snapshot: CalendarDateNavigationSnapshot) => {
+      const anchor = parseCalendarDateNavigationAnchor(snapshot);
+      if (anchor) {
+        setVisibleRangeStart(anchor);
+      }
+    },
+    [setVisibleRangeStart],
+  );
+
+  useApplyCalendarDateNavigationRestore(
+    dateNavigationRestoreSnapshot,
+    dateNavigationRestoreRequestId,
+    applyDateNavigationRestore,
+  );
+
   const handleCalendarTaskContextMenuCapture =
     useCalendarTaskColorMenuCaptureHandler(tasks);
   const canDragTasks = Boolean(onSetTaskDueDate || onSetTaskDueTime);
@@ -432,6 +464,7 @@ export function CalendarMultiDayView({
 
   function goToPreviousRange() {
     if (!rangeStart) return;
+    recordCalendarDateNavigation?.();
     const nextRangeStart = startOfDay(
       new Date(
         rangeStart.getFullYear(),
@@ -445,6 +478,7 @@ export function CalendarMultiDayView({
 
   function goToNextRange() {
     if (!rangeStart) return;
+    recordCalendarDateNavigation?.();
     const nextRangeStart = startOfDay(
       new Date(
         rangeStart.getFullYear(),
@@ -457,6 +491,7 @@ export function CalendarMultiDayView({
   }
 
   function goToToday() {
+    recordCalendarDateNavigation?.();
     const current = startOfDay(new Date());
     setVisibleRangeStart(current);
     onSidebarFocusDateChange?.(current);
@@ -666,9 +701,17 @@ export function CalendarMultiDayView({
     draggingTaskPreview,
   );
 
+  const calendarGridTaskPaddingStartPx =
+    CALENDAR_TASK_HORIZONTAL_PADDING_START_PX +
+    CALENDAR_TASK_GRID_EXTRA_PADDING_START_PX;
+
   return (
     <div
       className={CALENDAR_VIEW_WRAPPER_CLASS}
+      data-calendar-grid-view="days"
+      style={{
+        ["--calendar-task-content-padding-start" as string]: `${calendarGridTaskPaddingStartPx}px`,
+      }}
       onContextMenuCapture={handleCalendarTaskContextMenuCapture}
     >
       <div className={getCalendarShellClassName(fullWidth)}>
@@ -706,18 +749,13 @@ export function CalendarMultiDayView({
                   {visibleDays.map((day, dayIndex) => {
                     const isToday = isSameDay(day, today);
                     const isDaySelected = isSelectedDay(day);
-
-                    return (
-                      <button
-                        key={`head-${toDateKey(day)}`}
-                        type="button"
-                        onClick={() => handleDaySelect(day)}
-                        className={`pt-1 pb-[5px] py-2 text-center transition-colors cursor-pointer ${getSelectedDayColumnDividerClass(dayIndex, visibleDays, isSelectedDay)} ${
-                          isDaySelected
-                            ? `${SELECTED_DAY_COLUMN_CLASS} rounded-t-[8px] ${SELECTED_DAY_ROW_BORDER_CLASS}`
-                            : `${SELECTED_DAY_ROW_BORDER_CLASS} bg-white dark:bg-zinc-950`
-                        }`}
-                      >
+                    const headerCellClassName = `pt-1 pb-[5px] py-2 text-center transition-colors ${getSelectedDayColumnDividerClass(dayIndex, visibleDays, isSelectedDay)} ${
+                      isDaySelected
+                        ? `${SELECTED_DAY_COLUMN_CLASS} rounded-t-[8px] ${SELECTED_DAY_ROW_BORDER_CLASS}`
+                        : `${SELECTED_DAY_ROW_BORDER_CLASS} bg-white dark:bg-zinc-950`
+                    }`;
+                    const dayHeaderLabel = (
+                      <>
                         <div className="text-[14px] font-medium uppercase tracking-wide text-[#393939] dark:text-zinc-200">
                           {getCalendarWeekdayLabel(day)}
                         </div>
@@ -730,6 +768,48 @@ export function CalendarMultiDayView({
                         >
                           {day.getDate()}
                         </div>
+                      </>
+                    );
+
+                    if (dayIndex === 0) {
+                      return (
+                        <div
+                          key={`head-${toDateKey(day)}`}
+                          className={`flex items-center ${headerCellClassName}`}
+                        >
+                          <button
+                            type="button"
+                            aria-label="Previous day"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              goToPreviousRange();
+                            }}
+                            className="flex shrink-0 cursor-pointer items-center justify-center self-center pl-0.5"
+                          >
+                            <MdKeyboardArrowLeft
+                              className="size-[22px] text-[#b4b8c4]"
+                              aria-hidden="true"
+                            />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDaySelect(day)}
+                            className="min-w-0 flex-1 cursor-pointer text-center"
+                          >
+                            {dayHeaderLabel}
+                          </button>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <button
+                        key={`head-${toDateKey(day)}`}
+                        type="button"
+                        onClick={() => handleDaySelect(day)}
+                        className={`cursor-pointer ${headerCellClassName}`}
+                      >
+                        {dayHeaderLabel}
                       </button>
                     );
                   })}

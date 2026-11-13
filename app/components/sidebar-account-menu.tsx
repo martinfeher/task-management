@@ -1,6 +1,12 @@
 "use client";
 
-import { type ReactNode, type RefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import {
   LuBell,
   LuCheck,
@@ -24,6 +30,7 @@ const ACCOUNT_MENU_BTN_Y = "py-[7px]";
 const ACCOUNT_MENU_SECTION_X = "px-[7px]";
 const ACCOUNT_MENU_SECTION_Y = "py-[7px]";
 const ACCOUNT_MENU_ROW_GAP = "gap-[8.8px]";
+const ACCOUNT_MENU_HOVER_CLOSE_MS = 160;
 
 type AccountUser = {
   name?: string | null;
@@ -47,17 +54,30 @@ type SidebarAccountMenuProps = {
   onSignOut: () => void;
   onCloseDrawer: () => void;
   onCloseMenu: () => void;
+  /** Open the menu on hover over the account row (default true). */
+  openOnHover?: boolean;
 };
 
-function getAccountUserInitials(
+function getAccountUserFirstName(
   name: string | undefined | null,
   email: string | undefined | null,
 ) {
-  const source = name?.trim() || email?.trim() || "";
-  const parts = source.split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0]!.slice(0, 1).toUpperCase();
-  return (parts[0]![0] + parts[parts.length - 1]![0]).toUpperCase();
+  const trimmedName = name?.trim();
+  if (trimmedName) {
+    return trimmedName.split(/\s+/).filter(Boolean)[0] ?? "";
+  }
+  const trimmedEmail = email?.trim();
+  if (!trimmedEmail) return "";
+  return trimmedEmail.split("@")[0]?.split(/[._-]+/).filter(Boolean)[0] ?? "";
+}
+
+function getAccountUserInitial(
+  name: string | undefined | null,
+  email: string | undefined | null,
+) {
+  const firstName = getAccountUserFirstName(name, email);
+  if (!firstName) return "?";
+  return firstName.slice(0, 1).toUpperCase();
 }
 
 type WorkspaceRow = {
@@ -78,25 +98,17 @@ function UserAvatar({
   sizeClass: string;
   roundedClass?: string;
 }) {
-  const initials = getAccountUserInitials(user.name, user.email);
-
-  if (user.image) {
-    return (
-      <img
-        src={user.image}
-        alt=""
-        referrerPolicy="no-referrer"
-        className={`${sizeClass} shrink-0 object-cover ${roundedClass}`}
-      />
-    );
-  }
+  const firstName = getAccountUserFirstName(user.name, user.email);
+  const initial = getAccountUserInitial(user.name, user.email);
 
   return (
     <div
       className={`flex shrink-0 items-center justify-center font-semibold text-white ${sizeClass} ${roundedClass}`}
       style={{ backgroundColor: USER_AVATAR_COLOR }}
+      aria-hidden={!firstName}
+      title={firstName || undefined}
     >
-      {initials}
+      {initial}
     </div>
   );
 }
@@ -145,7 +157,42 @@ export function SidebarAccountMenu({
   onSignOut,
   onCloseDrawer,
   onCloseMenu,
+  openOnHover = true,
 }: SidebarAccountMenuProps) {
+  const hoverCloseTimerRef = useRef<number | null>(null);
+
+  const cancelHoverClose = useCallback(() => {
+    if (hoverCloseTimerRef.current !== null) {
+      window.clearTimeout(hoverCloseTimerRef.current);
+      hoverCloseTimerRef.current = null;
+    }
+  }, []);
+
+  const scheduleHoverClose = useCallback(() => {
+    cancelHoverClose();
+    hoverCloseTimerRef.current = window.setTimeout(() => {
+      hoverCloseTimerRef.current = null;
+      onCloseMenu();
+    }, ACCOUNT_MENU_HOVER_CLOSE_MS);
+  }, [cancelHoverClose, onCloseMenu]);
+
+  useEffect(() => {
+    return () => cancelHoverClose();
+  }, [cancelHoverClose]);
+
+  const handleAccountAreaPointerEnter = useCallback(() => {
+    if (!openOnHover) return;
+    cancelHoverClose();
+    if (!isOpen) {
+      onToggle();
+    }
+  }, [cancelHoverClose, isOpen, onToggle, openOnHover]);
+
+  const handleAccountAreaPointerLeave = useCallback(() => {
+    if (!openOnHover) return;
+    scheduleHoverClose();
+  }, [openOnHover, scheduleHoverClose]);
+
   const displayName = user.name?.trim() || "Account";
   const usagePercent = Math.min(
     100,
@@ -156,7 +203,7 @@ export function SidebarAccountMenu({
     {
       id: "personal",
       name: "Personal",
-      initial: getAccountUserInitials(user.name, user.email).slice(0, 1),
+      initial: getAccountUserInitial(user.name, user.email),
       color: USER_AVATAR_COLOR,
       taskCount: activeTaskCount,
       isActive: true,
@@ -178,13 +225,19 @@ export function SidebarAccountMenu({
   }
 
   return (
-    <div ref={menuRef} className="relative">
+    <div
+      ref={menuRef}
+      className="relative"
+      onMouseEnter={handleAccountAreaPointerEnter}
+      onMouseLeave={handleAccountAreaPointerLeave}
+    >
       {isOpen ? (
-        <div
-          className="absolute bottom-full left-0 right-0 z-20 mb-2 overflow-hidden rounded-[20px] border border-[#e3e3e3] bg-white text-left shadow-[0_10px_40px_rgba(15,23,42,0.12)] dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-[0_10px_40px_rgba(0,0,0,0.45)]"
-          role="menu"
-          aria-label="Account menu"
-        >
+        <div className="absolute bottom-full left-0 right-0 z-20 pb-2">
+          <div
+            className="overflow-hidden rounded-[20px] border border-[#e3e3e3] bg-white text-left shadow-[0_10px_40px_rgba(15,23,42,0.12)] dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-[0_10px_40px_rgba(0,0,0,0.45)]"
+            role="menu"
+            aria-label="Account menu"
+          >
           <div className="flex items-start gap-[10.5px] border-b border-zinc-100 px-[12.3px] py-[10.5px] dark:border-zinc-800">
             <div className="relative shrink-0">
               <UserAvatar user={user} sizeClass="size-8" />
@@ -371,13 +424,14 @@ export function SidebarAccountMenu({
               Sign out
             </button>
           </div>
+          </div>
         </div>
       ) : null}
 
       <div className="rounded-[12px] bg-[#dceff2] p-[0.5px] dark:bg-cyan-950/35 shadow-[0_7px_17px_rgba(0,0,0,0.06)] cursor-pointer">
         <button
           type="button"
-          className="flex w-full cursor-pointer items-center gap-3 rounded-[12px] border border-[#e8eaed] bg-white px-2.5 py-2 text-left shadow-[0_1px_4px_rgba(15,23,42,0.06)] transition-colors hover:bg-zinc-50/90 dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-[0_1px_4px_rgba(0,0,0,0.35)] dark:hover:bg-zinc-800/90"
+          className="flex w-full cursor-pointer items-center gap-3 rounded-[12px] border border-[#e8eaed] bg-white px-2.5 py-[7px] text-left shadow-[0_1px_4px_rgba(15,23,42,0.06)] transition-colors hover:bg-zinc-50/90 dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-[0_1px_4px_rgba(0,0,0,0.35)] dark:hover:bg-zinc-800/90"
           onClick={onToggle}
           aria-expanded={isOpen}
           aria-haspopup="menu"
@@ -398,7 +452,7 @@ export function SidebarAccountMenu({
             </p>
           </div>
           <LuChevronsUpDown
-            className="size-[18px] shrink-0 text-[#9aa3ab] dark:text-zinc-500"
+            className="size-[17px] shrink-0 text-[#b8bfc4] dark:text-zinc-500"
             aria-hidden="true"
           />
         </button>

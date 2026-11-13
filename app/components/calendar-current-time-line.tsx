@@ -5,8 +5,8 @@ import {
   CALENDAR_NOW_LINE_OVER_TASK_OPACITY,
 } from "@/lib/calendar-now-line-overlap";
 
-const CALENDAR_NOW_LINE_COLOR = "#9d9d9d";
-const CALENDAR_NOW_LABEL_BG = "#BBBBBB";
+export const CALENDAR_NOW_LINE_COLOR = "#3FAF79";
+const CALENDAR_NOW_LABEL_BG = "#3FAF79";
 
 export function formatCalendarCurrentTimeLabel(date: Date) {
   return new Intl.DateTimeFormat(undefined, {
@@ -131,6 +131,37 @@ export function CalendarCurrentTimeLine({
           style={calendarNowLineStyle(taskColumnOpacity)}
         />
       )}
+    </div>
+  );
+}
+
+type CalendarMonthCellCurrentTimeLineProps = {
+  top: number;
+  left: number;
+  width: number;
+  lineOpacity?: number;
+};
+
+/** Now indicator confined to a single day cell (month grid). */
+export function CalendarMonthCellCurrentTimeLine({
+  top,
+  left,
+  width,
+  lineOpacity = CALENDAR_NOW_LINE_OPACITY,
+}: CalendarMonthCellCurrentTimeLineProps) {
+  const lineStyle = calendarNowLineStyle(lineOpacity);
+
+  return (
+    <div
+      aria-hidden
+      className="pointer-events-none absolute z-30 flex items-center"
+      style={{ top, left, width }}
+    >
+      <span
+        className="absolute left-0 size-2 -translate-x-1/2 rounded-full"
+        style={lineStyle}
+      />
+      <div className="h-px min-w-0 w-full" style={lineStyle} />
     </div>
   );
 }

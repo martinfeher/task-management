@@ -1,6 +1,14 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, Fragment } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  Fragment,
+} from "react";
 import { CalendarTaskTitle } from "./calendar-task-title";
 import { CalendarPeriodNavigation } from "./calendar-period-navigation";
 import { CalendarCurrentTimeLine } from "./calendar-current-time-line";
@@ -61,6 +69,8 @@ import {
   CalendarTaskDragSourcePlaceholder,
   getCalendarTaskDragPreviewTop,
   getTaskTiming,
+  CALENDAR_TASK_GRID_EXTRA_PADDING_START_PX,
+  CALENDAR_TASK_HORIZONTAL_PADDING_START_PX,
   type CalendarTaskResizePreview,
 } from "./calendar-timed-task-block";
 import {
@@ -68,6 +78,13 @@ import {
   useCalendarTaskDragPreview,
 } from "./calendar-task-hover-preview";
 import { useRecordCalendarTaskMove } from "./calendar-task-move-undo";
+import {
+  parseCalendarDateNavigationAnchor,
+  useApplyCalendarDateNavigationRestore,
+  useRecordCalendarDateNavigation,
+  useSyncCalendarDateNavigationAnchor,
+} from "./calendar-date-navigation-undo";
+import type { CalendarDateNavigationSnapshot } from "@/lib/calendar-date-navigation-undo";
 import {
   bindCalendarTaskDrag,
   getActiveCalendarDropSlot,
@@ -277,6 +294,8 @@ export function CalendarWeekView({
   sidebarFocusDate,
   sidebarJumpRequestId,
   onSidebarFocusDateChange,
+  dateNavigationRestoreRequestId,
+  dateNavigationRestoreSnapshot,
 }: CalendarWeekViewProps) {
   const [today, setToday] = useState<Date | null>(null);
   const [weekStart, setWeekStart] = useState<Date | null>(null);
@@ -326,7 +345,26 @@ export function CalendarWeekView({
     endDragPreview,
   } = useCalendarTaskDragPreview();
   const recordCalendarTaskMove = useRecordCalendarTaskMove();
+  const recordCalendarDateNavigation = useRecordCalendarDateNavigation();
   const canDragTasks = Boolean(onSetTaskDueDate || onSetTaskDueTime);
+
+  useSyncCalendarDateNavigationAnchor(weekStart);
+
+  const applyDateNavigationRestore = useCallback(
+    (snapshot: CalendarDateNavigationSnapshot) => {
+      const anchor = parseCalendarDateNavigationAnchor(snapshot);
+      if (anchor) {
+        setWeekStart(anchor);
+      }
+    },
+    [],
+  );
+
+  useApplyCalendarDateNavigationRestore(
+    dateNavigationRestoreSnapshot,
+    dateNavigationRestoreRequestId,
+    applyDateNavigationRestore,
+  );
 
   useEffect(() => {
     const current = startOfDay(new Date());
@@ -409,6 +447,7 @@ export function CalendarWeekView({
 
   function goToPreviousWeek() {
     if (!weekStart) return;
+    recordCalendarDateNavigation?.();
     const nextWeekStart = startOfDay(
       new Date(
         weekStart.getFullYear(),
@@ -422,6 +461,7 @@ export function CalendarWeekView({
 
   function goToNextWeek() {
     if (!weekStart) return;
+    recordCalendarDateNavigation?.();
     const nextWeekStart = startOfDay(
       new Date(
         weekStart.getFullYear(),
@@ -434,6 +474,7 @@ export function CalendarWeekView({
   }
 
   function goToToday() {
+    recordCalendarDateNavigation?.();
     const current = startOfDay(new Date());
     setWeekStart(getWeekStart(current));
     onSidebarFocusDateChange?.(current);
@@ -624,8 +665,18 @@ export function CalendarWeekView({
     );
   }
 
+  const calendarGridTaskPaddingStartPx =
+    CALENDAR_TASK_HORIZONTAL_PADDING_START_PX +
+    CALENDAR_TASK_GRID_EXTRA_PADDING_START_PX;
+
   return (
-    <div className={CALENDAR_VIEW_WRAPPER_CLASS}>
+    <div
+      className={CALENDAR_VIEW_WRAPPER_CLASS}
+      data-calendar-grid-view="week"
+      style={{
+        ["--calendar-task-content-padding-start" as string]: `${calendarGridTaskPaddingStartPx}px`,
+      }}
+    >
       <div className={getCalendarShellClassName(fullWidth)}>
         <div className={getCalendarViewSurfaceClassName(fullWidth)}>
           <div

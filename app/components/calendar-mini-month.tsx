@@ -275,7 +275,7 @@ export function CalendarMiniMonth({
   const todayWeekdayIndex = getMondayFirstWeekdayIndex(today);
 
   return (
-    <div className="border-b border-zinc-200 px-2 pb-2 dark:border-zinc-800">
+    <div className="border-b border-zinc-150 px-2 pb-1 dark:border-zinc-800">
       <div className="mb-1.5 flex items-center justify-between gap-1.5">
         <h4 className="min-w-0 truncate text-[17.5px] font-semibold text-[#3f3f3f] dark:text-zinc-50">
           {formatMonthYear(monthDate)}

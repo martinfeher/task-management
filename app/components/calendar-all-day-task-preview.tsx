@@ -34,11 +34,14 @@ export function CalendarAllDayTaskPreview({
         false,
         false,
       )} calendar-task-row--single-line pointer-events-none select-none gap-1 overflow-hidden ${previewClassName}`}
-      style={getCalendarTaskItemStyle(
-        priority,
-        calendarColor,
-        calendarTaskDefaultColor,
-      )}
+      style={{
+        ...getCalendarTaskItemStyle(
+          priority,
+          calendarColor,
+          calendarTaskDefaultColor,
+        ),
+        ...(variant === "source" ? { backgroundColor: "transparent" } : null),
+      }}
     >
       <CalendarTaskTitle
         name={taskName}
