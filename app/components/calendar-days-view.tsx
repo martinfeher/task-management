@@ -787,7 +787,7 @@ export function CalendarMultiDayView({
                             className="flex shrink-0 cursor-pointer items-center justify-center self-center pl-0.5"
                           >
                             <MdKeyboardArrowLeft
-                              className="size-[22px] text-[#b4b8c4]"
+                              className="size-[22px] text-[#abb1be] hover:text-[#90949e]"
                               aria-hidden="true"
                             />
                           </button>

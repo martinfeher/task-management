@@ -324,7 +324,7 @@ function CalendarViewTabs({
     ) : null;
 
   return (
-    <div className={`relative z-40 ${activeView === "month" ? "mb-[26px]" : "mb-[3px]"} grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-4 pl-2 pt-0`}>
+    <div className={`relative z-40 ${activeView === "month" ? "mb-[16px]" : "mb-[3px]"} grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-4 pl-2 pt-0`}>
       {periodLabel || listCalendarLayoutToggle ? (
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-2">
@@ -956,7 +956,7 @@ export function CalendarMonthView({
           <div className="relative min-h-full">
             <div
               ref={monthGridRef}
-              className="grid h-full min-h-full grid-cols-7"
+              className="grid h-full min-h-full grid-cols-7 "
               style={{
                 gridTemplateRows: `repeat(${monthRowCount}, minmax(96px, 140px))`,
               }}

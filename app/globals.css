@@ -318,6 +318,7 @@
   --calendar-task-hover-width-extra: calc(
     var(--calendar-task-drag-width-extra) - 3px
   );
+  --calendar-task-column-left-inset: 1px;
   --calendar-task-column-right-inset: calc(2% + 5px);
   --calendar-task-all-day-radius: 5px;
   --calendar-task-all-day-radius-drag: 7px;
@@ -1636,13 +1637,20 @@ body {
 }
 
 .calendar-task-timed-column-inset {
-  left: 1px;
+  left: var(--calendar-task-column-left-inset);
   right: var(--calendar-task-column-right-inset);
 }
 
+[data-calendar-grid-view="days"],
+[data-calendar-grid-view="week"],
+[data-calendar-grid-view="weeks"] {
+  --calendar-task-column-left-inset: 4px;
+}
+
 [data-calendar-grid-view="days"] .calendar-task-item:not(.calendar-timed-task-block),
-[data-calendar-grid-view="week"] .calendar-task-item:not(.calendar-timed-task-block) {
-  padding-left: 9px;
+[data-calendar-grid-view="week"] .calendar-task-item:not(.calendar-timed-task-block),
+[data-calendar-grid-view="weeks"] .calendar-task-item:not(.calendar-timed-task-block) {
+  padding-left: 12px;
 }
 
 .calendar-timed-task-block {
