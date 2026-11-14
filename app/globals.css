@@ -1780,7 +1780,7 @@ body {
   position: relative;
   z-index: 40;
   width: calc(100% + var(--calendar-task-drag-width-extra));
-  border-radius: var(--calendar-task-all-day-radius-drag);
+  border-radius: var(--calendar-task-all-day-radius);
   cursor: move;
   overflow: hidden !important;
   user-select: none;
@@ -1808,14 +1808,21 @@ body {
 
 .calendar-task-drop-preview {
   z-index: 15;
-  border-radius: var(--calendar-task-block-radius-drag);
   overflow: hidden;
-  right: calc(
-    var(--calendar-task-column-right-inset) - var(--calendar-task-drag-width-extra)
-  );
   box-shadow:
     0 0 0 1px rgba(15, 23, 42, 0.038),
     0 0 11px rgba(15, 23, 42, 0.128);
+}
+
+.calendar-task-drop-preview.absolute {
+  border-radius: var(--calendar-task-block-radius-drag);
+  right: calc(
+    var(--calendar-task-column-right-inset) - var(--calendar-task-drag-width-extra)
+  );
+}
+
+.calendar-task-drop-preview:not(.absolute) {
+  border-radius: var(--calendar-task-all-day-radius);
 }
 
 .calendar-task-item-background,
@@ -1856,13 +1863,21 @@ body {
 
 .calendar-task-drag-source-placeholder,
 .calendar-task-drag-source-placeholder.calendar-task-item-background {
+  position: relative;
   z-index: 8;
-  border-radius: var(--calendar-task-block-radius-drag);
   overflow: hidden;
+  background-color: transparent;
+}
+
+.calendar-task-drag-source-placeholder.absolute {
+  border-radius: var(--calendar-task-block-radius-drag);
   right: calc(
     var(--calendar-task-column-right-inset) - var(--calendar-task-drag-width-extra)
   );
-  background-color: transparent;
+}
+
+.calendar-task-drag-source-placeholder:not(.absolute) {
+  border-radius: var(--calendar-task-all-day-radius);
 }
 
 .calendar-task-drag-source-placeholder::before {

@@ -276,8 +276,8 @@ export function CalendarMiniMonth({
 
   return (
     <div className="border-b border-zinc-150 px-2 pb-1 dark:border-zinc-800">
-      <div className="mb-1.5 flex items-center justify-between gap-1.5">
-        <h4 className="min-w-0 truncate text-[17.5px] font-semibold text-[#3f3f3f] dark:text-zinc-50">
+      <div className="mb-1.5 flex items-center justify-between gap-1.5 pt-[2px]">
+        <h4 className="min-w-0 truncate text-[17.5px] font-semibold text-[#3f3f3f] pt-[2px] dark:text-zinc-50">
           {formatMonthYear(monthDate)}
         </h4>
         <div className="flex shrink-0 items-center gap-0.5">

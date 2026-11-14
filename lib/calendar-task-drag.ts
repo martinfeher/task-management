@@ -220,12 +220,23 @@ export function shouldShowCalendarAllDaySourcePlaceholderDuringInternalDrag(
   draggingTaskPreview: CalendarTaskDragPreviewState | null,
   activeDropSlot: CalendarDropSlot | null,
 ): boolean {
-  return shouldHideCalendarAllDayTaskDuringInternalDrag(
-    task,
-    dayDateKey,
-    draggingTaskPreview,
-    activeDropSlot,
-  );
+  if (!draggingTaskPreview || draggingTaskPreview.taskId !== task.id) {
+    return false;
+  }
+
+  if (!isCalendarTaskAtDragSource(task, draggingTaskPreview)) {
+    return false;
+  }
+
+  if (getCalendarTaskDisplayDateKey(task) !== dayDateKey) {
+    return false;
+  }
+
+  if (!activeDropSlot) {
+    return false;
+  }
+
+  return isCalendarDragOverDifferentSlot(activeDropSlot, draggingTaskPreview);
 }
 
 export function getActiveCalendarDropSlot(

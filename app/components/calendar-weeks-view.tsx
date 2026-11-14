@@ -470,7 +470,11 @@ export function CalendarMultiWeekView({
     <div className={CALENDAR_VIEW_WRAPPER_CLASS} data-calendar-grid-view="weeks">
       <div className={getCalendarShellClassName(fullWidth)}>
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <div className="flex shrink-0 items-center justify-end px-1 py-2">
+          <div
+            className={`flex shrink-0 items-center justify-start mb-[10px] ${
+              fullWidth ? "pr-2 pl-0" : "pr-3 pl-1"
+            }`}
+          >
             <CalendarPeriodNavigation
               onToday={goToToday}
               onPrevious={goToPreviousRange}
