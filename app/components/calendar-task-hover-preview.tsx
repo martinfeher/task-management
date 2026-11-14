@@ -221,7 +221,7 @@ function PreviewMetaRow({
   children: ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-2.5 text-[11px] leading-5">
+    <div className="-my-[3px] flex items-center gap-2.5 text-[11px] leading-5">
       <span className="flex size-[14px] shrink-0 items-center justify-center text-zinc-400 dark:text-zinc-500">
         {icon}
       </span>

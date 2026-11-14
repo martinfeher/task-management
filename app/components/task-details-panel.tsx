@@ -6618,6 +6618,15 @@ export function TaskDetailsPanel({
       event.preventDefault();
     }
 
+    const imageInteractionTarget = getImageDragTarget(event.target);
+    if (imageInteractionTarget) {
+      event.preventDefault();
+      window.getSelection()?.removeAllRanges();
+      beginEditorPointerInteraction();
+      closeFormatMenu();
+      return;
+    }
+
     beginEditorPointerInteraction();
     pendingLineEndClickRef.current = null;
 
@@ -7301,6 +7310,9 @@ export function TaskDetailsPanel({
     const editor = editorRef.current;
     if (!editor?.contains(wrapper)) return;
 
+    window.getSelection()?.removeAllRanges();
+    editor.blur();
+
     const items = collectDetailImageLightboxItems(editor);
     const index = items.findIndex((item) => item.wrapper === wrapper);
     if (index < 0) return;
@@ -7553,6 +7565,7 @@ export function TaskDetailsPanel({
       }
       event.preventDefault();
       event.stopPropagation();
+      window.getSelection()?.removeAllRanges();
       return;
     }
 

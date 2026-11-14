@@ -7,6 +7,7 @@ import {
   useState,
 } from "react";
 import { HiOutlineSquare3Stack3D } from "react-icons/hi2";
+import { LuX } from "react-icons/lu";
 import { MdOutlineStickyNote2 } from "react-icons/md";
 import { VscTasklist } from "react-icons/vsc";
 import type { IconType } from "react-icons";
@@ -30,6 +31,46 @@ export function taskMatchesEntityScope(
   if (scope === "all") return true;
   if (scope === "notes") return isNote;
   return !isNote;
+}
+
+function getEntityScopeTab(scope: TaskListEntityScope) {
+  return ENTITY_SCOPE_TABS.find((tab) => tab.id === scope) ?? null;
+}
+
+type TaskListEntityFilterActiveChipProps = {
+  scope: Exclude<TaskListEntityScope, "all">;
+  onClear: () => void;
+};
+
+/** Shown above the task list while Notes or Tasks filter is active. */
+export function TaskListEntityFilterActiveChip({
+  scope,
+  onClear,
+}: TaskListEntityFilterActiveChipProps) {
+  const tab = getEntityScopeTab(scope);
+  if (!tab) return null;
+
+  const { Icon, label } = tab;
+
+  return (
+    <div className="px-1 -mt-[2px]">
+      <div
+        className="inline-flex max-w-full items-center gap-1 rounded-full border border-[#d8e4f8] bg-[#e8f0fe] py-0 pl-2 pr-0.5 text-[9px] font-medium leading-none text-[#4873c7] dark:border-[#2a4a7a] dark:bg-[#1e3a5f] dark:text-[#7da2ff]"
+        role="status"
+      >
+        <Icon className="size-3 shrink-0" aria-hidden="true" />
+        <span className="truncate">{label}</span>
+        <button
+          type="button"
+          onClick={onClear}
+          aria-label={`Clear ${label.toLowerCase()} filter`}
+          className="flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-full text-[#4873c7] transition-colors hover:bg-[#d4e3fb] dark:text-[#7da2ff] dark:hover:bg-[#25476f]"
+        >
+          <LuX className="size-2.5" aria-hidden="true" />
+        </button>
+      </div>
+    </div>
+  );
 }
 
 type TaskListEntityFilterProps = {

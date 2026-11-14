@@ -178,6 +178,8 @@ export function startImagePointerInteraction(
   onComplete: () => void,
   onTap?: () => void,
 ) {
+  window.getSelection()?.removeAllRanges();
+
   const startX = event.clientX;
   const startY = event.clientY;
   const startRect = wrapper.getBoundingClientRect();
@@ -283,6 +285,7 @@ export function startImagePointerInteraction(
 
       onComplete();
     } else if (onTap) {
+      window.getSelection()?.removeAllRanges();
       onTap();
     } else {
       placeCaretBelowWrapper(wrapper);

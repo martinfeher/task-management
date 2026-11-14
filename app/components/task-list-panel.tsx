@@ -35,6 +35,7 @@ import { TaskPrioritySelector } from "./task-priority-selector";
 import { TaskPriorityFlagIcon } from "./task-priority-icon";
 import {
   TaskListEntityFilter,
+  TaskListEntityFilterActiveChip,
   taskMatchesEntityScope,
   type TaskListEntityScope,
 } from "./task-list-entity-filter";
@@ -3406,6 +3407,13 @@ export function TaskListPanel({
                 : undefined
             }
           >
+          {showEntityFilter && entityScope !== "all" ? (
+            <TaskListEntityFilterActiveChip
+              scope={entityScope}
+              onClear={() => setEntityScope("all")}
+            />
+          ) : null}
+
           {showAddTask && filteredPinnedVisibleTasks.length > 0 && (
             <div className="mb-2 border-b border-zinc-200 bg-zinc-50/40 dark:border-zinc-700 dark:bg-zinc-900/40">
               <p className="px-4 pb-1 pt-2.5 text-[10px] font-semibold uppercase tracking-wide ptxt-300 dark:ptxt-400">
