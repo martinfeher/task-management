@@ -95,7 +95,7 @@ function KanbanTaskLabelBars({
           className="group/kanban-label-bar relative"
         >
           <div
-            className="block h-[3px] w-6 rounded-full!"
+            className="block h-[3px] w-6 !rounded-full"
             style={{ backgroundColor: getLabelDotColor(label) }}
             aria-hidden="true"
           />
@@ -799,7 +799,7 @@ export function ListKanbanPanel({
 
   return (
     <div className="panel-text-scope flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#fbfbfc] dark:bg-zinc-950">
-      <header className="flex shrink-0 items-center gap-2 border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
+      <header className="flex shrink-0 items-center gap-2 border-b border-zinc-200 px-4 py-2 dark:border-zinc-800">
         {showSidebarMenu ? (
           <button
             type="button"
@@ -1071,7 +1071,7 @@ export function ListKanbanPanel({
                                 aria-haspopup="menu"
                                 aria-expanded={isTaskMenuOpen}
                                 title="More options"
-                                className="flex size-[22px] -mt-[2px]! shrink-0 cursor-pointer items-center justify-center rounded-full ptxt-400 transition-colors hover:bg-zinc-200/80 hover:ptxt-500 dark:hover:bg-zinc-800 dark:hover:ptxt-100"
+                                className="flex size-[22px] !-mt-[2px] shrink-0 cursor-pointer items-center justify-center rounded-full ptxt-400 transition-colors hover:bg-zinc-200/80 hover:ptxt-500 dark:hover:bg-zinc-800 dark:hover:ptxt-100"
                                 onPointerDown={(event) => {
                                   if (event.button !== 0) return;
                                   event.stopPropagation();

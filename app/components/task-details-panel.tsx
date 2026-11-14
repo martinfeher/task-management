@@ -447,6 +447,8 @@ const FORMAT_TOOLBAR_ICON_BUTTON_CLASS =
 const TASK_DETAILS_DATE_MENU_HOVER_CLOSE_MS = 120;
 /** Above `calendar-task-modal` overlay (`z-[10050]`). */
 const TASK_DETAILS_MODAL_DATE_MENU_Z_CLASS = "z-[10060]";
+/** Above task modal and date menus; matches `.format-toolbar-popover--task-modal` in globals.css. */
+const TASK_DETAILS_MODAL_FORMAT_MENU_CLASS = "format-toolbar-popover--task-modal";
 
 type FormatMenuClampBounds = {
   left: number;
@@ -8980,7 +8982,7 @@ export function TaskDetailsPanel({
         <div
           ref={formatMenuRef}
           className={`${getFormatToolbarPopoverClass(formatMenu)} ${
-            isModalLayout ? TASK_DETAILS_MODAL_DATE_MENU_Z_CLASS : ""
+            isModalLayout ? TASK_DETAILS_MODAL_FORMAT_MENU_CLASS : ""
           }`}
           style={{ left: formatMenu.x, top: formatMenu.y }}
         >

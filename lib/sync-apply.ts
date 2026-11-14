@@ -133,7 +133,7 @@ function toSyncTask(task: SyncTaskRecord): SyncTaskPayload {
       .filter((entry) => entry.tag.category === LABEL_CATEGORY)
       .map((entry) => ({ id: entry.tag.id, label: entry.tag.label, color: entry.tag.color })),
     listId: task.listId,
-    listName: task.list.name,
+    listName: task.list?.name ?? "",
     details: task.details,
     detailsDoc: task.detailsDoc ?? null,
     schemaVersion: task.schemaVersion,

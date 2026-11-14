@@ -239,7 +239,7 @@ export function CalendarTaskHoverPreviewCard({ task }: { task: TaskListItem }) {
   );
 
   return (
-    <div className="flex flex-col gap-2.5 p-[12px]">
+    <div className="flex flex-col gap-2.5 px-[15px] py-[10px]">
       <div className="flex flex-col gap-1">
         <p className={PREVIEW_TITLE_CLASS}>{task.name}</p>
 

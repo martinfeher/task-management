@@ -228,10 +228,10 @@ function CalendarSidebarDayTasks({
                 aria-label={group.label}
                 className={groupIndex > 0 ? "mt-2 border-t border-[#f0f0f0] pt-1" : ""}
               >
-                <h4 className="sticky top-0 z-10 bg-white px-1 pt-1 pb-[3px] text-[11.5px] font-medium text-zinc-400 dark:bg-zinc-950 dark:text-zinc-500">
+                <h4 className="sticky top-0 z-10 bg-white px-1 pt-[2px] pb-[1px] text-[11.5px] font-medium text-zinc-400 dark:bg-zinc-950 dark:text-zinc-500">
                   {group.label}
                 </h4>
-                <ul className="flex flex-col gap-1">
+                <ul className="flex flex-col gap-1">  
                   {group.tasks.map((task) => {
                     const dueTimeLabel = formatDueTimeLabel(task.dueTimeMinutes);
                     const isSelected = task.id === selectedTaskId;

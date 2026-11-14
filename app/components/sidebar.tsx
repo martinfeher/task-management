@@ -597,6 +597,22 @@ export function Sidebar({
   }, []);
 
   useEffect(() => {
+    function handleSettingsShortcut(event: KeyboardEvent) {
+      if (!(event.metaKey || event.ctrlKey)) return;
+      if (event.key !== "," && event.code !== "Comma") return;
+      if (event.altKey || event.shiftKey) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      openSettingsModal(lastMousePositionRef.current, "general");
+    }
+
+    document.addEventListener("keydown", handleSettingsShortcut, true);
+    return () =>
+      document.removeEventListener("keydown", handleSettingsShortcut, true);
+  }, []);
+
+  useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (
         isCompletedOpen &&

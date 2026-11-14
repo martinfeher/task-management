@@ -117,7 +117,7 @@ function AccountMenuRow({
     <button
       type="button"
       role="menuitem"
-      className={`flex w-full items-center ${ACCOUNT_MENU_ROW_GAP} rounded-lg ${ACCOUNT_MENU_BTN_X} ${ACCOUNT_MENU_BTN_Y} text-left text-[13px] text-zinc-800 transition-colors hover:bg-zinc-100 dark:text-zinc-100 dark:hover:bg-zinc-800/80 ${className}`}
+      className={`flex w-full items-center ${ACCOUNT_MENU_ROW_GAP} cursor-pointer rounded-lg ${ACCOUNT_MENU_BTN_X} ${ACCOUNT_MENU_BTN_Y} text-left text-[13px] text-zinc-800 transition-colors hover:bg-zinc-100 dark:text-zinc-100 dark:hover:bg-zinc-800/80 ${className}`}
       onClick={onClick}
     >
       <span className="flex size-[18px] shrink-0 items-center justify-center text-zinc-500 dark:text-zinc-400">

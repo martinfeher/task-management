@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Local History backups — may contain invalid/draft Tailwind classes. */
+@source not "../.history";
+
 @source inline("rounded-[5px]");
 @source inline("rounded-[8px]");
 @source inline("rounded-[14px]");
@@ -2084,48 +2087,26 @@ body {
   box-shadow: 0 10px 23px rgba(0, 0, 0, 0.09);
 }
 
-.calendar-task-modal-content-transition {
-  transition:
-    opacity var(--calendar-task-modal-content-switch-ms)
-      cubic-bezier(0.4, 0, 0.2, 1),
-    filter var(--calendar-task-modal-content-switch-ms)
-      cubic-bezier(0.4, 0, 0.2, 1);
-  will-change: opacity, filter;
-}
-
-.calendar-task-modal-content-transition--out {
-  opacity: 0;
-  filter: blur(7px);
-}
-
+/* Task switch (header up/down arrows): very subtle fade-in only. */
 .calendar-task-modal-content-transition--in {
-  opacity: 0;
-  filter: blur(7px);
   animation: calendar-task-modal-content-reveal
-    var(--calendar-task-modal-content-switch-ms, 125ms)
-    cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    var(--calendar-task-modal-content-switch-ms, 125ms) ease-out both;
 }
 
 @keyframes calendar-task-modal-content-reveal {
   from {
-    opacity: 0;
-    filter: blur(7px);
+    opacity: 0.82;
   }
 
   to {
     opacity: 1;
-    filter: blur(0);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .calendar-task-modal-content-transition,
-  .calendar-task-modal-content-transition--out,
   .calendar-task-modal-content-transition--in {
-    transition: none !important;
     animation: none !important;
     opacity: 1 !important;
-    filter: none !important;
   }
 }
 
@@ -2353,6 +2334,11 @@ body {
   position: fixed;
   z-index: 50;
   pointer-events: none;
+}
+
+/* Task modal overlay is z-[10050]; selection toolbar is portaled to body in modal layout. */
+.format-toolbar-popover.format-toolbar-popover--task-modal {
+  z-index: 10070;
 }
 
 .format-toolbar-popover--above.format-toolbar-popover--align-center {

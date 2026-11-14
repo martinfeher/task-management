@@ -27,6 +27,7 @@ export function getKeyboardShortcutCatalog(): KeyboardShortcutGroup[] {
       title: "General",
       shortcuts: [
         { description: "Search", keys: [mod, "K"] },
+        { description: "Open settings", keys: [mod, ","] },
         { description: "Open calendar quick view", keys: ["Alt", "+", "Alt"] },
         { description: "Close modal, menu, or dialog", keys: ["Esc"] },
       ],

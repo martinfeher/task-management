@@ -51,7 +51,7 @@ export const CALENDAR_ALL_DAY_ROW_MIN_HEIGHT_PX = CALENDAR_ALL_DAY_ROW_HEIGHT_PX
 export const CALENDAR_ALL_DAY_ROW_MAX_HEIGHT_PX = CALENDAR_ALL_DAY_ROW_HEIGHT_PX;
 export const CALENDAR_HOUR_COLUMN_WIDTH_PX = 49;
 export const CALENDAR_ALL_DAY_CELL_PADDING_CLASS =
-  "pt-1.5 pr-[11px] pb-1.5 pl-1.5";
+  "pt-1.5 pr-[7px] pb-1.5 pl-1.5";
 export const CALENDAR_ALL_DAY_TASK_HEIGHT_PX = 19;
 
 export function getCalendarAllDayRowHeightPx(_maxStackedItemCount = 1) {

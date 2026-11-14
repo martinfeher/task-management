@@ -44,8 +44,6 @@ export {
   type CalendarTaskModalAnchorRect,
 } from "@/lib/calendar-task-modal-position";
 
-const CALENDAR_TASK_MODAL_NAVIGATION_MORPH_MS = 300;
-
 export type CalendarTaskSnapshot = {
   name: string;
   completed: boolean;
@@ -128,13 +126,12 @@ export function CalendarTaskModal({
   const [focusNoteAtEndRequest, setFocusNoteAtEndRequest] = useState(0);
   const detailsSaveControllerRef = useRef<TaskDetailsSaveController | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
-  const morphSourceRectRef = useRef<DOMRect | null>(null);
   const skipTaskContentSwitchAnimationRef = useRef(true);
   const modalActions = useCalendarTaskModalActions();
   const shouldAnimateTaskContentSwitch = !isHoverPreview && !isNewTaskDraft;
   const [displayedTaskId, setDisplayedTaskId] = useState(taskId);
   const [contentSwitchPhase, setContentSwitchPhase] = useState<
-    "idle" | "out" | "in"
+    "idle" | "in"
   >("idle");
   const modalTask = useCalendarTaskModalTask(displayedTaskId);
   const navPreviewClearTimerRef = useRef<number | null>(null);
@@ -199,13 +196,6 @@ export function CalendarTaskModal({
 
   const handleNavigateToTask = useCallback(
     async (targetTaskId: string) => {
-      const previewElement = document.querySelector(
-        ".calendar-modal-navigation-task-preview",
-      );
-      morphSourceRectRef.current =
-        previewElement instanceof HTMLElement
-          ? previewElement.getBoundingClientRect()
-          : null;
       setNavigationPreview(null);
       await detailsSaveControllerRef.current?.flushSave();
       onNavigateTask?.(targetTaskId);
@@ -373,32 +363,9 @@ export function CalendarTaskModal({
 
     if (taskId === displayedTaskId) return;
 
-    if (morphSourceRectRef.current) {
-      setDisplayedTaskId(taskId);
-      setContentSwitchPhase("in");
-      return;
-    }
-
-    if (contentSwitchPhase !== "idle") return;
-
-    setContentSwitchPhase("out");
-  }, [
-    contentSwitchPhase,
-    displayedTaskId,
-    shouldAnimateTaskContentSwitch,
-    taskId,
-  ]);
-
-  useEffect(() => {
-    if (contentSwitchPhase !== "out") return;
-
-    const timer = window.setTimeout(() => {
-      setDisplayedTaskId(taskId);
-      setContentSwitchPhase("in");
-    }, CALENDAR_TASK_MODAL_CONTENT_SWITCH_MS);
-
-    return () => window.clearTimeout(timer);
-  }, [contentSwitchPhase, taskId]);
+    setDisplayedTaskId(taskId);
+    setContentSwitchPhase("in");
+  }, [displayedTaskId, shouldAnimateTaskContentSwitch, taskId]);
 
   useEffect(() => {
     if (contentSwitchPhase !== "in") return;
@@ -453,43 +420,6 @@ export function CalendarTaskModal({
   useLayoutEffect(() => {
     dialogRef.current?.scrollTo({ top: 0 });
   }, [taskId]);
-
-  useLayoutEffect(() => {
-    const source = morphSourceRectRef.current;
-    if (!source) return;
-    morphSourceRectRef.current = null;
-
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-
-    const target = dialog.getBoundingClientRect();
-    if (!target.width || !target.height) return;
-
-    const scaleX = source.width / target.width;
-    const scaleY = source.height / target.height;
-    const translateX = source.left - target.left;
-    const translateY = source.top - target.top;
-
-    dialog.animate(
-      [
-        {
-          transformOrigin: "top left",
-          transform: `translate(${translateX}px, ${translateY}px) scale(${scaleX}, ${scaleY})`,
-          opacity: 0.7,
-        },
-        {
-          transformOrigin: "top left",
-          transform: "translate(0, 0) scale(1, 1)",
-          opacity: 1,
-        },
-      ],
-      {
-        duration: CALENDAR_TASK_MODAL_NAVIGATION_MORPH_MS,
-        easing: "cubic-bezier(0.22, 1, 0.36, 1)",
-      },
-    );
-  }, [displayedTaskId]);
 
   useLayoutEffect(() => {
     const clipConfig = sidebarBackdropClip;
@@ -587,16 +517,11 @@ export function CalendarTaskModal({
         onMouseLeave={isHoverPreview ? onHoverPreviewPointerLeave : undefined}
       >
         <div
-          className={`calendar-task-modal-content-transition flex min-h-0 flex-1 flex-col ${
-            contentSwitchPhase === "out"
-              ? "calendar-task-modal-content-transition--out"
-              : contentSwitchPhase === "in"
-                ? "calendar-task-modal-content-transition--in"
-                : ""
+          className={`flex min-h-0 flex-1 flex-col ${
+            contentSwitchPhase === "in"
+              ? "calendar-task-modal-content-transition--in"
+              : ""
           }`}
-          style={
-            isTaskContentSwitching ? { pointerEvents: "none" } : undefined
-          }
         >
           <TaskDetailsPanel
             taskId={displayedTaskId}

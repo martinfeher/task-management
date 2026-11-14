@@ -123,7 +123,7 @@ export function TaskDetailImageLightbox({
         }}
       >
         <div
-          className="task-detail-image-lightbox-frame relative w-fit max-h-[min(85vh,100%)] max-w-[92vw] overflow-visible"
+          className="task-detail-image-lightbox-frame relative w-fit max-h-[min(85vh,100%)] max-w-[92vw] -translate-y-[20px] overflow-visible"
           onMouseDown={(event) => event.stopPropagation()}
         >
         {showGalleryNav ? (
