@@ -708,7 +708,7 @@ body {
   ):not([data-line-type="bullet"]):not([data-line-type="numbered"]):not(
     [data-line-type="checklist"]
   )::before {
-  content: "start writing or press / to access commands";
+  content: "press / to access commands, start writing";
   position: absolute;
   left: 5px;
   top: 0;
@@ -731,7 +731,7 @@ body {
   .detail-line[data-show-body-placeholder="true"][data-line-type="numbered"]::after,
 .task-details-editor
   .detail-line[data-show-body-placeholder="true"][data-line-type="checklist"]::after {
-  content: "start writing or press / to access commands";
+  content: "press / to access commands";
   color: #d4d4d8;
   pointer-events: none;
   user-select: none;
@@ -840,8 +840,12 @@ body {
   cursor: grabbing;
 }
 
-.detail-image-wrapper[data-drag-axis="vertical"] {
-  opacity: 0.55;
+.detail-image-wrapper[data-drag-axis="free"] {
+  position: relative;
+  z-index: 40;
+  opacity: 0.8;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+  transition: none;
 }
 
 .detail-image {
@@ -858,6 +862,50 @@ body {
   background: rgba(0, 0, 0, 0.1);
   -webkit-backdrop-filter: blur(1.5px);
   backdrop-filter: blur(1.5px);
+  animation: task-detail-image-lightbox-backdrop-in 0.25s ease-out forwards;
+}
+
+@keyframes task-detail-image-lightbox-backdrop-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes task-detail-image-lightbox-reveal {
+  from {
+    opacity: 0;
+    filter: blur(10px);
+    transform: scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: scale(1);
+  }
+}
+
+.task-detail-image-lightbox-image {
+  animation: task-detail-image-lightbox-reveal 0.39s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .task-detail-image-lightbox {
+    animation: none;
+    opacity: 1;
+  }
+
+  .task-detail-image-lightbox-image {
+    animation: none;
+    filter: none;
+    opacity: 1;
+    transform: none;
+    will-change: auto;
+  }
 }
 
 .detail-image-wrapper[data-dragging="true"] .detail-image {
@@ -1180,6 +1228,11 @@ body {
   transform: translate(-50%, -4px) scale(0.96);
 }
 
+.app-hover-tooltip-below-start {
+  left: 0;
+  transform: translateY(-4px) scale(0.96);
+}
+
 .group:hover > .app-hover-tooltip,
 [class*="group/"]:hover > .app-hover-tooltip {
   opacity: 1;
@@ -1205,6 +1258,11 @@ body {
   transform: translate(-50%, 0) scale(1);
 }
 
+.group:hover > .app-hover-tooltip-below-start,
+[class*="group/"]:hover > .app-hover-tooltip-below-start {
+  transform: translateY(0) scale(1);
+}
+
 .app-hover-tooltip--shown {
   opacity: 1;
 }
@@ -1220,6 +1278,10 @@ body {
 
 .app-hover-tooltip--shown.app-hover-tooltip-below-center {
   transform: translate(-50%, 0) scale(1);
+}
+
+.app-hover-tooltip--shown.app-hover-tooltip-below-start {
+  transform: translateY(0) scale(1);
 }
 
 .add-task-date-tooltip-sm {
@@ -1312,7 +1374,8 @@ body {
   }
 
   .app-hover-tooltip-above-start,
-  .app-hover-tooltip-above-end {
+  .app-hover-tooltip-above-end,
+  .app-hover-tooltip-below-start {
     transform: none;
   }
 
@@ -1323,6 +1386,12 @@ body {
   .app-hover-tooltip--shown.app-hover-tooltip-above-center,
   .app-hover-tooltip--shown.app-hover-tooltip-below-center {
     transform: translateX(-50%);
+  }
+
+  .group:hover > .app-hover-tooltip-below-start,
+  [class*="group/"]:hover > .app-hover-tooltip-below-start,
+  .app-hover-tooltip--shown.app-hover-tooltip-below-start {
+    transform: none;
   }
 
   .group:hover > .app-hover-tooltip-above-start,
@@ -1363,7 +1432,8 @@ body {
   }
 }
 
-.detail-image-delete {
+.detail-image-delete,
+.detail-image-crop {
   position: absolute;
   top: 0.5rem;
   right: 0.5rem;
@@ -1381,19 +1451,36 @@ body {
   transition: opacity 150ms ease, background-color 150ms ease;
 }
 
+.detail-image-crop {
+  right: 2.5rem;
+}
+
 .detail-image-wrapper:hover .detail-image-delete,
+.detail-image-wrapper:hover .detail-image-crop,
 .detail-image-wrapper[data-resizing="true"] .detail-image-delete,
-.detail-image-delete:focus-visible {
+.detail-image-wrapper[data-resizing="true"] .detail-image-crop,
+.detail-image-delete:focus-visible,
+.detail-image-crop:focus-visible {
   opacity: 1;
 }
 
-.detail-image-delete:hover {
+.detail-image-delete:hover,
+.detail-image-crop:hover {
   background: rgb(24 24 27 / 0.9);
 }
 
-.detail-image-delete svg {
+.detail-image-delete svg,
+.detail-image-crop svg {
   width: 0.875rem;
   height: 0.875rem;
+}
+
+/* Animated GIFs / SVGs cannot be cropped without flattening them. */
+.detail-image[src*=".gif"] ~ .detail-image-crop,
+.detail-image[src*="image/gif"] ~ .detail-image-crop,
+.detail-image[src*=".svg"] ~ .detail-image-crop,
+.detail-image[src*="image/svg"] ~ .detail-image-crop {
+  display: none;
 }
 
 .detail-image-resize-handles {
@@ -1510,6 +1597,7 @@ body {
 }
 
 .search-result-content-preview .detail-image-delete,
+.search-result-content-preview .detail-image-crop,
 .search-result-content-preview .detail-image-resize-handles {
   display: none !important;
 }

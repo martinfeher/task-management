@@ -8,11 +8,11 @@ export const EDITOR_HISTORY_DEFAULT_LABEL = "Edit text";
 export const EDITOR_HISTORY_OPEN_TASK_LABEL = "Open task";
 
 export function formatUndoTooltipLabel(actionLabel: string) {
-  return `Undo ${actionLabel}`;
+  return `Undo | ${actionLabel}`;
 }
 
 export function formatRedoTooltipLabel(actionLabel: string) {
-  return `Redo ${actionLabel}`;
+  return `Redo | ${actionLabel}`;
 }
 
 export function inlineFormatHistoryLabel(

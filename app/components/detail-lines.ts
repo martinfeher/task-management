@@ -2097,6 +2097,18 @@ function createImageDeleteButton() {
   return button;
 }
 
+function createImageCropButton() {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "detail-image-crop";
+  button.setAttribute("aria-label", "Crop image");
+  button.setAttribute("title", "Crop image");
+  button.contentEditable = "false";
+  button.innerHTML =
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2v14a2 2 0 0 0 2 2h14" /><path d="M18 22V8a2 2 0 0 0-2-2H2" /></svg>';
+  return button;
+}
+
 function wrapImageWithControls(image: HTMLImageElement) {
   let wrapper = image.parentElement;
 
@@ -2111,6 +2123,10 @@ function wrapImageWithControls(image: HTMLImageElement) {
 
   if (!wrapper.querySelector(".detail-image-delete")) {
     wrapper.appendChild(createImageDeleteButton());
+  }
+
+  if (!wrapper.querySelector(".detail-image-crop")) {
+    wrapper.appendChild(createImageCropButton());
   }
 
   ensureImageResizeHandles(wrapper);
@@ -2142,6 +2158,7 @@ function createImageWrapper(src: string) {
   wrapper.className = "detail-image-wrapper";
   wrapper.appendChild(image);
   wrapper.appendChild(createImageDeleteButton());
+  wrapper.appendChild(createImageCropButton());
   ensureImageResizeHandles(wrapper);
   prepareBlockImageWrapper(wrapper);
 
@@ -3300,7 +3317,11 @@ function editorHasStartedBodyContent(editor: HTMLElement) {
 
 export function syncEditorBodyPlaceholderVisibility(
   editor: HTMLElement,
-  options?: { hoveredLine?: HTMLElement | null },
+  options?: {
+    hoveredLine?: HTMLElement | null;
+    /** Empty body line receiving focus before the selection range is updated. */
+    focusedLine?: HTMLElement | null;
+  },
 ) {
   for (const line of getLineElements(editor)) {
     delete line.dataset.showBodyPlaceholder;
@@ -3323,7 +3344,19 @@ export function syncEditorBodyPlaceholderVisibility(
       ? hoveredLine
       : null;
 
-  if (editorHasFocus && selectionInEditor) {
+  const explicitFocusLine =
+    options?.focusedLine && isEmptyEditableBodyLine(editor, options.focusedLine)
+      ? options.focusedLine
+      : null;
+
+  const activeLine = getActiveLineElement(editor);
+  const activeEmptyLine =
+    explicitFocusLine ??
+    (activeLine && isEmptyEditableBodyLine(editor, activeLine)
+      ? activeLine
+      : null);
+
+  if (editorHasFocus) {
     if (editorHasStartedBodyContent(editor)) {
       editor.dataset.hideBodyPlaceholder = "true";
     } else {
@@ -3333,16 +3366,15 @@ export function syncEditorBodyPlaceholderVisibility(
     delete editor.dataset.hideBodyPlaceholder;
   }
 
-  if (hoverPlaceholderLine) {
-    hoverPlaceholderLine.dataset.showBodyPlaceholder = "true";
-    return;
-  }
+  const focusedPlaceholderLine =
+    editorHasFocus && activeEmptyLine && (selectionInEditor || explicitFocusLine)
+      ? activeEmptyLine
+      : null;
 
-  if (editorHasFocus && selectionInEditor) {
-    const activeLine = getActiveLineElement(editor);
-    if (activeLine && isEmptyEditableBodyLine(editor, activeLine)) {
-      activeLine.dataset.showBodyPlaceholder = "true";
-    }
+  const placeholderLine = focusedPlaceholderLine ?? hoverPlaceholderLine;
+
+  if (placeholderLine) {
+    placeholderLine.dataset.showBodyPlaceholder = "true";
   }
 }
 

@@ -240,8 +240,7 @@ export function getCalendarMonthDayColumnDividerClass(
     : "";
 }
 
-export const CALENDAR_MONTH_SELECTED_CELL_CLASS =
-  "bg-[#f7f7fb] shadow-[inset_0_0_0_0.5px_#d4d4d8] dark:bg-zinc-900 dark:shadow-[inset_0_0_0_0.5px_#52525b]";
+export const CALENDAR_MONTH_SELECTED_CELL_CLASS = "bg-[#fce2ff]";
 
 export const CALENDAR_HOUR_COLUMN_DIVIDER_CLASS =
   "border-r border-zinc-200 dark:border-zinc-800";

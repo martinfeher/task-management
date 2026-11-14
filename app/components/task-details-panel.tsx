@@ -113,6 +113,7 @@ import {
   getImageFilesFromDataTransfer,
   hasImageFilesInDataTransfer,
   uploadEmbeddedImagesInHtml,
+  uploadImageFile,
   uploadImageFiles,
 } from "./detail-images";
 import {
@@ -124,6 +125,9 @@ import {
   startImageResize,
 } from "./detail-image-resize";
 import { TaskDetailImageLightbox } from "./task-detail-image-lightbox";
+import { TaskDetailImageCropModal } from "./task-detail-image-crop-modal";
+import { ConfirmModal } from "./confirm-modal";
+import { isCroppableImageSrc, type RenderedCrop } from "@/lib/image-crop";
 import {
   applyLinkToSelection,
   findDetailLinkFromTarget,
@@ -186,6 +190,7 @@ import {
   computeTaskDatePickerMenuPosition,
 } from "./task-date-picker";
 import { TaskVersionHistoryOffcanvas } from "./task-version-history-offcanvas";
+import { APP_HOVER_TOOLTIP_BELOW_START } from "@/lib/app-hover-tooltip-classes";
 import { TASK_DETAILS_HEADER_ICON_HOVER_CLASS } from "@/lib/task-details-header-icon-hover";
 import {
   blockTypeHistoryLabel,
@@ -480,8 +485,40 @@ const MAX_RECENT_FORMAT_COLORS = 5;
 const TASK_DETAILS_TOOLTIP_CLASS =
   "add-task-date-tooltip add-task-date-tooltip-below app-hover-tooltip app-hover-tooltip-below-center pointer-events-none absolute top-[calc(100%+8px)] z-50 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium";
 
+const TASK_DETAILS_HISTORY_TOOLTIP_CLASS = `add-task-date-tooltip add-task-date-tooltip-below task-context-menu-tooltip-start ${APP_HOVER_TOOLTIP_BELOW_START} pointer-events-none absolute top-[calc(100%+8px)] z-[10060] whitespace-nowrap px-3 py-1.5 text-[11px] font-medium`;
+
 const FORMAT_TOOLBAR_DIVIDER_CLASS =
   "mx-0.5 h-5 w-px shrink-0 self-center bg-zinc-200 dark:bg-zinc-700";
+
+type DetailImageLightboxItem = {
+  src: string;
+  alt: string;
+  wrapper: HTMLElement;
+};
+
+function collectDetailImageLightboxItems(
+  editor: HTMLElement,
+): DetailImageLightboxItem[] {
+  const items: DetailImageLightboxItem[] = [];
+
+  editor.querySelectorAll(".detail-image-wrapper").forEach((node) => {
+    if (!(node instanceof HTMLElement)) return;
+
+    const image = node.querySelector("img.detail-image");
+    if (!(image instanceof HTMLImageElement)) return;
+
+    const src = image.currentSrc || image.getAttribute("src") || "";
+    if (!src) return;
+
+    items.push({
+      src,
+      alt: image.alt?.trim() || "Task image",
+      wrapper: node,
+    });
+  });
+
+  return items;
+}
 
 type TextBlockType = "text" | "h1" | "h2" | "h3";
 
@@ -1539,9 +1576,13 @@ function scheduleCaretAtLineStart(editor: HTMLElement, line: HTMLElement) {
     const selection = window.getSelection();
     if (!selection?.isCollapsed || !editor.contains(line)) return;
     if (!shouldPlaceCaretAtLineStart(editor, line)) return;
-    if (isCaretAtStartOfLine(line)) return;
+    if (isCaretAtStartOfLine(line)) {
+      syncEditorBodyPlaceholderVisibility(editor, { focusedLine: line });
+      return;
+    }
 
     focusDetailLine(editor, line);
+    syncEditorBodyPlaceholderVisibility(editor, { focusedLine: line });
   };
 
   place();
@@ -2255,8 +2296,16 @@ export function TaskDetailsPanel({
   const [dropIndicator, setDropIndicator] = useState<DropIndicatorState | null>(null);
   const [isImageDropActive, setIsImageDropActive] = useState(false);
   const [imageLightbox, setImageLightbox] = useState<{
+    items: DetailImageLightboxItem[];
+    index: number;
+  } | null>(null);
+  const [imageCrop, setImageCrop] = useState<{
+    wrapper: HTMLElement;
     src: string;
-    alt: string;
+  } | null>(null);
+  const [imageDeleteConfirm, setImageDeleteConfirm] = useState<{
+    wrapper: HTMLElement;
+    filename: string | null;
   } | null>(null);
   const [addBlockMenu, setAddBlockMenu] = useState<AddBlockMenuState | null>(null);
   const [slashCommandMenu, setSlashCommandMenu] =
@@ -2330,6 +2379,7 @@ export function TaskDetailsPanel({
   const pendingFocusTaskTitleRequestRef = useRef(0);
   const panelRef = useRef<HTMLElement>(null);
   const editorWrapperRef = useRef<HTMLDivElement>(null);
+  const suppressImageLightboxClickRef = useRef(false);
   const editorRef = useRef<HTMLDivElement>(null);
   const editorHeightFrameRef = useRef<number | null>(null);
   const pendingEditorHeightSyncOptionsRef = useRef<{
@@ -6545,6 +6595,13 @@ export function TaskDetailsPanel({
     clickedLineRef.current = line;
     pendingClickLineRef.current = line;
 
+    if (isEmptyEditableBodyLine(editor, line)) {
+      syncEditorBodyPlaceholderVisibility(editor, {
+        hoveredLine: line,
+        focusedLine: line,
+      });
+    }
+
     updateLineControls();
     requestAnimationFrame(() => {
       updateLineControls();
@@ -7020,6 +7077,12 @@ export function TaskDetailsPanel({
       !editorHasLiveExtendedTextSelection(editor)
     ) {
       scheduleCaretAtLineStart(editor, pendingLine);
+    } else if (
+      editor &&
+      pendingLine &&
+      isEmptyEditableBodyLine(editor, pendingLine)
+    ) {
+      syncEditorBodyPlaceholderVisibility(editor, { focusedLine: pendingLine });
     }
 
     updateLineControls();
@@ -7087,24 +7150,72 @@ export function TaskDetailsPanel({
       dragTarget.line,
       editor,
       () => {
+        suppressImageLightboxClickRef.current = true;
         syncEditorContent();
         recordHistorySnapshot("Move image");
         requestSave("flush");
         scheduleEditorHeightSync();
       },
-      editorWrapperRef.current
-        ? {
-            editorViewport: editorWrapperRef.current,
-            onDropIndicatorChange: setDropIndicator,
-          }
-        : undefined,
+      () => openDetailImageLightboxFromWrapper(dragTarget.wrapper),
     );
+  }
+
+  function openDetailImageLightboxFromWrapper(wrapper: HTMLElement) {
+    const editor = editorRef.current;
+    if (!editor?.contains(wrapper)) return;
+
+    const items = collectDetailImageLightboxItems(editor);
+    const index = items.findIndex((item) => item.wrapper === wrapper);
+    if (index < 0) return;
+
+    setImageLightbox({ items, index });
+  }
+
+  function stepImageLightbox(delta: -1 | 1) {
+    setImageLightbox((prev) => {
+      if (!prev) return prev;
+
+      const editor = editorRef.current;
+      const items = editor ? collectDetailImageLightboxItems(editor) : prev.items;
+      if (items.length === 0) return null;
+
+      const currentItem = prev.items[prev.index];
+      let index = currentItem
+        ? items.findIndex((item) => item.wrapper === currentItem.wrapper)
+        : -1;
+      if (index < 0) {
+        index = Math.min(prev.index, items.length - 1);
+      }
+
+      const nextIndex = index + delta;
+      if (nextIndex < 0 || nextIndex >= items.length) {
+        return { items, index };
+      }
+
+      return { items, index: nextIndex };
+    });
+  }
+
+  function handleImageLightboxCrop() {
+    const current = imageLightbox?.items[imageLightbox.index];
+    if (!current || !isCroppableImageSrc(current.src)) return;
+
+    const { wrapper, src } = current;
+    const editor = editorRef.current;
+    if (!editor?.contains(wrapper)) {
+      setImageLightbox(null);
+      return;
+    }
+
+    setImageLightbox(null);
+    setImageCrop({ wrapper, src });
   }
 
   function handleEditorDoubleClick(event: React.MouseEvent<HTMLDivElement>) {
     const target = event.target as HTMLElement;
     if (
       target.closest(".detail-image-delete") ||
+      target.closest(".detail-image-crop") ||
       target.closest("[data-resize]")
     ) {
       scheduleFormatMenuReveal();
@@ -7112,29 +7223,112 @@ export function TaskDetailsPanel({
       return;
     }
 
-    const image =
-      target instanceof HTMLImageElement &&
-      target.classList.contains("detail-image")
-        ? target
-        : target
-            .closest(".detail-image-wrapper")
-            ?.querySelector("img.detail-image");
-
-    if (image instanceof HTMLImageElement) {
-      const src = image.currentSrc || image.getAttribute("src") || "";
-      if (src) {
-        event.preventDefault();
-        event.stopPropagation();
-        setImageLightbox({
-          src,
-          alt: image.alt?.trim() || "Task image",
-        });
-        return;
-      }
+    if (target.closest(".detail-image-wrapper")) {
+      event.preventDefault();
+      return;
     }
 
     scheduleFormatMenuReveal();
     updateLineControls();
+  }
+
+  async function handleImageCropApply(result: RenderedCrop) {
+    const cropTarget = imageCrop;
+    const currentTaskId = taskIdRef.current;
+    if (!cropTarget || !currentTaskId) {
+      setImageCrop(null);
+      return;
+    }
+
+    const image = cropTarget.wrapper.querySelector("img.detail-image");
+    if (!(image instanceof HTMLImageElement)) {
+      setImageCrop(null);
+      return;
+    }
+
+    // Displayed size before the swap, so the visible scale is preserved.
+    const displayedRect = image.getBoundingClientRect();
+    const extension =
+      result.blob.type === "image/png"
+        ? "png"
+        : result.blob.type === "image/webp"
+          ? "webp"
+          : "jpg";
+    const file = new File([result.blob], `cropped.${extension}`, {
+      type: result.blob.type,
+    });
+
+    // Throws on failure so the crop dialog can show the error and stay open.
+    const url = await uploadImageFile(currentTaskId, file);
+
+    const editor = editorRef.current;
+    if (
+      taskIdRef.current !== currentTaskId ||
+      !editor ||
+      !editor.contains(cropTarget.wrapper)
+    ) {
+      setImageCrop(null);
+      return;
+    }
+
+    const line = cropTarget.wrapper.closest(".detail-line");
+    const maxWidth =
+      line instanceof HTMLElement
+        ? Math.max(
+            1,
+            line.clientWidth - (parseFloat(cropTarget.wrapper.style.marginLeft) || 0),
+          )
+        : Infinity;
+
+    let nextWidth = Math.max(1, displayedRect.width * result.fractionX);
+    let nextHeight = Math.max(1, displayedRect.height * result.fractionY);
+    if (nextWidth > maxWidth) {
+      nextHeight *= maxWidth / nextWidth;
+      nextWidth = maxWidth;
+    }
+
+    image.removeAttribute("srcset");
+    image.setAttribute("src", url);
+    image.style.width = `${Math.round(nextWidth)}px`;
+    image.style.height = `${Math.round(nextHeight)}px`;
+    image.style.maxWidth = "100%";
+
+    setImageCrop(null);
+    syncEditorContent();
+    recordHistorySnapshot("Crop image");
+    requestSave("flush");
+    scheduleEditorHeightSync();
+    updateLineControls();
+  }
+
+  function confirmPendingImageDelete() {
+    const pending = imageDeleteConfirm;
+    const editor = editorRef.current;
+    setImageDeleteConfirm(null);
+    if (!pending || !editor || !editor.contains(pending.wrapper)) return;
+
+    const currentTaskId = taskIdRef.current;
+    const imageFilename = pending.filename;
+
+    const removed = removeImageWrapper(editor, pending.wrapper);
+    if (!removed) return;
+
+    syncEditorContent();
+    recordHistorySnapshot("Remove image");
+    requestSave("flush");
+    updateLineControls();
+
+    if (currentTaskId && imageFilename) {
+      void (async () => {
+        await waitForSaveIdle();
+        if (taskIdRef.current !== currentTaskId) return;
+        try {
+          await deleteUploadedTaskImage(currentTaskId, imageFilename);
+        } catch {
+          // File cleanup is best-effort; content save is the source of truth.
+        }
+      })();
+    }
   }
 
   function handleEditorClick(event: React.MouseEvent<HTMLDivElement>) {
@@ -7161,6 +7355,26 @@ export function TaskDetailsPanel({
       return;
     }
 
+    const cropButton = (event.target as HTMLElement).closest(
+      ".detail-image-crop",
+    );
+    if (cropButton) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const imageWrapper = cropButton.closest(".detail-image-wrapper");
+      if (!(imageWrapper instanceof HTMLElement)) return;
+
+      const image = imageWrapper.querySelector("img.detail-image");
+      if (!(image instanceof HTMLImageElement)) return;
+
+      const imageSrc = image.currentSrc || image.getAttribute("src") || "";
+      if (!imageSrc || !isCroppableImageSrc(imageSrc)) return;
+
+      setImageCrop({ wrapper: imageWrapper, src: imageSrc });
+      return;
+    }
+
     const deleteButton = (event.target as HTMLElement).closest(
       ".detail-image-delete",
     );
@@ -7180,25 +7394,22 @@ export function TaskDetailsPanel({
           ? extractTaskImageFilename(currentTaskId, imageSrc)
           : null;
 
-      const removed = removeImageWrapper(editor, imageWrapper);
-      if (!removed) return;
+      setImageDeleteConfirm({ wrapper: imageWrapper, filename: imageFilename });
+      return;
+    }
 
-      syncEditorContent();
-      recordHistorySnapshot("Remove image");
-      requestSave("flush");
-      updateLineControls();
-
-      if (currentTaskId && imageFilename) {
-        void (async () => {
-          await waitForSaveIdle();
-          if (taskIdRef.current !== currentTaskId) return;
-          try {
-            await deleteUploadedTaskImage(currentTaskId, imageFilename);
-          } catch {
-            // File cleanup is best-effort; content save is the source of truth.
-          }
-        })();
+    const imageWrapperClick = (event.target as HTMLElement).closest(
+      ".detail-image-wrapper",
+    );
+    if (
+      imageWrapperClick instanceof HTMLElement &&
+      !(event.target as HTMLElement).closest("[data-resize]")
+    ) {
+      if (suppressImageLightboxClickRef.current) {
+        suppressImageLightboxClickRef.current = false;
       }
+      event.preventDefault();
+      event.stopPropagation();
       return;
     }
 
@@ -7797,7 +8008,7 @@ export function TaskDetailsPanel({
       <div
         className={
           isModalLayout
-            ? "sticky top-0 z-30 shrink-0 bg-white dark:bg-zinc-950"
+            ? "sticky top-0 z-30 shrink-0 overflow-visible bg-white dark:bg-zinc-950"
             : undefined
         }
       >
@@ -7957,13 +8168,19 @@ export function TaskDetailsPanel({
                   <span
                     id="task-details-undo-tooltip"
                     role="tooltip"
-                    className={`${TASK_DETAILS_TOOLTIP_CLASS} max-w-[min(220px,calc(100vw-32px))]`}
+                    className={TASK_DETAILS_HISTORY_TOOLTIP_CLASS}
                   >
-                    <span className="block max-w-full truncate">
-                      {canUndo && undoActionLabel
-                        ? formatUndoTooltipLabel(undoActionLabel)
-                        : "Undo"}
-                    </span>
+                    {canUndo && undoActionLabel ? (
+                      <>
+                        Undo
+                        <span className="format-toolbar-tooltip-shortcut">
+                          {" "}
+                          | {undoActionLabel}
+                        </span>
+                      </>
+                    ) : (
+                      "Undo"
+                    )}
                   </span>
                 </div>
                 
@@ -7987,13 +8204,19 @@ export function TaskDetailsPanel({
                   <span
                     id="task-details-redo-tooltip"
                     role="tooltip"
-                    className={`${TASK_DETAILS_TOOLTIP_CLASS} max-w-[min(220px,calc(100vw-32px))]`}
+                    className={TASK_DETAILS_HISTORY_TOOLTIP_CLASS}
                   >
-                    <span className="block max-w-full truncate">
-                      {canRedo && redoActionLabel
-                        ? formatRedoTooltipLabel(redoActionLabel)
-                        : "Redo"}
-                    </span>
+                    {canRedo && redoActionLabel ? (
+                      <>
+                        Redo
+                        <span className="format-toolbar-tooltip-shortcut">
+                          {" "}
+                          | {redoActionLabel}
+                        </span>
+                      </>
+                    ) : (
+                      "Redo"
+                    )}
                   </span>
               </div>
                 {renderHeaderQuickFormatButtons()}
@@ -8776,13 +8999,43 @@ export function TaskDetailsPanel({
           </span>
                 </div>
       ) : null}
-      {imageLightbox ? (
+      {imageLightbox &&
+      imageLightbox.items[imageLightbox.index] ? (
         <TaskDetailImageLightbox
-          src={imageLightbox.src}
-          alt={imageLightbox.alt}
+          key={imageLightbox.items[imageLightbox.index].src}
+          src={imageLightbox.items[imageLightbox.index].src}
+          alt={imageLightbox.items[imageLightbox.index].alt}
+          imageIndex={imageLightbox.index}
+          imageCount={imageLightbox.items.length}
+          hasPrevious={imageLightbox.index > 0}
+          hasNext={imageLightbox.index < imageLightbox.items.length - 1}
+          onPrevious={() => stepImageLightbox(-1)}
+          onNext={() => stepImageLightbox(1)}
           onClose={() => setImageLightbox(null)}
+          onCrop={
+            isCroppableImageSrc(
+              imageLightbox.items[imageLightbox.index].src,
+            )
+              ? handleImageLightboxCrop
+              : undefined
+          }
         />
       ) : null}
+      {imageCrop ? (
+        <TaskDetailImageCropModal
+          src={imageCrop.src}
+          onCancel={() => setImageCrop(null)}
+          onApply={handleImageCropApply}
+        />
+      ) : null}
+      <ConfirmModal
+        open={imageDeleteConfirm !== null}
+        title="Delete image"
+        message="Are you sure you want to delete this image? This cannot be undone."
+        confirmLabel="Delete"
+        onConfirm={confirmPendingImageDelete}
+        onCancel={() => setImageDeleteConfirm(null)}
+      />
     </section>
   );
 }
