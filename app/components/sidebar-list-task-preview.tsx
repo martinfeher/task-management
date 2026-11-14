@@ -26,7 +26,7 @@ type SidebarListTaskPreviewProps = {
 
 export const LIST_TASK_PREVIEW_HEIGHT_PX = 1200;
 const PREVIEW_FRAME_SIDE_PADDING_PX = 5;
-const PREVIEW_FRAME_BOTTOM_PADDING_PX = 15;
+const PREVIEW_FRAME_BOTTOM_PADDING_PX = 13;
 const PREVIEW_FRAME_BORDER_PX = 1;
 const PREVIEW_OUTER_RADIUS_PX = 14;
 const PREVIEW_INNER_RADIUS_PX =
@@ -66,7 +66,7 @@ export function SidebarListTaskPreview({
       }}
     >
       <div
-        className="box-border flex h-full flex-col overflow-hidden border border-[#67679b]/92 bg-[#75758f]/92 p-5 shadow-[0_10px_28px_rgba(0,0,0,0.22)] backdrop-blur-[2px]"
+        className="box-border flex h-full flex-col overflow-hidden border border-[#a3a3cf] bg-[#a2a2b5] shadow-[0_10px_28px_rgba(0,0,0,0.22)] backdrop-blur-[2px]"
         style={{
           borderRadius: PREVIEW_OUTER_RADIUS_PX,
           paddingTop: PREVIEW_FRAME_SIDE_PADDING_PX,

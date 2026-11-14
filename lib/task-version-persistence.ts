@@ -16,6 +16,7 @@ import {
   type TaskVersionListItem,
 } from "@/lib/task-versions";
 import { prisma } from "@/lib/prisma";
+import { stampTaskFields } from "@/lib/task-field-clock";
 import { Prisma } from "@/app/generated/prisma/client";
 
 function buildDetailsDocFields(detailsHtml: string): {
@@ -99,6 +100,7 @@ export async function persistTaskDetailsUpdate(
       ...docFields,
     },
   });
+  await stampTaskFields(taskId, ["details"]);
 
   return { changed: true as const };
 }
@@ -132,10 +134,12 @@ export async function persistTaskRename(
     "auto",
   );
 
-  return prisma.task.update({
+  const renamed = await prisma.task.update({
     where: { id: taskId },
     data: { name: trimmedName },
   });
+  await stampTaskFields(taskId, ["name"]);
+  return renamed;
 }
 
 export async function fetchTaskVersions(

@@ -17,6 +17,7 @@ import {
   updateTaskRecurrence,
 } from "@/app/actions/todo";
 import { requireUser, UnauthorizedError } from "@/lib/require-user";
+import { stampTaskFields } from "@/lib/task-field-clock";
 
 type RouteContext = {
   params: Promise<{ taskId: string }>;
@@ -407,6 +408,10 @@ export async function PATCH(request: Request, context: RouteContext) {
       return jsonWithCors({ error: "Task not found" }, { status: 404 });
     }
 
+    const directFields = (["important", "pinned", "name"] as const).filter(
+      (field) => field in updateData,
+    );
+    await stampTaskFields(taskId, [...directFields]);
     revalidatePath("/");
 
     return jsonWithCors({

@@ -20,6 +20,7 @@
     "claim:legacy-data": "tsx scripts/claim-legacy-data.ts",
     "diagnose:legacy-data": "tsx scripts/diagnose-legacy-data.ts",
     "verify:api": "tsx scripts/verify-mobile-api.ts",
+    "verify:sync": "tsx scripts/verify-sync-api.ts",
     "verify:template-styles-db": "tsx scripts/verify-template-styles-db.ts",
     "qa:gate": "tsx scripts/qa-gate-web.ts",
     "qa:gate:mobile": "tsx scripts/qa-gate-mobile.ts",

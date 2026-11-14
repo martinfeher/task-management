@@ -26,6 +26,7 @@ import {
   repairBrokenTaskImageReferences,
 } from "@/lib/task-image-storage";
 import { persistTaskDetailsUpdate, persistTaskRename } from "@/lib/task-version-persistence";
+import { stampTaskFields } from "@/lib/task-field-clock";
 import {
   plainTextToTaskDetails,
   taskDetailsHasContent,
@@ -208,6 +209,10 @@ export async function updateTaskDueDate(taskId: string, dueDate: string | null) 
     },
   });
 
+  await stampTaskFields(
+    taskId,
+    dateChanged ? ["dueDate", "dueTimeMinutes", "dueDurationMinutes"] : ["dueDate"],
+  );
   revalidatePath("/");
   return {
     id: task.id,
@@ -243,6 +248,7 @@ export async function updateTaskDueDateAndTime(
     },
   });
 
+  await stampTaskFields(taskId, ["dueDate", "dueTimeMinutes", "dueDurationMinutes"]);
   revalidatePath("/");
   return {
     id: task.id,
@@ -272,6 +278,7 @@ export async function updateTaskDueTime(taskId: string, dueTime: TaskDueTime) {
     },
   });
 
+  await stampTaskFields(taskId, ["dueTimeMinutes", "dueDurationMinutes"]);
   revalidatePath("/");
   return {
     id: task.id,
@@ -314,6 +321,7 @@ export async function updateTaskPriority(taskId: string, priority: number | null
     }
   });
 
+  await stampTaskFields(taskId, ["priority"]);
   revalidatePath("/");
   return {
     id: taskId,
@@ -336,6 +344,7 @@ export async function updateTaskCalendarColor(
     select: { id: true, calendarColor: true },
   });
 
+  await stampTaskFields(taskId, ["calendarColor"]);
   revalidatePath("/");
   return {
     id: task.id,
@@ -567,6 +576,7 @@ export async function applyTaskLabels(
     ),
   );
 
+  await stampTaskFields(taskId, ["labelIds"]);
   revalidatePath("/");
   return getTaskLabels(taskId);
 }
@@ -604,6 +614,7 @@ export async function setTaskLabel(
     });
   }
 
+  await stampTaskFields(taskId, ["labelIds"]);
   revalidatePath("/");
   return getTaskLabels(taskId);
 }
@@ -651,6 +662,7 @@ export async function addTaskLabel(taskId: string, label: string) {
     });
   });
 
+  await stampTaskFields(taskId, ["labelIds"]);
   revalidatePath("/");
   return { id: taskId, label: trimmed };
 }
@@ -665,6 +677,7 @@ export async function updateTaskPinned(taskId: string, pinned: boolean) {
     select: { id: true, pinned: true },
   });
 
+  await stampTaskFields(taskId, ["pinned"]);
   revalidatePath("/");
   return task;
 }
@@ -679,6 +692,7 @@ export async function updateTaskImportant(taskId: string, important: boolean) {
     select: { id: true, important: true },
   });
 
+  await stampTaskFields(taskId, ["important"]);
   revalidatePath("/");
   return task;
 }
@@ -724,6 +738,7 @@ export async function convertTaskToNote(taskId: string) {
     updated.details = nextDetails;
   }
 
+  await stampTaskFields(taskId, ["isNote", "completed"]);
   revalidatePath("/");
   return updated;
 }
@@ -745,6 +760,7 @@ export async function convertNoteToTask(taskId: string) {
     },
   });
 
+  await stampTaskFields(taskId, ["isNote"]);
   revalidatePath("/");
   return updated;
 }
@@ -1217,6 +1233,9 @@ export async function moveTaskToList(taskId: string, targetListId: string) {
       ),
     );
   });
+
+  await stampTaskFields(movingIds, ["listId", "position"]);
+  if (task.parentId) await stampTaskFields(taskId, ["parentId"]);
 }
 
 export type TaskParentUpdate = {
@@ -1318,6 +1337,7 @@ export async function toggleTask(taskId: string, completed: boolean) {
       where: { id: taskId },
       data: { completed: false },
     });
+    await stampTaskFields(taskId, ["completed"]);
     revalidatePath("/");
     return { id: taskId, completed: false as const };
   }
@@ -1399,6 +1419,7 @@ export async function toggleTask(taskId: string, completed: boolean) {
     return created;
   });
 
+  await stampTaskFields(taskId, ["completed"]);
   revalidatePath("/");
 
   return {

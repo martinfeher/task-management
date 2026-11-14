@@ -171,6 +171,8 @@ model Task {
   tags               TaskTag[]
   versions           TaskVersion[]
   deletedAt          DateTime?
+  /// Per-field last-write timestamps (epoch ms) used by offline sync conflict resolution.
+  fieldUpdatedAt     Json?
   userId             String?
   user               User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt          DateTime      @default(now())
@@ -179,7 +181,19 @@ model Task {
   @@index([userId, listId, position])
   @@index([userId, dueDate])
   @@index([userId, deletedAt])
+  @@index([userId, updatedAt])
   @@index([parentId])
+}
+
+/// Offline sync mutations already applied, so retried pushes are idempotent.
+model SyncMutation {
+  id        String
+  userId    String
+  appliedAt DateTime @default(now())
+  result    Json
+
+  @@id([userId, id])
+  @@index([appliedAt])
 }
 
 model TaskVersion {

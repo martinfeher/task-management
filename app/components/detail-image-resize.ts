@@ -57,6 +57,16 @@ function isUpwardHeightHandle(handle: ImageResizeHandle) {
   return handle === "n" || handle === "ne" || handle === "nw";
 }
 
+/** Handles whose drag moves the right edge (left edge/opposite side stays fixed). */
+function isEastHandle(handle: ImageResizeHandle) {
+  return handle === "e" || handle === "ne" || handle === "se";
+}
+
+/** Handles whose drag moves the left edge (right edge/opposite side stays fixed). */
+function isWestHandle(handle: ImageResizeHandle) {
+  return handle === "w" || handle === "nw" || handle === "sw";
+}
+
 function getMinAllowedWrapperTop(line: HTMLElement, wrapper: HTMLElement) {
   const lineRect = line.getBoundingClientRect();
   let minTop = lineRect.top;
@@ -135,14 +145,16 @@ function clampResizeLayout(
     }
   }
 
-  const maxWidthFromLeft = state.startWidth + 2 * state.startMarginLeft;
-  const maxWidthFromRight =
-    2 * (state.lineWidth - state.startMarginLeft) - state.startWidth;
-  let maxWidth = Math.min(
-    state.lineWidth,
-    maxWidthFromLeft,
-    maxWidthFromRight,
-  );
+  // The edge opposite the dragged handle stays fixed, so the available growth
+  // room is bounded by the space between that fixed edge and the line's own
+  // edge (not a symmetric/centered allowance).
+  let maxWidth = state.lineWidth;
+  if (isWestHandle(handle)) {
+    maxWidth = state.startWidth + state.startMarginLeft;
+  } else if (isEastHandle(handle)) {
+    maxWidth = state.lineWidth - state.startMarginLeft;
+  }
+  maxWidth = Math.min(state.lineWidth, maxWidth);
   maxWidth = Math.max(MIN_IMAGE_WIDTH, maxWidth);
 
   if (width > maxWidth) {
@@ -163,7 +175,14 @@ function clampResizeLayout(
   width = clampDimension(width, MIN_IMAGE_WIDTH);
   height = clampDimension(height, MIN_IMAGE_HEIGHT);
 
-  let marginLeft = state.startMarginLeft - (width - state.startWidth) / 2;
+  // Keep the edge opposite the dragged handle fixed: east handles grow the
+  // image to the right (left edge/marginLeft unchanged); west handles grow
+  // it to the left (right edge stays fixed by shifting marginLeft back by
+  // the full width delta, not half of it).
+  let marginLeft = state.startMarginLeft;
+  if (isWestHandle(handle)) {
+    marginLeft = state.startMarginLeft - (width - state.startWidth);
+  }
   let marginTop = state.startMarginTop;
 
   if (isUpwardHeightHandle(handle)) {
@@ -260,10 +279,10 @@ function computeResizeSize(
 
   switch (handle) {
     case "e":
-      nextWidth = startWidth + 2 * deltaX;
+      nextWidth = startWidth + deltaX;
       break;
     case "w":
-      nextWidth = startWidth - 2 * deltaX;
+      nextWidth = startWidth - deltaX;
       break;
     case "s":
       nextHeight = startHeight + deltaY;

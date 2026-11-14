@@ -26,6 +26,12 @@ function assertGeneratedClientSupportsSchema() {
     );
   }
 
+  if (!("fieldUpdatedAt" in Prisma.TaskScalarFieldEnum)) {
+    throw new Error(
+      "Prisma client is out of date (missing Task.fieldUpdatedAt). Run: npx prisma migrate deploy && npx prisma generate",
+    );
+  }
+
   if (!("titleColor" in Prisma.CalendarTaskTemplateSettingScalarFieldEnum)) {
     throw new Error(
       "Prisma client is out of date. Run: npx prisma generate",
@@ -98,6 +104,7 @@ function isPrismaClientCurrent(client: PrismaClient) {
     "sidebarTemplateSetting" in client &&
     "calendarTaskTemplateSetting" in client &&
     "templateStyle" in client &&
+    "syncMutation" in client &&
     (client as PrismaClient & { __clientVersion?: string }).__clientVersion ===
       PRISMA_CLIENT_VERSION
   );
