@@ -45,7 +45,7 @@ export function TaskDetailImageLightbox({
       <img
         src={src}
         alt={alt}
-        className="task-detail-image-lightbox-image max-h-[min(88vh,1600px)] max-w-[min(92vw,1400px)] select-none rounded-lg object-contain shadow-[0_18px_50px_rgba(15,23,42,0.18)] dark:shadow-[0_18px_50px_rgba(0,0,0,0.45)]"
+        className="task-detail-image-lightbox-image h-auto max-h-[85vh] w-auto max-w-[92vw] select-none rounded-lg object-contain shadow-[0_18px_50px_rgba(15,23,42,0.18)] dark:shadow-[0_18px_50px_rgba(0,0,0,0.45)]"
         onMouseDown={(event) => event.stopPropagation()}
         draggable={false}
       />

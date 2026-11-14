@@ -1568,7 +1568,7 @@ export function splitLineAtCursor(editor: HTMLElement) {
     normalizeCodeLine(newLine);
   }
 
-  activeLine.after(newLine);
+  insertLineAfterLine(activeLine, newLine);
   placeCaretInLine(newLine);
 }
 
@@ -2214,6 +2214,111 @@ function migrateLegacyImageLine(line: HTMLElement) {
     prepareBlockImageWrapper(wrapper);
     ensureContentBelowWrapper(wrapper);
   }
+}
+
+function lineHasContentBesideWrapper(
+  line: HTMLElement,
+  wrapper: HTMLElement,
+  side: "before" | "after",
+) {
+  const range = document.createRange();
+
+  if (side === "before") {
+    range.setStart(line, 0);
+    range.setEndBefore(wrapper);
+  } else {
+    range.setStartAfter(wrapper);
+    range.setEnd(line, line.childNodes.length);
+  }
+
+  const fragment = range.cloneContents();
+  if (fragment.querySelector("img")) return true;
+
+  return Boolean(
+    (fragment.textContent ?? "").replace(/\u00a0|\u200B/g, " ").trim(),
+  );
+}
+
+/**
+ * Whether dropping `wrapper` into line slot `slotIndex` (the gap before
+ * `lines[slotIndex]`, or after the last line) would actually move it.
+ * Images live inside a line next to their trailing `<br>`, so slots adjacent
+ * to a line that holds only the image are no-ops.
+ */
+export function canMoveImageWrapperToLineSlot(
+  editor: HTMLElement,
+  wrapper: HTMLElement,
+  slotIndex: number,
+) {
+  const sourceLine = wrapper.closest(`.${DETAIL_LINE_CLASS}`);
+  if (!(sourceLine instanceof HTMLElement)) return false;
+
+  const lines = getLineElements(editor);
+  const sourceIndex = lines.indexOf(sourceLine);
+  if (sourceIndex <= 0) return false;
+
+  const slot = Math.max(1, Math.min(lines.length, slotIndex));
+
+  if (slot === sourceIndex) {
+    return lineHasContentBesideWrapper(sourceLine, wrapper, "before");
+  }
+
+  if (slot === sourceIndex + 1) {
+    return lineHasContentBesideWrapper(sourceLine, wrapper, "after");
+  }
+
+  return true;
+}
+
+/**
+ * Moves an image into its own new line at `slotIndex`, leaving any text that
+ * shared its old line behind (the old line is removed if only the image was
+ * in it).
+ */
+export function moveImageWrapperToLineSlot(
+  editor: HTMLElement,
+  wrapper: HTMLElement,
+  slotIndex: number,
+) {
+  if (!canMoveImageWrapperToLineSlot(editor, wrapper, slotIndex)) {
+    return false;
+  }
+
+  const sourceLine = wrapper.closest(`.${DETAIL_LINE_CLASS}`);
+  if (!(sourceLine instanceof HTMLElement)) return false;
+
+  const lines = getLineElements(editor);
+  const slot = Math.max(1, Math.min(lines.length, slotIndex));
+  const anchorLine = slot >= lines.length ? null : lines[slot];
+
+  wrapper.remove();
+
+  const sourceIsRemovable =
+    !sourceLine.querySelector(".detail-image-wrapper") &&
+    isLineEmpty(sourceLine) &&
+    !sourceLine.dataset.lineType;
+
+  const newLine = createLineElement("", "text");
+  newLine.appendChild(wrapper);
+  ensureContentBelowWrapper(wrapper);
+
+  if (anchorLine) {
+    anchorLine.before(newLine);
+  } else {
+    editor.appendChild(newLine);
+  }
+
+  if (sourceIsRemovable) {
+    sourceLine.remove();
+  } else if (!sourceLine.firstChild) {
+    sourceLine.appendChild(document.createElement("br"));
+  }
+
+  syncLineEmptyState(editor);
+  placeCaretBelowWrapper(wrapper);
+  editor.focus();
+
+  return true;
 }
 
 export function removeImageWrapper(editor: HTMLElement, wrapper: HTMLElement) {
@@ -2884,7 +2989,13 @@ function isDetailsHtmlEmpty(html: string) {
   container.innerHTML = html;
   ensureBlockLines(container);
 
-  return getLineElements(container).every((line) => isLineEmpty(line));
+  // `isLineEmpty` treats an image-only line as text-empty (by design, so it
+  // doesn't get an extra placeholder height/caret row), so it can't be used
+  // alone here or a body that is only an image would be misreported as
+  // empty and dropped before being persisted.
+  return getLineElements(container).every(
+    (line) => isLineEmpty(line) && !line.querySelector(".detail-image-wrapper"),
+  );
 }
 
 function stripLineTransientState(line: HTMLElement) {
@@ -3001,11 +3112,42 @@ function syncTrailingBodyPlaceholderLine(editor: HTMLElement) {
   const bodyHasContent = bodyLines.some(isBodyLineWithContent);
 
   if (!bodyHasContent) {
-    while (bodyLines.length > 1) {
-      bodyLines.pop()?.remove();
+    if (getLineElements(editor).length === 1) {
+      editor.appendChild(createLineElement("<br>", "text"));
+      return;
     }
 
-    if (getLineElements(editor).length === 1) {
+    // Keep all empty text rows the user created; only ensure one trailing
+    // placeholder line at the end (no collapsing back to a single empty row).
+    while (true) {
+      const body = getLineElements(editor).slice(1);
+      const last = body.at(-1);
+      if (!last) break;
+
+      if (
+        isLineEmpty(last) &&
+        (isListBlockLine(last) || isCodeLine(last))
+      ) {
+        last.remove();
+        continue;
+      }
+
+      break;
+    }
+
+    const lastLine = getLineElements(editor).at(-1);
+    if (!lastLine || isTitleLine(editor, lastLine)) {
+      editor.appendChild(createLineElement("<br>", "text"));
+      return;
+    }
+
+    const lastIsTrailingPlaceholder =
+      isLineEmpty(lastLine) &&
+      isBodyPlaceholderCandidateLine(lastLine) &&
+      !isListBlockLine(lastLine) &&
+      !isCodeLine(lastLine);
+
+    if (!lastIsTrailingPlaceholder) {
       editor.appendChild(createLineElement("<br>", "text"));
     }
 

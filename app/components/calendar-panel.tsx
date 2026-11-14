@@ -216,6 +216,8 @@ type CalendarPanelProps = {
   onMultiWeekCountChange?: (count: number) => void;
   persistViewSession?: boolean;
   embeddedInCalendarModal?: boolean;
+  /** Full-page `/calendar` route (not list-embedded calendar). */
+  standaloneCalendar?: boolean;
   periodLabelAction?: ReactNode;
   headerTrailingAction?: ReactNode;
 };
@@ -457,7 +459,7 @@ function CalendarViewTabs({
         })}
       </div>
       <div
-        className={`ml-auto flex min-w-0 items-center justify-end gap-2 -mt-[2px] pl-[7px] ${
+        className={`ml-auto flex min-w-0 items-center justify-end gap-1.5 -mt-[2px] pl-[7px] ${
           sidebarOpen ? sidebarWidthClass : ""
         }`}
       >
@@ -1154,6 +1156,7 @@ type CalendarViewsPanelProps = {
   onMultiWeekCountChange?: (count: number) => void;
   persistViewSession?: boolean;
   embeddedInCalendarModal?: boolean;
+  standaloneCalendar?: boolean;
   fullWidth?: boolean;
   externalDropTargetDateKey?: string | null;
   externalDropTargetTimeMinutes?: number | null;
@@ -1200,6 +1203,7 @@ export function CalendarViewsPanel({
   onMultiWeekCountChange,
   persistViewSession = true,
   embeddedInCalendarModal = false,
+  standaloneCalendar = false,
   fullWidth = false,
   externalDropTargetDateKey = null,
   externalDropTargetTimeMinutes = null,
@@ -1297,6 +1301,7 @@ export function CalendarViewsPanel({
       view ??
         readCalendarViewSession()?.activeView ??
         defaultView,
+      { standaloneCalendar },
     ),
   );
   const [searchQuery, setSearchQuery] = useState("");
@@ -1318,11 +1323,15 @@ export function CalendarViewsPanel({
 
     if (
       activeView === "month" &&
-      !shouldDefaultCalendarSidebarOpen("month", window.innerWidth)
+      !shouldDefaultCalendarSidebarOpen({
+        activeView: "month",
+        viewportWidth: window.innerWidth,
+        standaloneCalendar,
+      })
     ) {
       setSidebarOpen(false);
     }
-  }, [activeView]);
+  }, [activeView, standaloneCalendar]);
 
   const calendarTaskModalActions = useMemo(
     () => ({
@@ -1904,6 +1913,7 @@ export function CalendarPanel({
   onMultiWeekCountChange,
   persistViewSession = true,
   embeddedInCalendarModal = false,
+  standaloneCalendar = true,
   periodLabelAction,
   headerTrailingAction,
   labels = [],
@@ -1950,6 +1960,7 @@ export function CalendarPanel({
         onMultiWeekCountChange={onMultiWeekCountChange}
         persistViewSession={persistViewSession}
         embeddedInCalendarModal={embeddedInCalendarModal}
+        standaloneCalendar={standaloneCalendar}
         periodLabelAction={periodLabelAction}
         headerTrailingAction={headerTrailingAction}
       />

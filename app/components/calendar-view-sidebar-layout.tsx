@@ -45,16 +45,45 @@ import {
 
 const CALENDAR_SIDEBAR_COMPLETE_UNDO_MS = 5000;
 
-/** Month view keeps the task sidebar closed by default below this width. */
+/** Month view keeps the task sidebar closed by default below this width (list calendar). */
 export const CALENDAR_MONTH_SIDEBAR_DEFAULT_MIN_VIEWPORT_PX = 1700;
 
+export type CalendarSidebarDefaultOptions = {
+  activeView: CalendarViewTab;
+  viewportWidth: number;
+  /** `/calendar/*` full-page calendar — sidebar open by default in month view. */
+  standaloneCalendar?: boolean;
+};
+
+export function shouldDefaultCalendarSidebarOpen(
+  options: CalendarSidebarDefaultOptions,
+): boolean;
 export function shouldDefaultCalendarSidebarOpen(
   activeView: CalendarViewTab,
   viewportWidth: number,
+  standaloneCalendar?: boolean,
+): boolean;
+export function shouldDefaultCalendarSidebarOpen(
+  activeViewOrOptions: CalendarViewTab | CalendarSidebarDefaultOptions,
+  viewportWidth?: number,
+  standaloneCalendar = false,
 ) {
+  const resolved: CalendarSidebarDefaultOptions =
+    typeof activeViewOrOptions === "object"
+      ? activeViewOrOptions
+      : {
+          activeView: activeViewOrOptions,
+          viewportWidth: viewportWidth ?? 0,
+          standaloneCalendar,
+        };
+
+  if (resolved.standaloneCalendar) {
+    return true;
+  }
+
   if (
-    activeView === "month" &&
-    viewportWidth < CALENDAR_MONTH_SIDEBAR_DEFAULT_MIN_VIEWPORT_PX
+    resolved.activeView === "month" &&
+    resolved.viewportWidth < CALENDAR_MONTH_SIDEBAR_DEFAULT_MIN_VIEWPORT_PX
   ) {
     return false;
   }
@@ -62,12 +91,19 @@ export function shouldDefaultCalendarSidebarOpen(
   return true;
 }
 
-export function getInitialCalendarSidebarOpen(activeView: CalendarViewTab) {
+export function getInitialCalendarSidebarOpen(
+  activeView: CalendarViewTab,
+  options?: { standaloneCalendar?: boolean },
+) {
   if (typeof window === "undefined") {
     return true;
   }
 
-  return shouldDefaultCalendarSidebarOpen(activeView, window.innerWidth);
+  return shouldDefaultCalendarSidebarOpen({
+    activeView,
+    viewportWidth: window.innerWidth,
+    standaloneCalendar: options?.standaloneCalendar,
+  });
 }
 
 const CALENDAR_SIDEBAR_TASK_ROW_BUTTON_CLASS =

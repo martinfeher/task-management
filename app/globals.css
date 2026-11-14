@@ -840,6 +840,10 @@ body {
   cursor: grabbing;
 }
 
+.detail-image-wrapper[data-drag-axis="vertical"] {
+  opacity: 0.55;
+}
+
 .detail-image {
   display: block;
   max-width: 100%;
@@ -851,9 +855,9 @@ body {
 }
 
 .task-detail-image-lightbox {
-  background: transparent;
-  -webkit-backdrop-filter: blur(3px);
-  backdrop-filter: blur(3px);
+  background: rgba(0, 0, 0, 0.1);
+  -webkit-backdrop-filter: blur(1.5px);
+  backdrop-filter: blur(1.5px);
 }
 
 .detail-image-wrapper[data-dragging="true"] .detail-image {

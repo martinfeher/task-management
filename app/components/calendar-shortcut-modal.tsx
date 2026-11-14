@@ -146,6 +146,7 @@ export function CalendarShortcutModal({
           <CalendarPanel
             {...calendarPanelProps}
             embeddedInCalendarModal
+            standaloneCalendar={false}
             periodLabelAction={
               onExpandToFullPage ? (
                 <button

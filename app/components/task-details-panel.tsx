@@ -7092,6 +7092,12 @@ export function TaskDetailsPanel({
         requestSave("flush");
         scheduleEditorHeightSync();
       },
+      editorWrapperRef.current
+        ? {
+            editorViewport: editorWrapperRef.current,
+            onDropIndicatorChange: setDropIndicator,
+          }
+        : undefined,
     );
   }
 

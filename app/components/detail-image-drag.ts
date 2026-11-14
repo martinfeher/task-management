@@ -1,6 +1,22 @@
-import { placeCaretBelowWrapper } from "./detail-lines";
+import {
+  canMoveImageWrapperToLineSlot,
+  getLineElements,
+  getLineIndex,
+  moveImageWrapperToLineSlot,
+  placeCaretBelowWrapper,
+} from "./detail-lines";
 
 const DRAG_THRESHOLD_PX = 5;
+
+/**
+ * Lets a vertical image drag move the image between detail lines,
+ * showing a drop indicator at the target gap.
+ */
+export type ImageVerticalReorderController = {
+  /** The scroll container `.detail-line` rects are measured against. */
+  editorViewport: HTMLElement;
+  onDropIndicatorChange: (indicator: { top: number } | null) => void;
+};
 
 function parseMarginLeft(element: HTMLElement) {
   const parsed = parseFloat(element.style.marginLeft);
@@ -30,32 +46,70 @@ function applyHorizontalOffset(
   }
 }
 
+function getVerticalDropIndicatorTop(
+  editorViewport: HTMLElement,
+  lines: HTMLElement[],
+  dropIndex: number,
+) {
+  const viewportRect = editorViewport.getBoundingClientRect();
+
+  if (dropIndex >= lines.length) {
+    const lastLine = lines[lines.length - 1];
+    return lastLine
+      ? lastLine.getBoundingClientRect().bottom - viewportRect.top
+      : 0;
+  }
+
+  const targetLine = lines[dropIndex];
+  return targetLine.getBoundingClientRect().top - viewportRect.top;
+}
+
+function getImageDropSlot(clientY: number, lines: HTMLElement[]) {
+  for (let index = 1; index < lines.length; index += 1) {
+    const rect = lines[index].getBoundingClientRect();
+    if (clientY < rect.top + rect.height / 2) {
+      return index;
+    }
+  }
+
+  return lines.length;
+}
+
 export function startImagePointerInteraction(
   event: PointerEvent,
   wrapper: HTMLElement,
   line: HTMLElement,
   editor: HTMLElement,
   onComplete: () => void,
+  verticalReorder?: ImageVerticalReorderController,
 ) {
   const startX = event.clientX;
   const startY = event.clientY;
   const startMarginLeft = parseMarginLeft(wrapper);
+  const canMoveBetweenLines =
+    Boolean(verticalReorder) && getLineIndex(editor, line) > 0;
   let dragging = false;
+  let pendingSlot: number | null = null;
+
+  function clearVerticalPreview() {
+    pendingSlot = null;
+    delete wrapper.dataset.dragAxis;
+    verticalReorder?.onDropIndicatorChange(null);
+  }
 
   function beginDragging() {
     dragging = true;
     wrapper.dataset.dragging = "true";
     wrapper.setPointerCapture(event.pointerId);
-    document.body.style.cursor = "grabbing";
     document.body.style.userSelect = "none";
+    document.body.style.cursor = "grabbing";
   }
 
   function onPointerMove(moveEvent: PointerEvent) {
-    if (
-      !dragging &&
-      Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY) <
-        DRAG_THRESHOLD_PX
-    ) {
+    const deltaX = moveEvent.clientX - startX;
+    const deltaY = moveEvent.clientY - startY;
+
+    if (!dragging && Math.hypot(deltaX, deltaY) < DRAG_THRESHOLD_PX) {
       return;
     }
 
@@ -63,11 +117,37 @@ export function startImagePointerInteraction(
       beginDragging();
     }
 
-    applyHorizontalOffset(
-      line,
-      wrapper,
-      startMarginLeft + moveEvent.clientX - startX,
-    );
+    const verticalDominant =
+      canMoveBetweenLines && Math.abs(deltaY) > Math.abs(deltaX);
+
+    if (!verticalDominant || !verticalReorder) {
+      if (wrapper.dataset.dragAxis) {
+        clearVerticalPreview();
+      }
+
+      applyHorizontalOffset(line, wrapper, startMarginLeft + deltaX);
+      return;
+    }
+
+    wrapper.dataset.dragAxis = "vertical";
+
+    const lines = getLineElements(editor);
+    const slot = getImageDropSlot(moveEvent.clientY, lines);
+
+    if (!canMoveImageWrapperToLineSlot(editor, wrapper, slot)) {
+      pendingSlot = null;
+      verticalReorder.onDropIndicatorChange(null);
+      return;
+    }
+
+    pendingSlot = slot;
+    verticalReorder.onDropIndicatorChange({
+      top: getVerticalDropIndicatorTop(
+        verticalReorder.editorViewport,
+        lines,
+        slot,
+      ),
+    });
   }
 
   function onPointerUp() {
@@ -76,6 +156,14 @@ export function startImagePointerInteraction(
         wrapper.releasePointerCapture(event.pointerId);
       }
       delete wrapper.dataset.dragging;
+
+      const slot = pendingSlot;
+      clearVerticalPreview();
+
+      if (slot !== null) {
+        moveImageWrapperToLineSlot(editor, wrapper, slot);
+      }
+
       onComplete();
     } else {
       placeCaretBelowWrapper(wrapper);
