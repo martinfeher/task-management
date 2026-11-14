@@ -3983,6 +3983,70 @@ export function TodoApp({
     return null;
   }, [selectedTaskId, tasksByList]);
 
+  const selectedTaskListItem = useMemo(() => {
+    if (!selectedTaskId) return null;
+
+    for (const listTasks of Object.values(tasksByList)) {
+      const task = listTasks.find((item) => item.id === selectedTaskId);
+      if (task) return task;
+    }
+
+    return null;
+  }, [selectedTaskId, tasksByList]);
+
+  const noteDetailsMenu = useMemo(() => {
+    if (!selectedTaskListItem?.isNote) return null;
+
+    const noteTask = selectedTaskListItem;
+    const sourceListId = findTaskListId(noteTask.id);
+
+    return {
+      task: noteTask,
+      lists,
+      currentListId: sourceListId,
+      availableLabels: labels,
+      hasMoveActions: lists.length > 1,
+      onSelectTaskPriority: (priority: number) =>
+        setTaskPriority(noteTask.id, priority),
+      onClearTaskPriority: () => setTaskPriority(noteTask.id, null),
+      onToggleTaskLabel: (labelId: string, assigned: boolean) =>
+        toggleTaskLabel(noteTask.id, labelId, assigned),
+      onCreateLabel: async (label: string, color: string) => {
+        const trimmed = label.trim();
+        if (!trimmed) return;
+
+        const tag = await createLabelInDb(trimmed, color);
+        setLabels((current) => {
+          if (current.some((item) => item.id === tag.id)) {
+            return current;
+          }
+
+          return [...current, tag].sort((a, b) =>
+            a.label.localeCompare(b.label, undefined, { sensitivity: "base" }),
+          );
+        });
+        await toggleTaskLabel(noteTask.id, tag.id, true);
+        refreshLabels();
+      },
+      onMoveTaskToList: (targetListId: string) => {
+        if (!sourceListId) return;
+        void moveTaskToList(noteTask.id, sourceListId, targetListId);
+      },
+      onDuplicateTask: () => void duplicateTaskById(noteTask.id),
+      onDeleteTask: () => void deleteTaskById(noteTask.id),
+    };
+  }, [
+    deleteTaskById,
+    duplicateTaskById,
+    labels,
+    lists,
+    moveTaskToList,
+    refreshLabels,
+    selectedTaskListItem,
+    setTaskPriority,
+    toggleTaskLabel,
+  ]);
+
   const selectedTaskSubtasksContext = useMemo(() => {
     if (!selectedTaskId) {
       return { subtasks: [], canManageSubtasks: false };
@@ -4391,6 +4455,7 @@ export function TodoApp({
                     onDeleteSubtask={deleteTaskById}
                     onEditSubtask={handleEditSubtaskFromDetails}
                     onBack={isCompactLayout ? handleCompactBack : undefined}
+                    noteMenu={noteDetailsMenu}
                   />
                 </div>
               )}
@@ -4578,6 +4643,7 @@ export function TodoApp({
                   onDeleteSubtask={deleteTaskById}
                   onEditSubtask={handleEditSubtaskFromDetails}
                   onBack={isCompactLayout ? handleCompactBack : undefined}
+                  noteMenu={noteDetailsMenu}
                 />
               </div>
             ) : null}

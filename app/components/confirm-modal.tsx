@@ -9,6 +9,7 @@ type ConfirmModalProps = {
   message: string;
   confirmLabel?: string;
   showConfirm?: boolean;
+  overlayClassName?: string;
   onConfirm: () => void;
   onCancel: () => void;
 };
@@ -19,6 +20,7 @@ export function ConfirmModal({
   message,
   confirmLabel = "Remove",
   showConfirm = true,
+  overlayClassName = "z-50",
   onConfirm,
   onCancel,
 }: ConfirmModalProps) {
@@ -46,7 +48,7 @@ export function ConfirmModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex cursor-default items-center justify-center bg-black/40 p-4"
+      className={`fixed inset-0 flex cursor-default items-center justify-center bg-black/40 p-4 ${overlayClassName}`}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) {
           onCancel();

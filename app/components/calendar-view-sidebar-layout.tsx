@@ -248,7 +248,7 @@ function CalendarSidebarDayTasks({
                           onClick={() => onOpenTask?.(task.id)}
                           onMouseEnter={() => onHoverTaskStart?.(task.id)}
                           onMouseLeave={() => onHoverTaskEnd?.()}
-                          className={`${CALENDAR_SIDEBAR_TASK_ROW_BUTTON_CLASS} flex w-full items-center gap-2 rounded-[18px] min-h-[40px] px-2.5 py-1 text-left transition-colors hover:bg-[#f4f4f8]! dark:hover:bg-zinc-900 cursor-pointer ${getCalendarSidebarTaskRowClassName(
+                          className={`${CALENDAR_SIDEBAR_TASK_ROW_BUTTON_CLASS} flex w-full items-center gap-2 rounded-[18px] min-h-[40px] px-2.5 py-1 border border-[#f8f8fa] text-left transition-colors hover:bg-[#f4f4f8]! dark:hover:bg-zinc-900 cursor-pointer ${getCalendarSidebarTaskRowClassName(
                             {
                               isActiveInModal,
                               isSelected,
@@ -271,7 +271,7 @@ function CalendarSidebarDayTasks({
                             </div>
                           ) : null}
                           <span className="min-w-0 flex-1">
-                            <span className="block truncate text-sm leading-5 text-zinc-650 dark:text-zinc-100">
+                            <span className="block truncate text-[14px] leading-5 text-zinc-600 dark:text-zinc-100">
                               {task.name}
                             </span>
                             {dueTimeLabel ? (

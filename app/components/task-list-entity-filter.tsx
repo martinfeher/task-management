@@ -109,8 +109,6 @@ export function TaskListEntityFilter({
         const isSelected = value === tab.id;
         const { Icon } = tab;
 
-        const tooltipId = `entity-filter-${tab.id}-tooltip`;
-
         return (
           <span key={tab.id} className="relative z-[1] flex items-center">
             {index > 0 ? (
@@ -129,10 +127,9 @@ export function TaskListEntityFilter({
                 type="button"
                 aria-pressed={isSelected}
                 aria-label={tab.label}
-                aria-describedby={tooltipId}
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => onChange(tab.id)}
-                className={`flex h-[22px] min-w-[22px] cursor-pointer items-center justify-center gap-1 rounded-full px-1.5 py-[2px] leading-none transition-[color,font-size,font-weight] duration-[400ms] ease-in-out motion-reduce:transition-none ${
+                className={`flex h-[21px] min-w-[22px] mb-[1px] mt-px cursor-pointer items-center justify-center gap-1 rounded-full px-1.5 py-[2px] leading-none transition-[color,font-size,font-weight] duration-[400ms] ease-in-out motion-reduce:transition-none ${
                   isSelected
                     ? "text-[11px] font-medium text-[#4873c7] dark:text-[#7da2ff]"
                     : "text-[9px] font-normal text-[#8b8f98] hover:bg-zinc-100 hover:text-[#5c616b] dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
@@ -141,13 +138,6 @@ export function TaskListEntityFilter({
                 <Icon className="size-3.5 shrink-0" aria-hidden="true" />
                 <span className="whitespace-nowrap">{tab.label}</span>
               </button>
-              <span
-                id={tooltipId}
-                role="tooltip"
-                className="add-task-date-tooltip app-hover-tooltip app-hover-tooltip-above-center pointer-events-none absolute bottom-[calc(100%+8px)] z-40 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium"
-              >
-                {tab.label}
-              </span>
             </div>
           </span>
         );

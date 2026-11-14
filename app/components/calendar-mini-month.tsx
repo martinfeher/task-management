@@ -349,7 +349,7 @@ export function CalendarMiniMonth({
                     className={`absolute inset-0 rounded-full transition-[box-shadow,transform] group-hover:scale-105 ${
                       isToday
                         ? CALENDAR_TODAY_DATE_CIRCLE_CLASS
-                        : "bg-[#d6cece]"
+                        : "bg-[#d6d2d8]"
                     }`}
                     aria-hidden="true"
                   />

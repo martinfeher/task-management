@@ -15,6 +15,7 @@ type TaskDetailImageLightboxProps = {
   hasNext?: boolean;
   onPrevious?: () => void;
   onNext?: () => void;
+  taskTitle?: string | null;
 };
 
 /** Above calendar task modal (`z-[10050]`) and detail date menus (`z-[10060]`). */
@@ -37,8 +38,15 @@ export function TaskDetailImageLightbox({
   hasNext = false,
   onPrevious,
   onNext,
+  taskTitle,
 }: TaskDetailImageLightboxProps) {
   const showGalleryNav = imageCount > 1;
+  const galleryTitleTrimmed = taskTitle?.trim() ?? "";
+  const galleryTitle =
+    galleryTitleTrimmed.length > 0
+      ? galleryTitleTrimmed.charAt(0).toLocaleUpperCase() +
+        galleryTitleTrimmed.slice(1)
+      : "";
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -80,7 +88,7 @@ export function TaskDetailImageLightbox({
 
   return createPortal(
     <div
-      className={`task-detail-image-lightbox fixed inset-0 ${TASK_DETAIL_IMAGE_LIGHTBOX_Z_CLASS} flex cursor-zoom-out items-center justify-center p-6`}
+      className={`task-detail-image-lightbox fixed inset-0 ${TASK_DETAIL_IMAGE_LIGHTBOX_Z_CLASS} flex cursor-zoom-out flex-col`}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) {
           onClose();
@@ -88,12 +96,36 @@ export function TaskDetailImageLightbox({
       }}
       role="dialog"
       aria-modal="true"
-      aria-label={ariaLabel}
+      aria-label={galleryTitle && showGalleryNav ? undefined : ariaLabel}
+      aria-labelledby={
+        showGalleryNav && galleryTitle
+          ? "task-detail-image-lightbox-title"
+          : undefined
+      }
     >
+      {showGalleryNav && galleryTitle ? (
+        <header className="shrink-0 px-6 pt-3.5 pb-2">
+          <h2
+            id="task-detail-image-lightbox-title"
+            className="mx-auto max-w-[min(92vw,48rem)] truncate mr-[32%] text-[19px] font-semibold leading-snug text-zinc-800 dark:text-zinc-100"
+            title={galleryTitle}
+          >
+            {galleryTitle}
+          </h2>
+        </header>
+      ) : null}
       <div
-        className="task-detail-image-lightbox-frame relative w-fit max-h-[85vh] max-w-[92vw] overflow-visible"
-        onMouseDown={(event) => event.stopPropagation()}
+        className="flex min-h-0 flex-1 items-center justify-center p-6"
+        onMouseDown={(event) => {
+          if (event.target === event.currentTarget) {
+            onClose();
+          }
+        }}
       >
+        <div
+          className="task-detail-image-lightbox-frame relative w-fit max-h-[min(85vh,100%)] max-w-[92vw] overflow-visible"
+          onMouseDown={(event) => event.stopPropagation()}
+        >
         {showGalleryNav ? (
           <button
             type="button"
@@ -159,6 +191,7 @@ export function TaskDetailImageLightbox({
             <LuChevronRight className="size-6" aria-hidden="true" />
           </button>
         ) : null}
+        </div>
       </div>
     </div>,
     document.body,

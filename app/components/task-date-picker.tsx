@@ -58,6 +58,8 @@ type TaskDatePickerProps = {
   onReminderMenuOpenChange?: (open: boolean) => void;
   reminderOptionId?: TaskReminderOptionId | null;
   onSaveReminder?: (optionId: TaskReminderOptionId) => void;
+  /** Clears date, time, and related schedule fields (preferred over separate callbacks). */
+  onClearDateAndTime?: () => void | Promise<void>;
   className?: string;
 };
 
@@ -1310,6 +1312,7 @@ export function TaskDatePicker({
   onReminderMenuOpenChange,
   reminderOptionId = null,
   onSaveReminder,
+  onClearDateAndTime,
   className,
 }: TaskDatePickerProps) {
   const today = useMemo(() => startOfDay(new Date()), []);
@@ -1481,13 +1484,28 @@ export function TaskDatePicker({
     },
   ];
 
-  function handleClearDateAndTime(event?: SyntheticEvent) {
-    event?.preventDefault();
-    event?.stopPropagation();
-    onSelectDate(null);
+  function resetPickerScheduleState() {
     setTypedDate("");
     setDateInputError(false);
     setIsTimeMenuOpen(false);
+    setDisplayRecurrence(null);
+    setDisplayReminder(null);
+    setOpenFooterSubmenu(null);
+  }
+
+  function handleClearDateAndTime(event?: SyntheticEvent) {
+    event?.preventDefault();
+    event?.stopPropagation();
+
+    if (onClearDateAndTime) {
+      void Promise.resolve(onClearDateAndTime()).finally(() => {
+        resetPickerScheduleState();
+      });
+      return;
+    }
+
+    onSelectDate(null);
+    resetPickerScheduleState();
 
     if (onSaveDueTime) {
       onSaveDueTime({
@@ -1495,6 +1513,10 @@ export function TaskDatePicker({
         dueDurationMinutes: null,
         dueTimeZone: normalizeDueTimeZone(dueTimeZone),
       });
+    }
+
+    if (onSaveRecurrence) {
+      void Promise.resolve(onSaveRecurrence(null));
     }
   }
 

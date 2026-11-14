@@ -44,6 +44,8 @@ export {
   type CalendarTaskModalAnchorRect,
 } from "@/lib/calendar-task-modal-position";
 
+const CALENDAR_TASK_MODAL_NAVIGATION_MORPH_MS = 300;
+
 export type CalendarTaskSnapshot = {
   name: string;
   completed: boolean;
@@ -126,6 +128,7 @@ export function CalendarTaskModal({
   const [focusNoteAtEndRequest, setFocusNoteAtEndRequest] = useState(0);
   const detailsSaveControllerRef = useRef<TaskDetailsSaveController | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
+  const morphSourceRectRef = useRef<DOMRect | null>(null);
   const skipTaskContentSwitchAnimationRef = useRef(true);
   const modalActions = useCalendarTaskModalActions();
   const shouldAnimateTaskContentSwitch = !isHoverPreview && !isNewTaskDraft;
@@ -172,6 +175,9 @@ export function CalendarTaskModal({
   );
 
   const handleCreateNewTask = useCallback(async () => {
+    if (detailsSaveControllerRef.current?.hasCreateTitle?.() === false) {
+      return;
+    }
     await detailsSaveControllerRef.current?.flushSave();
     onNewTaskDraftComplete?.();
     onClose();
@@ -193,6 +199,14 @@ export function CalendarTaskModal({
 
   const handleNavigateToTask = useCallback(
     async (targetTaskId: string) => {
+      const previewElement = document.querySelector(
+        ".calendar-modal-navigation-task-preview",
+      );
+      morphSourceRectRef.current =
+        previewElement instanceof HTMLElement
+          ? previewElement.getBoundingClientRect()
+          : null;
+      setNavigationPreview(null);
       await detailsSaveControllerRef.current?.flushSave();
       onNavigateTask?.(targetTaskId);
     },
@@ -359,6 +373,12 @@ export function CalendarTaskModal({
 
     if (taskId === displayedTaskId) return;
 
+    if (morphSourceRectRef.current) {
+      setDisplayedTaskId(taskId);
+      setContentSwitchPhase("in");
+      return;
+    }
+
     if (contentSwitchPhase !== "idle") return;
 
     setContentSwitchPhase("out");
@@ -391,8 +411,9 @@ export function CalendarTaskModal({
   }, [contentSwitchPhase]);
 
   useEffect(() => {
+    if (isHoverPreview) return;
     setFocusNoteAtEndRequest((current) => current + 1);
-  }, [displayedTaskId]);
+  }, [displayedTaskId, isHoverPreview]);
 
   useEffect(() => {
     if (isHoverPreview || !showBackdrop) return;
@@ -432,6 +453,43 @@ export function CalendarTaskModal({
   useLayoutEffect(() => {
     dialogRef.current?.scrollTo({ top: 0 });
   }, [taskId]);
+
+  useLayoutEffect(() => {
+    const source = morphSourceRectRef.current;
+    if (!source) return;
+    morphSourceRectRef.current = null;
+
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const target = dialog.getBoundingClientRect();
+    if (!target.width || !target.height) return;
+
+    const scaleX = source.width / target.width;
+    const scaleY = source.height / target.height;
+    const translateX = source.left - target.left;
+    const translateY = source.top - target.top;
+
+    dialog.animate(
+      [
+        {
+          transformOrigin: "top left",
+          transform: `translate(${translateX}px, ${translateY}px) scale(${scaleX}, ${scaleY})`,
+          opacity: 0.7,
+        },
+        {
+          transformOrigin: "top left",
+          transform: "translate(0, 0) scale(1, 1)",
+          opacity: 1,
+        },
+      ],
+      {
+        duration: CALENDAR_TASK_MODAL_NAVIGATION_MORPH_MS,
+        easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+      },
+    );
+  }, [displayedTaskId]);
 
   useLayoutEffect(() => {
     const clipConfig = sidebarBackdropClip;

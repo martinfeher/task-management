@@ -1,7 +1,9 @@
 import {
   canMoveImageWrapperToLineSlot,
   getLineElements,
+  getLineImageWrappers,
   getLineIndex,
+  moveImageWrapperIntoImageRow,
   moveImageWrapperToLineSlot,
   placeCaretBelowWrapper,
 } from "./detail-lines";
@@ -29,27 +31,139 @@ function getImageDropSlot(
   return lines.length;
 }
 
-function applyDropPosition(
-  wrapper: HTMLElement,
-  dropLeft: number,
-  dropTop: number,
-) {
-  const line = wrapper.closest(".detail-line");
-  if (!(line instanceof HTMLElement)) return;
+type Box = { left: number; top: number; right: number; bottom: number };
 
-  wrapper.style.marginLeft = "";
-  wrapper.style.marginTop = "";
+type ImageSnapshot = { element: HTMLElement; rect: DOMRect };
 
-  const naturalRect = wrapper.getBoundingClientRect();
-  const maxLeft = Math.max(0, line.clientWidth - naturalRect.width);
+type ImageRowTarget = { line: HTMLElement; beforeWrapper: HTMLElement | null };
 
-  const marginLeft = Math.round(
-    Math.max(0, Math.min(maxLeft, dropLeft - naturalRect.left)),
+function getImageWrappers(editor: HTMLElement) {
+  return Array.from(
+    editor.querySelectorAll(".detail-image-wrapper"),
+  ).filter((element): element is HTMLElement => element instanceof HTMLElement);
+}
+
+function horizontalOverlap(a: Box, b: Box) {
+  return Math.min(a.right, b.right) - Math.max(a.left, b.left);
+}
+
+function verticalOverlap(a: Box, b: Box) {
+  return Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+}
+
+function rectsOverlap(a: Box, b: Box) {
+  return horizontalOverlap(a, b) > 0 && verticalOverlap(a, b) > 0;
+}
+
+function getLineContentRight(line: HTMLElement) {
+  const rect = line.getBoundingClientRect();
+  const paddingRight = parseFloat(getComputedStyle(line).paddingRight) || 0;
+  return rect.left + line.clientLeft + line.clientWidth - paddingRight;
+}
+
+function getLineContentWidth(line: HTMLElement) {
+  const style = getComputedStyle(line);
+  return (
+    line.clientWidth -
+    (parseFloat(style.paddingLeft) || 0) -
+    (parseFloat(style.paddingRight) || 0)
   );
-  const marginTop = Math.round(Math.max(0, dropTop - naturalRect.top));
+}
 
-  if (marginLeft > 0) wrapper.style.marginLeft = `${marginLeft}px`;
-  if (marginTop > 0) wrapper.style.marginTop = `${marginTop}px`;
+/**
+ * Snapshots every other image that does not overlap the drop area, so it can
+ * be pinned back to its on-screen position after the dragged image is moved.
+ */
+function snapshotUnaffectedImages(
+  editor: HTMLElement,
+  wrapper: HTMLElement,
+  dropRect: Box,
+) {
+  const snapshots: ImageSnapshot[] = [];
+
+  for (const element of getImageWrappers(editor)) {
+    if (element === wrapper) continue;
+    const rect = element.getBoundingClientRect();
+    if (rectsOverlap(rect, dropRect)) continue;
+    snapshots.push({ element, rect });
+  }
+
+  return snapshots;
+}
+
+/**
+ * When the drop area sits beside (same height, no horizontal overlap) other
+ * images, returns the line to join so the images end up side by side.
+ */
+function getImageRowTarget(
+  editor: HTMLElement,
+  wrapper: HTMLElement,
+  dropRect: Box,
+): ImageRowTarget | null {
+  const lines = getLineElements(editor);
+  let anchor: { element: HTMLElement; overlap: number } | null = null;
+
+  for (const element of getImageWrappers(editor)) {
+    if (element === wrapper) continue;
+    const rect = element.getBoundingClientRect();
+    const overlap = verticalOverlap(rect, dropRect);
+    if (overlap <= 0) continue;
+    if (horizontalOverlap(rect, dropRect) > 0) return null;
+    if (!anchor || overlap > anchor.overlap) {
+      anchor = { element, overlap };
+    }
+  }
+
+  if (!anchor) return null;
+
+  const line = anchor.element.closest(".detail-line");
+  if (!(line instanceof HTMLElement) || lines.indexOf(line) <= 0) return null;
+
+  const rowWrappers = getLineImageWrappers(line).filter(
+    (element) => element !== wrapper,
+  );
+  const rowWidth = rowWrappers.reduce(
+    (total, element) => total + element.getBoundingClientRect().width,
+    0,
+  );
+  if (rowWidth + (dropRect.right - dropRect.left) > getLineContentWidth(line)) {
+    return null;
+  }
+
+  const dropCenter = (dropRect.left + dropRect.right) / 2;
+  const beforeWrapper =
+    rowWrappers.find((element) => {
+      const rect = element.getBoundingClientRect();
+      return dropCenter < rect.left + rect.width / 2;
+    }) ?? null;
+
+  return { line, beforeWrapper };
+}
+
+/** Adjusts an image's margins so its top-left corner lands on (left, top). */
+function pinImageTo(element: HTMLElement, left: number, top: number) {
+  const line = element.closest(".detail-line");
+  let rect = element.getBoundingClientRect();
+
+  const currentLeft = parseFloat(element.style.marginLeft) || 0;
+  let nextLeft = currentLeft + (left - rect.left);
+  if (line instanceof HTMLElement) {
+    nextLeft = Math.min(
+      nextLeft,
+      currentLeft + (getLineContentRight(line) - rect.right),
+    );
+  }
+  nextLeft = Math.max(0, Math.round(nextLeft));
+  if (Math.abs(nextLeft - currentLeft) >= 1) {
+    element.style.marginLeft = nextLeft > 0 ? `${nextLeft}px` : "";
+    rect = element.getBoundingClientRect();
+  }
+
+  const currentTop = parseFloat(element.style.marginTop) || 0;
+  const nextTop = Math.max(0, Math.round(currentTop + (top - rect.top)));
+  if (Math.abs(nextTop - currentTop) >= 1) {
+    element.style.marginTop = nextTop > 0 ? `${nextTop}px` : "";
+  }
 }
 
 /**
@@ -117,9 +231,30 @@ export function startImagePointerInteraction(
       delete wrapper.dataset.dragging;
       delete wrapper.dataset.dragAxis;
 
+      const dropRect: Box = {
+        left: dropLeft,
+        top: dropTop,
+        right: dropLeft + startRect.width,
+        bottom: dropTop + startRect.height,
+      };
+      const unaffectedImages = snapshotUnaffectedImages(
+        editor,
+        wrapper,
+        dropRect,
+      );
+
       if (canMoveBetweenLines) {
+        const rowTarget = getImageRowTarget(editor, wrapper, dropRect);
         const sourceLine = wrapper.closest(".detail-line");
-        if (sourceLine instanceof HTMLElement) {
+
+        if (rowTarget) {
+          moveImageWrapperIntoImageRow(
+            editor,
+            wrapper,
+            rowTarget.line,
+            rowTarget.beforeWrapper,
+          );
+        } else if (sourceLine instanceof HTMLElement) {
           const slot = getImageDropSlot(
             dropTop,
             getLineElements(editor),
@@ -131,7 +266,21 @@ export function startImagePointerInteraction(
         }
       }
 
-      applyDropPosition(wrapper, dropLeft, dropTop);
+      wrapper.style.marginLeft = "";
+      wrapper.style.marginTop = "";
+
+      const snapshotRects = new Map(
+        unaffectedImages.map(({ element, rect }) => [element, rect]),
+      );
+      for (const element of getImageWrappers(editor)) {
+        if (element === wrapper) {
+          pinImageTo(wrapper, dropLeft, dropTop);
+          continue;
+        }
+        const rect = snapshotRects.get(element);
+        if (rect) pinImageTo(element, rect.left, rect.top);
+      }
+
       onComplete();
     } else if (onTap) {
       onTap();

@@ -257,7 +257,11 @@ export function CalendarTaskHoverPreviewCard({ task }: { task: TaskListItem }) {
         ) : null}
       </div>
 
-      <div className="flex flex-col gap-1.5">
+      <div
+        className={`flex flex-col gap-1.5 ${
+          descriptionLines.length === 0 ? "-mt-1" : ""
+        }`}
+      >
         {task.listName ? (
           <PreviewMetaRow icon={<LuList className="h-[14px] w-[14px]" />}>
             {task.listName}

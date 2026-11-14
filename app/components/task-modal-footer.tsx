@@ -21,6 +21,7 @@ import { TaskMoveToSelector } from "./task-move-to-selector";
 import { TaskPriorityFlagIcon } from "./task-priority-icon";
 import { TaskPrioritySelector } from "./task-priority-selector";
 import type { TodoList } from "./todo-app";
+import { ConfirmModal } from "./confirm-modal";
 
 const MODAL_FOOTER_ACTION_COLOR = "#a4a4a4";
 
@@ -240,6 +241,7 @@ export function TaskModalFooter({
   const [moveQuery, setMoveQuery] = useState("");
   const [isLabelSubmitting, setIsLabelSubmitting] = useState(false);
   const [copyLinkMessage, setCopyLinkMessage] = useState<string | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const footerRef = useRef<HTMLDivElement>(null);
   const copyLinkTimerRef = useRef<number | null>(null);
   const footerMenuHoverCloseTimerRef = useRef<number | null>(null);
@@ -408,9 +410,14 @@ export function TaskModalFooter({
     closeMenus();
   }
 
-  function handleDelete() {
-    void Promise.resolve(onDeleteTask?.(taskId));
+  function handleDeleteClick() {
     closeMenus();
+    setDeleteConfirmOpen(true);
+  }
+
+  function confirmDeleteTask() {
+    setDeleteConfirmOpen(false);
+    void Promise.resolve(onDeleteTask?.(taskId));
   }
 
   function openLabelMenu() {
@@ -491,6 +498,7 @@ export function TaskModalFooter({
   }
 
   return (
+    <>
     <div ref={footerRef} className="flex min-w-0 flex-1 items-center gap-4">
       {hasPriorityActions ? (
         <div
@@ -608,18 +616,28 @@ export function TaskModalFooter({
             tooltipId={MODAL_FOOTER_DELETE_TOOLTIP_ID}
             ariaLabel="Delete task"
             tooltipText="Delete task"
-            onClick={handleDelete}
+            onClick={handleDeleteClick}
             className={`${MODAL_FOOTER_ICON_BUTTON_CLASS} ml-auto w-5 -mr-1.5 hover:text-red-500 dark:hover:text-red-400`}
           >
             <MdDeleteOutline className="size-[18px]" />
           </ModalFooterPortaledIconButton>
         ) : (
-          <FooterTextButton ariaLabel="Delete task" onClick={handleDelete}>
+          <FooterTextButton ariaLabel="Delete task" onClick={handleDeleteClick}>
             Delete
           </FooterTextButton>
         )
       ) : null}
     </div>
+    <ConfirmModal
+      open={deleteConfirmOpen}
+      title="Delete task"
+      message="Are you sure you want to delete this task? This cannot be undone."
+      confirmLabel="Delete"
+      overlayClassName="z-[10070]"
+      onConfirm={confirmDeleteTask}
+      onCancel={() => setDeleteConfirmOpen(false)}
+    />
+    </>
   );
 }
 

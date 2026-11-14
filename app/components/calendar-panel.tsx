@@ -1014,7 +1014,7 @@ export function CalendarMonthView({
                       handleDaySelect(day);
                     }
                   }}
-                  className={`flex h-full min-h-0 cursor-pointer flex-col py-[5px] pl-[5px] pr-[5px] text-left transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-900/60 ${CALENDAR_MONTH_CELL_BORDER_CLASS} ${getCalendarMonthDayColumnDividerClass(index % 7, 7)} ${
+                  className={`flex h-full min-h-0 cursor-pointer flex-col py-[5px] pl-[5px] pr-[5px] text-left ${CALENDAR_MONTH_CELL_BORDER_CLASS} ${getCalendarMonthDayColumnDividerClass(index % 7, 7)} ${
                     isDropTarget
                       ? "bg-blue-50 dark:bg-blue-950/30 dark:ring-blue-500"
                       : isSelected
@@ -1030,7 +1030,7 @@ export function CalendarMonthView({
                           ? CALENDAR_CURRENT_MONTH_DAY_NUMBER_CLASS
                           : isFollowingMonth
                             ? CALENDAR_FOLLOWING_MONTH_DAY_NUMBER_CLASS
-                            : "text-zinc-400"
+                            : "text-slate-350"
                     }`}
                   >
                     {!isCurrentMonth && day.getDate() === 1 ? (

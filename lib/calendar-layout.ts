@@ -240,7 +240,7 @@ export function getCalendarMonthDayColumnDividerClass(
     : "";
 }
 
-export const CALENDAR_MONTH_SELECTED_CELL_CLASS = "bg-[#fce2ff]";
+export const CALENDAR_MONTH_SELECTED_CELL_CLASS = "bg-[#f3f3f6]";
 
 export const CALENDAR_HOUR_COLUMN_DIVIDER_CLASS =
   "border-r border-zinc-200 dark:border-zinc-800";
@@ -285,7 +285,7 @@ export const CALENDAR_TODAY_DATE_CIRCLE_CLASS =
 
 /** Base month day number color (#b2b6bf) darkened by 15%. */
 export const CALENDAR_CURRENT_MONTH_DAY_NUMBER_CLASS =
-  "font-medium text-[#7a7b8d] dark:text-zinc-100";
+  "font-medium text-[#686C7A] dark:text-zinc-100";
 
 /** Outside-month day number color (#a1a1aa) brightened by 15%. */
 export const CALENDAR_FOLLOWING_MONTH_DAY_NUMBER_CLASS = "text-[#afafb7]";

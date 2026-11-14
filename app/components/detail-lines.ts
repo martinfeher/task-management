@@ -2138,8 +2138,14 @@ function prepareBlockImageWrapper(wrapper: HTMLElement) {
   wrapper.contentEditable = "false";
   wrapper.classList.add("detail-image-wrapper");
   wrapper.style.removeProperty("float");
-  wrapper.style.display = "block";
-  wrapper.style.clear = "both";
+  const inRow = wrapper.dataset.imageRow === "true";
+  wrapper.style.display = inRow ? "inline-block" : "block";
+  wrapper.style.clear = inRow ? "none" : "both";
+  if (inRow) {
+    wrapper.style.verticalAlign = "top";
+  } else {
+    wrapper.style.removeProperty("vertical-align");
+  }
   wrapper.style.removeProperty("margin-right");
 
   if (!wrapper.style.marginBottom) {
@@ -2327,12 +2333,99 @@ export function moveImageWrapperToLineSlot(
 
   if (sourceIsRemovable) {
     sourceLine.remove();
-  } else if (!sourceLine.firstChild) {
-    sourceLine.appendChild(document.createElement("br"));
+  } else {
+    if (!sourceLine.firstChild) {
+      sourceLine.appendChild(document.createElement("br"));
+    }
+    syncImageRowLayout(sourceLine);
   }
 
+  syncImageRowLayout(newLine);
   syncLineEmptyState(editor);
   placeCaretBelowWrapper(wrapper);
+  editor.focus();
+
+  return true;
+}
+
+export function getLineImageWrappers(line: HTMLElement) {
+  return Array.from(line.querySelectorAll(".detail-image-wrapper")).filter(
+    (element): element is HTMLElement => element instanceof HTMLElement,
+  );
+}
+
+/**
+ * Lines holding several images lay them out side by side (inline-block);
+ * a line with a single image falls back to the regular block layout.
+ */
+export function syncImageRowLayout(line: HTMLElement) {
+  const wrappers = getLineImageWrappers(line);
+  const isRow = wrappers.length > 1;
+
+  for (const wrapper of wrappers) {
+    if (isRow) {
+      wrapper.dataset.imageRow = "true";
+    } else {
+      delete wrapper.dataset.imageRow;
+    }
+    prepareBlockImageWrapper(wrapper);
+  }
+
+  if (isRow) {
+    const lastWrapper = wrappers[wrappers.length - 1];
+    const next = lastWrapper.nextSibling;
+    if (next && !(next instanceof HTMLBRElement)) {
+      lastWrapper.after(document.createElement("br"));
+    }
+  }
+}
+
+/**
+ * Moves an image into `line` next to the images already there, before
+ * `beforeWrapper` (or after the last image in the line when null).
+ */
+export function moveImageWrapperIntoImageRow(
+  editor: HTMLElement,
+  wrapper: HTMLElement,
+  line: HTMLElement,
+  beforeWrapper: HTMLElement | null,
+) {
+  const sourceLine = wrapper.closest(`.${DETAIL_LINE_CLASS}`);
+  if (!(sourceLine instanceof HTMLElement)) return false;
+
+  const rowWrappers = getLineImageWrappers(line).filter(
+    (element) => element !== wrapper,
+  );
+  if (rowWrappers.length === 0) return false;
+
+  wrapper.remove();
+  if (beforeWrapper) {
+    beforeWrapper.before(wrapper);
+  } else {
+    rowWrappers[rowWrappers.length - 1].after(wrapper);
+  }
+
+  if (sourceLine !== line) {
+    const sourceIsRemovable =
+      !sourceLine.querySelector(".detail-image-wrapper") &&
+      isLineEmpty(sourceLine) &&
+      !sourceLine.dataset.lineType;
+
+    if (sourceIsRemovable) {
+      sourceLine.remove();
+    } else {
+      if (!sourceLine.firstChild) {
+        sourceLine.appendChild(document.createElement("br"));
+      }
+      syncImageRowLayout(sourceLine);
+    }
+  }
+
+  syncImageRowLayout(line);
+  syncLineEmptyState(editor);
+
+  const lineWrappers = getLineImageWrappers(line);
+  placeCaretBelowWrapper(lineWrappers[lineWrappers.length - 1]);
   editor.focus();
 
   return true;
@@ -2461,6 +2554,8 @@ function normalizeImageLines(editor: HTMLElement) {
           );
         }
       }
+
+      syncImageRowLayout(line);
     }
   });
 }

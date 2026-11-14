@@ -262,11 +262,20 @@ function parseCodeContent(line: ParsedElement): TextNode[] {
   return decoded ? [{ type: "text", text: decoded }] : [];
 }
 
-function parseImageLine(line: ParsedElement): BlockNode | null {
-  const wrapper = line.querySelector(".detail-image-wrapper");
-  const img = (wrapper ?? line).querySelector("img");
-  if (!img) return null;
+function parseImageLine(line: ParsedElement): BlockNode[] {
+  const wrappers = line.querySelectorAll(".detail-image-wrapper");
+  const images =
+    wrappers.length > 0
+      ? wrappers.map((wrapper) => wrapper.querySelector("img"))
+      : [line.querySelector("img")];
 
+  return images.flatMap((img) => {
+    const block = img ? parseImage(img) : null;
+    return block ? [block] : [];
+  });
+}
+
+function parseImage(img: ParsedElement): BlockNode | null {
   const src = img.getAttribute("src");
   if (!src || !isSafeHref(src)) return null;
 
@@ -408,8 +417,7 @@ export function htmlToDoc(html: string): TaskDoc {
     const lineType = getLineType(line);
 
     if (line.querySelector(".detail-image-wrapper") || line.querySelector("img")) {
-      const imageBlock = parseImageLine(line);
-      if (imageBlock) blocks.push(imageBlock);
+      blocks.push(...parseImageLine(line));
       index += 1;
       continue;
     }

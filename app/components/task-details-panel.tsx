@@ -17,7 +17,13 @@ import { HiItalic } from "react-icons/hi2";
 import { VscChecklist } from "react-icons/vsc";
 import { renameTask, updateTaskDueDate, updateTaskDueTime, updateTaskRecurrence } from "@/app/actions/todo";
 import type { TaskRecurrenceRule } from "@/lib/task-recurrence";
-import type { TaskListItem } from "./todo-app";
+import type { TaskListItem, TodoList } from "./todo-app";
+import type { Label } from "./task-label-selector";
+import {
+  TaskRowContextMenu,
+  type TaskRowContextMenuView,
+} from "./task-row-context-menu";
+import { PiDotsThreeBold } from "react-icons/pi";
 import { serializeRecurrenceRule } from "@/lib/task-recurrence";
 import type { TaskReminderOptionId } from "@/lib/task-reminder";
 import {
@@ -35,6 +41,7 @@ import { formatShortDayMonthYear } from "@/lib/date-format";
 import {
   formatDueTimeLabel,
   formatDurationLabel,
+  normalizeDueTimeZone,
   type TaskDueTime,
 } from "@/lib/task-due-time";
 import {
@@ -273,6 +280,25 @@ function buildTaskDetailsFromSnapshot(
 
 export type TaskDetailsSaveController = {
   flushSave: () => Promise<void>;
+  hasCreateTitle?: () => boolean;
+};
+
+export type TaskDetailsNoteMenuProps = {
+  task: TaskListItem;
+  lists: TodoList[];
+  currentListId: string | null;
+  availableLabels: Label[];
+  hasMoveActions: boolean;
+  onSelectTaskPriority: (priority: number) => void | Promise<void>;
+  onClearTaskPriority: () => void | Promise<void>;
+  onToggleTaskLabel: (
+    labelId: string,
+    assigned: boolean,
+  ) => Promise<{ id: string }[] | void>;
+  onCreateLabel: (label: string, color: string) => Promise<void>;
+  onMoveTaskToList: (targetListId: string) => void | Promise<void>;
+  onDuplicateTask: () => void | Promise<void>;
+  onDeleteTask: () => void | Promise<void>;
 };
 
 type TaskDetailsPanelProps = {
@@ -337,7 +363,25 @@ type TaskDetailsPanelProps = {
     onNext?: () => void;
   } | null;
   onClose?: () => void;
+  noteMenu?: TaskDetailsNoteMenuProps | null;
 };
+
+const TASK_DETAILS_NOTE_MENU_WIDTH = 220;
+const TASK_DETAILS_NOTE_MENU_HEIGHT = 350;
+
+function computeTaskDetailsNoteMenuPosition(anchor: HTMLElement) {
+  const rect = anchor.getBoundingClientRect();
+  return {
+    x: Math.min(
+      Math.max(8, rect.right - TASK_DETAILS_NOTE_MENU_WIDTH),
+      window.innerWidth - TASK_DETAILS_NOTE_MENU_WIDTH - 8,
+    ),
+    y: Math.min(
+      Math.max(8, rect.bottom + 4),
+      window.innerHeight - TASK_DETAILS_NOTE_MENU_HEIGHT - 8,
+    ),
+  };
+}
 
 type SaveStatus = "idle" | "loading" | "pending" | "saved" | "error";
 
@@ -2099,6 +2143,7 @@ const FORMAT_MENU_VIEWPORT_PADDING = 8;
 const TASK_DETAILS_LINE_CONTROLS_GUTTER_PX = 30;
 
 const TASK_DETAILS_EDITOR_MIN_HEIGHT_PX = 500;
+const TASK_DETAILS_EDITOR_SHORT_CONTENT_MIN_HEIGHT_VH = 0.85;
 const TASK_DETAILS_EDITOR_MODAL_MIN_HEIGHT_PX = 88;
 const TASK_DETAILS_EDITOR_BOTTOM_INSET_PX = 30;
 const TASK_DETAILS_EDITOR_MODAL_MAX_HEIGHT_PX = 560;
@@ -2144,6 +2189,25 @@ function getModalEditorChromeHeightPx(
     chromeOriginTop +
     getEditorReservedBelowSpacePx(editor, panel, true)
   );
+}
+
+function getEditorMinHeightPx(
+  contentHeight: number,
+  maxHeight: number,
+  isModalLayout: boolean,
+) {
+  if (isModalLayout) {
+    return TASK_DETAILS_EDITOR_MODAL_MIN_HEIGHT_PX;
+  }
+
+  if (contentHeight > TASK_DETAILS_EDITOR_MIN_HEIGHT_PX) {
+    return TASK_DETAILS_EDITOR_MIN_HEIGHT_PX;
+  }
+
+  const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+  const screenMinHeight = viewportHeight * TASK_DETAILS_EDITOR_SHORT_CONTENT_MIN_HEIGHT_VH;
+
+  return Math.min(screenMinHeight, maxHeight);
 }
 
 function getEditorMaxHeightPx(
@@ -2284,9 +2348,11 @@ export function TaskDetailsPanel({
   hideModalFormatToggle = false,
   modalTaskNavigation = null,
   onClose,
+  noteMenu = null,
 }: TaskDetailsPanelProps) {
   const isModalLayout = layout === "modal";
   const [task, setTask] = useState<TaskDetails | null>(null);
+  const [modalCreateHasTitle, setModalCreateHasTitle] = useState(false);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [showClipboardNotice, setShowClipboardNotice] = useState(false);
   const [clipboardNoticeMessage, setClipboardNoticeMessage] = useState("Clipboard");
@@ -2326,6 +2392,22 @@ export function TaskDetailsPanel({
   const [canRedo, setCanRedo] = useState(false);
   const [undoActionLabel, setUndoActionLabel] = useState<string | null>(null);
   const [redoActionLabel, setRedoActionLabel] = useState<string | null>(null);
+  const [noteMenuView, setNoteMenuView] = useState<TaskRowContextMenuView | null>(
+    null,
+  );
+  const [noteMenuPosition, setNoteMenuPosition] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+  const [noteMenuMoveQuery, setNoteMenuMoveQuery] = useState("");
+  const [noteMenuLabelQuery, setNoteMenuLabelQuery] = useState("");
+  const [noteMenuAssignedLabelIds, setNoteMenuAssignedLabelIds] = useState<
+    string[]
+  >([]);
+  const [isNoteMenuLabelSubmitting, setIsNoteMenuLabelSubmitting] =
+    useState(false);
+  const noteMenuButtonRef = useRef<HTMLButtonElement>(null);
+  const noteMenuRef = useRef<HTMLDivElement>(null);
   const [openFormatDropdown, setOpenFormatDropdown] =
     useState<FormatToolbarDropdown | null>(null);
   const [openHeaderFormatDropdown, setOpenHeaderFormatDropdown] =
@@ -2377,6 +2459,7 @@ export function TaskDetailsPanel({
   const handledFocusNoteAtEndRequestRef = useRef(0);
   const handledFocusTaskTitleRequestRef = useRef(0);
   const pendingFocusTaskTitleRequestRef = useRef(0);
+  const pendingFocusNoteAtEndRequestRef = useRef(0);
   const panelRef = useRef<HTMLElement>(null);
   const editorWrapperRef = useRef<HTMLDivElement>(null);
   const suppressImageLightboxClickRef = useRef(false);
@@ -2712,6 +2795,9 @@ export function TaskDetailsPanel({
     if (!currentTaskId || !editor || !isReadyRef.current) return;
 
     const title = getEditorTitle(editor);
+    if (modalCreateAction) {
+      setModalCreateHasTitle(Boolean(title));
+    }
     if (!title || title === syncedTitleRef.current) return;
 
     syncedTitleRef.current = title;
@@ -2727,7 +2813,7 @@ export function TaskDetailsPanel({
       titleSyncTimerRef.current = null;
       onTaskRenamed(currentTaskId, title);
     }, TITLE_SYNC_DEBOUNCE_MS);
-  }, [onTaskRenamed]);
+  }, [modalCreateAction, onTaskRenamed]);
 
   const syncExternalTaskName = useCallback(
     (name: string) => {
@@ -3194,15 +3280,36 @@ export function TaskDetailsPanel({
     waitForSaveIdle,
   ]);
 
+  const hasCreateTitle = useCallback(() => {
+    const editor = editorRef.current;
+    return Boolean(editor && getEditorTitle(editor));
+  }, []);
+
+  useEffect(() => {
+    if (!modalCreateAction) {
+      setModalCreateHasTitle(false);
+      return;
+    }
+
+    if (isReadyRef.current && editorRef.current) {
+      setModalCreateHasTitle(hasCreateTitle());
+    } else {
+      setModalCreateHasTitle(false);
+    }
+  }, [hasCreateTitle, modalCreateAction, taskId]);
+
   useEffect(() => {
     if (!registerSaveController) return;
 
-    registerSaveController({ flushSave });
+    registerSaveController({
+      flushSave,
+      ...(modalCreateAction ? { hasCreateTitle } : {}),
+    });
 
     return () => {
       registerSaveController(null);
     };
-  }, [flushSave, registerSaveController]);
+  }, [flushSave, hasCreateTitle, modalCreateAction, registerSaveController]);
 
   const updateLineControls = useCallback(() => {
     const editor = editorRef.current;
@@ -3353,9 +3460,11 @@ export function TaskDetailsPanel({
       editor.style.height = "auto";
       const contentHeight = editor.scrollHeight;
       const maxHeight = getEditorMaxHeightPx(editor, panel, isModalLayout);
-      const minEditorHeight = isModalLayout
-        ? TASK_DETAILS_EDITOR_MODAL_MIN_HEIGHT_PX
-        : TASK_DETAILS_EDITOR_MIN_HEIGHT_PX;
+      const minEditorHeight = getEditorMinHeightPx(
+        contentHeight,
+        maxHeight,
+        isModalLayout,
+      );
       let nextHeight = Math.max(
         minEditorHeight,
         Math.min(contentHeight, maxHeight),
@@ -3414,6 +3523,31 @@ export function TaskDetailsPanel({
       });
     },
     [syncEditorHeight],
+  );
+
+  const applyFocusNoteAtEndIfReady = useCallback(
+    (requestId: number) => {
+      if (!requestId) return false;
+      if (requestId === handledFocusNoteAtEndRequestRef.current) return true;
+      if (!isReadyRef.current || !editorRef.current || !taskId) return false;
+      if (hydratedTaskIdRef.current !== taskId) return false;
+
+      handledFocusNoteAtEndRequestRef.current = requestId;
+      pendingFocusNoteAtEndRequestRef.current = 0;
+
+      requestAnimationFrame(() => {
+        const editor = editorRef.current;
+        if (!editor) return;
+
+        focusNoteAtEnd(editor);
+        updateLineControls();
+        if (isModalLayout) {
+          scheduleEditorHeightSync({ scrollActiveLineIntoView: true });
+        }
+      });
+      return true;
+    },
+    [isModalLayout, scheduleEditorHeightSync, taskId, updateLineControls],
   );
 
   function beginEditorPointerInteraction() {
@@ -5090,6 +5224,9 @@ export function TaskDetailsPanel({
     hydratedTaskIdRef.current = task.id;
     editor.scrollTop = 0;
     resetHistory(readEditorContent());
+    if (modalCreateAction) {
+      setModalCreateHasTitle(Boolean(getEditorTitle(editor)));
+    }
 
     requestAnimationFrame(() => {
       updateLineControls();
@@ -5098,8 +5235,18 @@ export function TaskDetailsPanel({
       if (task.isNote) {
         syncFormatMenuFontState();
       }
+      const pendingNoteFocusRequest = pendingFocusNoteAtEndRequestRef.current;
+      if (pendingNoteFocusRequest) {
+        applyFocusNoteAtEndIfReady(pendingNoteFocusRequest);
+      } else if (isModalLayout && focusNoteAtEndRequest) {
+        applyFocusNoteAtEndIfReady(focusNoteAtEndRequest);
+      }
     });
   }, [
+    applyFocusNoteAtEndIfReady,
+    focusNoteAtEndRequest,
+    isModalLayout,
+    modalCreateAction,
     readEditorContent,
     resetHistory,
     syncEditorHeight,
@@ -5163,22 +5310,10 @@ export function TaskDetailsPanel({
 
   useEffect(() => {
     if (!focusNoteAtEndRequest) return;
-    if (focusNoteAtEndRequest === handledFocusNoteAtEndRequestRef.current) {
-      return;
+    if (!applyFocusNoteAtEndIfReady(focusNoteAtEndRequest)) {
+      pendingFocusNoteAtEndRequestRef.current = focusNoteAtEndRequest;
     }
-    if (!isReadyRef.current || !editorRef.current || !taskId) return;
-    if (hydratedTaskIdRef.current !== taskId) return;
-
-    handledFocusNoteAtEndRequestRef.current = focusNoteAtEndRequest;
-
-    requestAnimationFrame(() => {
-      const editor = editorRef.current;
-      if (!editor) return;
-
-      focusNoteAtEnd(editor);
-      updateLineControls();
-    });
-  }, [focusNoteAtEndRequest, task?.id, taskId, updateLineControls]);
+  }, [applyFocusNoteAtEndIfReady, focusNoteAtEndRequest, task?.id]);
 
   useEffect(() => {
     if (!taskId || !taskSnapshot || !isReadyRef.current) return;
@@ -7196,6 +7331,12 @@ export function TaskDetailsPanel({
     });
   }
 
+  function getTaskTitleForImageLightbox() {
+    const editor = editorRef.current;
+    const editorTitle = editor ? getEditorTitle(editor).trim() : "";
+    return editorTitle || task?.name?.trim() || "";
+  }
+
   function handleImageLightboxCrop() {
     const current = imageLightbox?.items[imageLightbox.index];
     if (!current || !isCroppableImageSrc(current.src)) return;
@@ -7497,6 +7638,73 @@ export function TaskDetailsPanel({
     });
   }
 
+  async function handleClearDueDateAndTime() {
+    if (!task) return;
+
+    try {
+      const updated = await updateTaskDueDate(task.id, null);
+      let dueTimeMinutes = updated.dueTimeMinutes;
+      let dueDurationMinutes = updated.dueDurationMinutes;
+      let dueTimeZone = normalizeDueTimeZone(updated.dueTimeZone);
+
+      if (dueTimeMinutes !== null) {
+        const timeUpdated = await updateTaskDueTime(task.id, {
+          dueTimeMinutes: null,
+          dueDurationMinutes: null,
+          dueTimeZone: "floating",
+        });
+        dueTimeMinutes = timeUpdated.dueTimeMinutes;
+        dueDurationMinutes = timeUpdated.dueDurationMinutes;
+        dueTimeZone = normalizeDueTimeZone(timeUpdated.dueTimeZone);
+      }
+
+      if (task.recurrenceRule) {
+        await handleSaveRecurrence(null);
+      } else {
+        onRecurrenceUpdated?.(task.id, null);
+      }
+
+      setTask((current) => {
+        if (!current) return current;
+
+        taskDetailsCache.set(task.id, {
+          id: task.id,
+          name: current.name,
+          completed: current.completed,
+          isNote: current.isNote,
+          details: savedDetailsRef.current,
+          dueDate: null,
+          dueTimeMinutes,
+          dueDurationMinutes,
+          dueTimeZone,
+          recurrenceRule: null,
+        });
+
+        return {
+          ...current,
+          dueDate: null,
+          dueTimeMinutes,
+          dueDurationMinutes,
+          dueTimeZone,
+          recurrenceRule: null,
+        };
+      });
+
+      onDueDateUpdated(task.id, null, {
+        dueTimeMinutes,
+        dueDurationMinutes,
+        dueTimeZone,
+      });
+      taskReminderByIdRef.current.delete(task.id);
+      setTaskReminderOptionId(null);
+      clearDateMenuCloseTimer();
+      setIsDateMenuOpen(false);
+      setMetadataError(null);
+    } catch {
+      setMetadataError("Could not clear the date and time.");
+    }
+  }
+
   async function handleSelectDueDate(dateValue: string | null) {
     if (!task) return;
 
@@ -7623,9 +7831,145 @@ export function TaskDetailsPanel({
     isModalLayout &&
     Boolean(task && !task.isNote) &&
     !hideModalFormatToggle;
-  const showTaskDatePickerHeader = Boolean(
-    task && (!task.isNote || isModalLayout),
+  const showTaskDatePickerHeader = Boolean(task);
+  const showNoteActionsMenu = Boolean(
+    !isModalLayout &&
+      task?.isNote &&
+      noteMenu &&
+      noteMenu.task.id === task.id,
   );
+
+  const closeNoteActionsMenu = useCallback(() => {
+    setNoteMenuView(null);
+    setNoteMenuPosition(null);
+    setNoteMenuMoveQuery("");
+    setNoteMenuLabelQuery("");
+    setIsNoteMenuLabelSubmitting(false);
+  }, []);
+
+  const toggleNoteActionsMenu = useCallback(() => {
+    const button = noteMenuButtonRef.current;
+    if (!button || !noteMenu) return;
+
+    if (noteMenuView !== null) {
+      closeNoteActionsMenu();
+      return;
+    }
+
+    setNoteMenuAssignedLabelIds(noteMenu.task.labels.map((label) => label.id));
+    setNoteMenuMoveQuery("");
+    setNoteMenuLabelQuery("");
+    setNoteMenuPosition(computeTaskDetailsNoteMenuPosition(button));
+    setNoteMenuView("main");
+  }, [closeNoteActionsMenu, noteMenu, noteMenuView]);
+
+  const handleNoteMenuToggleLabel = useCallback(
+    async (labelId: string) => {
+      if (!noteMenu) return;
+
+      let nextAssigned = false;
+      setNoteMenuAssignedLabelIds((current) => {
+        const isAssigned = current.includes(labelId);
+        nextAssigned = !isAssigned;
+        return isAssigned
+          ? current.filter((id) => id !== labelId)
+          : [...current, labelId];
+      });
+      setIsNoteMenuLabelSubmitting(true);
+
+      try {
+        const updatedTags = await noteMenu.onToggleTaskLabel(
+          labelId,
+          nextAssigned,
+        );
+        if (updatedTags) {
+          setNoteMenuAssignedLabelIds(updatedTags.map((tag) => tag.id));
+        }
+      } catch {
+        setNoteMenuAssignedLabelIds((current) =>
+          nextAssigned
+            ? current.filter((id) => id !== labelId)
+            : current.includes(labelId)
+              ? current
+              : [...current, labelId],
+        );
+      } finally {
+        setIsNoteMenuLabelSubmitting(false);
+      }
+    },
+    [noteMenu],
+  );
+
+  const handleNoteMenuCreateLabel = useCallback(
+    async (label: string, color: string) => {
+      if (!noteMenu) return;
+
+      setIsNoteMenuLabelSubmitting(true);
+      try {
+        await noteMenu.onCreateLabel(label, color);
+        setNoteMenuLabelQuery("");
+      } catch {
+        return;
+      } finally {
+        setIsNoteMenuLabelSubmitting(false);
+      }
+    },
+    [noteMenu],
+  );
+
+  useEffect(() => {
+    closeNoteActionsMenu();
+  }, [taskId, closeNoteActionsMenu]);
+
+  useEffect(() => {
+    if (!showNoteActionsMenu || noteMenuView === null) return;
+
+    function handlePointerDown(event: MouseEvent) {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (noteMenuRef.current?.contains(target)) return;
+      if (noteMenuButtonRef.current?.contains(target)) return;
+      closeNoteActionsMenu();
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        closeNoteActionsMenu();
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerDown, true);
+    document.addEventListener("keydown", handleKeyDown, true);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown, true);
+      document.removeEventListener("keydown", handleKeyDown, true);
+    };
+  }, [closeNoteActionsMenu, noteMenuView, showNoteActionsMenu]);
+
+  useEffect(() => {
+    if (!showNoteActionsMenu || noteMenuView === null) return;
+
+    function updateNoteMenuPosition() {
+      const button = noteMenuButtonRef.current;
+      if (!button) return;
+      setNoteMenuPosition(computeTaskDetailsNoteMenuPosition(button));
+    }
+
+    window.addEventListener("resize", updateNoteMenuPosition);
+    window.visualViewport?.addEventListener("resize", updateNoteMenuPosition);
+  return () => {
+      window.removeEventListener("resize", updateNoteMenuPosition);
+      window.visualViewport?.removeEventListener(
+        "resize",
+        updateNoteMenuPosition,
+      );
+    };
+  }, [noteMenuView, showNoteActionsMenu]);
+
+  useEffect(() => {
+    if (!noteMenu || noteMenuView === null) return;
+    setNoteMenuAssignedLabelIds(noteMenu.task.labels.map((label) => label.id));
+  }, [noteMenu, noteMenu?.task.labels, noteMenuView]);
 
   function renderModalTaskNavigationButtons() {
     if (!isModalLayout || !modalTaskNavigation) return null;
@@ -7654,7 +7998,7 @@ export function TaskDetailsPanel({
     }
 
     return (
-      <div className="ml-1 flex items-center">
+      <div className="flex items-center gap-0.5">
         <div
           className="group/prev-task relative"
           onPointerEnter={(event) => {
@@ -7918,16 +8262,19 @@ export function TaskDetailsPanel({
           </>
         ) : null}
 
-        {onClose ? (
-          <button
-            type="button"
-            aria-label="Close task editor"
-            onClick={() => void onClose()}
-            className={`flex size-[29px] -mt-[2px] -mr-[2px] cursor-pointer items-center justify-center rounded-full text-zinc-500 transition-colors bg-zinc-200/30 hover:text-zinc-600 dark:text-zinc-400 dark:hover:text-zinc-100 ${TASK_DETAILS_HEADER_ICON_HOVER_CLASS}`}
-          >
-            <LuX className="size-[15px]" aria-hidden="true" />
-          </button>
-        ) : null}
+        <div className="flex items-center gap-1">
+          {renderModalTaskNavigationButtons()}
+          {onClose ? (
+            <button
+              type="button"
+              aria-label="Close task editor"
+              onClick={() => void onClose()}
+              className={`flex size-[29px] -mt-[2px] -mr-[2px] cursor-pointer items-center justify-center rounded-full text-zinc-500 transition-colors bg-zinc-200/30 hover:text-zinc-600 dark:text-zinc-400 dark:hover:text-zinc-100 ${TASK_DETAILS_HEADER_ICON_HOVER_CLASS}`}
+            >
+              <LuX className="size-[15px]" aria-hidden="true" />
+            </button>
+          ) : null}
+        </div>
       </div>
     );
   }
@@ -7965,6 +8312,7 @@ export function TaskDetailsPanel({
           recurrenceRule={task.recurrenceRule}
           reminderOptionId={taskReminderOptionId}
           onSelectDate={(dateValue) => void handleSelectDueDate(dateValue)}
+          onClearDateAndTime={() => void handleClearDueDateAndTime()}
           onSaveDueTime={(dueTime, options) =>
             void handleSaveDueTime(dueTime, options)
           }
@@ -8014,9 +8362,7 @@ export function TaskDetailsPanel({
       >
         {renderModalHeaderActions()}
         <div
-          className={`relative flex shrink-0 ${
-            task?.isNote && !isModalLayout ? "h-[41px]" : "h-[47px]"
-          } items-center justify-between overflow-visible ml-[6px] px-2.5 pt-[8px] pb-[8px] ${
+          className={`relative flex shrink-0 h-[47px] items-center justify-between overflow-visible ml-[6px] px-2.5 pt-[8px] pb-[8px] ${
             isModalLayout
               ? isModalFormatToolbarOpen
                 ? "pr-[22rem]"
@@ -8119,7 +8465,7 @@ export function TaskDetailsPanel({
                             <div
                               className={
                                 isModalLayout
-                                  ? "font-normal text-[#9f9f9f] text-[7px] leading-[7px] pt-[2px]!"
+                                  ? "font-normal text-[#9f9f9f] text-[7.5px] leading-[7.5px] pt-[2px]!"
                                   : "absolute -bottom-[6.5px] right-[2px] font-normal text-[#9f9f9f] text-[8px] leading-tight border border-[#e6e6e6]"
                               }
                             >
@@ -8136,12 +8482,6 @@ export function TaskDetailsPanel({
                   </div>
                   <span className="text-[#cfcfcf] ml-2">|</span>
                 </>
-              ) : null}
-              {renderModalTaskNavigationButtons()}
-              {isModalLayout && modalTaskNavigation ? (
-                <span className="ml-1 text-[#cfcfcf]" aria-hidden="true">
-                  |
-                </span>
               ) : null}
               <div
                 ref={headerFormatActionsRef}
@@ -8220,7 +8560,7 @@ export function TaskDetailsPanel({
                   </span>
               </div>
                 {renderHeaderQuickFormatButtons()}
-                <span className="text-[#cacaca]" aria-hidden="true">
+                <span className="text-[#cacaca] px-1" aria-hidden="true">
                   |
                 </span>
                 <div
@@ -8253,9 +8593,9 @@ export function TaskDetailsPanel({
                   />
                   {showHeaderClearFormatting ? (
                     <>
-                      <span className="text-[#cacaca]" aria-hidden="true">
+                      <div className="text-[#cacaca]" aria-hidden="true">
                         |
-                      </span>
+                      </div>
                       <div className="group/clear-format relative">
                         <button
                           type="button"
@@ -8305,23 +8645,39 @@ export function TaskDetailsPanel({
               </button>
             ) : null}
             {!isModalLayout ? (
-              <div className="group/history relative mr-3">
-                <button
-                  type="button"
-                  aria-label="Version history"
-                  aria-describedby="task-details-history-tooltip"
-                  onClick={() => setIsVersionHistoryOpen(true)}
-                  className={`flex h-10 min-w-[2.25rem] cursor-pointer items-center justify-center rounded-full px-1 text-slate-400 transition-colors hover:text-zinc-600 dark:text-zinc-400 dark:hover:text-zinc-100 ${TASK_DETAILS_HEADER_ICON_HOVER_CLASS}`}
-                >
-                  <LuHistory className="size-[16px] text-[#b6b6b6]" />
-                </button>
-                <span
-                  id="task-details-history-tooltip"
-                  role="tooltip"
-                  className={TASK_DETAILS_TOOLTIP_CLASS}
-                >
-                  Version history
-                </span>
+              <div className="mr-1 flex shrink-0 items-center gap-0.5">
+                <div className="group/history relative">
+                  <button
+                    type="button"
+                    aria-label="Version history"
+                    aria-describedby="task-details-history-tooltip"
+                    onClick={() => setIsVersionHistoryOpen(true)}
+                    className={`flex h-10 min-w-[2.25rem] cursor-pointer items-center justify-center rounded-full px-1 text-slate-400 transition-colors hover:text-zinc-600 dark:text-zinc-400 dark:hover:text-zinc-100 ${TASK_DETAILS_HEADER_ICON_HOVER_CLASS}`}
+                  >
+                    <LuHistory className="size-[16px] text-[#b6b6b6]" />
+                  </button>
+                  <span
+                    id="task-details-history-tooltip"
+                    role="tooltip"
+                    className={TASK_DETAILS_TOOLTIP_CLASS}
+                  >
+                    Version history
+                  </span>
+                </div>
+                {showNoteActionsMenu && noteMenu ? (
+                  <button
+                    ref={noteMenuButtonRef}
+                    type="button"
+                    aria-label={`Open menu for ${noteMenu.task.name}`}
+                    aria-haspopup="menu"
+                    aria-expanded={noteMenuView !== null}
+                    title="More options"
+                    onClick={toggleNoteActionsMenu}
+                    className={`flex size-[34px] shrink-0 cursor-pointer items-center justify-center rounded-full text-[#8a8a8a] transition-colors hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-100 ${TASK_DETAILS_HEADER_ICON_HOVER_CLASS}`}
+                  >
+                    <PiDotsThreeBold className="size-[18px]" />
+                  </button>
+                ) : null}
               </div>
             ) : null}
           </div>
@@ -8384,7 +8740,7 @@ export function TaskDetailsPanel({
               className={`task-details-editor w-full resize-none rounded-xl pt-[8px] pl-[25px] pr-3 pb-4! text-[#555555] outline-none transition-colors focus:border-[#7f7f7f] dark:text-zinc-300 [&_.detail-line[data-line-type=bullet]]:pl-1 [&_.detail-line[data-line-type=checklist]]:cursor-pointer [&_.detail-line[data-line-type=checklist]]:pl-1 [&_.detail-line[data-line-type=h1]]:text-[26px] [&_.detail-line[data-line-type=h1]]:font-bold [&_.detail-line[data-line-type=h1]]:leading-[36px] [&_.detail-line[data-line-type=h1]]:text-[#4B4B4B] dark:[&_.detail-line[data-line-type=h1]]:text-[#F5F5F5] [&_.detail-line[data-line-type=h2]]:text-[23px] [&_.detail-line[data-line-type=h2]]:font-semibold [&_.detail-line[data-line-type=h2]]:leading-[30px] [&_.detail-line[data-line-type=h3]]:text-[19px] [&_.detail-line[data-line-type=h3]]:font-semibold [&_.detail-line[data-line-type=h3]]:leading-[26px] [&_.detail-line[data-line-type=numbered]]:pl-1 [&_mark]:bg-yellow-200 dark:[&_mark]:bg-yellow-300/30 [&_s]:line-through [&_strike]:line-through [&_u]:underline ${
                 isModalLayout
                   ? "min-h-0 shrink-0 overflow-hidden"
-                  : "min-h-[500px] overflow-auto"
+                  : "min-h-0 overflow-auto"
               }`}
             />
 
@@ -8926,10 +9282,14 @@ export function TaskDetailsPanel({
                 type="button"
                 disabled={
                   modalCreateAction.disabled === true ||
-                  saveStatus === "loading"
+                  saveStatus === "loading" ||
+                  !modalCreateHasTitle
                 }
-                onClick={() => void modalCreateAction.onClick()}
-                className="rounded-[12px] bg-[#6387cf] px-3.5 py-1.5 cursor-pointer text-[13px] font-medium text-white transition-colors hover:bg-[#3f68bd] disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={() => {
+                  if (!modalCreateHasTitle) return;
+                  void modalCreateAction.onClick();
+                }}
+                className="rounded-full bg-[#688bd0] px-3.5 py-1.5 cursor-pointer text-[13px] font-medium text-white transition-colors hover:bg-[#3f68bd] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {modalCreateAction.label}
               </button>
@@ -9007,6 +9367,11 @@ export function TaskDetailsPanel({
           alt={imageLightbox.items[imageLightbox.index].alt}
           imageIndex={imageLightbox.index}
           imageCount={imageLightbox.items.length}
+          taskTitle={
+            imageLightbox.items.length > 1
+              ? getTaskTitleForImageLightbox()
+              : undefined
+          }
           hasPrevious={imageLightbox.index > 0}
           hasNext={imageLightbox.index < imageLightbox.items.length - 1}
           onPrevious={() => stepImageLightbox(-1)}
@@ -9036,6 +9401,72 @@ export function TaskDetailsPanel({
         onConfirm={confirmPendingImageDelete}
         onCancel={() => setImageDeleteConfirm(null)}
       />
+      {showNoteActionsMenu &&
+      noteMenu &&
+      noteMenuView &&
+      noteMenuPosition &&
+      typeof document !== "undefined"
+        ? createPortal(
+            <div ref={noteMenuRef} className="z-[10080]">
+              <TaskRowContextMenu
+                task={noteMenu.task}
+                view={noteMenuView}
+                lists={noteMenu.lists}
+                currentListId={noteMenu.currentListId}
+                moveQuery={noteMenuMoveQuery}
+                availableLabels={noteMenu.availableLabels}
+                assignedLabelIds={noteMenuAssignedLabelIds}
+                labelQuery={noteMenuLabelQuery}
+                isLabelSubmitting={isNoteMenuLabelSubmitting}
+                fixedPosition={noteMenuPosition}
+                onMoveQueryChange={setNoteMenuMoveQuery}
+                onLabelQueryChange={setNoteMenuLabelQuery}
+                onToggleLabelSelection={handleNoteMenuToggleLabel}
+                onCreateLabel={handleNoteMenuCreateLabel}
+                onClose={closeNoteActionsMenu}
+                onToggleTaskImportant={() => {}}
+                onOpenLabelMenu={() => setNoteMenuView("label")}
+                onOpenMoveMenu={() => setNoteMenuView("moveTo")}
+                onMoveTaskToList={(targetListId) => {
+                  void noteMenu.onMoveTaskToList(targetListId);
+                  closeNoteActionsMenu();
+                }}
+                onSetTaskDueDate={() => {}}
+                onClearTaskDueDate={() => {}}
+                onOpenCustomDatePicker={() => {}}
+                onSelectTaskPriority={(priority) => {
+                  void noteMenu.onSelectTaskPriority(priority);
+                  closeNoteActionsMenu();
+                }}
+                onClearTaskPriority={() => {
+                  void noteMenu.onClearTaskPriority();
+                  closeNoteActionsMenu();
+                }}
+                onConvertTaskToNote={() => {}}
+                onAddSubtask={() => {}}
+                onDuplicateTask={() => {
+                  void noteMenu.onDuplicateTask();
+                  closeNoteActionsMenu();
+                }}
+                onDeleteTask={() => {
+                  void noteMenu.onDeleteTask();
+                  closeNoteActionsMenu();
+                }}
+                hasDueDateActions={false}
+                hasPriorityActions
+                hasNoteActions={false}
+                hasImportantActions={false}
+                hasLabelActions
+                hasMoveActions={noteMenu.hasMoveActions}
+                hasSubtaskActions={false}
+                hasDuplicateActions
+                hasDeleteActions
+                dateShortcutVariant="full"
+              />
+            </div>,
+            document.body,
+          )
+        : null}
     </section>
   );
 }
