@@ -2,6 +2,7 @@
 
 import { useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { createPortal } from "react-dom";
+import { useIsTaskRestoredForFade } from "@/lib/task-restore-fade";
 import { InteractIcon } from "./line-control-icons";
 import { TaskSetDateIcon } from "./task-set-date-icon";
 import {
@@ -414,6 +415,7 @@ export function TaskListTaskRow({
   onToggleSubtasksExpanded,
   showSubtaskCollapseToggle = false,
 }: TaskListTaskRowProps) {
+  const isRestoredForFade = useIsTaskRestoredForFade(task.id);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const [reminderOptionId, setReminderOptionId] =
     useState<TaskReminderOptionId | null>(null);
@@ -659,6 +661,8 @@ export function TaskListTaskRow({
             : "task-row-completing task-row-completing-no-bg"
           : "cursor-pointer"
       } ${showDragHandle && !isCompleting ? "touch-none" : ""} ${
+        isRestoredForFade ? "task-row-restore-fade-in" : ""
+      } ${
         isCompleting
           ? ""
           : isSelected

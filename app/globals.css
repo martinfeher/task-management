@@ -2779,6 +2779,27 @@ body {
   border-color: #fff;
 }
 
+/* Task row re-created after undoing "Task completed": simple fade-in */
+.task-row-restore-fade-in {
+  animation: task-row-restore-fade-in 450ms ease-out both;
+}
+
+@keyframes task-row-restore-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .task-row-restore-fade-in {
+    animation: none;
+  }
+}
+
 /* Task row completion: purple flash → rainbow sweep → light green settle */
 .task-row-completing {
   position: relative;

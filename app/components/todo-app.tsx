@@ -51,6 +51,7 @@ import {
 import type { TaskParentUpdate } from "@/app/actions/todo";
 import { normalizeDueTimeZone, type TaskDueTime } from "@/lib/task-due-time";
 import type { ToggleTaskOptions } from "@/lib/toggle-task-options";
+import { markTaskRestoredForFade } from "@/lib/task-restore-fade";
 import type { TaskRecurrenceRule } from "@/lib/task-recurrence";
 import {
   getRecurrenceUndoMessage,
@@ -1564,6 +1565,7 @@ export function TodoApp({
     if (task?.completed) {
       await toggleTaskInDb(taskId, false);
 
+      markTaskRestoredForFade(taskId);
       setTasksByList((current) => ({
         ...current,
         [listId]: (current[listId] ?? []).map((item) =>
