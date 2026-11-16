@@ -26,7 +26,9 @@ export function useCalendarTimedGridScrollSession(
   scrollRef: RefObject<HTMLElement | null>,
   view: CalendarViewTab,
   ready: boolean,
+  options?: { restoreScroll?: boolean },
 ) {
+  const restoreScroll = options?.restoreScroll !== false;
   const restoredRef = useRef(false);
   const saveTimerRef = useRef<number | null>(null);
 
@@ -38,10 +40,10 @@ export function useCalendarTimedGridScrollSession(
 
     const savedScrollTop = readStoredCalendarTimedGridScrollTop(view);
     restoredRef.current = true;
-    if (savedScrollTop !== null) {
+    if (restoreScroll && savedScrollTop !== null) {
       el.scrollTop = savedScrollTop;
     }
-  }, [ready, scrollRef, view]);
+  }, [ready, restoreScroll, scrollRef, view]);
 
   useEffect(() => {
     if (!ready) return;

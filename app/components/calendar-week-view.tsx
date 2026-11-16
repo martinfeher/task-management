@@ -39,6 +39,7 @@ import {
   calendarHourLabelClassName,
   shouldShowCalendarHourLabel,
   getCalendarDayColumnDividerClass,
+  getCalendarMultiWeekRangeStart,
   getCalendarWeekStart,
   getCalendarWeekdayLabel,
   CALENDAR_TODAY_DATE_CIRCLE_CLASS,
@@ -338,6 +339,7 @@ export function CalendarWeekView({
     timeScrollRef,
     timedGridScrollView,
     isTimedGridReady,
+    { restoreScroll: visibleWeekCount <= 1 },
   );
   const [nowLineTop, setNowLineTop] = useState<number | null>(null);
 
@@ -375,7 +377,9 @@ export function CalendarWeekView({
         ? startOfDay(sidebarFocusDate)
         : current;
     setToday(current);
-    setWeekStart(getWeekStart(focusDay));
+    setWeekStart(
+      getCalendarMultiWeekRangeStart(visibleWeekCount, current, focusDay),
+    );
     setNow(new Date());
   }, []);
 
@@ -404,8 +408,10 @@ export function CalendarWeekView({
     }
 
     lastSidebarJumpRequestIdRef.current = sidebarJumpRequestId;
-    setWeekStart(getWeekStart(sidebarFocusDate));
-  }, [sidebarFocusDate, sidebarJumpRequestId]);
+    if (visibleWeekCount <= 1) {
+      setWeekStart(getWeekStart(sidebarFocusDate));
+    }
+  }, [sidebarFocusDate, sidebarJumpRequestId, visibleWeekCount]);
 
   const visibleWeeks = useMemo(
     () => (weekStart ? getVisibleWeeks(weekStart, visibleWeekCount) : []),

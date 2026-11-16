@@ -39,6 +39,19 @@ export function getCalendarWeekStart(date: Date) {
   );
 }
 
+/** Multi-week grids show weeks forward from the week that contains `today`. */
+export function getCalendarMultiWeekRangeStart(
+  weekCount: number,
+  today: Date,
+  focusDate: Date,
+): Date {
+  if (weekCount <= 1) {
+    return getCalendarWeekStart(focusDate);
+  }
+
+  return getCalendarWeekStart(today);
+}
+
 export function getCalendarWeekdayLabel(
   date: Date,
   labels: readonly string[] = CALENDAR_WEEKDAY_LABELS,

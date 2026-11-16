@@ -22,6 +22,7 @@ import {
   calendarTaskItemClassName,
   getCalendarTaskItemStyle,
   isCalendarTaskPast,
+  getCalendarMultiWeekRangeStart,
   getCalendarWeekStart,
   CALENDAR_TODAY_DATE_CIRCLE_CLASS,
   CALENDAR_GRID_SCROLL_CLASS,
@@ -225,8 +226,12 @@ export function CalendarMultiWeekView({
 
   useEffect(() => {
     const current = startOfDay(new Date());
+    const focusDay =
+      sidebarFocusDate !== undefined
+        ? startOfDay(sidebarFocusDate)
+        : current;
     setToday(current);
-    setRangeStart(getWeekStart(current));
+    setRangeStart(getCalendarMultiWeekRangeStart(weekCount, current, focusDay));
     setNow(new Date());
   }, []);
 
@@ -258,8 +263,10 @@ export function CalendarMultiWeekView({
     }
 
     lastSidebarJumpRequestIdRef.current = sidebarJumpRequestId;
-    setRangeStart(getWeekStart(sidebarFocusDate));
-  }, [sidebarFocusDate, sidebarJumpRequestId]);
+    if (weekCount <= 1) {
+      setRangeStart(getWeekStart(sidebarFocusDate));
+    }
+  }, [sidebarFocusDate, sidebarJumpRequestId, weekCount]);
 
   const calendarRange = useMemo(
     () => getCalendarRangeFromDays(visibleDays),

@@ -622,7 +622,7 @@ export function TaskModalFooter({
             }}
           >
             {currentList ? (
-              <span className="flex max-w-[180px] items-center gap-1">
+              <span className="flex max-w-[180px] items-center gap-0.5">
                 {isInboxList(currentList) ? (
                   <LuInbox className="size-3.5 shrink-0" aria-hidden="true" />
                 ) : (
