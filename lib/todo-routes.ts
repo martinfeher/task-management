@@ -83,7 +83,7 @@ function parseCalendarRouteView(
   }
 
   return {
-    calendarView: parseListCalendarView(viewSegment) ?? "week",
+    calendarView: parseListCalendarView(viewSegment) ?? "days",
   };
 }
 
@@ -184,7 +184,7 @@ export function parseTodoPath(
     /^\/calendar(?:\/(day|week|month|days|weeks))?$/,
   );
   if (calendarMatch) {
-    const view = parseCalendarRouteView(calendarMatch[1] ?? "week", params);
+    const view = parseCalendarRouteView(calendarMatch[1] ?? "days", params);
     return { kind: "calendar", ...view };
   }
 
@@ -200,7 +200,7 @@ export function parseTodoPath(
   );
   if (listCalendarMatch) {
     const listId = decodeURIComponent(listCalendarMatch[1]);
-    const view = parseCalendarRouteView(listCalendarMatch[2] ?? "week", params);
+    const view = parseCalendarRouteView(listCalendarMatch[2] ?? "days", params);
 
     return {
       kind: "listCalendar",

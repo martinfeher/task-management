@@ -39,7 +39,7 @@ export function hasEnabledTasksInDaysCalendar(
 export function resolveAdaptiveCalendarEntryView(
   tasks: TaskListItem[],
   session: CalendarViewSession,
-): Extract<CalendarViewTab, "days" | "month"> {
+): Extract<CalendarViewTab, "days"> {
   const rangeStart =
     (session.daysRangeStartKey
       ? fromDateKey(session.daysRangeStartKey)
@@ -47,9 +47,11 @@ export function resolveAdaptiveCalendarEntryView(
     (session.focusDateKey ? fromDateKey(session.focusDateKey) : null) ??
     startOfDay(new Date());
 
-  return hasEnabledTasksInDaysCalendar(tasks, session.multiDayCount, rangeStart)
-    ? "days"
-    : "month";
+  if (hasEnabledTasksInDaysCalendar(tasks, session.multiDayCount, rangeStart)) {
+    return "days";
+  }
+
+  return "days";
 }
 
 export function resolveCalendarEntryActiveView(

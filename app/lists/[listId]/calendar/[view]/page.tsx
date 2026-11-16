@@ -20,7 +20,7 @@ export default async function ListCalendarViewPage({
   const calendarView = parseListCalendarView(view);
 
   if (!calendarView) {
-    redirect(`/lists/${encodeURIComponent(listId)}/calendar/week`);
+    redirect(`/lists/${encodeURIComponent(listId)}/calendar/days`);
   }
 
   if (calendarView === "days") {

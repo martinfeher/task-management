@@ -6,10 +6,11 @@ import type { CalendarViewTab } from "@/lib/calendar-view-settings";
 export type CalendarDefaultViewPreference = "adaptive" | CalendarViewTab;
 
 const STORAGE_KEY = "todolist:calendar-default-view-preference";
-const CHANGE_EVENT = "todolist:calendar-default-view-preference-change";
+export const CALENDAR_DEFAULT_VIEW_PREFERENCE_CHANGE_EVENT =
+  "todolist:calendar-default-view-preference-change";
 
 export const DEFAULT_CALENDAR_DEFAULT_VIEW_PREFERENCE: CalendarDefaultViewPreference =
-  "adaptive";
+  "days";
 
 const VALID_FIXED_VIEWS = new Set<CalendarViewTab>([
   "day",
@@ -27,7 +28,7 @@ export const CALENDAR_DEFAULT_VIEW_PREFERENCE_OPTIONS: {
   {
     value: "adaptive",
     label: "Adaptive",
-    description: "Days when scheduled tasks are in range, otherwise Month",
+    description: "Days when scheduled tasks are in range, otherwise Days",
   },
   { value: "day", label: "Day" },
   { value: "days", label: "Days" },
@@ -58,9 +59,12 @@ export function setCalendarDefaultViewPreference(
 
   window.localStorage.setItem(STORAGE_KEY, preference);
   window.dispatchEvent(
-    new CustomEvent<CalendarDefaultViewPreference>(CHANGE_EVENT, {
-      detail: preference,
-    }),
+    new CustomEvent<CalendarDefaultViewPreference>(
+      CALENDAR_DEFAULT_VIEW_PREFERENCE_CHANGE_EVENT,
+      {
+        detail: preference,
+      },
+    ),
   );
 }
 
@@ -79,8 +83,12 @@ export function useCalendarDefaultViewPreference() {
       setPreferenceState(readCalendarDefaultViewPreferenceFromStorage());
     }
 
-    window.addEventListener(CHANGE_EVENT, handleChange);
-    return () => window.removeEventListener(CHANGE_EVENT, handleChange);
+    window.addEventListener(CALENDAR_DEFAULT_VIEW_PREFERENCE_CHANGE_EVENT, handleChange);
+    return () =>
+      window.removeEventListener(
+        CALENDAR_DEFAULT_VIEW_PREFERENCE_CHANGE_EVENT,
+        handleChange,
+      );
   }, []);
 
   const setPreference = useCallback((next: CalendarDefaultViewPreference) => {

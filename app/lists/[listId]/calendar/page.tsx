@@ -7,5 +7,5 @@ type ListCalendarPageProps = {
 export default async function ListCalendarPage({ params }: ListCalendarPageProps) {
   const { listId } = await params;
 
-  redirect(`/lists/${encodeURIComponent(listId)}/calendar/week`);
+  redirect(`/lists/${encodeURIComponent(listId)}/calendar/days`);
 }

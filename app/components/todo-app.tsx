@@ -95,7 +95,10 @@ import {
   patchCalendarViewSession,
   saveCalendarViewSession,
 } from "@/lib/calendar-view-settings";
-import { readCalendarDefaultViewPreferenceFromStorage } from "@/lib/calendar-default-view-settings";
+import {
+  CALENDAR_DEFAULT_VIEW_PREFERENCE_CHANGE_EVENT,
+  readCalendarDefaultViewPreferenceFromStorage,
+} from "@/lib/calendar-default-view-settings";
 import { resolveCalendarEntryActiveView } from "@/lib/resolve-calendar-entry-view";
 import {
   readTaskListPanelWidthCustomizedFromStorage,
@@ -535,13 +538,13 @@ function resolveStateFromRoute(
 ) {
   const firstListId = lists[0]?.id ?? null;
   const defaultGlobalCalendar = {
-    calendarView: "week" as ListCalendarView,
+    calendarView: "days" as ListCalendarView,
     calendarMultiDayCount: LIST_CALENDAR_MULTI_DAY_DEFAULT,
     calendarMultiWeekCount: LIST_CALENDAR_MULTI_WEEK_DEFAULT,
   };
   const closedListCalendar = {
     isListCalendarOpen: false,
-    listCalendarView: "week" as ListCalendarView,
+    listCalendarView: "days" as ListCalendarView,
     listCalendarMultiDayCount: LIST_CALENDAR_MULTI_DAY_DEFAULT,
     listCalendarMultiWeekCount: LIST_CALENDAR_MULTI_WEEK_DEFAULT,
   };
@@ -1843,6 +1846,32 @@ export function TodoApp({
       resolveCalendarViewSession(readCalendarViewSession()),
     );
   }, [applyCalendarViewSession, pathname, searchParamsKey]);
+
+  useEffect(() => {
+    function handleDefaultViewPreferenceChange() {
+      if (activeView !== "calendar" && !isListCalendarOpen) return;
+      applyCalendarViewSession(
+        resolveCalendarSessionForEntry(
+          resolveCalendarViewSession(readCalendarViewSession()),
+        ),
+      );
+    }
+
+    window.addEventListener(
+      CALENDAR_DEFAULT_VIEW_PREFERENCE_CHANGE_EVENT,
+      handleDefaultViewPreferenceChange,
+    );
+    return () =>
+      window.removeEventListener(
+        CALENDAR_DEFAULT_VIEW_PREFERENCE_CHANGE_EVENT,
+        handleDefaultViewPreferenceChange,
+      );
+  }, [
+    activeView,
+    applyCalendarViewSession,
+    isListCalendarOpen,
+    resolveCalendarSessionForEntry,
+  ]);
 
   useEffect(() => {
     if (activeView === "calendar") {

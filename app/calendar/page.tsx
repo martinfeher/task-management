@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
 export default function CalendarPage() {
-  redirect("/calendar/week");
+  redirect("/calendar/days");
 }

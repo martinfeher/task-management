@@ -47,7 +47,7 @@ export function CalendarShortcutModal({
   calendarEntryTasks = [],
   ...calendarPanelProps
 }: CalendarShortcutModalProps) {
-  const [view, setView] = useState<CalendarViewTab>("week");
+  const [view, setView] = useState<CalendarViewTab>("days");
   const [multiDayCount, setMultiDayCount] = useState(
     LIST_CALENDAR_MULTI_DAY_DEFAULT,
   );

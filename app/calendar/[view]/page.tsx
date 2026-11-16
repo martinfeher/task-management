@@ -20,7 +20,7 @@ export default async function CalendarViewPage({
   const calendarView = parseListCalendarView(view);
 
   if (!calendarView) {
-    redirect("/calendar/week");
+    redirect("/calendar/days");
   }
 
   if (calendarView === "days") {

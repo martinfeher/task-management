@@ -2363,6 +2363,7 @@ export function TaskDetailsPanel({
   const [lineControls, setLineControls] = useState<LineControlItem[]>([]);
   const [dropIndicator, setDropIndicator] = useState<DropIndicatorState | null>(null);
   const [isImageDropActive, setIsImageDropActive] = useState(false);
+  const [isDetailsBodyLoading, setIsDetailsBodyLoading] = useState(false);
   const [imageLightbox, setImageLightbox] = useState<{
     items: DetailImageLightboxItem[];
     index: number;
@@ -5376,6 +5377,7 @@ export function TaskDetailsPanel({
       isReadyRef.current = false;
       hydratedTaskIdRef.current = null;
       detailsUserModifiedRef.current = false;
+      setIsDetailsBodyLoading(false);
       setTask(null);
       savedDetailsRef.current = "";
       detailsRef.current = "";
@@ -5416,6 +5418,8 @@ export function TaskDetailsPanel({
     const cachedTask = taskDetailsCache.get(taskId);
     const snapshot = taskSnapshotRef.current;
 
+    setIsDetailsBodyLoading(!cachedTask && Boolean(snapshot) && !pendingLocal);
+
     if (cachedTask) {
       taskLoadHandlersRef.current?.hydrateFromTaskRecord(cachedTask, pendingLocal);
     } else if (snapshot) {
@@ -5434,6 +5438,8 @@ export function TaskDetailsPanel({
     void fetchTaskById(taskId)
       .then((loadedTask) => {
         if (cancelled || taskIdRef.current !== taskId) return;
+
+        setIsDetailsBodyLoading(false);
 
         if (!loadedTask) {
           if (!cachedTask && !snapshot) {
@@ -5467,7 +5473,9 @@ export function TaskDetailsPanel({
         );
       })
       .catch(() => {
-        if (!cancelled && !cachedTask && !snapshot) {
+        if (cancelled) return;
+        setIsDetailsBodyLoading(false);
+        if (!cachedTask && !snapshot) {
           isReadyRef.current = false;
           setSaveStatus("error");
         }
@@ -8730,8 +8738,24 @@ export function TaskDetailsPanel({
               <div className="pointer-events-none absolute inset-0 z-30 rounded-[30px] border-2 border-dashed border-blue-400 bg-blue-50/40 dark:border-blue-500 dark:bg-blue-950/20" />
             )}
 
+            {isDetailsBodyLoading ? (
+              <div
+                className="pointer-events-none absolute top-[60px] right-3 left-[25px] z-10"
+                aria-hidden="true"
+              >
+                <div className={`h-3.5 w-[92%] rounded ${TASK_DETAILS_SKELETON_BAR_CLASS}`} />
+                <div className={`mt-2.5 h-3.5 w-[85%] rounded ${TASK_DETAILS_SKELETON_BAR_CLASS}`} />
+                <div className={`mt-2.5 h-3.5 w-[78%] rounded ${TASK_DETAILS_SKELETON_BAR_CLASS}`} />
+                <div className={`mt-2.5 h-3.5 w-[64%] rounded ${TASK_DETAILS_SKELETON_BAR_CLASS}`} />
+              </div>
+            ) : null}
+            {isDetailsBodyLoading ? (
+              <span className="sr-only">Loading task details</span>
+            ) : null}
+
             <div
               ref={editorRef}
+              data-details-loading={isDetailsBodyLoading ? "true" : undefined}
               data-format-highlight-menu-open={
                 openFormatDropdown === "highlight" ? "true" : undefined
               }

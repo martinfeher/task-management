@@ -2042,11 +2042,11 @@ export function Sidebar({
                     className="flex h-[35px] w-full cursor-pointer items-center gap-2.5 px-3 text-left text-sm ptxt-900 hover:bg-zinc-100 dark:ptxt-50 dark:hover:bg-zinc-800"
                     onClick={() => {
                       setIsBottomAddMenuOpen(false);
-                      setIsAddListOpen(true);
+                      setIsAddFolderOpen(true);
                     }}
                   >
-                    <LuList className="size-[14px] shrink-0 text-[#acadb7]" aria-hidden="true" />
-                    List
+                    <SidebarFolderIcon className="h-[12px] w-[14px] shrink-0" />
+                    Folder
                   </button>
                   <button
                     type="button"
@@ -2054,11 +2054,11 @@ export function Sidebar({
                     className="flex h-[35px] w-full cursor-pointer items-center gap-2.5 px-3 text-left text-sm ptxt-900 hover:bg-zinc-100 dark:ptxt-50 dark:hover:bg-zinc-800"
                     onClick={() => {
                       setIsBottomAddMenuOpen(false);
-                      setIsAddFolderOpen(true);
+                      setIsAddListOpen(true);
                     }}
                   >
-                    <SidebarFolderIcon className="h-[12px] w-[14px] shrink-0" />
-                    Folder
+                    <LuList className="size-[14px] shrink-0 text-[#acadb7]" aria-hidden="true" />
+                    List
                   </button>
                   </div>
                 </div>

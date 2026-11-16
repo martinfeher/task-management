@@ -438,6 +438,10 @@ body {
   background-color: color-mix(in srgb, #27272a 65%, white);
 }
 
+.task-details-editor[data-details-loading="true"] > .detail-line:not(:first-child) {
+  visibility: hidden;
+}
+
 .task-details-editor {
   color: #333333;
   /* color: #2e2e2e; */

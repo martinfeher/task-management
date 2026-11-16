@@ -21,7 +21,7 @@ export type CalendarViewSession = {
   timedGridScrollTopByView?: Partial<Record<CalendarViewTab, number>>;
 };
 
-export const DEFAULT_CALENDAR_VIEW: CalendarViewTab = "week";
+export const DEFAULT_CALENDAR_VIEW: CalendarViewTab = "days";
 
 const CALENDAR_VIEW_STORAGE_KEY = "todolist:calendar-view";
 const LEGACY_CALENDAR_VIEW_SESSION_KEY = "todolist:calendar-view";

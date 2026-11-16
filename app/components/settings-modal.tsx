@@ -485,7 +485,8 @@ function CalendarSettingsContent() {
           Calendar
         </h3>
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          Calendar view preferences.
+          Choose which calendar opens by default from the sidebar and shortcut
+          modal.
         </p>
       </div>
       <SettingsSelectField<CalendarDefaultViewPreference>
