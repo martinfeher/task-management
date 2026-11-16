@@ -1168,12 +1168,10 @@ body {
 @keyframes add-task-form-in {
   from {
     opacity: 0;
-    filter: blur(8px);
   }
 
   to {
     opacity: 1;
-    filter: blur(0);
   }
 }
 
@@ -1184,12 +1182,10 @@ body {
 @keyframes add-task-form-reset {
   from {
     opacity: 0.45;
-    filter: blur(6px);
   }
 
   to {
     opacity: 1;
-    filter: blur(0);
   }
 }
 
@@ -1367,6 +1363,11 @@ body {
 }
 
 .task-list-context-menu .frosted-popover-surface {
+  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter: blur(5px);
+}
+
+.add-task-form .frosted-popover-surface {
   -webkit-backdrop-filter: blur(5px);
   backdrop-filter: blur(5px);
 }
@@ -2121,6 +2122,10 @@ body {
   border-radius: 24px;
   border: 1px solid rgb(235 235 235);
   box-shadow: 0 10px 23px rgba(0, 0, 0, 0.09);
+}
+
+.calendar-task-modal footer {
+  align-items: center;
 }
 
 /* Task switch (header up/down arrows): very subtle fade-in only. */

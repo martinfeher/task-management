@@ -13,6 +13,7 @@ import { createPortal } from "react-dom";
 import { BiLink, BiLeftArrowAlt, BiRedo, BiUndo } from "react-icons/bi";
 import { MdKeyboardArrowUp, MdOutlineKeyboardArrowDown } from "react-icons/md";
 import { LuCheck, LuCode, LuHeading1, LuHeading2, LuHeading3, LuHistory, LuPilcrow, LuRemoveFormatting, LuType, LuX } from "react-icons/lu";
+import { RxEnterFullScreen } from "react-icons/rx";
 import { HiItalic } from "react-icons/hi2";
 import { VscChecklist } from "react-icons/vsc";
 import { renameTask, updateTaskDueDate, updateTaskDueTime, updateTaskRecurrence } from "@/app/actions/todo";
@@ -197,7 +198,11 @@ import {
   computeTaskDatePickerMenuPosition,
 } from "./task-date-picker";
 import { TaskVersionHistoryOffcanvas } from "./task-version-history-offcanvas";
-import { APP_HOVER_TOOLTIP_BELOW_START } from "@/lib/app-hover-tooltip-classes";
+import {
+  APP_HOVER_TOOLTIP_ABOVE_CENTER,
+  APP_HOVER_TOOLTIP_BELOW_START,
+  APP_HOVER_TOOLTIP_SHOWN,
+} from "@/lib/app-hover-tooltip-classes";
 import { TASK_DETAILS_HEADER_ICON_HOVER_CLASS } from "@/lib/task-details-header-icon-hover";
 import {
   blockTypeHistoryLabel,
@@ -214,6 +219,7 @@ import {
 } from "./task-modal-footer";
 import {
   CALENDAR_TASK_MODAL_EDITOR_MIN_HEIGHT_EXTRA_PX,
+  CALENDAR_TASK_MODAL_FOOTER_MIN_HEIGHT_PX,
   CALENDAR_TASK_MODAL_MIN_HEIGHT_PX,
 } from "@/lib/calendar-task-modal-position";
 import {
@@ -363,11 +369,138 @@ type TaskDetailsPanelProps = {
     onNext?: () => void;
   } | null;
   onClose?: () => void;
+  /** Calendar task modal: open this task in the list + details panel layout. */
+  onExpandFromModal?: () => void;
   noteMenu?: TaskDetailsNoteMenuProps | null;
 };
 
 const TASK_DETAILS_NOTE_MENU_WIDTH = 220;
 const TASK_DETAILS_NOTE_MENU_HEIGHT = 350;
+
+const TASK_DETAILS_MODAL_EXPAND_TOOLTIP_ID =
+  "task-details-modal-expand-tooltip";
+const TASK_DETAILS_MODAL_HEADER_TOOLTIP_GAP_PX = 8;
+const TASK_DETAILS_MODAL_HEADER_TOOLTIP_VIEWPORT_PADDING_PX = 8;
+const TASK_DETAILS_MODAL_HEADER_TOOLTIP_CLASS = `add-task-date-tooltip ${APP_HOVER_TOOLTIP_ABOVE_CENTER} pointer-events-none fixed whitespace-nowrap px-3 py-1.5 text-[11px] font-medium z-[10060]`;
+
+function ModalHeaderPortaledTooltipButton({
+  tooltipId,
+  ariaLabel,
+  tooltipText,
+  onClick,
+  className,
+  children,
+}: {
+  tooltipId: string;
+  ariaLabel: string;
+  tooltipText: string;
+  onClick: () => void;
+  className: string;
+  children: ReactNode;
+}) {
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const tooltipRef = useRef<HTMLSpanElement>(null);
+  const [tooltipVisible, setTooltipVisible] = useState(false);
+  const [tooltipStyle, setTooltipStyle] = useState<{
+    top: number;
+    left: number;
+    anchorCenterX: number;
+  } | null>(null);
+
+  useLayoutEffect(() => {
+    if (!tooltipVisible) {
+      setTooltipStyle(null);
+      return;
+    }
+
+    let frameId = 0;
+
+    function updatePosition() {
+      const button = buttonRef.current;
+      const tooltip = tooltipRef.current;
+      if (!button || !tooltip) {
+        frameId = window.requestAnimationFrame(updatePosition);
+        return;
+      }
+
+      const anchorRect = button.getBoundingClientRect();
+      const tooltipRect = tooltip.getBoundingClientRect();
+      const anchorCenterX = anchorRect.left + anchorRect.width / 2;
+      const halfTooltipWidth = tooltipRect.width / 2;
+
+      const left = Math.max(
+        TASK_DETAILS_MODAL_HEADER_TOOLTIP_VIEWPORT_PADDING_PX +
+          halfTooltipWidth,
+        Math.min(
+          anchorCenterX,
+          window.innerWidth -
+            TASK_DETAILS_MODAL_HEADER_TOOLTIP_VIEWPORT_PADDING_PX -
+            halfTooltipWidth,
+        ),
+      );
+
+      const top =
+        anchorRect.top - tooltipRect.height - TASK_DETAILS_MODAL_HEADER_TOOLTIP_GAP_PX;
+
+      setTooltipStyle({ top, left, anchorCenterX });
+    }
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [tooltipText, tooltipVisible]);
+
+  return (
+    <>
+      <button
+        ref={buttonRef}
+        type="button"
+        aria-label={ariaLabel}
+        aria-describedby={tooltipVisible ? tooltipId : undefined}
+        onClick={onClick}
+        onMouseEnter={() => setTooltipVisible(true)}
+        onMouseLeave={() => setTooltipVisible(false)}
+        onFocus={() => setTooltipVisible(true)}
+        onBlur={() => setTooltipVisible(false)}
+        className={className}
+      >
+        {children}
+      </button>
+      {tooltipVisible && typeof document !== "undefined"
+        ? createPortal(
+            <span
+              ref={tooltipRef}
+              id={tooltipId}
+              role="tooltip"
+              className={`${TASK_DETAILS_MODAL_HEADER_TOOLTIP_CLASS} task-priority-tooltip ${
+                tooltipStyle ? APP_HOVER_TOOLTIP_SHOWN : ""
+              }`}
+              style={
+                tooltipStyle
+                  ? {
+                      top: tooltipStyle.top,
+                      left: tooltipStyle.left,
+                      ["--task-priority-tooltip-arrow-left" as string]: `calc(50% + ${
+                        tooltipStyle.anchorCenterX - tooltipStyle.left
+                      }px)`,
+                    }
+                  : { top: -9999, left: -9999 }
+              }
+            >
+              {tooltipText}
+            </span>,
+            document.body,
+          )
+        : null}
+    </>
+  );
+}
 
 function computeTaskDetailsNoteMenuPosition(anchor: HTMLElement) {
   const rect = anchor.getBoundingClientRect();
@@ -2148,6 +2281,8 @@ const TASK_DETAILS_EDITOR_MIN_HEIGHT_PX = 500;
 const TASK_DETAILS_EDITOR_SHORT_CONTENT_MIN_HEIGHT_VH = 0.85;
 const TASK_DETAILS_EDITOR_MODAL_MIN_HEIGHT_PX = 88;
 const TASK_DETAILS_EDITOR_BOTTOM_INSET_PX = 30;
+/** Space between the modal editor and footer (8px tighter than the default editor inset). */
+const TASK_DETAILS_EDITOR_MODAL_BOTTOM_INSET_PX = 14;
 const TASK_DETAILS_EDITOR_MODAL_MAX_HEIGHT_PX = 560;
 const TASK_DETAILS_EDITOR_MODAL_MAX_HEIGHT_VH = 0.6;
 
@@ -2156,7 +2291,9 @@ function getEditorReservedBelowSpacePx(
   panel: HTMLElement | null,
   isModalLayout: boolean,
 ) {
-  let reserved = TASK_DETAILS_EDITOR_BOTTOM_INSET_PX;
+  let reserved = isModalLayout
+    ? TASK_DETAILS_EDITOR_MODAL_BOTTOM_INSET_PX
+    : TASK_DETAILS_EDITOR_BOTTOM_INSET_PX;
 
   const contentRoot = editor.closest("[data-task-details-content]");
   if (contentRoot instanceof HTMLElement) {
@@ -2350,6 +2487,7 @@ export function TaskDetailsPanel({
   hideModalFormatToggle = false,
   modalTaskNavigation = null,
   onClose,
+  onExpandFromModal,
   noteMenu = null,
 }: TaskDetailsPanelProps) {
   const isModalLayout = layout === "modal";
@@ -3474,15 +3612,28 @@ export function TaskDetailsPanel({
       );
 
       if (isModalLayout) {
-        const modalChromeHeight = getModalEditorChromeHeightPx(editor, panel);
-        const modalMinEditorHeight = Math.max(
-          TASK_DETAILS_EDITOR_MODAL_MIN_HEIGHT_PX,
-          CALENDAR_TASK_MODAL_MIN_HEIGHT_PX -
-            modalChromeHeight +
-            CALENDAR_TASK_MODAL_EDITOR_MIN_HEIGHT_EXTRA_PX,
-        );
-        const contentCappedHeight = Math.min(contentHeight, maxHeight);
-        nextHeight = Math.max(contentCappedHeight, modalMinEditorHeight);
+        const wrapper = editorWrapperRef.current;
+        const wrapperHeight = wrapper?.clientHeight ?? 0;
+
+        if (wrapperHeight > 0) {
+          nextHeight = Math.min(
+            Math.max(wrapperHeight, TASK_DETAILS_EDITOR_MODAL_MIN_HEIGHT_PX),
+            maxHeight,
+          );
+        } else {
+          const dialog = panel?.closest<HTMLElement>(".calendar-task-modal");
+          const modalHeight =
+            dialog?.getBoundingClientRect().height ??
+            CALENDAR_TASK_MODAL_MIN_HEIGHT_PX;
+          const modalChromeHeight = getModalEditorChromeHeightPx(editor, panel);
+          const modalFillEditorHeight = Math.max(
+            TASK_DETAILS_EDITOR_MODAL_MIN_HEIGHT_PX,
+            modalHeight -
+              modalChromeHeight +
+              CALENDAR_TASK_MODAL_EDITOR_MIN_HEIGHT_EXTRA_PX,
+          );
+          nextHeight = Math.min(modalFillEditorHeight, maxHeight);
+        }
       }
 
       editor.style.height = `${nextHeight}px`;
@@ -5290,6 +5441,10 @@ export function TaskDetailsPanel({
     const footer = panelRef.current?.querySelector("footer");
     if (footer instanceof HTMLElement) {
       resizeObserver.observe(footer);
+    }
+    const editorWrapper = editorWrapperRef.current;
+    if (isModalLayout && editorWrapper) {
+      resizeObserver.observe(editorWrapper);
     }
 
     return () => {
@@ -8287,6 +8442,17 @@ export function TaskDetailsPanel({
 
         <div className="flex items-center gap-1">
           {renderModalTaskNavigationButtons()}
+          {onExpandFromModal ? (
+            <ModalHeaderPortaledTooltipButton
+              tooltipId={TASK_DETAILS_MODAL_EXPAND_TOOLTIP_ID}
+              ariaLabel="Open task in side panel"
+              tooltipText="Open in side panel"
+              onClick={() => onExpandFromModal()}
+              className={`flex size-[29px] -mt-[2px] cursor-pointer items-center justify-center rounded-full text-zinc-500 transition-colors bg-zinc-200/30 hover:text-zinc-600 dark:text-zinc-400 dark:hover:text-zinc-100 ${TASK_DETAILS_HEADER_ICON_HOVER_CLASS}`}
+            >
+              <RxEnterFullScreen className="size-[15px]" aria-hidden="true" />
+            </ModalHeaderPortaledTooltipButton>
+          ) : null}
           {onClose ? (
             <button
               type="button"
@@ -8373,7 +8539,9 @@ export function TaskDetailsPanel({
       ref={panelRef}
       data-task-details-panel
       data-task-details-layout={layout}
-      className="task-details-panel-background relative flex min-h-0 min-w-[300px] flex-1 flex-col"
+      className={`task-details-panel-background relative flex min-h-0 min-w-[300px] flex-1 flex-col${
+        isModalLayout ? " h-full" : ""
+      }`}
       aria-busy={saveStatus === "loading" ? true : undefined}
     >
       <div
@@ -8723,7 +8891,7 @@ export function TaskDetailsPanel({
           <div
             ref={editorWrapperRef}
             className={`relative text-[#555555] ${
-              isModalLayout ? "flex min-h-0 flex-1 flex-col" : ""
+              isModalLayout ? "flex min-h-0 h-0 flex-1 flex-col" : ""
             }`}
             onMouseEnter={handleEditorWrapperMouseEnter}
             onMouseLeave={handleEditorWrapperMouseLeave}
@@ -9296,7 +9464,10 @@ export function TaskDetailsPanel({
       />
 
       {isModalLayout && task && modalFooterConfig ? (
-        <footer className="flex min-h-[52px] shrink-0 items-center justify-between gap-2 px-[22px] py-0 dark:border-zinc-800">
+        <footer
+          className="mt-auto flex shrink-0 items-center justify-between gap-2 px-[22px] py-0 dark:border-zinc-800"
+          style={{ minHeight: CALENDAR_TASK_MODAL_FOOTER_MIN_HEIGHT_PX }}
+        >
           <TaskModalFooter taskId={task.id} {...modalFooterConfig} />
           {modalCreateAction ? (
             <div className="flex shrink-0 flex-col items-end gap-1">
@@ -9335,9 +9506,7 @@ export function TaskDetailsPanel({
             </div>
           ) : taskId &&
             saveStatus !== "loading" &&
-            (saveStatus === "error" ||
-              showClipboardNotice ||
-              (lastSavedAt !== null && saveStatus === "saved")) ? (
+            (saveStatus === "error" || showClipboardNotice) ? (
             <div className="shrink-0">
               <span className="flex flex-wrap items-center justify-end gap-2 text-xs text-[#82828a] dark:text-[#acacb4]">
                 {showClipboardNotice ? <span>{clipboardNoticeMessage}</span> : null}
@@ -9357,9 +9526,6 @@ export function TaskDetailsPanel({
                       Retry
                     </button>
                   </span>
-                ) : null}
-                {lastSavedAt && saveStatus === "saved" ? (
-                  <span>Saved · {formatSaveTime(lastSavedAt)}</span>
                 ) : null}
               </span>
             </div>

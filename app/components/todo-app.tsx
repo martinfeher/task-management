@@ -4019,6 +4019,58 @@ export function TodoApp({
     [selectTask],
   );
 
+  const expandCalendarTaskFromModal = useCallback(
+    async (taskId: string) => {
+      await detailsSaveControllerRef.current?.flushSave();
+
+      if (isListCalendarOpen || isListCalendarPreview) {
+        listCalendarReturnTaskIdRef.current = null;
+        if (isListCalendarPreview && !isListCalendarOpen) {
+          setIsListCalendarPreview(false);
+          setIsListCalendarOpen(true);
+        }
+        setListCalendarShowingDetails(true);
+        await selectTask(taskId);
+        return;
+      }
+
+      if (activeView === "calendar") {
+        setSidebarHoverPreview(null);
+        const listId =
+          findListIdForTask(taskId, tasksByList) ??
+          calendarTasks.find((task) => task.id === taskId)?.listId ??
+          null;
+
+        if (listId) {
+          setActiveView(null);
+          setSelectedLabelId(null);
+          setSelectedListId(listId);
+          selectTaskImmediate(taskId);
+          return;
+        }
+      }
+
+      await selectTask(taskId);
+    },
+    [
+      activeView,
+      calendarTasks,
+      isListCalendarOpen,
+      isListCalendarPreview,
+      selectTask,
+      selectTaskImmediate,
+      tasksByList,
+    ],
+  );
+
+  const handleKanbanModalExpandToTaskPanel = useCallback(
+    async (taskId: string) => {
+      await expandCalendarTaskFromModal(taskId);
+      setKanbanModalTaskId(null);
+    },
+    [expandCalendarTaskFromModal],
+  );
+
   useEffect(() => {
     const route = parseTodoPath(pathname, searchParams);
     if (
@@ -4283,6 +4335,7 @@ export function TodoApp({
     labels,
     onDeleteTask: deleteTaskById,
     defaultListId: inboxListId,
+    onExpandCalendarTaskToPanel: expandCalendarTaskFromModal,
   } as const;
 
   const kanbanTaskModal = kanbanModalTaskId ? (
@@ -4290,6 +4343,7 @@ export function TodoApp({
       taskId={kanbanModalTaskId}
       taskSnapshot={kanbanModalTaskSnapshot}
       onClose={() => setKanbanModalTaskId(null)}
+      onExpandToTaskPanel={handleKanbanModalExpandToTaskPanel}
       onDetailsSaved={handleDetailsSaved}
       onTaskHasDetailsKnown={handleTaskHasDetailsKnown}
       onTaskRenamed={handleTaskRenamed}

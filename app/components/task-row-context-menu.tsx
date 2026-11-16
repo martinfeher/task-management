@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { BiChevronRight } from "react-icons/bi";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { BiChevronLeft, BiChevronRight } from "react-icons/bi";
 // import { IoMdPricetag } from "react-icons/io";
 import { IoDuplicateOutline } from "react-icons/io5";
 import { PiListStarThin, PiNoteThin } from "react-icons/pi";
@@ -69,6 +69,22 @@ type TaskRowContextMenuProps = {
 
 const menuClassName = `overflow-visible rounded-[23px] p-[5px] ${FROSTED_POPOVER_SURFACE_CLASS}`;
 
+const MOVE_FLYOUT_WIDTH_PX = 240;
+const MOVE_FLYOUT_GAP_PX = 4;
+const MOVE_FLYOUT_VIEWPORT_PADDING_PX = 8;
+
+type MoveSubmenuSide = "left" | "right";
+
+function resolveMoveFlyoutSide(anchorLeft: number, mainMenuWidth: number) {
+  const spaceOnRight =
+    window.innerWidth -
+    MOVE_FLYOUT_VIEWPORT_PADDING_PX -
+    anchorLeft -
+    mainMenuWidth -
+    MOVE_FLYOUT_GAP_PX;
+  return spaceOnRight < MOVE_FLYOUT_WIDTH_PX ? "left" : "right";
+}
+
 const menuItemClassName =
   "tcm-menu-item flex h-[35px] w-full items-center px-3 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800";
 
@@ -133,6 +149,7 @@ function MainMenuItems({
   onDuplicateTask,
   onDeleteTask,
   dateShortcutVariant = "full",
+  moveSubmenuSide = "right",
 }: Pick<
   TaskRowContextMenuProps,
   | "task"
@@ -163,6 +180,7 @@ function MainMenuItems({
 > & {
   onMoveMouseEnter?: () => void;
   onMoveMouseLeave?: () => void;
+  moveSubmenuSide?: MoveSubmenuSide;
 }) {
   const menuWidthClass =
     hasDueDateActions || hasPriorityActions ? "w-[196px]" : "w-36";
@@ -237,15 +255,27 @@ function MainMenuItems({
               Move to
             </span>
           </span>
-          <BiChevronRight
-            className="tcm-icon size-5 shrink-0"
-            style={{
-              color: "var(--tcm-icon-350)",
-              ["--tcm-icon" as string]: TASK_CONTEXT_MENU_COLORS.icon350,
-              ["--tcm-icon-hover" as string]: TASK_CONTEXT_MENU_COLORS.icon400,
-            }}
-            aria-hidden
-          />
+          {moveSubmenuSide === "left" ? (
+            <BiChevronLeft
+              className="tcm-icon size-5 shrink-0"
+              style={{
+                color: "var(--tcm-icon-350)",
+                ["--tcm-icon" as string]: TASK_CONTEXT_MENU_COLORS.icon350,
+                ["--tcm-icon-hover" as string]: TASK_CONTEXT_MENU_COLORS.icon400,
+              }}
+              aria-hidden
+            />
+          ) : (
+            <BiChevronRight
+              className="tcm-icon size-5 shrink-0"
+              style={{
+                color: "var(--tcm-icon-350)",
+                ["--tcm-icon" as string]: TASK_CONTEXT_MENU_COLORS.icon350,
+                ["--tcm-icon-hover" as string]: TASK_CONTEXT_MENU_COLORS.icon400,
+              }}
+              aria-hidden
+            />
+          )}
         </button>
       ) : null}
       {hasLabelActions ? (
@@ -461,7 +491,10 @@ export function TaskRowContextMenu({
   dateShortcutVariant = "full",
 }: TaskRowContextMenuProps) {
   const [isMoveHoverPreviewOpen, setIsMoveHoverPreviewOpen] = useState(false);
+  const [moveSubmenuSide, setMoveSubmenuSide] =
+    useState<MoveSubmenuSide>("right");
   const moveHoverCloseTimerRef = useRef<number | null>(null);
+  const moveFlyoutRowRef = useRef<HTMLDivElement>(null);
 
   const clearMoveHoverCloseTimer = () => {
     if (moveHoverCloseTimerRef.current !== null) {
@@ -504,9 +537,52 @@ export function TaskRowContextMenu({
 
   const showMoveFlyout = view === "moveTo" || isMoveHoverPreviewOpen;
 
+  const estimateMainMenuWidth =
+    hasDueDateActions || hasPriorityActions ? 196 : 144;
+
+  const updateMoveSubmenuSide = () => {
+    if (!showMoveFlyout) {
+      setMoveSubmenuSide("right");
+      return;
+    }
+
+    const row = moveFlyoutRowRef.current;
+    let anchorLeft = fixedPosition?.x ?? 0;
+    let mainMenuWidth = estimateMainMenuWidth;
+
+    if (row) {
+      const mainMenu = row.querySelector(':scope > [role="menu"]');
+      if (mainMenu instanceof HTMLElement) {
+        mainMenuWidth = mainMenu.getBoundingClientRect().width;
+      }
+      anchorLeft = row.getBoundingClientRect().left;
+    }
+
+    setMoveSubmenuSide(resolveMoveFlyoutSide(anchorLeft, mainMenuWidth));
+  };
+
+  useLayoutEffect(() => {
+    updateMoveSubmenuSide();
+  }, [
+    estimateMainMenuWidth,
+    fixedPosition?.x,
+    fixedPosition?.y,
+    showMoveFlyout,
+    view,
+  ]);
+
+  useEffect(() => {
+    if (!showMoveFlyout) return;
+
+    const handleResize = () => updateMoveSubmenuSide();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [showMoveFlyout]);
+
   const mainMenuProps = {
     task,
     view: showMoveFlyout ? ("moveTo" as const) : view,
+    moveSubmenuSide,
     hasImportantActions,
     hasPriorityActions,
     hasNoteActions,
@@ -534,6 +610,41 @@ export function TaskRowContextMenu({
     dateShortcutVariant,
   };
 
+  const moveFlyoutAutoFocus = view === "moveTo";
+
+  const moveFlyoutRow = (
+    <div
+      ref={moveFlyoutRowRef}
+      className={`flex items-start gap-1 ${
+        moveSubmenuSide === "left" ? "flex-row-reverse" : ""
+      }`}
+      onMouseEnter={openMoveHoverPreview}
+      onMouseLeave={scheduleCloseMoveHoverPreview}
+    >
+      <MainMenuItems {...mainMenuProps} />
+      <div
+        className={moveSubmenuSide === "left" ? "-mr-0.75" : "-ml-0.75"}
+        onMouseEnter={openMoveHoverPreview}
+      >
+        <TaskMoveToSelector
+          lists={lists}
+          currentListId={currentListId}
+          query={moveQuery}
+          onQueryChange={onMoveQueryChange}
+          onSelectList={onMoveTaskToList}
+          onCancel={onClose}
+          autoFocus={moveFlyoutAutoFocus}
+          tone="contextMenu"
+        />
+      </div>
+    </div>
+  );
+
+  const fixedLeftOffset =
+    fixedPosition && showMoveFlyout && moveSubmenuSide === "left"
+      ? -(MOVE_FLYOUT_WIDTH_PX + MOVE_FLYOUT_GAP_PX)
+      : 0;
+
   const menu = (
     <div
       className="task-list-context-menu"
@@ -541,55 +652,9 @@ export function TaskRowContextMenu({
     >
       {view === "main" && !showMoveFlyout && <MainMenuItems {...mainMenuProps} />}
 
-      {view === "main" && showMoveFlyout && (
-        <div
-          className="flex items-start gap-1"
-          onMouseEnter={openMoveHoverPreview}
-          onMouseLeave={scheduleCloseMoveHoverPreview}
-        >
-          <MainMenuItems {...mainMenuProps} />
-          <div
-            className="-ml-0.75"
-            onMouseEnter={openMoveHoverPreview}
-          >
-            <TaskMoveToSelector
-              lists={lists}
-              currentListId={currentListId}
-              query={moveQuery}
-              onQueryChange={onMoveQueryChange}
-              onSelectList={onMoveTaskToList}
-              onCancel={onClose}
-              autoFocus={false}
-              tone="contextMenu"
-            />
-          </div>
-        </div>
-      )}
+      {view === "main" && showMoveFlyout ? moveFlyoutRow : null}
 
-      {view === "moveTo" && (
-        <div
-          className="flex items-start gap-1"
-          onMouseEnter={openMoveHoverPreview}
-          onMouseLeave={scheduleCloseMoveHoverPreview}
-        >
-          <MainMenuItems {...mainMenuProps} />
-          <div
-            className="-ml-0.75"
-            onMouseEnter={openMoveHoverPreview}
-          >
-            <TaskMoveToSelector
-              lists={lists}
-              currentListId={currentListId}
-              query={moveQuery}
-              onQueryChange={onMoveQueryChange}
-              onSelectList={onMoveTaskToList}
-              onCancel={onClose}
-              autoFocus
-              tone="contextMenu"
-            />
-          </div>
-        </div>
-      )}
+      {view === "moveTo" ? moveFlyoutRow : null}
 
       {view === "label" && (
         <TaskLabelSelector
@@ -611,7 +676,10 @@ export function TaskRowContextMenu({
     return (
       <div
         className="fixed z-[100]"
-        style={{ left: fixedPosition.x, top: fixedPosition.y }}
+        style={{
+          left: fixedPosition.x + fixedLeftOffset,
+          top: fixedPosition.y,
+        }}
       >
         {menu}
       </div>

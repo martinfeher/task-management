@@ -220,6 +220,7 @@ type CalendarPanelProps = {
   standaloneCalendar?: boolean;
   periodLabelAction?: ReactNode;
   headerTrailingAction?: ReactNode;
+  onExpandCalendarTaskToPanel?: (taskId: string) => void | Promise<void>;
 };
 
 function CalendarViewCounter({
@@ -1164,6 +1165,7 @@ type CalendarViewsPanelProps = {
   externalDraggingTaskName?: string | null;
   periodLabelAction?: ReactNode;
   headerTrailingAction?: ReactNode;
+  onExpandCalendarTaskToPanel?: (taskId: string) => void | Promise<void>;
 };
 
 export function CalendarViewsPanel({
@@ -1211,6 +1213,7 @@ export function CalendarViewsPanel({
   externalDraggingTaskName = null,
   periodLabelAction,
   headerTrailingAction,
+  onExpandCalendarTaskToPanel,
 }: CalendarViewsPanelProps) {
   const listCalendarOverlap = useListCalendarOverlapLayout();
   const [internalActiveView, setInternalActiveView] =
@@ -1365,6 +1368,14 @@ export function CalendarViewsPanel({
     setTaskEditorModalId(null);
     setNewCalendarTaskDraftId(null);
   }, []);
+  const handleExpandCalendarTaskToPanel = useCallback(
+    async (taskId: string) => {
+      if (!onExpandCalendarTaskToPanel) return;
+      await onExpandCalendarTaskToPanel(taskId);
+      closeTaskEditorModal();
+    },
+    [closeTaskEditorModal, onExpandCalendarTaskToPanel],
+  );
   const handleCalendarSelectTask = useCallback(
     (taskId: string) => {
       onSelectTask(taskId);
@@ -1622,6 +1633,11 @@ export function CalendarViewsPanel({
         onCloseCenterModal={closeTaskEditorModal}
         centerModalNavigableTaskIds={calendarModalNavigableTaskIds}
         onCenterModalNavigateTask={handleCalendarModalNavigateTask}
+        onExpandCenterModalToTaskPanel={
+          onExpandCalendarTaskToPanel
+            ? handleExpandCalendarTaskToPanel
+            : undefined
+        }
       >
         {view}
       </CalendarViewSidebarLayout>
@@ -1916,6 +1932,7 @@ export function CalendarPanel({
   standaloneCalendar = true,
   periodLabelAction,
   headerTrailingAction,
+  onExpandCalendarTaskToPanel,
   labels = [],
   onDeleteTask,
 }: CalendarPanelProps) {
@@ -1963,6 +1980,7 @@ export function CalendarPanel({
         standaloneCalendar={standaloneCalendar}
         periodLabelAction={periodLabelAction}
         headerTrailingAction={headerTrailingAction}
+        onExpandCalendarTaskToPanel={onExpandCalendarTaskToPanel}
       />
     </section>
   );

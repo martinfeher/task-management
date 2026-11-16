@@ -93,10 +93,25 @@ type CalendarTaskHoverPreviewContextValue = {
 const CalendarTaskHoverPreviewContext =
   createContext<CalendarTaskHoverPreviewContextValue | null>(null);
 
+function getTaskEdgePreviewMaxLeft(anchor: HTMLElement | null) {
+  if (typeof window === "undefined") {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  const viewportPadding = 8;
+  const gridView = anchor?.closest("[data-calendar-grid-view]");
+  const rightEdge = gridView
+    ? gridView.getBoundingClientRect().right
+    : window.innerWidth;
+
+  return rightEdge - viewportPadding - PREVIEW_WIDTH;
+}
+
 function getPreviewPosition(
   rect: DOMRect,
   clientX: number,
   options: PreviewPositionOptions = { mode: "task-edge" },
+  anchor: HTMLElement | null = null,
 ) {
   let left =
     options.mode === "cursor"
@@ -108,9 +123,20 @@ function getPreviewPosition(
   }
 
   if (typeof window !== "undefined") {
-    const minTop = 8;
-    const maxTop = window.innerHeight - PREVIEW_ESTIMATED_HEIGHT - 8;
-    left = Math.max(8, Math.min(left, window.innerWidth - PREVIEW_WIDTH - 8));
+    const viewportPadding = 8;
+    const minTop = viewportPadding;
+    const maxTop = window.innerHeight - PREVIEW_ESTIMATED_HEIGHT - viewportPadding;
+    const maxLeft = window.innerWidth - PREVIEW_WIDTH - viewportPadding;
+
+    if (options.mode === "task-edge") {
+      const preferredLeft = left;
+      const maxLeftBesideTask = getTaskEdgePreviewMaxLeft(anchor);
+      if (preferredLeft > maxLeftBesideTask) {
+        left = rect.left - PREVIEW_WIDTH - TASK_GAP;
+      }
+    }
+
+    left = Math.max(viewportPadding, Math.min(left, maxLeft));
     top = Math.max(minTop, Math.min(top, maxTop));
   }
 
@@ -205,6 +231,7 @@ function openPreview(
     element.getBoundingClientRect(),
     clientX,
     positionOptions,
+    element,
   );
 
   setPreview({
@@ -341,6 +368,7 @@ export function CalendarTaskHoverPreviewProvider({
         element.getBoundingClientRect(),
         x,
         positionOptions,
+        element,
       );
       setPreview((previous) =>
         previous ? { ...previous, x: left, y: top } : null,

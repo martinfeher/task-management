@@ -3,9 +3,11 @@ import type { CSSProperties } from "react";
 export const CALENDAR_TASK_MODAL_GAP_PX = 8;
 export const CALENDAR_TASK_MODAL_VIEWPORT_PADDING_PX = 24;
 export const CALENDAR_TASK_MODAL_WIDTH_PX = 750;
-export const CALENDAR_TASK_MODAL_MIN_HEIGHT_PX = 580;
+export const CALENDAR_TASK_MODAL_MIN_HEIGHT_PX = 590;
 /** Extra editor height so the note area fills the modal body (calendar view). */
-export const CALENDAR_TASK_MODAL_EDITOR_MIN_HEIGHT_EXTRA_PX = 29;
+export const CALENDAR_TASK_MODAL_EDITOR_MIN_HEIGHT_EXTRA_PX = 47;
+/** Bottom action row height in the calendar task modal (icons vertically centered). */
+export const CALENDAR_TASK_MODAL_FOOTER_MIN_HEIGHT_PX = 44;
 /** Fade/blur out and in when navigating between tasks in the modal (each phase). */
 export const CALENDAR_TASK_MODAL_CONTENT_SWITCH_MS = 125;
 export const CALENDAR_TASK_MODAL_CONTENT_SWITCH_TOTAL_MS = 250;

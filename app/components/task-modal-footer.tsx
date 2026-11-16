@@ -4,11 +4,10 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CiLink } from "react-icons/ci";
 import { LiaTagSolid } from "react-icons/lia";
-import { LuHash, LuInbox } from "react-icons/lu";
+import { LuInbox, LuList } from "react-icons/lu";
 import { MdDeleteOutline } from "react-icons/md";
 import { createLabel } from "@/app/actions/todo";
 import { isInboxList } from "@/lib/inbox-list";
-import { getListColor } from "@/lib/list-colors";
 import {
   APP_HOVER_TOOLTIP_ABOVE_CENTER,
   APP_HOVER_TOOLTIP_SHOWN,
@@ -541,7 +540,10 @@ export function TaskModalFooter({
 
   return (
     <>
-    <div ref={footerRef} className="flex min-h-[26px] min-w-0 flex-1 items-center gap-4 self-stretch">
+    <div
+      ref={footerRef}
+      className="flex h-full min-h-0 min-w-0 flex-1 items-center gap-4 self-stretch"
+    >
       {hasPriorityActions ? (
         <div
           className="relative shrink-0"
@@ -626,9 +628,8 @@ export function TaskModalFooter({
                 {isInboxList(currentList) ? (
                   <LuInbox className="size-3.5 shrink-0" aria-hidden="true" />
                 ) : (
-                  <LuHash
+                  <LuList
                     className="size-3.5 shrink-0"
-                    style={{ color: getListColor(currentList) }}
                     aria-hidden="true"
                   />
                 )}

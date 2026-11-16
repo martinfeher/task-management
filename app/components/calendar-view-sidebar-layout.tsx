@@ -139,6 +139,7 @@ type CalendarViewSidebarLayoutProps = {
   onCloseCenterModal?: () => void;
   centerModalNavigableTaskIds?: string[];
   onCenterModalNavigateTask?: (taskId: string) => void;
+  onExpandCenterModalToTaskPanel?: (taskId: string) => void | Promise<void>;
   children: React.ReactNode;
 } & CalendarTaskEditorCallbacks;
 
@@ -455,6 +456,7 @@ export function CalendarViewSidebarLayout({
   onCloseCenterModal,
   centerModalNavigableTaskIds,
   onCenterModalNavigateTask,
+  onExpandCenterModalToTaskPanel,
   children,
 }: CalendarViewSidebarLayoutProps) {
   const listCalendarOverlap = useListCalendarOverlapLayout();
@@ -838,6 +840,7 @@ export function CalendarViewSidebarLayout({
           onToggleTask={onToggleTask}
           navigableTaskIds={modalNavigableTaskIds}
           onNavigateTask={handleModalNavigateTask}
+          onExpandToTaskPanel={onExpandCenterModalToTaskPanel}
         />
       ) : null}
 

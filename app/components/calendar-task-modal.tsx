@@ -98,6 +98,8 @@ type CalendarTaskModalProps = {
   onNavigateTask?: (taskId: string) => void;
   onNewTaskDraftComplete?: () => void;
   onClose: () => void;
+  /** Leave modal and show this task in the list + details panel layout. */
+  onExpandToTaskPanel?: (taskId: string) => void | Promise<void>;
 } & CalendarTaskEditorCallbacks;
 
 export function CalendarTaskModal({
@@ -115,6 +117,7 @@ export function CalendarTaskModal({
   onNavigateTask,
   onNewTaskDraftComplete,
   onClose,
+  onExpandToTaskPanel,
   onDetailsSaved,
   onTaskHasDetailsKnown,
   onTaskRenamed,
@@ -262,6 +265,16 @@ export function CalendarTaskModal({
   useEffect(() => {
     setNavigationPreview(null);
   }, [taskId]);
+
+  const handleExpandToTaskPanel = useCallback(() => {
+    if (!onExpandToTaskPanel || isNewTaskDraft || isHoverPreview) return;
+    void onExpandToTaskPanel(displayedTaskId);
+  }, [
+    displayedTaskId,
+    isHoverPreview,
+    isNewTaskDraft,
+    onExpandToTaskPanel,
+  ]);
 
   const modalTaskNavigation = useMemo(() => {
     if (
@@ -413,8 +426,9 @@ export function CalendarTaskModal({
   const leaveSidebarInteractive =
     clipSidebarBackdrop && !allowBackgroundInteraction;
 
-  const dialogClassName =
-    "calendar-task-modal relative z-10 flex h-auto min-h-0 max-h-[calc(100vh-48px)] flex-col overflow-hidden bg-white dark:bg-zinc-950";
+  const dialogClassName = isHoverPreview
+    ? "calendar-task-modal relative z-10 flex h-auto min-h-0 max-h-[calc(100vh-48px)] flex-col overflow-hidden bg-white dark:bg-zinc-950"
+    : "calendar-task-modal relative z-10 flex h-[min(var(--calendar-task-modal-height),calc(100vh-48px))] min-h-0 flex-col overflow-hidden bg-white dark:bg-zinc-950";
 
   useLayoutEffect(() => {
     dialogRef.current?.scrollTo({ top: 0 });
@@ -504,19 +518,21 @@ export function CalendarTaskModal({
         }`}
         style={{
           width: CALENDAR_TASK_MODAL_WIDTH_PX,
-          minHeight: CALENDAR_TASK_MODAL_MIN_HEIGHT_PX,
           ...(isHoverPreview
             ? {
+                minHeight: CALENDAR_TASK_MODAL_MIN_HEIGHT_PX,
                 transitionDuration: `${CALENDAR_SIDEBAR_HOVER_PREVIEW_TRANSITION_MS}ms`,
               }
-            : undefined),
+            : {
+                ["--calendar-task-modal-height" as string]: `${CALENDAR_TASK_MODAL_MIN_HEIGHT_PX}px`,
+              }),
         }}
         onMouseDown={(event) => event.stopPropagation()}
         onMouseEnter={isHoverPreview ? onHoverPreviewPointerEnter : undefined}
         onMouseLeave={isHoverPreview ? onHoverPreviewPointerLeave : undefined}
       >
         <div
-          className={`flex min-h-0 flex-1 flex-col ${
+          className={`flex h-full min-h-0 flex-1 flex-col ${
             contentSwitchPhase === "in"
               ? "calendar-task-modal-content-transition--in"
               : ""
@@ -539,6 +555,11 @@ export function CalendarTaskModal({
               onToggleTask ? handleMarkTaskComplete : undefined
             }
             onClose={() => void handleClose()}
+            onExpandFromModal={
+              onExpandToTaskPanel && !isNewTaskDraft && !isHoverPreview
+                ? handleExpandToTaskPanel
+                : undefined
+            }
             modalFooterConfig={modalFooterConfig}
             modalCreateAction={modalCreateAction}
             modalTaskNavigation={modalTaskNavigation}
