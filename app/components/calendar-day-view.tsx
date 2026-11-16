@@ -34,6 +34,8 @@ import {
   getCalendarTimedGridHeightPx,
   getCalendarTimedGridScrollTop,
   getCalendarTaskPreviewHeight,
+  getCalendarTimedTaskBlockHeight,
+  getConsecutiveTimedTaskHeightAdjustments,
   getMinutesFromCalendarGridY,
   getTopForCalendarMinutes,
   isCalendarSlotWithinTimedGrid,
@@ -815,8 +817,26 @@ export function CalendarDayView({
                 />
               ))}
 
-              {dayTasks.timed.map((task) => {
+              {(() => {
+                const consecutiveTimedTaskHeightAdjustments =
+                  getConsecutiveTimedTaskHeightAdjustments(
+                    dayTasks.timed.map((timedTask) => {
+                      const timedTiming = getTaskTiming(
+                        timedTask,
+                        resizePreview,
+                      );
+                      return {
+                        id: timedTask.id,
+                        dueTimeMinutes: timedTiming.dueTimeMinutes,
+                        dueDurationMinutes: timedTiming.dueDurationMinutes,
+                      };
+                    }),
+                  );
+
+                return dayTasks.timed.map((task) => {
                 const timing = getTaskTiming(task, resizePreview);
+                const consecutiveHeightAdjustment =
+                  consecutiveTimedTaskHeightAdjustments.get(task.id) ?? 0;
                 const baseTop = getTopForCalendarMinutes(
                   timing.dueTimeMinutes,
                   HOUR_START,
@@ -828,9 +848,10 @@ export function CalendarDayView({
                   isDraggingTask &&
                   draggingTaskPreview !== null &&
                   isCalendarTaskAtDragSource(task, draggingTaskPreview);
-                const height = Math.max(
-                  24,
-                  (timing.dueDurationMinutes / 60) * HOUR_HEIGHT_PX,
+                const height = getCalendarTimedTaskBlockHeight(
+                  timing.dueDurationMinutes,
+                  HOUR_HEIGHT_PX,
+                  consecutiveHeightAdjustment,
                 );
                 const sourcePlaceholderTop =
                   draggingTaskPreview?.sourceTimeMinutes == null
@@ -851,9 +872,10 @@ export function CalendarDayView({
                 const sourcePlaceholder = hideDraggedBlock ? (
                   <CalendarTaskDragSourcePlaceholder
                     top={sourcePlaceholderTop}
-                    height={Math.max(
-                      24,
-                      (sourcePlaceholderDuration / 60) * HOUR_HEIGHT_PX,
+                    height={getCalendarTimedTaskBlockHeight(
+                      sourcePlaceholderDuration,
+                      HOUR_HEIGHT_PX,
+                      consecutiveHeightAdjustment,
                     )}
                     taskName={task.name}
                     startMinutes={
@@ -946,7 +968,8 @@ export function CalendarDayView({
                     />
                   </Fragment>
                 );
-              })}
+              });
+              })()}
 
               {showSelectedSlotMarker &&
               selectedSlotTop !== null &&

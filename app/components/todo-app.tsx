@@ -1373,10 +1373,7 @@ export function TodoApp({
 
       const rect = node.getBoundingClientRect();
       const width = FOLDER_LIST_PREVIEW_WIDTH_PX;
-      const left = Math.max(
-        8,
-        rect.left - width - FOLDER_LIST_PREVIEW_GAP_PX,
-      );
+      const left = rect.left - width - FOLDER_LIST_PREVIEW_GAP_PX;
 
       setFolderHoverPreviewPanelRect({
         top: rect.top,

@@ -75,6 +75,8 @@ import {
   CALENDAR_COLLAPSE_EARLY_END_HOUR,
   CALENDAR_TIME_SLOT_MINUTES,
   getCalendarTaskPreviewHeight,
+  getCalendarTimedTaskBlockHeight,
+  getConsecutiveTimedTaskHeightAdjustments,
   getMinutesFromCalendarGridY,
   getTopForCalendarMinutes,
   type CalendarDropSlot,
@@ -763,7 +765,7 @@ export function CalendarMultiDayView({
                           className={`mt-px inline-flex size-7 items-center justify-center rounded-full text-sm ${
                             isToday
                               ? CALENDAR_TODAY_DATE_CIRCLE_CLASS
-                              : " text-[#999999] dark:text-zinc-400"
+                              : " text-[#abafb9] dark:text-zinc-400"
                           }`}
                         >
                           {day.getDate()}
@@ -1076,12 +1078,32 @@ export function CalendarMultiDayView({
                     </div>
                   ))}
 
-                  {timedTasks.map((task) => {
+                  {(() => {
+                    const consecutiveTimedTaskHeightAdjustments =
+                      getConsecutiveTimedTaskHeightAdjustments(
+                        timedTasks.map((timedTask) => {
+                          const timedTiming = getTaskTiming(
+                            timedTask,
+                            resizePreview,
+                          );
+                          return {
+                            id: timedTask.id,
+                            dueTimeMinutes: timedTiming.dueTimeMinutes,
+                            dueDurationMinutes:
+                              timedTiming.dueDurationMinutes,
+                          };
+                        }),
+                      );
+
+                    return timedTasks.map((task) => {
                     const timing = getTaskTiming(task, resizePreview);
+                    const consecutiveHeightAdjustment =
+                      consecutiveTimedTaskHeightAdjustments.get(task.id) ?? 0;
                     const baseTop = getTopForMinutes(timing.dueTimeMinutes);
-                    const height = Math.max(
-                      24,
-                      (timing.dueDurationMinutes / 60) * hourHeightPx,
+                    const height = getCalendarTimedTaskBlockHeight(
+                      timing.dueDurationMinutes,
+                      hourHeightPx,
+                      consecutiveHeightAdjustment,
                     );
                     const isDraggingTask =
                       draggingTaskPreview?.taskId === task.id;
@@ -1108,9 +1130,10 @@ export function CalendarMultiDayView({
                       hideDraggedBlock && isSourceColumn ? (
                         <CalendarTaskDragSourcePlaceholder
                           top={sourcePlaceholderTop}
-                          height={Math.max(
-                            24,
-                            (sourcePlaceholderDuration / 60) * hourHeightPx,
+                          height={getCalendarTimedTaskBlockHeight(
+                            sourcePlaceholderDuration,
+                            hourHeightPx,
+                            consecutiveHeightAdjustment,
                           )}
                           taskName={task.name}
                           startMinutes={
@@ -1201,7 +1224,8 @@ export function CalendarMultiDayView({
                         />
                       </Fragment>
                     );
-                  })}
+                  });
+                  })()}
 
                   {showSelectedSlotMarker &&
                   selectedSlotTop !== null &&

@@ -31,6 +31,47 @@ export function getCalendarTaskPreviewHeight(
   return Math.max(minHeightPx, (durationMinutes / 60) * hourHeightPx);
 }
 
+/** Visual gap between timed tasks that start exactly when the previous one ends. */
+export const CALENDAR_CONSECUTIVE_TASK_GAP_PX = 2;
+
+export type CalendarConsecutiveTaskTiming = {
+  id: string;
+  dueTimeMinutes: number;
+  dueDurationMinutes: number;
+};
+
+/** Negative height delta (px) when a task is immediately followed by another in the same column. */
+export function getConsecutiveTimedTaskHeightAdjustments(
+  tasks: readonly CalendarConsecutiveTaskTiming[],
+): ReadonlyMap<string, number> {
+  if (tasks.length === 0) return new Map();
+
+  const startMinutes = new Set(tasks.map((task) => task.dueTimeMinutes));
+  const heightDeltaById = new Map<string, number>();
+
+  for (const task of tasks) {
+    const endMinutes = task.dueTimeMinutes + task.dueDurationMinutes;
+    heightDeltaById.set(
+      task.id,
+      startMinutes.has(endMinutes) ? -CALENDAR_CONSECUTIVE_TASK_GAP_PX : 0,
+    );
+  }
+
+  return heightDeltaById;
+}
+
+export function getCalendarTimedTaskBlockHeight(
+  durationMinutes: number,
+  hourHeightPx: number,
+  heightAdjustmentPx = 0,
+  minHeightPx = 24,
+) {
+  return Math.max(
+    minHeightPx,
+    (durationMinutes / 60) * hourHeightPx + heightAdjustmentPx,
+  );
+}
+
 export const CALENDAR_NEW_TASK_PREVIEW_CLASS =
   `pointer-events-none absolute ${CALENDAR_TASK_TIMED_COLUMN_INSET_CLASS} z-10 flex items-center overflow-hidden rounded border border-[#aaaaaa] bg-[#aaaaaa] px-1.5 text-left leading-none ${CALENDAR_TASK_TITLE_TEXT_CLASS} ${CALENDAR_TASK_FONT_CLASS}`;
 

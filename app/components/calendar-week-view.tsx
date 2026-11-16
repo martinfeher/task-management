@@ -53,6 +53,8 @@ import {
   CALENDAR_COLLAPSE_EARLY_END_HOUR,
   CALENDAR_TIME_SLOT_MINUTES,
   getCalendarTaskPreviewHeight,
+  getCalendarTimedTaskBlockHeight,
+  getConsecutiveTimedTaskHeightAdjustments,
   getMinutesFromCalendarGridY,
   getTopForCalendarMinutes,
   type CalendarDropSlot,
@@ -1063,17 +1065,37 @@ export function CalendarWeekView({
                     </div>
                   ))}
 
-                  {timedTasks.map((task) => {
+                  {(() => {
+                    const consecutiveTimedTaskHeightAdjustments =
+                      getConsecutiveTimedTaskHeightAdjustments(
+                        timedTasks.map((timedTask) => {
+                          const timedTiming = getTaskTiming(
+                            timedTask,
+                            resizePreview,
+                          );
+                          return {
+                            id: timedTask.id,
+                            dueTimeMinutes: timedTiming.dueTimeMinutes,
+                            dueDurationMinutes:
+                              timedTiming.dueDurationMinutes,
+                          };
+                        }),
+                      );
+
+                    return timedTasks.map((task) => {
                     const timing = getTaskTiming(task, resizePreview);
+                    const consecutiveHeightAdjustment =
+                      consecutiveTimedTaskHeightAdjustments.get(task.id) ?? 0;
                     const baseTop = getTopForCalendarMinutes(
                       timing.dueTimeMinutes,
                       gridHourStart,
                       hourHeightPx,
                       effectiveGridTopOffset,
                     );
-                    const height = Math.max(
-                      24,
-                      (timing.dueDurationMinutes / 60) * hourHeightPx,
+                    const height = getCalendarTimedTaskBlockHeight(
+                      timing.dueDurationMinutes,
+                      hourHeightPx,
+                      consecutiveHeightAdjustment,
                     );
                     const isDraggingTask =
                       draggingTaskPreview?.taskId === task.id;
@@ -1103,9 +1125,10 @@ export function CalendarWeekView({
                       hideDraggedBlock && isSourceColumn ? (
                         <CalendarTaskDragSourcePlaceholder
                           top={sourcePlaceholderTop}
-                          height={Math.max(
-                            24,
-                            (sourcePlaceholderDuration / 60) * hourHeightPx,
+                          height={getCalendarTimedTaskBlockHeight(
+                            sourcePlaceholderDuration,
+                            hourHeightPx,
+                            consecutiveHeightAdjustment,
                           )}
                           taskName={task.name}
                           startMinutes={
@@ -1196,7 +1219,8 @@ export function CalendarWeekView({
                         />
                       </Fragment>
                     );
-                  })}
+                  });
+                  })()}
 
                   {showSelectedSlotMarker &&
                   selectedSlotTop !== null &&
