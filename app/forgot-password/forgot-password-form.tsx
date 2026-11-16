@@ -37,12 +37,12 @@ export function ForgotPasswordForm() {
   }
 
   return (
-    <div className="flex min-h-screen w-full items-center justify-center bg-zinc-50 px-4 dark:bg-zinc-950">
-      <div className="w-full max-w-sm rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+    <div className="login-sf-pro flex min-h-screen w-full justify-center bg-zinc-50 px-4 py-12 sm:py-16 dark:bg-zinc-950">
+      <div className="w-full max-w-sm self-start rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
         <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">
           Reset password
         </h1>
-        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+        <p className="mt-1 text-sm text-[#9ca8b8] dark:text-zinc-400">
           Enter your email and we&apos;ll send you a link to choose a new
           password.
         </p>
@@ -58,7 +58,7 @@ export function ForgotPasswordForm() {
             <div>
               <label
                 htmlFor="forgot-email"
-                className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+                className="block text-sm font-medium text-zinc-600 dark:text-zinc-300"
               >
                 Email
               </label>
@@ -69,13 +69,13 @@ export function ForgotPasswordForm() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none ring-zinc-400 focus:border-zinc-400 focus:ring-2 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+                className="mt-1 w-full rounded-[11px] border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-400 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
               />
             </div>
             <button
               type="submit"
               disabled={status === "loading"}
-              className="w-full rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+              className="w-full cursor-pointer rounded-[22px] bg-[#484862] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#424654] disabled:cursor-not-allowed disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
             >
               {status === "loading" ? "Sending…" : "Send reset link"}
             </button>
@@ -86,10 +86,10 @@ export function ForgotPasswordForm() {
           <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>
         ) : null}
 
-        <p className="mt-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
+        <p className="mt-4 text-center text-sm text-zinc-500 dark:text-zinc-400">
           <Link
             href="/login"
-            className="font-medium text-zinc-800 underline underline-offset-2 hover:text-zinc-950 dark:text-zinc-200 dark:hover:text-zinc-50"
+            className="text-xs font-medium text-slate-550 underline-offset-2 hover:text-slate-700 hover:underline dark:text-zinc-400 dark:hover:text-zinc-200"
           >
             Back to sign in
           </Link>

@@ -347,6 +347,14 @@ html[data-app-font="sf-pro"] :where(b, strong, .font-bold, .font-semibold, .font
   font-synthesis: none;
 }
 
+.login-sf-pro {
+  font-family: var(--font-sf-pro), ui-sans-serif, system-ui, sans-serif;
+}
+
+.login-sf-pro :where(b, strong, .font-bold, .font-semibold, .font-medium) {
+  font-synthesis: none;
+}
+
 html[data-app-font="euclid-circular"] {
   --font-app: var(--font-euclid-circular);
 }
@@ -2142,6 +2150,18 @@ body {
   scrollbar-gutter: stable;
   scrollbar-width: thin;
   scrollbar-color: rgb(212 212 216 / 0.5) transparent;
+}
+
+/* Room for above-row hover tooltips without clipping at the scroll top edge. */
+.list-panel-scroll--tooltip-clearance {
+  --list-panel-tooltip-clearance: 40px;
+  padding-top: var(--list-panel-tooltip-clearance);
+  margin-top: calc(-1 * var(--list-panel-tooltip-clearance));
+  pointer-events: none;
+}
+
+.list-panel-scroll--tooltip-clearance > * {
+  pointer-events: auto;
 }
 
 /* Sidebar lists: scrollbar sits on the left edge of the task list column. */

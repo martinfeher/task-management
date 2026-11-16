@@ -351,7 +351,7 @@ export function SidebarAccountMenu({
           <div className="relative shrink-0">
             <UserAvatar user={user} sizeClass="size-7 text-[14px]" />
             <span
-              className="absolute bottom-0 right-0 size-2.5 rounded-full border-2 border-white bg-emerald-500 dark:border-zinc-900"
+              className="absolute bottom-0 right-0 size-[9px] rounded-full border-2 border-white bg-emerald-500 dark:border-zinc-900"
               aria-hidden="true"
             />
           </div>

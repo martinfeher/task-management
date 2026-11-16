@@ -125,6 +125,7 @@ import {
   resolveTaskListPanelDefaultWidth,
 } from "./task-list-panel";
 import { ListKanbanPanel } from "./list-kanban-panel";
+import { UpcomingPanel } from "./upcoming-panel";
 import { ListCalendarOverlapShell } from "./list-calendar-overlap-shell";
 import {
   createKanbanColumn,
@@ -384,6 +385,7 @@ function getTasksByLabel(
 
 type ActiveView =
   | "today"
+  | "upcoming"
   | "inbox"
   // | "next7days"
   | "important"
@@ -608,6 +610,14 @@ function resolveStateFromRoute(
           lists,
           tasksByList,
         ),
+        selectedLabelId: null,
+        ...closedCalendar,
+      };
+    case "upcoming":
+      return {
+        activeView: "upcoming" as ActiveView,
+        selectedListId: null,
+        selectedTaskId: null,
         selectedLabelId: null,
         ...closedCalendar,
       };
@@ -1154,6 +1164,7 @@ export function TodoApp({
       : null;
 
   const showingCalendarMonth = displayedActiveView === "calendar";
+  const showingUpcoming = displayedActiveView === "upcoming";
 
   const selectedList = lists.find((list) => list.id === selectedListId) ?? null;
   const showKanbanListView =
@@ -1178,6 +1189,11 @@ export function TodoApp({
     null,
     lists,
     tasksByList,
+  );
+
+  const upcomingTasks: TaskListItem[] = useMemo(
+    () => getVisibleTasks("calendar", null, null, lists, tasksByList),
+    [lists, tasksByList],
   );
 
   const taskListTitle = selectedLabel
@@ -1991,6 +2007,7 @@ export function TodoApp({
       if (
         !listPreviewEnabled ||
         activeView === "calendar" ||
+        activeView === "upcoming" ||
         isListCalendarOpen ||
         isListCalendarPreview ||
         isCalendarShortcutModalOpen
@@ -2034,6 +2051,13 @@ export function TodoApp({
     setSelectedTaskId(
       getFirstVisibleTaskId("today", null, null, lists, tasksByList),
     );
+  }
+
+  function selectUpcoming() {
+    setActiveView("upcoming");
+    setSelectedLabelId(null);
+    setSelectedListId(null);
+    setSelectedTaskId(null);
   }
 
   function selectInbox() {
@@ -2481,6 +2505,16 @@ export function TodoApp({
   );
 
   const kanbanModalTasks = useMemo(() => {
+    if (activeView === "upcoming") {
+      return lists.flatMap((list) =>
+        (tasksByList[list.id] ?? []).map((task) => ({
+          ...task,
+          listId: list.id,
+          listName: list.name,
+        })),
+      );
+    }
+
     if (!selectedListId) return [];
 
     const list = lists.find((item) => item.id === selectedListId);
@@ -2489,7 +2523,7 @@ export function TodoApp({
       listId: selectedListId,
       listName: list?.name ?? "",
     }));
-  }, [lists, selectedListId, tasksByList]);
+  }, [activeView, lists, selectedListId, tasksByList]);
 
   const kanbanModalActions = useMemo(
     () => ({
@@ -2524,7 +2558,7 @@ export function TodoApp({
 
   useEffect(() => {
     setKanbanModalTaskId(null);
-  }, [selectedListId, showKanbanListView]);
+  }, [activeView, selectedListId, showKanbanListView]);
 
   const duplicateKanbanTaskById = useCallback(
     async (taskId: string) => {
@@ -2910,7 +2944,11 @@ export function TodoApp({
       [listId]: [newTask, ...(current[listId] ?? [])],
     }));
 
-    if (activeView === "calendar" || isListCalendarOpen) {
+    if (
+      activeView === "calendar" ||
+      activeView === "upcoming" ||
+      isListCalendarOpen
+    ) {
       return;
     }
 
@@ -3353,6 +3391,35 @@ export function TodoApp({
       dueTimeMinutes: updated.dueTimeMinutes,
       dueDurationMinutes: updated.dueDurationMinutes,
       dueTimeZone: updated.dueTimeZone,
+    });
+  }
+
+  async function moveUpcomingTaskToDate(taskId: string, dateKey: string) {
+    const task = Object.values(tasksByListRef.current)
+      .flat()
+      .find((item) => item.id === taskId);
+    if (!task) return;
+
+    if (task.dueTimeMinutes === null) {
+      await setTaskDueDate(taskId, dateKey);
+      return;
+    }
+
+    await setTaskDueDateAndTime(taskId, dateKey, {
+      dueTimeMinutes: task.dueTimeMinutes,
+      dueDurationMinutes: task.dueDurationMinutes,
+      dueTimeZone: normalizeDueTimeZone(task.dueTimeZone),
+    });
+  }
+
+  async function addUpcomingTask(dateKey: string, name: string) {
+    if (!inboxListId) return;
+
+    await addCalendarTask({
+      name,
+      dueDate: dateKey,
+      details: "",
+      listId: inboxListId,
     });
   }
 
@@ -4147,6 +4214,21 @@ export function TodoApp({
     defaultListId: inboxListId,
   } as const;
 
+  const kanbanTaskModal = kanbanModalTaskId ? (
+    <CalendarTaskModal
+      taskId={kanbanModalTaskId}
+      taskSnapshot={kanbanModalTaskSnapshot}
+      onClose={() => setKanbanModalTaskId(null)}
+      onDetailsSaved={handleDetailsSaved}
+      onTaskHasDetailsKnown={handleTaskHasDetailsKnown}
+      onTaskRenamed={handleTaskRenamed}
+      onDueDateUpdated={handleDueDateUpdated}
+      onRecurrenceUpdated={handleRecurrenceUpdated}
+      onSaveTaskRecurrence={setTaskRecurrence}
+      onToggleTask={toggleTask}
+    />
+  ) : null;
+
   return (
     <>
       <div className="flex h-dvh overflow-hidden">
@@ -4165,6 +4247,7 @@ export function TodoApp({
           suppressListSelectionHighlightId={suppressListSelectionHighlightId}
           selectedLabelId={selectedLabelId}
           isTodaySelected={activeView === "today"}
+          isUpcomingSelected={activeView === "upcoming"}
           isInboxSelected={activeView === "inbox"}
           // isNext7DaysSelected={activeView === "next7days"}
           isImportantSelected={activeView === "important"}
@@ -4173,6 +4256,7 @@ export function TodoApp({
           onSelectList={selectList}
           onSelectLabel={selectLabel}
           onSelectToday={selectToday}
+          onSelectUpcoming={selectUpcoming}
           onSelectInbox={selectInbox}
           // onSelectNext7Days={selectNext7Days}
           onSelectImportant={selectImportant}
@@ -4235,6 +4319,43 @@ export function TodoApp({
               persistViewSession={false}
             />
           </div>
+        ) : showingUpcoming ? (
+          <CalendarTaskModalActionsProvider value={kanbanModalActions}>
+            <div
+              className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+              onMouseEnter={commitSidebarHoverSelection}
+            >
+              <UpcomingPanel
+                lists={lists}
+                tasks={upcomingTasks}
+                completingTaskIds={completingTaskIds}
+                completingWithoutBackgroundTaskIds={
+                  completingWithoutBackgroundTaskIds
+                }
+                checkAnimatingTaskIds={checkAnimatingTaskIds}
+                onToggleTask={toggleTask}
+                onOpenTask={setKanbanModalTaskId}
+                onSetTaskDueDate={setTaskDueDate}
+                onSetTaskDueTime={setTaskDueTime}
+                onSetTaskRecurrence={setTaskRecurrence}
+                onSetTaskPriority={setTaskPriority}
+                onToggleTaskLabel={toggleTaskLabel}
+                onLabelsChanged={refreshLabels}
+                onDuplicateTask={duplicateTaskById}
+                onDeleteTask={async (taskId) => {
+                  await deleteTaskById(taskId);
+                  setKanbanModalTaskId((current) =>
+                    current === taskId ? null : current,
+                  );
+                }}
+                onAddTask={addUpcomingTask}
+                onMoveTaskToDate={moveUpcomingTaskToDate}
+                showSidebarMenu={isCompactLayout}
+                onOpenSidebar={() => setSidebarDrawerOpen(true)}
+              />
+            </div>
+            {kanbanTaskModal}
+          </CalendarTaskModalActionsProvider>
         ) : showKanbanListView && selectedList ? (
           <CalendarTaskModalActionsProvider value={kanbanModalActions}>
             <div
@@ -4278,20 +4399,7 @@ export function TodoApp({
                 onOpenSidebar={() => setSidebarDrawerOpen(true)}
               />
             </div>
-            {kanbanModalTaskId ? (
-              <CalendarTaskModal
-                taskId={kanbanModalTaskId}
-                taskSnapshot={kanbanModalTaskSnapshot}
-                onClose={() => setKanbanModalTaskId(null)}
-                onDetailsSaved={handleDetailsSaved}
-                onTaskHasDetailsKnown={handleTaskHasDetailsKnown}
-                onTaskRenamed={handleTaskRenamed}
-                onDueDateUpdated={handleDueDateUpdated}
-                onRecurrenceUpdated={handleRecurrenceUpdated}
-                onSaveTaskRecurrence={setTaskRecurrence}
-                onToggleTask={toggleTask}
-              />
-            ) : null}
+            {kanbanTaskModal}
           </CalendarTaskModalActionsProvider>
         ) : showRightPanel ? (
           <div

@@ -4,8 +4,11 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CiLink } from "react-icons/ci";
 import { LiaTagSolid } from "react-icons/lia";
+import { LuHash, LuInbox } from "react-icons/lu";
 import { MdDeleteOutline } from "react-icons/md";
 import { createLabel } from "@/app/actions/todo";
+import { isInboxList } from "@/lib/inbox-list";
+import { getListColor } from "@/lib/list-colors";
 import {
   APP_HOVER_TOOLTIP_ABOVE_CENTER,
   APP_HOVER_TOOLTIP_SHOWN,
@@ -199,15 +202,21 @@ function FooterTextButton({
   children,
   onClick,
   ariaLabel,
+  ariaHaspopup,
+  ariaExpanded,
 }: {
   children: React.ReactNode;
   onClick: () => void;
   ariaLabel: string;
+  ariaHaspopup?: "dialog" | "menu";
+  ariaExpanded?: boolean;
 }) {
   return (
     <button
       type="button"
       aria-label={ariaLabel}
+      aria-haspopup={ariaHaspopup}
+      aria-expanded={ariaExpanded}
       onClick={onClick}
       className="cursor-pointer text-[13px] mb-[1px] transition-opacity hover:opacity-80"
       style={{ color: MODAL_FOOTER_ACTION_COLOR }}
@@ -251,6 +260,9 @@ export function TaskModalFooter({
   const hasPriorityActions = Boolean(onSetTaskPriority);
   const hasLabelActions = Boolean(onToggleTaskLabel);
   const hasMoveActions = Boolean(onMoveTaskToList && listId);
+  const currentList = listId
+    ? (lists.find((list) => list.id === listId) ?? null)
+    : null;
   const hasDeleteActions = Boolean(onDeleteTask) && !hideDelete;
   const sortedLabels = useMemo(
     () =>
@@ -566,14 +578,33 @@ export function TaskModalFooter({
           }
         >
           <FooterTextButton
-            ariaLabel="Move to list"
+            ariaLabel={
+              currentList ? `List: ${currentList.name}. Change list` : "Move to list"
+            }
+            ariaHaspopup="dialog"
+            ariaExpanded={isMoveMenuOpen}
             onClick={() => {
               setIsPriorityMenuOpen(false);
               setIsLabelMenuOpen(false);
               setIsMoveMenuOpen((open) => !open);
             }}
           >
-            Move to
+            {currentList ? (
+              <span className="flex max-w-[180px] items-center gap-1">
+                {isInboxList(currentList) ? (
+                  <LuInbox className="size-3.5 shrink-0" aria-hidden="true" />
+                ) : (
+                  <LuHash
+                    className="size-3.5 shrink-0"
+                    style={{ color: getListColor(currentList) }}
+                    aria-hidden="true"
+                  />
+                )}
+                <span className="truncate">{currentList.name}</span>
+              </span>
+            ) : (
+              "Move to"
+            )}
           </FooterTextButton>
 
           {isMoveMenuOpen ? (
@@ -581,6 +612,7 @@ export function TaskModalFooter({
               <TaskMoveToSelector
                 lists={lists}
                 currentListId={listId}
+                showCurrentList
                 query={moveQuery}
                 onQueryChange={setMoveQuery}
                 onSelectList={handleMoveToList}

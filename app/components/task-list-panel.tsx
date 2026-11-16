@@ -3401,7 +3401,7 @@ export function TaskListPanel({
             ref={taskListScrollRef}
             className={
               panelWidth != null || title
-                ? `list-panel-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden${
+                ? `list-panel-scroll list-panel-scroll--tooltip-clearance min-h-0 flex-1 overflow-y-auto overflow-x-hidden${
                     showEntityFilter ? " pb-14" : ""
                   }`
                 : undefined

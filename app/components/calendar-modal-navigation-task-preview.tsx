@@ -11,12 +11,17 @@ import {
 
 const PREVIEW_ESTIMATED_HEIGHT = 240;
 const PREVIEW_VIEWPORT_PADDING_PX = 8;
+const MODAL_NAVIGATION_PREVIEW_OFFSET_X_PX = 20;
 
 function clampNavigationPreviewPosition(
   anchorRect: DOMRect,
 ): { left: number; top: number } {
   const width = CALENDAR_TASK_HOVER_PREVIEW_WIDTH_PX;
-  let left = anchorRect.left + anchorRect.width / 2 - width / 2;
+  let left =
+    anchorRect.left +
+    anchorRect.width / 2 -
+    width / 2 +
+    MODAL_NAVIGATION_PREVIEW_OFFSET_X_PX;
   let top = anchorRect.bottom + 8;
 
   if (typeof window !== "undefined") {

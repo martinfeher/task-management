@@ -130,12 +130,12 @@ export function LoginForm({ googleConfigured }: LoginFormProps) {
   }
 
   return (
-    <div className="flex min-h-screen w-full items-center justify-center bg-zinc-50 px-4 dark:bg-zinc-950">
-      <div className="w-full max-w-sm rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+    <div className="login-sf-pro flex min-h-screen w-full justify-center bg-zinc-50 px-4 py-12 sm:py-16 dark:bg-zinc-950">
+      <div className="w-full max-w-sm self-start rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
         <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">
-          Sign in
+          {mode === "sign-up" ? "Create account" : "Sign in"}
         </h1>
-        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+        <p className="mt-1 text-sm text-[#9ca8b8] dark:text-zinc-400">
           Use your email or Google to access your lists and tasks.
         </p>
 
@@ -174,12 +174,12 @@ export function LoginForm({ googleConfigured }: LoginFormProps) {
         ) : null}
 
         <form className="mt-6 space-y-4" onSubmit={handleEmailAuth}>
-          <div className="flex rounded-lg border border-zinc-200 p-0.5 dark:border-zinc-700">
+          <div className="flex rounded-[10px] border border-zinc-200 p-0.5 dark:border-zinc-700">
             <button
               type="button"
-              className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+              className={`flex-1 rounded-[10px] px-3 py-1.5 text-sm font-medium cursor-pointer transition-colors ${
                 mode === "sign-in"
-                  ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                  ? "bg-[#5274a9] text-white"
                   : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
               }`}
               onClick={() => {
@@ -191,9 +191,9 @@ export function LoginForm({ googleConfigured }: LoginFormProps) {
             </button>
             <button
               type="button"
-              className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+              className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium cursor-pointer transition-colors ${
                 mode === "sign-up"
-                  ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                  ? "bg-[#5274a9] text-white"
                   : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
               }`}
               onClick={() => {
@@ -205,30 +205,36 @@ export function LoginForm({ googleConfigured }: LoginFormProps) {
             </button>
           </div>
 
-          {mode === "sign-up" ? (
-            <div>
-              <label
-                htmlFor="auth-name"
-                className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
-              >
-                Name
-              </label>
-              <input
-                id="auth-name"
-                type="text"
-                autoComplete="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-400 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
-                placeholder="Your name"
-              />
-            </div>
-          ) : null}
+          <div
+            className={
+              mode === "sign-in"
+                ? "invisible pointer-events-none"
+                : undefined
+            }
+            aria-hidden={mode === "sign-in"}
+          >
+            <label
+              htmlFor="auth-name"
+              className="block text-sm font-medium text-zinc-600 dark:text-zinc-300"
+            >
+              Name
+            </label>
+            <input
+              id="auth-name"
+              type="text"
+              autoComplete="name"
+              tabIndex={mode === "sign-in" ? -1 : undefined}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-zinc-250 bg-white px-3 py-2 text-sm text-zinc-750 outline-none placeholder:text-zinc-350 focus:border-zinc-400 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+              placeholder="Your name"
+            />
+          </div>
 
           <div>
             <label
               htmlFor="auth-email"
-              className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+              className="block text-sm font-medium text-zinc-600 dark:text-zinc-300"
             >
               Email
             </label>
@@ -239,7 +245,7 @@ export function LoginForm({ googleConfigured }: LoginFormProps) {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-400 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+              className="mt-1 w-full rounded-[11px] border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-350  dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
             />
           </div>
 
@@ -247,18 +253,22 @@ export function LoginForm({ googleConfigured }: LoginFormProps) {
             <div className="flex items-center justify-between">
               <label
                 htmlFor="auth-password"
-                className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+                className="block text-sm font-medium text-zinc-600 dark:text-zinc-300"
               >
                 Password
               </label>
-              {mode === "sign-in" ? (
-                <Link
-                  href="/forgot-password"
-                  className="text-xs font-medium text-zinc-600 underline-offset-2 hover:text-zinc-900 hover:underline dark:text-zinc-400 dark:hover:text-zinc-200"
-                >
-                  Forgot password?
-                </Link>
-              ) : null}
+              <Link
+                href="/forgot-password"
+                tabIndex={mode === "sign-up" ? -1 : undefined}
+                className={`text-xs font-medium text-zinc-550 underline-offset-2 hover:text-zinc-700 hover:underline dark:text-zinc-400 dark:hover:text-zinc-200 ${
+                  mode === "sign-up"
+                    ? "invisible pointer-events-none"
+                    : ""
+                }`}
+                aria-hidden={mode === "sign-up"}
+              >
+                Forgot password?
+              </Link>
             </div>
             <input
               id="auth-password"
@@ -270,19 +280,22 @@ export function LoginForm({ googleConfigured }: LoginFormProps) {
               minLength={8}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-400 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+              className="mt-1 w-full rounded-[11px] border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-400  dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
             />
-            {mode === "sign-up" ? (
-              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                At least 8 characters.
-              </p>
-            ) : null}
+            <p
+              className={`mt-1 text-xs text-zinc-400 dark:text-zinc-400 ${
+                mode === "sign-in" ? "invisible" : ""
+              }`}
+              aria-hidden={mode === "sign-in"}
+            >
+              At least 8 characters.
+            </p>
           </div>
 
           <button
             type="submit"
             disabled={isBusy}
-            className="w-full rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+            className="w-full rounded-[22px] bg-[#484862] hover:bg-[#424654] px-4 py-2.5 text-sm font-medium text-white transition-colors disabled:cursor-not-allowed disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 cursor-pointer"
           >
             {isBusy
               ? mode === "sign-up"
@@ -299,7 +312,7 @@ export function LoginForm({ googleConfigured }: LoginFormProps) {
             <div className="w-full border-t border-zinc-200 dark:border-zinc-700" />
           </div>
           <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-white px-2 text-zinc-500 dark:bg-zinc-900 dark:text-zinc-400">
+            <span className="bg-white px-2 text-zinc-350 dark:bg-zinc-900 dark:text-zinc-400">
               Or
             </span>
           </div>
@@ -309,7 +322,7 @@ export function LoginForm({ googleConfigured }: LoginFormProps) {
           type="button"
           onClick={handleGoogleSignIn}
           disabled={isBusy || !googleConfigured}
-          className="flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+          className="flex w-full items-center justify-center gap-2 rounded-full cursor-pointer border border-zinc-300 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
         >
           <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
             <path

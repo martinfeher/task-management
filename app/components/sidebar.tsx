@@ -115,6 +115,7 @@ function getTotalActiveTaskCount(taskCountByListId: Record<string, number>) {
 
 const NAV_ITEM_TEXT_CLASS = {
   today: "ptxt-list-nav-today",
+  upcoming: "ptxt-list-nav-today",
   inbox: "ptxt-list-nav-inbox",
   important: "ptxt-list-nav-important",
   calendar: "ptxt-list-nav-calendar",
@@ -122,6 +123,7 @@ const NAV_ITEM_TEXT_CLASS = {
 
 const NAV_ITEM_ICON_CLASS = {
   today: "ptxt-list-nav-today-icon",
+  upcoming: "ptxt-list-nav-today-icon",
   inbox: "ptxt-list-nav-inbox-icon",
   important: "ptxt-list-nav-important-icon",
   calendar: "ptxt-list-nav-calendar-icon",
@@ -133,6 +135,7 @@ const NAV_ITEMS = [
   { label: "Inbox", action: "inbox" as const },
   // { label: "Next 7 days", action: "next7days" as const },
   { label: "Important", action: "important" as const },
+  { label: "Upcoming", action: "upcoming" as const },
   { label: "Calendar", action: "calendar" as const },
 ];
 
@@ -181,6 +184,7 @@ type SidebarProps = {
   suppressListSelectionHighlightId?: string | null;
   selectedLabelId: string | null;
   isTodaySelected: boolean;
+  isUpcomingSelected: boolean;
   isInboxSelected: boolean;
   // isNext7DaysSelected: boolean;
   isImportantSelected: boolean;
@@ -189,6 +193,7 @@ type SidebarProps = {
   onSelectList: (listId: string) => void;
   onSelectLabel: (labelId: string) => void;
   onSelectToday: () => void;
+  onSelectUpcoming: () => void;
   onSelectInbox: () => void;
   // onSelectNext7Days: () => void;
   onSelectImportant: () => void;
@@ -301,6 +306,7 @@ export function Sidebar({
   suppressListSelectionHighlightId = null,
   selectedLabelId,
   isTodaySelected,
+  isUpcomingSelected,
   isInboxSelected,
   // isNext7DaysSelected,
   isImportantSelected,
@@ -309,6 +315,7 @@ export function Sidebar({
   onSelectList,
   onSelectLabel,
   onSelectToday,
+  onSelectUpcoming,
   onSelectInbox,
   // onSelectNext7Days,
   onSelectImportant,
@@ -1732,22 +1739,17 @@ export function Sidebar({
           {visibleNavItems.map((item) => {
             const isNavItemSelected =
               (item.action === "today" && isTodaySelected) ||
+              (item.action === "upcoming" && isUpcomingSelected) ||
               (item.action === "inbox" && isInboxSelected) ||
               // (item.action === "next7days" && isNext7DaysSelected) ||
               (item.action === "important" && isImportantSelected) ||
               (item.action === "calendar" && isCalendarSelected);
             const navTextClass =
-              item.action === "today" ||
-              item.action === "inbox" ||
-              item.action === "important" ||
-              item.action === "calendar"
+              item.action !== "search"
                 ? NAV_ITEM_TEXT_CLASS[item.action]
                 : null;
             const navIconClass =
-              item.action === "today" ||
-              item.action === "inbox" ||
-              item.action === "important" ||
-              item.action === "calendar"
+              item.action !== "search"
                 ? NAV_ITEM_ICON_CLASS[item.action]
                 : null;
             const navIconColor = isNavItemSelected
@@ -1755,10 +1757,7 @@ export function Sidebar({
               : navIconClass ?? "ptxt-400";
 
             return (
-            item.action === "today" ||
-            item.action === "inbox" ||
-            item.action === "important" ||
-            item.action === "calendar" ? (
+            item.action !== "search" ? (
             (() => {
               const showNavAccentBorder =
                 isNavItemSelected && sidebarHoverPreview === null;
@@ -1777,6 +1776,7 @@ export function Sidebar({
                 : {})}
               onClick={() => {
                 if (item.action === "today") onSelectToday();
+                else if (item.action === "upcoming") onSelectUpcoming();
                 else if (item.action === "inbox") onSelectInbox();
                 else if (item.action === "important") onSelectImportant();
                 else onSelectCalendar();
@@ -1786,6 +1786,7 @@ export function Sidebar({
                 if (event.key !== "Enter" && event.key !== " ") return;
                 event.preventDefault();
                 if (item.action === "today") onSelectToday();
+                else if (item.action === "upcoming") onSelectUpcoming();
                 else if (item.action === "inbox") onSelectInbox();
                 else if (item.action === "important") onSelectImportant();
                 else onSelectCalendar();
@@ -1802,6 +1803,12 @@ export function Sidebar({
                   className={`size-[19.5px] -ml-[2px] shrink-0 ${navIconColor}`}
                   strokeWidth={1}
                   // strokeWidth={0.875}
+                />
+              ) : item.action === "upcoming" ? (
+                <LuCalendarDays
+                  className={`size-[17px] shrink-0 ${navIconColor}`}
+                  aria-hidden="true"
+                  strokeWidth={1}
                 />
               ) : item.action === "inbox" ? (
                 <LuInbox

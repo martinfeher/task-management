@@ -9,6 +9,7 @@ import {
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
+  type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
 import { BiAlarm, BiRevision } from "react-icons/bi";
@@ -169,11 +170,19 @@ type KanbanDatePickerState = {
   y: number;
 };
 
+export type KanbanBoardColumn = Pick<KanbanColumnRecord, "id" | "name">;
+
 type ListKanbanPanelProps = {
-  list: TodoList;
+  list?: TodoList;
+  /** Replaces the default list-name header. */
+  header?: ReactNode;
   lists: TodoList[];
-  columns: KanbanColumnRecord[];
+  columns: KanbanBoardColumn[];
   tasks: TaskListItem[];
+  /** Pre-grouped column tasks; when omitted tasks are grouped by `kanbanColumnId`. */
+  tasksByColumnId?: Map<string, TaskListItem[]>;
+  showTaskListName?: boolean;
+  canAddTaskToColumn?: (columnId: string) => boolean;
   completingTaskIds?: Set<string>;
   completingWithoutBackgroundTaskIds?: Set<string>;
   checkAnimatingTaskIds?: Set<string>;
@@ -194,14 +203,15 @@ type ListKanbanPanelProps = {
   onLabelsChanged?: () => void;
   onDuplicateTask?: (taskId: string) => Promise<void> | void;
   onDeleteTask?: (taskId: string) => Promise<void> | void;
-  onAddColumn: (name: string) => Promise<void> | void;
+  onAddColumn?: (name: string) => Promise<void> | void;
   onAddTask: (columnId: string, name: string) => Promise<void> | void;
   onMoveTask: (
     taskId: string,
     targetColumnId: string,
     targetIndex: number,
+    sourceColumnId: string,
   ) => Promise<void> | void;
-  onRemoveColumn: (columnId: string) => Promise<void> | void;
+  onRemoveColumn?: (columnId: string) => Promise<void> | void;
   onRenameColumn?: (columnId: string, name: string) => Promise<void> | void;
   showSidebarMenu?: boolean;
   onOpenSidebar?: () => void;
@@ -234,7 +244,7 @@ type DropIndicatorState = {
 } | null;
 
 type ColumnPendingRemoval = {
-  column: KanbanColumnRecord;
+  column: KanbanBoardColumn;
   taskCount: number;
 };
 
@@ -245,9 +255,13 @@ type ColumnRenameState = {
 
 export function ListKanbanPanel({
   list,
+  header,
   lists,
   columns,
   tasks,
+  tasksByColumnId: groupedTasksByColumnId,
+  showTaskListName = false,
+  canAddTaskToColumn,
   completingTaskIds = new Set(),
   completingWithoutBackgroundTaskIds = new Set(),
   checkAnimatingTaskIds = new Set(),
@@ -292,7 +306,7 @@ export function ListKanbanPanel({
   const taskContextMenuRef = useRef<HTMLDivElement>(null);
   const datePickerRef = useRef<HTMLDivElement>(null);
   const dragStateRef = useRef<KanbanDragState | null>(null);
-  const listColor = getListColor({ color: list.color ?? null });
+  const listColor = getListColor({ color: list?.color ?? null });
 
   const contextMenuTask = taskContextMenu
     ? (tasks.find((item) => item.id === taskContextMenu.task.id) ??
@@ -526,6 +540,8 @@ export function ListKanbanPanel({
   }
 
   const tasksByColumnId = useMemo(() => {
+    if (groupedTasksByColumnId) return groupedTasksByColumnId;
+
     const grouped = new Map<string, TaskListItem[]>();
 
     for (const column of columns) {
@@ -540,7 +556,7 @@ export function ListKanbanPanel({
     }
 
     return grouped;
-  }, [columns, tasks]);
+  }, [columns, groupedTasksByColumnId, tasks]);
 
   function clearDragVisuals(dragState: KanbanDragState) {
     dragState.dragGhost?.remove();
@@ -672,6 +688,7 @@ export function ListKanbanPanel({
           dragState.sourceTaskId,
           dragState.dropColumnId,
           insertIndex,
+          dragState.sourceColumnId,
         );
       }
     }
@@ -679,7 +696,7 @@ export function ListKanbanPanel({
     dragStateRef.current = null;
   }
 
-  function startColumnRename(column: KanbanColumnRecord) {
+  function startColumnRename(column: KanbanBoardColumn) {
     if (!onRenameColumn) return;
 
     setRenamingColumn({ columnId: column.id, value: column.name });
@@ -771,7 +788,7 @@ export function ListKanbanPanel({
   async function handleAddColumnSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const trimmed = newColumnName.trim();
-    if (!trimmed) return;
+    if (!trimmed || !onAddColumn) return;
 
     await onAddColumn(trimmed);
     setNewColumnName("");
@@ -799,6 +816,7 @@ export function ListKanbanPanel({
 
   return (
     <div className="panel-text-scope flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#fbfbfc] dark:bg-zinc-950">
+      {header ?? (
       <header className="flex shrink-0 items-center gap-2 border-b border-zinc-200 px-4 py-2 dark:border-zinc-800">
         {showSidebarMenu ? (
           <button
@@ -817,16 +835,20 @@ export function ListKanbanPanel({
           aria-hidden="true"
         />
         <h1 className="truncate text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-          {list.name}
+          {list?.name}
         </h1>
       </header>
+      )}
 
       <div className={KANBAN_BOARD_SCROLL_CLASS}>
         <div className="flex h-full w-max shrink-0 items-start gap-3 px-4 py-4">
           {columns.map((column) => {
             const columnTasks = tasksByColumnId.get(column.id) ?? [];
             const isAddingTaskHere = addingTask?.columnId === column.id;
-            const canRemoveColumn = column.name !== NOT_ASSIGNED_COLUMN_NAME;
+            const canRemoveColumn =
+              Boolean(onRemoveColumn) &&
+              column.name !== NOT_ASSIGNED_COLUMN_NAME;
+            const canAddTask = canAddTaskToColumn?.(column.id) ?? true;
 
             return (
               <section
@@ -1022,6 +1044,16 @@ export function ListKanbanPanel({
                             >
                               {task.name}
                             </span>
+                            {showTaskListName && task.listName ? (
+                              <div
+                                className={`mt-1 inline-flex max-w-full items-center gap-1 text-[11px] leading-none text-zinc-500 dark:text-zinc-400 ${
+                                  hideDueDate ? "hidden" : ""
+                                }`}
+                              >
+                                <span aria-hidden="true">#</span>
+                                <span className="truncate">{task.listName}</span>
+                              </div>
+                            ) : null}
                             {schedule.showDueSchedule && schedule.dueScheduleSubline ? (
                               <div
                                 className={`mt-0.5 inline-flex w-fit max-w-full items-center gap-1 text-[11px] leading-none ${KANBAN_TASK_SCHEDULE_COLOR_CLASS} ${
@@ -1119,7 +1151,7 @@ export function ListKanbanPanel({
                         }}
                       />
                     </form>
-                  ) : (
+                  ) : canAddTask ? (
                     <button
                       type="button"
                       onClick={() => startAddTask(column.id)}
@@ -1128,12 +1160,13 @@ export function ListKanbanPanel({
                       <LuPlus className="size-3.5 shrink-0" aria-hidden="true" />
                       Add task
                     </button>
-                  )}
+                  ) : null}
                 </div>
               </section>
             );
           })}
 
+          {onAddColumn ? (
           <div className="flex w-[220px] shrink-0 flex-col pt-4">
             {isAddingColumn ? (
               <form
@@ -1190,6 +1223,7 @@ export function ListKanbanPanel({
               </button>
             )}
           </div>
+          ) : null}
         </div>
       </div>
 
@@ -1200,7 +1234,7 @@ export function ListKanbanPanel({
                 task={contextMenuTask}
                 view={taskContextMenu.view}
                 lists={lists}
-                currentListId={list.id}
+                currentListId={list?.id ?? contextMenuTask.listId ?? ""}
                 moveQuery=""
                 availableLabels={availableLabels}
                 assignedLabelIds={assignedLabelIds}
@@ -1336,7 +1370,7 @@ export function ListKanbanPanel({
             return;
           }
 
-          void onRemoveColumn(columnPendingRemoval.column.id);
+          void onRemoveColumn?.(columnPendingRemoval.column.id);
           setColumnPendingRemoval(null);
         }}
         onCancel={() => setColumnPendingRemoval(null)}

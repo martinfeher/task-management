@@ -29,6 +29,7 @@ import {
   formatDueTimeLabel,
 } from "@/lib/task-due-time";
 import { useCalendarHoveredTaskId } from "./calendar-task-hover-preview";
+import { CalendarModalNavigationTaskPreview } from "./calendar-modal-navigation-task-preview";
 import { CalendarSidebarHoverPreviewShield } from "./calendar-sidebar-hover-preview-shield";
 import {
   CALENDAR_SIDEBAR_HOVER_PREVIEW_CLEAR_MS,
@@ -203,7 +204,7 @@ function CalendarSidebarDayTasks({
   onOpenTask?: (taskId: string) => void;
   onToggleTask?: (taskId: string, options?: ToggleTaskOptions) => void;
   checkAnimatingTaskIds?: Set<string>;
-  onHoverTaskStart?: (taskId: string) => void;
+  onHoverTaskStart?: (taskId: string, anchor: HTMLElement) => void;
   onHoverTaskEnd?: () => void;
   activeModalTaskId?: string | null;
 }) {
@@ -246,7 +247,9 @@ function CalendarSidebarDayTasks({
                         <button
                           type="button"
                           onClick={() => onOpenTask?.(task.id)}
-                          onMouseEnter={() => onHoverTaskStart?.(task.id)}
+                          onMouseEnter={(event) =>
+                            onHoverTaskStart?.(task.id, event.currentTarget)
+                          }
                           onMouseLeave={() => onHoverTaskEnd?.()}
                           className={`${CALENDAR_SIDEBAR_TASK_ROW_BUTTON_CLASS} flex w-full items-center gap-2 rounded-[18px] min-h-[40px] px-2.5 py-1 border border-[#f8f8fa] text-left transition-colors hover:bg-[#f4f4f8]! dark:hover:bg-zinc-900 cursor-pointer ${getCalendarSidebarTaskRowClassName(
                             {
@@ -315,7 +318,7 @@ function CalendarSidebarSearchResults({
   onToggleTask?: (taskId: string, options?: ToggleTaskOptions) => void;
   checkAnimatingTaskIds?: Set<string>;
   onSelectSearchTask?: (task: SearchTask) => void;
-  onHoverTaskStart?: (taskId: string) => void;
+  onHoverTaskStart?: (taskId: string, anchor: HTMLElement) => void;
   onHoverTaskEnd?: () => void;
   activeModalTaskId?: string | null;
 }) {
@@ -375,7 +378,9 @@ function CalendarSidebarSearchResults({
                       onSelectSearchTask?.(task);
                       onOpenTask?.(task.id);
                     }}
-                    onMouseEnter={() => onHoverTaskStart?.(task.id)}
+                    onMouseEnter={(event) =>
+                      onHoverTaskStart?.(task.id, event.currentTarget)
+                    }
                     onMouseLeave={() => onHoverTaskEnd?.()}
                     className={`${CALENDAR_SIDEBAR_TASK_ROW_BUTTON_CLASS} flex w-full items-center gap-2 rounded-[15px] min-h-[39px] px-2.5 py-1 text-left transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-900 cursor-pointer ${getCalendarSidebarTaskRowClassName(
                       {
@@ -471,6 +476,11 @@ export function CalendarViewSidebarLayout({
   const [hoverPreviewShown, setHoverPreviewShown] = useState(false);
   const hoverPreviewClearTimerRef = useRef<number | null>(null);
   const hoverPreviewExitTimerRef = useRef<number | null>(null);
+  const pinnedSidebarPreviewClearTimerRef = useRef<number | null>(null);
+  const [pinnedSidebarPreview, setPinnedSidebarPreview] = useState<{
+    task: TaskListItem;
+    anchorRect: DOMRect;
+  } | null>(null);
   const calendarSidebarRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -480,6 +490,9 @@ export function CalendarViewSidebarLayout({
       }
       if (hoverPreviewExitTimerRef.current !== null) {
         window.clearTimeout(hoverPreviewExitTimerRef.current);
+      }
+      if (pinnedSidebarPreviewClearTimerRef.current !== null) {
+        window.clearTimeout(pinnedSidebarPreviewClearTimerRef.current);
       }
     };
   }, []);
@@ -501,6 +514,26 @@ export function CalendarViewSidebarLayout({
     setHoverPreviewMounted(false);
   }, []);
 
+  const cancelPinnedSidebarPreviewClear = useCallback(() => {
+    if (pinnedSidebarPreviewClearTimerRef.current !== null) {
+      window.clearTimeout(pinnedSidebarPreviewClearTimerRef.current);
+      pinnedSidebarPreviewClearTimerRef.current = null;
+    }
+  }, []);
+
+  const clearPinnedSidebarPreview = useCallback(() => {
+    cancelPinnedSidebarPreviewClear();
+    setPinnedSidebarPreview(null);
+  }, [cancelPinnedSidebarPreviewClear]);
+
+  const schedulePinnedSidebarPreviewClear = useCallback(() => {
+    cancelPinnedSidebarPreviewClear();
+    pinnedSidebarPreviewClearTimerRef.current = window.setTimeout(() => {
+      pinnedSidebarPreviewClearTimerRef.current = null;
+      setPinnedSidebarPreview(null);
+    }, CALENDAR_SIDEBAR_HOVER_PREVIEW_CLEAR_MS);
+  }, [cancelPinnedSidebarPreviewClear]);
+
   const scheduleHoverPreviewClear = useCallback(() => {
     cancelHoverPreviewClear();
     hoverPreviewClearTimerRef.current = window.setTimeout(() => {
@@ -515,10 +548,27 @@ export function CalendarViewSidebarLayout({
   }, [cancelHoverPreviewClear]);
 
   const isPinnedModal = Boolean(modalTaskId || centerModalTaskId);
+  const activeSidebarModalTaskId = modalTaskId ?? centerModalTaskId ?? null;
 
   const handleSidebarTaskHoverStart = useCallback(
-    (taskId: string) => {
-      if (isPinnedModal) return;
+    (taskId: string, anchor: HTMLElement) => {
+      if (isPinnedModal) {
+        if (taskId === activeSidebarModalTaskId) {
+          schedulePinnedSidebarPreviewClear();
+          return;
+        }
+        const task = tasks.find((item) => item.id === taskId);
+        if (!task) {
+          clearPinnedSidebarPreview();
+          return;
+        }
+        cancelPinnedSidebarPreviewClear();
+        setPinnedSidebarPreview({
+          task,
+          anchorRect: DOMRect.fromRect(anchor.getBoundingClientRect()),
+        });
+        return;
+      }
       cancelHoverPreviewClear();
       const openingFresh = !hoverPreviewMounted;
       setHoverPreviewTaskId(taskId);
@@ -532,13 +582,33 @@ export function CalendarViewSidebarLayout({
       }
       setHoverPreviewShown(true);
     },
-    [cancelHoverPreviewClear, hoverPreviewMounted, isPinnedModal],
+    [
+      activeSidebarModalTaskId,
+      cancelHoverPreviewClear,
+      cancelPinnedSidebarPreviewClear,
+      clearPinnedSidebarPreview,
+      hoverPreviewMounted,
+      isPinnedModal,
+      schedulePinnedSidebarPreviewClear,
+      tasks,
+    ],
   );
 
   const handleSidebarTaskHoverEnd = useCallback(() => {
-    if (isPinnedModal) return;
+    if (isPinnedModal) {
+      schedulePinnedSidebarPreviewClear();
+      return;
+    }
     scheduleHoverPreviewClear();
-  }, [isPinnedModal, scheduleHoverPreviewClear]);
+  }, [isPinnedModal, scheduleHoverPreviewClear, schedulePinnedSidebarPreviewClear]);
+
+  const handlePinnedSidebarPreviewPointerEnter = useCallback(() => {
+    cancelPinnedSidebarPreviewClear();
+  }, [cancelPinnedSidebarPreviewClear]);
+
+  const handlePinnedSidebarPreviewPointerLeave = useCallback(() => {
+    schedulePinnedSidebarPreviewClear();
+  }, [schedulePinnedSidebarPreviewClear]);
 
   const handleHoverPreviewPointerEnter = useCallback(() => {
     if (isPinnedModal) return;
@@ -554,10 +624,16 @@ export function CalendarViewSidebarLayout({
     (taskId: string) => {
       cancelHoverPreviewClear();
       clearHoverPreviewLayer();
+      clearPinnedSidebarPreview();
       onSelectTask?.(taskId);
       setModalTaskId(taskId);
     },
-    [cancelHoverPreviewClear, clearHoverPreviewLayer, onSelectTask],
+    [
+      cancelHoverPreviewClear,
+      clearHoverPreviewLayer,
+      clearPinnedSidebarPreview,
+      onSelectTask,
+    ],
   );
 
   const visibleTaskId =
@@ -565,7 +641,6 @@ export function CalendarViewSidebarLayout({
     centerModalTaskId ??
     (hoverPreviewMounted ? hoverPreviewTaskId : null);
   const isHoverPreview = !isPinnedModal && hoverPreviewMounted;
-  const activeSidebarModalTaskId = modalTaskId ?? centerModalTaskId ?? null;
 
   const modalTaskSnapshot = useMemo(
     () =>
@@ -576,6 +651,7 @@ export function CalendarViewSidebarLayout({
   const handleCloseTaskModal = useCallback(() => {
     cancelHoverPreviewClear();
     clearHoverPreviewLayer();
+    clearPinnedSidebarPreview();
     if (modalTaskId) {
       setModalTaskId(null);
       return;
@@ -587,6 +663,7 @@ export function CalendarViewSidebarLayout({
     cancelHoverPreviewClear,
     centerModalTaskId,
     clearHoverPreviewLayer,
+    clearPinnedSidebarPreview,
     modalTaskId,
     onCloseCenterModal,
   ]);
@@ -667,6 +744,7 @@ export function CalendarViewSidebarLayout({
   const handleModalNavigateTask = useCallback(
     (taskId: string) => {
       cancelHoverPreviewClear();
+      clearPinnedSidebarPreview();
       if (modalTaskId) {
         onSelectTask?.(taskId);
         setModalTaskId(taskId);
@@ -681,10 +759,19 @@ export function CalendarViewSidebarLayout({
     [
       cancelHoverPreviewClear,
       centerModalTaskId,
+      clearPinnedSidebarPreview,
       modalTaskId,
       onCenterModalNavigateTask,
       onSelectTask,
     ],
+  );
+
+  const handlePinnedSidebarPreviewOpen = useCallback(
+    (taskId: string) => {
+      clearPinnedSidebarPreview();
+      handleModalNavigateTask(taskId);
+    },
+    [clearPinnedSidebarPreview, handleModalNavigateTask],
   );
 
   const taskModalIsNewTaskDraft =
@@ -849,6 +936,16 @@ export function CalendarViewSidebarLayout({
           onToggleTask={onToggleTask}
           navigableTaskIds={modalNavigableTaskIds}
           onNavigateTask={handleModalNavigateTask}
+        />
+      ) : null}
+
+      {isPinnedModal && pinnedSidebarPreview ? (
+        <CalendarModalNavigationTaskPreview
+          task={pinnedSidebarPreview.task}
+          anchorRect={pinnedSidebarPreview.anchorRect}
+          onPointerEnter={handlePinnedSidebarPreviewPointerEnter}
+          onPointerLeave={handlePinnedSidebarPreviewPointerLeave}
+          onOpenTask={handlePinnedSidebarPreviewOpen}
         />
       ) : null}
     </>
