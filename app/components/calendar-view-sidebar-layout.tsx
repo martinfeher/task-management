@@ -30,11 +30,7 @@ import {
 } from "@/lib/task-due-time";
 import { useCalendarHoveredTaskId } from "./calendar-task-hover-preview";
 import { CalendarModalNavigationTaskPreview } from "./calendar-modal-navigation-task-preview";
-import { CalendarSidebarHoverPreviewShield } from "./calendar-sidebar-hover-preview-shield";
-import {
-  CALENDAR_SIDEBAR_HOVER_PREVIEW_CLEAR_MS,
-  CALENDAR_SIDEBAR_HOVER_PREVIEW_TRANSITION_MS,
-} from "@/lib/calendar-sidebar-hover-preview";
+import { CALENDAR_SIDEBAR_HOVER_PREVIEW_CLEAR_MS } from "@/lib/calendar-sidebar-hover-preview";
 import type { ToggleTaskOptions } from "@/lib/toggle-task-options";
 import { useListCalendarOverlapLayout } from "./list-calendar-overlap-shell";
 import type { CalendarDateNavigationSnapshot } from "@/lib/calendar-date-navigation-undo";
@@ -469,15 +465,8 @@ export function CalendarViewSidebarLayout({
   );
 
   const [modalTaskId, setModalTaskId] = useState<string | null>(null);
-  const [hoverPreviewTaskId, setHoverPreviewTaskId] = useState<string | null>(
-    null,
-  );
-  const [hoverPreviewMounted, setHoverPreviewMounted] = useState(false);
-  const [hoverPreviewShown, setHoverPreviewShown] = useState(false);
-  const hoverPreviewClearTimerRef = useRef<number | null>(null);
-  const hoverPreviewExitTimerRef = useRef<number | null>(null);
-  const pinnedSidebarPreviewClearTimerRef = useRef<number | null>(null);
-  const [pinnedSidebarPreview, setPinnedSidebarPreview] = useState<{
+  const sidebarTaskHoverPreviewClearTimerRef = useRef<number | null>(null);
+  const [sidebarTaskHoverPreview, setSidebarTaskHoverPreview] = useState<{
     task: TaskListItem;
     anchorRect: DOMRect;
   } | null>(null);
@@ -485,162 +474,91 @@ export function CalendarViewSidebarLayout({
 
   useEffect(() => {
     return () => {
-      if (hoverPreviewClearTimerRef.current !== null) {
-        window.clearTimeout(hoverPreviewClearTimerRef.current);
-      }
-      if (hoverPreviewExitTimerRef.current !== null) {
-        window.clearTimeout(hoverPreviewExitTimerRef.current);
-      }
-      if (pinnedSidebarPreviewClearTimerRef.current !== null) {
-        window.clearTimeout(pinnedSidebarPreviewClearTimerRef.current);
+      if (sidebarTaskHoverPreviewClearTimerRef.current !== null) {
+        window.clearTimeout(sidebarTaskHoverPreviewClearTimerRef.current);
       }
     };
   }, []);
 
-  const cancelHoverPreviewClear = useCallback(() => {
-    if (hoverPreviewClearTimerRef.current !== null) {
-      window.clearTimeout(hoverPreviewClearTimerRef.current);
-      hoverPreviewClearTimerRef.current = null;
-    }
-    if (hoverPreviewExitTimerRef.current !== null) {
-      window.clearTimeout(hoverPreviewExitTimerRef.current);
-      hoverPreviewExitTimerRef.current = null;
+  const cancelSidebarTaskHoverPreviewClear = useCallback(() => {
+    if (sidebarTaskHoverPreviewClearTimerRef.current !== null) {
+      window.clearTimeout(sidebarTaskHoverPreviewClearTimerRef.current);
+      sidebarTaskHoverPreviewClearTimerRef.current = null;
     }
   }, []);
 
-  const clearHoverPreviewLayer = useCallback(() => {
-    setHoverPreviewShown(false);
-    setHoverPreviewTaskId(null);
-    setHoverPreviewMounted(false);
-  }, []);
+  const clearSidebarTaskHoverPreview = useCallback(() => {
+    cancelSidebarTaskHoverPreviewClear();
+    setSidebarTaskHoverPreview(null);
+  }, [cancelSidebarTaskHoverPreviewClear]);
 
-  const cancelPinnedSidebarPreviewClear = useCallback(() => {
-    if (pinnedSidebarPreviewClearTimerRef.current !== null) {
-      window.clearTimeout(pinnedSidebarPreviewClearTimerRef.current);
-      pinnedSidebarPreviewClearTimerRef.current = null;
-    }
-  }, []);
-
-  const clearPinnedSidebarPreview = useCallback(() => {
-    cancelPinnedSidebarPreviewClear();
-    setPinnedSidebarPreview(null);
-  }, [cancelPinnedSidebarPreviewClear]);
-
-  const schedulePinnedSidebarPreviewClear = useCallback(() => {
-    cancelPinnedSidebarPreviewClear();
-    pinnedSidebarPreviewClearTimerRef.current = window.setTimeout(() => {
-      pinnedSidebarPreviewClearTimerRef.current = null;
-      setPinnedSidebarPreview(null);
+  const scheduleSidebarTaskHoverPreviewClear = useCallback(() => {
+    cancelSidebarTaskHoverPreviewClear();
+    sidebarTaskHoverPreviewClearTimerRef.current = window.setTimeout(() => {
+      sidebarTaskHoverPreviewClearTimerRef.current = null;
+      setSidebarTaskHoverPreview(null);
     }, CALENDAR_SIDEBAR_HOVER_PREVIEW_CLEAR_MS);
-  }, [cancelPinnedSidebarPreviewClear]);
-
-  const scheduleHoverPreviewClear = useCallback(() => {
-    cancelHoverPreviewClear();
-    hoverPreviewClearTimerRef.current = window.setTimeout(() => {
-      hoverPreviewClearTimerRef.current = null;
-      setHoverPreviewShown(false);
-      hoverPreviewExitTimerRef.current = window.setTimeout(() => {
-        hoverPreviewExitTimerRef.current = null;
-        setHoverPreviewTaskId(null);
-        setHoverPreviewMounted(false);
-      }, CALENDAR_SIDEBAR_HOVER_PREVIEW_TRANSITION_MS);
-    }, CALENDAR_SIDEBAR_HOVER_PREVIEW_CLEAR_MS);
-  }, [cancelHoverPreviewClear]);
+  }, [cancelSidebarTaskHoverPreviewClear]);
 
   const isPinnedModal = Boolean(modalTaskId || centerModalTaskId);
   const activeSidebarModalTaskId = modalTaskId ?? centerModalTaskId ?? null;
 
   const handleSidebarTaskHoverStart = useCallback(
     (taskId: string, anchor: HTMLElement) => {
-      if (isPinnedModal) {
-        if (taskId === activeSidebarModalTaskId) {
-          schedulePinnedSidebarPreviewClear();
-          return;
-        }
-        const task = tasks.find((item) => item.id === taskId);
-        if (!task) {
-          clearPinnedSidebarPreview();
-          return;
-        }
-        cancelPinnedSidebarPreviewClear();
-        setPinnedSidebarPreview({
-          task,
-          anchorRect: DOMRect.fromRect(anchor.getBoundingClientRect()),
-        });
+      if (isPinnedModal && taskId === activeSidebarModalTaskId) {
+        scheduleSidebarTaskHoverPreviewClear();
         return;
       }
-      cancelHoverPreviewClear();
-      const openingFresh = !hoverPreviewMounted;
-      setHoverPreviewTaskId(taskId);
-      setHoverPreviewMounted(true);
-      if (openingFresh) {
-        setHoverPreviewShown(false);
-        window.requestAnimationFrame(() => {
-          window.requestAnimationFrame(() => setHoverPreviewShown(true));
-        });
+
+      const task = tasks.find((item) => item.id === taskId);
+      if (!task) {
+        clearSidebarTaskHoverPreview();
         return;
       }
-      setHoverPreviewShown(true);
+
+      cancelSidebarTaskHoverPreviewClear();
+      setSidebarTaskHoverPreview({
+        task,
+        anchorRect: DOMRect.fromRect(anchor.getBoundingClientRect()),
+      });
     },
     [
       activeSidebarModalTaskId,
-      cancelHoverPreviewClear,
-      cancelPinnedSidebarPreviewClear,
-      clearPinnedSidebarPreview,
-      hoverPreviewMounted,
+      cancelSidebarTaskHoverPreviewClear,
+      clearSidebarTaskHoverPreview,
       isPinnedModal,
-      schedulePinnedSidebarPreviewClear,
+      scheduleSidebarTaskHoverPreviewClear,
       tasks,
     ],
   );
 
   const handleSidebarTaskHoverEnd = useCallback(() => {
-    if (isPinnedModal) {
-      schedulePinnedSidebarPreviewClear();
-      return;
-    }
-    scheduleHoverPreviewClear();
-  }, [isPinnedModal, scheduleHoverPreviewClear, schedulePinnedSidebarPreviewClear]);
+    scheduleSidebarTaskHoverPreviewClear();
+  }, [scheduleSidebarTaskHoverPreviewClear]);
 
-  const handlePinnedSidebarPreviewPointerEnter = useCallback(() => {
-    cancelPinnedSidebarPreviewClear();
-  }, [cancelPinnedSidebarPreviewClear]);
+  const handleSidebarTaskHoverPreviewPointerEnter = useCallback(() => {
+    cancelSidebarTaskHoverPreviewClear();
+  }, [cancelSidebarTaskHoverPreviewClear]);
 
-  const handlePinnedSidebarPreviewPointerLeave = useCallback(() => {
-    schedulePinnedSidebarPreviewClear();
-  }, [schedulePinnedSidebarPreviewClear]);
-
-  const handleHoverPreviewPointerEnter = useCallback(() => {
-    if (isPinnedModal) return;
-    cancelHoverPreviewClear();
-  }, [cancelHoverPreviewClear, isPinnedModal]);
-
-  const handleHoverPreviewPointerLeave = useCallback(() => {
-    if (isPinnedModal) return;
-    scheduleHoverPreviewClear();
-  }, [isPinnedModal, scheduleHoverPreviewClear]);
+  const handleSidebarTaskHoverPreviewPointerLeave = useCallback(() => {
+    scheduleSidebarTaskHoverPreviewClear();
+  }, [scheduleSidebarTaskHoverPreviewClear]);
 
   const handleOpenSidebarTask = useCallback(
     (taskId: string) => {
-      cancelHoverPreviewClear();
-      clearHoverPreviewLayer();
-      clearPinnedSidebarPreview();
+      cancelSidebarTaskHoverPreviewClear();
+      clearSidebarTaskHoverPreview();
       onSelectTask?.(taskId);
       setModalTaskId(taskId);
     },
     [
-      cancelHoverPreviewClear,
-      clearHoverPreviewLayer,
-      clearPinnedSidebarPreview,
+      cancelSidebarTaskHoverPreviewClear,
+      clearSidebarTaskHoverPreview,
       onSelectTask,
     ],
   );
 
-  const visibleTaskId =
-    modalTaskId ??
-    centerModalTaskId ??
-    (hoverPreviewMounted ? hoverPreviewTaskId : null);
-  const isHoverPreview = !isPinnedModal && hoverPreviewMounted;
+  const visibleTaskId = modalTaskId ?? centerModalTaskId ?? null;
 
   const modalTaskSnapshot = useMemo(
     () =>
@@ -649,9 +567,8 @@ export function CalendarViewSidebarLayout({
   );
 
   const handleCloseTaskModal = useCallback(() => {
-    cancelHoverPreviewClear();
-    clearHoverPreviewLayer();
-    clearPinnedSidebarPreview();
+    cancelSidebarTaskHoverPreviewClear();
+    clearSidebarTaskHoverPreview();
     if (modalTaskId) {
       setModalTaskId(null);
       return;
@@ -660,10 +577,9 @@ export function CalendarViewSidebarLayout({
       onCloseCenterModal?.();
     }
   }, [
-    cancelHoverPreviewClear,
+    cancelSidebarTaskHoverPreviewClear,
     centerModalTaskId,
-    clearHoverPreviewLayer,
-    clearPinnedSidebarPreview,
+    clearSidebarTaskHoverPreview,
     modalTaskId,
     onCloseCenterModal,
   ]);
@@ -671,32 +587,31 @@ export function CalendarViewSidebarLayout({
   const closeTaskEditorForTask = useCallback(
     (taskId: string) => {
       if (modalTaskId === taskId) {
-        cancelHoverPreviewClear();
-        clearHoverPreviewLayer();
+        cancelSidebarTaskHoverPreviewClear();
+        clearSidebarTaskHoverPreview();
         setModalTaskId(null);
         return;
       }
 
       if (centerModalTaskId === taskId) {
-        cancelHoverPreviewClear();
-        clearHoverPreviewLayer();
+        cancelSidebarTaskHoverPreviewClear();
+        clearSidebarTaskHoverPreview();
         onCloseCenterModal?.();
         return;
       }
 
-      if (hoverPreviewMounted && hoverPreviewTaskId === taskId) {
-        cancelHoverPreviewClear();
-        clearHoverPreviewLayer();
+      if (sidebarTaskHoverPreview?.task.id === taskId) {
+        cancelSidebarTaskHoverPreviewClear();
+        clearSidebarTaskHoverPreview();
       }
     },
     [
-      cancelHoverPreviewClear,
+      cancelSidebarTaskHoverPreviewClear,
       centerModalTaskId,
-      clearHoverPreviewLayer,
-      hoverPreviewMounted,
-      hoverPreviewTaskId,
+      clearSidebarTaskHoverPreview,
       modalTaskId,
       onCloseCenterModal,
+      sidebarTaskHoverPreview?.task.id,
     ],
   );
 
@@ -743,8 +658,8 @@ export function CalendarViewSidebarLayout({
 
   const handleModalNavigateTask = useCallback(
     (taskId: string) => {
-      cancelHoverPreviewClear();
-      clearPinnedSidebarPreview();
+      cancelSidebarTaskHoverPreviewClear();
+      clearSidebarTaskHoverPreview();
       if (modalTaskId) {
         onSelectTask?.(taskId);
         setModalTaskId(taskId);
@@ -754,24 +669,25 @@ export function CalendarViewSidebarLayout({
         onCenterModalNavigateTask?.(taskId);
         return;
       }
-      setHoverPreviewTaskId(taskId);
+      onSelectTask?.(taskId);
+      setModalTaskId(taskId);
     },
     [
-      cancelHoverPreviewClear,
+      cancelSidebarTaskHoverPreviewClear,
       centerModalTaskId,
-      clearPinnedSidebarPreview,
+      clearSidebarTaskHoverPreview,
       modalTaskId,
       onCenterModalNavigateTask,
       onSelectTask,
     ],
   );
 
-  const handlePinnedSidebarPreviewOpen = useCallback(
+  const handleSidebarTaskHoverPreviewOpen = useCallback(
     (taskId: string) => {
-      clearPinnedSidebarPreview();
+      clearSidebarTaskHoverPreview();
       handleModalNavigateTask(taskId);
     },
-    [clearPinnedSidebarPreview, handleModalNavigateTask],
+    [clearSidebarTaskHoverPreview, handleModalNavigateTask],
   );
 
   const taskModalIsNewTaskDraft =
@@ -798,9 +714,7 @@ export function CalendarViewSidebarLayout({
       className={`${sidebarVisibilityClass} h-full min-h-0 ${sidebarWidthClass} flex-col overflow-hidden bg-white dark:bg-zinc-950 ${
         isListCalendarOverlapLayout ? "relative z-[1]" : ""
       } ${
-        sidebarOpen && (isHoverPreview || isPinnedModal)
-          ? "relative z-[10045]"
-          : ""
+        sidebarOpen && isPinnedModal ? "relative z-[10045]" : ""
       } ${
         sidebarPosition === "left"
           ? "border-r border-zinc-200 dark:border-zinc-800"
@@ -899,24 +813,14 @@ export function CalendarViewSidebarLayout({
     <>
       {layoutBody}
 
-      <CalendarSidebarHoverPreviewShield
-        active={isHoverPreview && sidebarOpen}
-        visible={hoverPreviewShown}
-        sidebarRef={calendarSidebarRef}
-        sidebarPosition={sidebarPosition}
-      />
-
       {visibleTaskId ? (
         <CalendarTaskModal
           taskId={visibleTaskId}
           taskSnapshot={modalTaskSnapshot}
           isNewTaskDraft={taskModalIsNewTaskDraft}
           onNewTaskDraftComplete={onCenterModalNewTaskDraftComplete}
-          isHoverPreview={isHoverPreview}
-          hoverPreviewVisible={hoverPreviewShown}
-          showBackdrop={!isHoverPreview}
           sidebarBackdropClip={
-            sidebarOpen && !isHoverPreview
+            sidebarOpen
               ? {
                   enabled: true,
                   sidebarRef: calendarSidebarRef,
@@ -924,8 +828,6 @@ export function CalendarViewSidebarLayout({
                 }
               : undefined
           }
-          onHoverPreviewPointerEnter={handleHoverPreviewPointerEnter}
-          onHoverPreviewPointerLeave={handleHoverPreviewPointerLeave}
           onClose={handleCloseTaskModal}
           onDetailsSaved={onDetailsSaved}
           onTaskHasDetailsKnown={onTaskHasDetailsKnown}
@@ -939,13 +841,15 @@ export function CalendarViewSidebarLayout({
         />
       ) : null}
 
-      {isPinnedModal && pinnedSidebarPreview ? (
+      {sidebarTaskHoverPreview ? (
         <CalendarModalNavigationTaskPreview
-          task={pinnedSidebarPreview.task}
-          anchorRect={pinnedSidebarPreview.anchorRect}
-          onPointerEnter={handlePinnedSidebarPreviewPointerEnter}
-          onPointerLeave={handlePinnedSidebarPreviewPointerLeave}
-          onOpenTask={handlePinnedSidebarPreviewOpen}
+          task={sidebarTaskHoverPreview.task}
+          anchorRect={sidebarTaskHoverPreview.anchorRect}
+          placement="sidebar-task"
+          sidebarPosition={sidebarPosition}
+          onPointerEnter={handleSidebarTaskHoverPreviewPointerEnter}
+          onPointerLeave={handleSidebarTaskHoverPreviewPointerLeave}
+          onOpenTask={handleSidebarTaskHoverPreviewOpen}
         />
       ) : null}
     </>

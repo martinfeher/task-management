@@ -231,7 +231,7 @@ export function UpcomingPanel({
   }
 
   const header = (
-    <header className="flex shrink-0 flex-col gap-2 border-b border-zinc-200 px-4 pt-3 pb-2 dark:border-zinc-800">
+    <header className="flex shrink-0 flex-col border-b border-zinc-200 px-4 pt-2 pb-1 dark:border-zinc-800">
       <div className="flex items-center gap-2">
         {showSidebarMenu ? (
           <button

@@ -12,17 +12,40 @@ import {
 const PREVIEW_ESTIMATED_HEIGHT = 240;
 const PREVIEW_VIEWPORT_PADDING_PX = 8;
 const MODAL_NAVIGATION_PREVIEW_OFFSET_X_PX = 20;
+const SIDEBAR_TASK_PREVIEW_GAP_PX = 9;
+const SIDEBAR_TASK_PREVIEW_OFFSET_Y_PX = 60;
+
+export type CalendarNavigationTaskPreviewPlacement =
+  | "modal-navigation"
+  | "sidebar-task";
 
 function clampNavigationPreviewPosition(
   anchorRect: DOMRect,
+  placement: CalendarNavigationTaskPreviewPlacement,
+  sidebarPosition: "left" | "right",
 ): { left: number; top: number } {
   const width = CALENDAR_TASK_HOVER_PREVIEW_WIDTH_PX;
-  let left =
-    anchorRect.left +
-    anchorRect.width / 2 -
-    width / 2 +
-    MODAL_NAVIGATION_PREVIEW_OFFSET_X_PX;
-  let top = anchorRect.bottom + 8;
+  let left: number;
+  let top: number;
+
+  if (placement === "sidebar-task") {
+    left =
+      sidebarPosition === "right"
+        ? anchorRect.left - width - SIDEBAR_TASK_PREVIEW_GAP_PX
+        : anchorRect.right + SIDEBAR_TASK_PREVIEW_GAP_PX;
+    top =
+      anchorRect.top +
+      anchorRect.height / 2 -
+      PREVIEW_ESTIMATED_HEIGHT / 2 +
+      SIDEBAR_TASK_PREVIEW_OFFSET_Y_PX;
+  } else {
+    left =
+      anchorRect.left +
+      anchorRect.width / 2 -
+      width / 2 +
+      MODAL_NAVIGATION_PREVIEW_OFFSET_X_PX;
+    top = anchorRect.bottom + 8;
+  }
 
   if (typeof window !== "undefined") {
     left = Math.max(
@@ -40,6 +63,8 @@ function clampNavigationPreviewPosition(
 type CalendarModalNavigationTaskPreviewProps = {
   task: TaskListItem;
   anchorRect: DOMRect;
+  placement?: CalendarNavigationTaskPreviewPlacement;
+  sidebarPosition?: "left" | "right";
   onPointerEnter: () => void;
   onPointerLeave: () => void;
   onOpenTask: (taskId: string) => void;
@@ -48,18 +73,22 @@ type CalendarModalNavigationTaskPreviewProps = {
 export function CalendarModalNavigationTaskPreview({
   task,
   anchorRect,
+  placement = "modal-navigation",
+  sidebarPosition = "right",
   onPointerEnter,
   onPointerLeave,
   onOpenTask,
 }: CalendarModalNavigationTaskPreviewProps) {
   const [previewTask, setPreviewTask] = useState(task);
   const [position, setPosition] = useState(() =>
-    clampNavigationPreviewPosition(anchorRect),
+    clampNavigationPreviewPosition(anchorRect, placement, sidebarPosition),
   );
 
   useLayoutEffect(() => {
-    setPosition(clampNavigationPreviewPosition(anchorRect));
-  }, [anchorRect]);
+    setPosition(
+      clampNavigationPreviewPosition(anchorRect, placement, sidebarPosition),
+    );
+  }, [anchorRect, placement, sidebarPosition]);
 
   useEffect(() => {
     let cancelled = false;
@@ -76,7 +105,9 @@ export function CalendarModalNavigationTaskPreview({
 
   useEffect(() => {
     function handleReposition() {
-      setPosition(clampNavigationPreviewPosition(anchorRect));
+      setPosition(
+        clampNavigationPreviewPosition(anchorRect, placement, sidebarPosition),
+      );
     }
 
     window.addEventListener("scroll", handleReposition, true);
@@ -85,7 +116,7 @@ export function CalendarModalNavigationTaskPreview({
       window.removeEventListener("scroll", handleReposition, true);
       window.removeEventListener("resize", handleReposition);
     };
-  }, [anchorRect]);
+  }, [anchorRect, placement, sidebarPosition]);
 
   if (typeof document === "undefined") return null;
 

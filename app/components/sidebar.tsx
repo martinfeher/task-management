@@ -2037,7 +2037,7 @@ export function Sidebar({
                 Add
               </button>
               {isBottomAddMenuOpen ? (
-                <div className="absolute bottom-full left-0 z-[1000] pb-[4px]">
+                <div className="absolute left-full -top-[3px] z-[1000] pl-[4px]">
                   <div
                     role="menu"
                     aria-label="Add list or folder"
