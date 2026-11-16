@@ -1939,6 +1939,9 @@ export function Sidebar({
                 selectedListId != null &&
                 orderedLists.find((list) => list.id === selectedListId)
                   ?.folderId === folder.id;
+              const isFolderHovered =
+                sidebarHoverPreview?.kind === "folder" &&
+                sidebarHoverPreview.folderId === folder.id;
 
               return (
                 <div key={folder.id} className="flex flex-col">
@@ -1959,10 +1962,28 @@ export function Sidebar({
                         left: event.clientX,
                       });
                     }}
+                    onMouseEnter={(event) => {
+                      const rect = event.currentTarget.getBoundingClientRect();
+                      onSidebarHoverStart?.({
+                        kind: "folder",
+                        folderId: folder.id,
+                        anchorTop: rect.top,
+                        anchorLeft: rect.left,
+                        anchorWidth: rect.width,
+                        anchorHeight: rect.height,
+                      });
+                    }}
+                    onMouseLeave={() => {
+                      if (isFolderHovered) {
+                        onSidebarHoverEnd?.();
+                      }
+                    }}
                     className={`group/folder relative ml-[11px] mb-1 flex h-[34px] cursor-pointer items-center rounded-md pr-3 pl-1.5 transition-[background-color] duration-200 hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 ${
                       isListDragOver
                         ? "bg-zinc-200/70 ring-2 ring-inset ring-blue-400 dark:bg-zinc-800/70 dark:ring-blue-500"
-                        : ""
+                        : isFolderHovered
+                          ? "bg-zinc-200/70 dark:bg-zinc-800/70"
+                          : ""
                     } ${onReorderLists ? "touch-none" : ""}`}
                   >
                     <SidebarFolderIcon className={SIDEBAR_FOLDER_ICON_CLASS} />

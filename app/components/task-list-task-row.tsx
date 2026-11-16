@@ -507,12 +507,22 @@ export function TaskListTaskRow({
     task.labels.length === 0 &&
     task.priority == null;
   const showHoverLabelIcon =
-    !isCompleting && task.labels.length === 0 && hasLabelActions && task.priority == null;
+    !isCompleting && task.labels.length === 0 && hasLabelActions;
   const showHoverPriorityIcon =
     !isCompleting &&
     task.labels.length === 0 &&
     task.priority == null &&
     hasPriorityActions;
+  const taskRowHoverActionSlotPx = 24;
+  const taskRowHoverActionCount =
+    (showSetDateOnHover ? 1 : 0) +
+    (showHoverPriorityIcon ? 1 : 0) +
+    (showHoverLabelIcon ? 1 : 0) +
+    1;
+  const taskRowMetaMarginRightPx =
+    task.labels.length > 0 || task.priority != null
+      ? Math.max(20, taskRowHoverActionCount * taskRowHoverActionSlotPx)
+      : 0;
   const dueScheduleSubline = formatTaskListScheduleSubline(
     task.dueDate,
     dueTimeLabel,
@@ -938,8 +948,11 @@ export function TaskListTaskRow({
         {task.labels.length > 0 || task.priority != null ? (
           <span
             ref={labelPillsAnchorRef}
-            className={`relative z-10 mr-[20px] flex min-w-0 max-w-[180px] items-center gap-1 ${checkedContentDim}`}
-            style={{ transition: dimTransition }}
+            className={`relative z-10 flex min-w-0 max-w-[180px] items-center gap-1 ${checkedContentDim}`}
+            style={{
+              transition: dimTransition,
+              marginRight: taskRowMetaMarginRightPx,
+            }}
           >
             {task.labels.length > 0 ? (
               <TaskLabelPills

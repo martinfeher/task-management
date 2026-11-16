@@ -13,6 +13,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
+import { FROSTED_POPOVER_SURFACE_CLASS } from "@/lib/frosted-popover-surface";
 import { LuList } from "react-icons/lu";
 import type { CalendarDropSlot } from "@/lib/calendar-time-grid";
 import { fetchTaskById } from "@/lib/task-details-api";
@@ -37,7 +38,7 @@ const PREVIEW_ESTIMATED_HEIGHT = 240;
 const PREVIEW_TITLE_CLASS =
   "line-clamp-2 text-[15px] font-semibold leading-5 text-[#3C3C3E]";
 const PREVIEW_SUBTITLE_CLASS =
-  "text-[13.5px] leading-[16px] text-[#bfbfbf] dark:text-[#bfbfbf]";
+  "text-[13.5px] leading-[16px] text-[#78789f] dark:text-[#78789f]";
 const TASK_GAP = 12;
 const TASK_EDGE_PREVIEW_UPWARD_OFFSET_PX = 10;
 const CURSOR_OFFSET_PX = 50;
@@ -248,7 +249,7 @@ export function CalendarTaskHoverPreviewCard({ task }: { task: TaskListItem }) {
             {descriptionLines.map((line, index) => (
               <p
                 key={`${index}-${line}`}
-                className={`line-clamp-1 ${PREVIEW_SUBTITLE_CLASS}`}
+                className={`calendar-task-hover-preview-description line-clamp-1 ${PREVIEW_SUBTITLE_CLASS}`}
               >
                 {line}
               </p>
@@ -489,7 +490,7 @@ export function CalendarTaskHoverPreviewProvider({
       {preview && typeof document !== "undefined"
         ? createPortal(
             <div
-              className="calendar-task-hover-preview pointer-events-none fixed z-[4100] overflow-hidden bg-white dark:bg-zinc-950"
+              className={`calendar-task-hover-preview pointer-events-none fixed z-[4100] overflow-hidden ${FROSTED_POPOVER_SURFACE_CLASS}`}
               style={{
                 width: PREVIEW_WIDTH,
                 left: preview.x,

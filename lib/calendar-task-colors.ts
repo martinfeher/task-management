@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 import {
   mixHexColors,
-  mixHexWithWhite,
+  mixHexWithBlack,
   normalizeHexColor,
 } from "@/lib/sidebar-background-types";
 import {
@@ -36,14 +36,14 @@ export const CALENDAR_TASK_TITLE_BRIGHTNESS_CSS_VAR =
 /** Title lightness multiplier applied to the task swatch (0.3 = 70% darker). */
 export const DEFAULT_CALENDAR_TASK_TITLE_BRIGHTNESS = 0.3;
 
-/** Hover brightening for task title text (mix toward white). */
-export const CALENDAR_TASK_TITLE_HOVER_BRIGHTEN_RATIO = 0.15;
+/** Hover darkening for task title text (mix toward black). */
+export const CALENDAR_TASK_TITLE_HOVER_DARKEN_RATIO = 0.15;
 
 export const CALENDAR_TASK_TITLE_HOVER_COLOR_CSS_VAR =
   "--calendar-task-title-hover-color";
 
 export function getCalendarTaskTitleHoverColor(titleColorHex: string) {
-  return mixHexWithWhite(titleColorHex, CALENDAR_TASK_TITLE_HOVER_BRIGHTEN_RATIO);
+  return mixHexWithBlack(titleColorHex, CALENDAR_TASK_TITLE_HOVER_DARKEN_RATIO);
 }
 
 export function appendCalendarTaskTitleColorVars(

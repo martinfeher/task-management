@@ -86,6 +86,18 @@ export function mixHexWithWhite(hex: string, whiteRatio: number) {
   );
 }
 
+export function mixHexWithBlack(hex: string, blackRatio: number) {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return hex;
+
+  const ratio = Math.max(0, Math.min(1, blackRatio));
+  return rgbToHex(
+    rgb.r * (1 - ratio),
+    rgb.g * (1 - ratio),
+    rgb.b * (1 - ratio),
+  );
+}
+
 export function mixHexColors(hexA: string, hexB: string, ratioB: number) {
   const rgbA = hexToRgb(hexA);
   const rgbB = hexToRgb(hexB);

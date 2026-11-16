@@ -30,7 +30,7 @@
 
 @layer utilities {
   .frosted-popover-surface {
-    @apply bg-white/[0.6] shadow-[0_10px_23px_rgba(0,0,0,0.09)] ring-1 ring-zinc-200/80 backdrop-blur-[4px] dark:bg-zinc-950/[0.6] dark:ring-zinc-800;
+    @apply bg-white/[0.6] shadow-[0_10px_23px_rgba(0,0,0,0.09)] backdrop-blur-[5px] dark:bg-zinc-950/[0.6] dark:ring-zinc-800;
   }
 
   .ptxt-50 {
@@ -1366,6 +1366,11 @@ body {
   color: var(--tcm-clear-date-hover, var(--tcm-clear-date)) !important;
 }
 
+.task-list-context-menu .frosted-popover-surface {
+  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter: blur(5px);
+}
+
 .task-priority-tooltip::after {
   right: auto;
   left: var(--task-priority-tooltip-arrow-left, 50%);
@@ -1973,7 +1978,7 @@ body {
         )
       )
       85%,
-      #ffffff 15%
+      #000000 15%
     )
   );
 }
@@ -2146,6 +2151,10 @@ body {
   border: 1px solid rgb(235 235 235);
   box-shadow: var(--calendar-task-hover-preview-shadow);
   animation: calendar-task-preview-in 160ms ease-out;
+}
+
+.calendar-task-hover-preview .calendar-task-hover-preview-description {
+  color: #9D9DB5;
 }
 
 .list-panel-scroll {

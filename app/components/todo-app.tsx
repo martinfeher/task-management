@@ -136,10 +136,12 @@ import {
   renameKanbanColumn,
   type KanbanColumnRecord,
 } from "@/app/actions/kanban";
+import { SidebarFolderListsPreview } from "./sidebar-folder-lists-preview";
 import {
   SidebarListTaskPreview,
   type SidebarListPreviewRect,
 } from "./sidebar-list-task-preview";
+import { getListsForFolder } from "@/lib/sidebar-list-layout";
 import {
   CHECKMARK_HIDE_FADE_MS,
   CHECKMARK_HIDE_MS,
@@ -788,14 +790,23 @@ export type AddTaskOptions = {
   isNote?: boolean;
 };
 
-export type SidebarHoverPreview = {
-  kind: "list";
-  listId: string;
-  anchorTop: number;
-  anchorLeft: number;
-  anchorWidth: number;
-  anchorHeight: number;
-};
+export type SidebarHoverPreview =
+  | {
+      kind: "list";
+      listId: string;
+      anchorTop: number;
+      anchorLeft: number;
+      anchorWidth: number;
+      anchorHeight: number;
+    }
+  | {
+      kind: "folder";
+      folderId: string;
+      anchorTop: number;
+      anchorLeft: number;
+      anchorWidth: number;
+      anchorHeight: number;
+    };
 
 export function TodoApp({
   initialLists,
@@ -1151,13 +1162,23 @@ export function TodoApp({
 
   const listHoverPreview =
     listPreviewEnabled &&
-    sidebarHoverPreview &&
+    sidebarHoverPreview?.kind === "list" &&
     !isCompactLayout &&
     (sidebarHoverPreview.listId !== selectedListId ||
       activeView !== null ||
       selectedLabelId !== null)
       ? sidebarHoverPreview
       : null;
+
+  const folderHoverPreview =
+    listPreviewEnabled &&
+    sidebarHoverPreview?.kind === "folder" &&
+    !isCompactLayout
+      ? sidebarHoverPreview
+      : null;
+
+  const FOLDER_LIST_PREVIEW_WIDTH_PX = 252;
+  const FOLDER_LIST_PREVIEW_GAP_PX = 10;
   const listHoverPreviewList =
     listHoverPreview !== null
       ? (lists.find((list) => list.id === listHoverPreview.listId) ?? null)
@@ -1292,6 +1313,8 @@ export function TodoApp({
   const taskListPanelRef = useRef<HTMLDivElement>(null);
   const [listHoverPreviewPanelRect, setListHoverPreviewPanelRect] =
     useState<SidebarListPreviewRect | null>(null);
+  const [folderHoverPreviewPanelRect, setFolderHoverPreviewPanelRect] =
+    useState<SidebarListPreviewRect | null>(null);
 
   useLayoutEffect(() => {
     if (!listHoverPreview) {
@@ -1321,6 +1344,57 @@ export function TodoApp({
       window.removeEventListener("scroll", updateRect, true);
     };
   }, [listHoverPreview, taskListWidth]);
+
+  const folderHoverPreviewMeta = useMemo(() => {
+    if (!folderHoverPreview) return null;
+
+    const folder = folders.find((item) => item.id === folderHoverPreview.folderId);
+    if (!folder) return null;
+
+    return {
+      folder,
+      listsInFolder: getListsForFolder(lists, folder.id),
+    };
+  }, [folderHoverPreview, folders, lists]);
+
+  useLayoutEffect(() => {
+    if (!folderHoverPreview) {
+      setFolderHoverPreviewPanelRect(null);
+      return;
+    }
+
+    const folderId = folderHoverPreview.folderId;
+
+    const updateRect = () => {
+      const node = document.querySelector<HTMLElement>(
+        `[data-folder-id="${folderId}"]`,
+      );
+      if (!node) return;
+
+      const rect = node.getBoundingClientRect();
+      const width = FOLDER_LIST_PREVIEW_WIDTH_PX;
+      const left = Math.max(
+        8,
+        rect.left - width - FOLDER_LIST_PREVIEW_GAP_PX,
+      );
+
+      setFolderHoverPreviewPanelRect({
+        top: rect.top,
+        left,
+        width,
+        height: rect.height,
+      });
+    };
+
+    updateRect();
+    window.addEventListener("resize", updateRect);
+    window.addEventListener("scroll", updateRect, true);
+
+    return () => {
+      window.removeEventListener("resize", updateRect);
+      window.removeEventListener("scroll", updateRect, true);
+    };
+  }, [folderHoverPreview]);
 
   const completedTasks: CompletedTask[] = useMemo(
     () =>
@@ -4800,6 +4874,25 @@ export function TodoApp({
           lists={lists}
           panelRect={listHoverPreviewPanelRect}
           subtasksEnabled={subtasksEnabled}
+        />
+      ) : null}
+      {folderHoverPreview &&
+      folderHoverPreviewMeta &&
+      folderHoverPreviewPanelRect ? (
+        <SidebarFolderListsPreview
+          folderName={folderHoverPreviewMeta.folder.name}
+          listsInFolder={folderHoverPreviewMeta.listsInFolder}
+          tasksByList={Object.fromEntries(
+            folderHoverPreviewMeta.listsInFolder.map((list) => [
+              list.id,
+              (tasksByList[list.id] ?? []).map((task) => ({
+                ...task,
+                listId: list.id,
+                listName: list.name,
+              })),
+            ]),
+          )}
+          panelRect={folderHoverPreviewPanelRect}
         />
       ) : null}
       <TaskEditorDefaultsBootstrap />
