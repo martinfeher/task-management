@@ -307,7 +307,7 @@ export function LoginForm({ googleConfigured }: LoginFormProps) {
           </button>
         </form>
 
-        <div className="relative my-6">
+        <div className="relative my-5">
           <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-zinc-200 dark:border-zinc-700" />
           </div>

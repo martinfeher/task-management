@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { BiSearch } from "react-icons/bi";
 import { LuCheck, LuInbox, LuList } from "react-icons/lu";
 import type { TodoList } from "./todo-app";
+import { FROSTED_POPOVER_SURFACE_CLASS } from "@/lib/frosted-popover-surface";
 import { taskContextMenuTextColor } from "@/lib/task-context-menu-colors";
 
 type TaskMoveToSelectorProps = {
@@ -16,7 +17,15 @@ type TaskMoveToSelectorProps = {
   showCurrentList?: boolean;
   autoFocus?: boolean;
   tone?: "default" | "contextMenu";
+  /** Calendar task modal: match sidebar task preview frosted surface. */
+  surface?: "solid" | "frosted";
 };
+
+const MOVE_TO_SURFACE_CLASS = {
+  solid:
+    "bg-white shadow-[0_12px_32px_rgba(0,0,0,0.12)] dark:bg-zinc-900 dark:shadow-[0_12px_32px_rgba(0,0,0,0.32)]",
+  frosted: FROSTED_POPOVER_SURFACE_CLASS,
+} as const;
 
 function getListIcon(name: string) {
   if (name.trim().toLowerCase() === "inbox") {
@@ -36,8 +45,10 @@ export function TaskMoveToSelector({
   showCurrentList = false,
   autoFocus = true,
   tone = "default",
+  surface = "frosted",
 }: TaskMoveToSelectorProps) {
   const isContextMenuTone = tone === "contextMenu";
+  const isFrostedSurface = surface === "frosted";
   const inputRef = useRef<HTMLInputElement>(null);
   const trimmedQuery = query.trim();
 
@@ -65,11 +76,17 @@ export function TaskMoveToSelector({
     <div
       role="dialog"
       aria-label="Move to list"
-      className="w-[240px] overflow-hidden rounded-3xl bg-white shadow-[0_12px_32px_rgba(0,0,0,0.12)] dark:bg-zinc-900 dark:shadow-[0_12px_32px_rgba(0,0,0,0.32)]"
+      className={`w-[240px] overflow-hidden rounded-3xl ${MOVE_TO_SURFACE_CLASS[surface]}`}
       onMouseDown={(event) => event.stopPropagation()}
       onClick={(event) => event.stopPropagation()}
     >
-      <div className="border-b border-zinc-200 px-3 py-2.5 dark:border-zinc-700">
+      <div
+        className={`border-b px-3 py-2.5 ${
+          isFrostedSurface
+            ? "border-zinc-200/70 dark:border-zinc-700/70"
+            : "border-zinc-200 dark:border-zinc-700"
+        }`}
+      >
         <div className="flex items-center gap-2">
           <BiSearch
             className={`size-4 shrink-0 ${isContextMenuTone ? "" : "text-zinc-400"}`}
@@ -135,9 +152,11 @@ export function TaskMoveToSelector({
                 className={`flex h-[38px] w-full items-center gap-2.5 px-4 text-left text-sm transition-colors ${
                   showCurrentList && isCurrent
                     ? "cursor-default text-[#4873c7] dark:text-[#7da2ff]"
-                    : isContextMenuTone
-                      ? "hover:bg-zinc-50 dark:text-zinc-100 dark:hover:bg-zinc-800/70"
-                      : "text-zinc-800 hover:bg-zinc-50 dark:text-zinc-100 dark:hover:bg-zinc-800/70"
+                    : isFrostedSurface
+                      ? "text-zinc-800 hover:bg-white/45 dark:text-zinc-100 dark:hover:bg-white/[0.08]"
+                      : isContextMenuTone
+                        ? "hover:bg-zinc-50 dark:text-zinc-100 dark:hover:bg-zinc-800/70"
+                        : "text-zinc-800 hover:bg-zinc-50 dark:text-zinc-100 dark:hover:bg-zinc-800/70"
                 }`}
                 style={
                   isContextMenuTone && !(showCurrentList && isCurrent)

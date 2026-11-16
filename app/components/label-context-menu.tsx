@@ -2,6 +2,7 @@
 
 import { useRef, useState, type RefObject } from "react";
 import { createPortal } from "react-dom";
+import { FROSTED_POPOVER_SURFACE_CLASS } from "@/lib/frosted-popover-surface";
 import {
   getLabelColor,
   LABEL_PRESET_COLORS,
@@ -119,7 +120,7 @@ export function LabelContextMenu({
 
       {showPresets ? (
         <div
-          className="absolute left-[42%] z-10 flex -translate-x-1/4 items-center gap-1 rounded-md border border-zinc-200 bg-white p-1.5 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
+          className={`absolute left-[42%] z-10 flex -translate-x-1/4 items-center gap-1 rounded-md p-1.5 ${FROSTED_POPOVER_SURFACE_CLASS}`}
           style={{ top: MENU_BODY_HEIGHT - 8 }}
           onMouseEnter={() => setShowPresets(true)}
         >

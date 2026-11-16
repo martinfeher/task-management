@@ -9,9 +9,9 @@ import {
   FORMAT_TOOLBAR_FONT_SIZE_SELECTED_COLOR,
   FORMAT_TOOLBAR_TRIGGER_LABEL_COLOR,
 } from "./detail-format-toolbar-menus";
+import { FROSTED_POPOVER_SURFACE_CLASS } from "@/lib/frosted-popover-surface";
 
-const DETAIL_LINE_HEIGHT_LIST_CLASS =
-  "min-w-[168px] overflow-y-auto overscroll-contain rounded-lg border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900";
+const DETAIL_LINE_HEIGHT_LIST_CLASS = `min-w-[168px] overflow-y-auto overscroll-contain rounded-lg py-1 ${FROSTED_POPOVER_SURFACE_CLASS}`;
 
 type DetailLineHeightControlProps = {
   value: DetailLineHeightOption;

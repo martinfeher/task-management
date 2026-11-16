@@ -29,6 +29,7 @@ import {
 import { BulletListIcon } from "./line-control-icons";
 import { DetailLineHeightControl } from "./detail-line-height-control";
 import type { DetailLineHeightOption } from "./detail-line-height";
+import { FROSTED_POPOVER_SURFACE_CLASS } from "@/lib/frosted-popover-surface";
 
 export type FormatToolbarDropdown =
   | "textColor"
@@ -52,18 +53,17 @@ export const FORMAT_TOOLBAR_CHEVRON_COLOR = "text-[#7f7f87]";
 /** 10% brighter than Tailwind zinc-800 / zinc-100 */
 export const FORMAT_TOOLBAR_TRIGGER_LABEL_COLOR =
   "text-[#3d3d3f] dark:text-[#f5f5f6]";
+
 /** Default text-color trigger icon — intentionally unchanged */
 const FORMAT_TOOLBAR_TEXT_COLOR_ICON_COLOR = "text-zinc-700 dark:text-zinc-200";
 
 export const FORMAT_TOOLBAR_DROPDOWN_TRIGGER_CLASS =
   `flex h-8 cursor-pointer items-center gap-0.5 rounded-lg px-2 text-sm ${FORMAT_TOOLBAR_ICON_COLOR} transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800`;
 
-export const FORMAT_TOOLBAR_DROPDOWN_MENU_CLASS =
-  "overflow-hidden rounded-[12px] border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900 min-w-[168px] cursor-pointer";
+export const FORMAT_TOOLBAR_DROPDOWN_MENU_CLASS = `overflow-hidden rounded-[12px] py-1 min-w-[168px] cursor-pointer ${FROSTED_POPOVER_SURFACE_CLASS}`;
 
 /** List, heading, and font-family menus: 8px inset on all sides. */
-export const FORMAT_TOOLBAR_LIST_BLOCK_MENU_CLASS =
-  "overflow-hidden rounded-[12px] border border-zinc-200 bg-white p-2 shadow-lg dark:border-zinc-700 dark:bg-zinc-900 min-w-[168px] cursor-pointer";
+export const FORMAT_TOOLBAR_LIST_BLOCK_MENU_CLASS = `overflow-hidden rounded-[12px] p-2 min-w-[168px] cursor-pointer ${FROSTED_POPOVER_SURFACE_CLASS}`;
 
 export const FORMAT_TOOLBAR_DROPDOWN_ITEM_CLASS =
   "flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm text-zinc-900 transition-colors hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800";
@@ -88,8 +88,7 @@ export const FORMAT_TOOLBAR_FONT_SIZE_TRIGGER_CLASS =
 const FORMAT_TOOLBAR_OVERFLOW_MENU_ICON_CLASS =
   `inline-flex h-[18px] w-[22px] shrink-0 items-center justify-center leading-none ${FORMAT_TOOLBAR_ICON_COLOR}`;
 
-const FORMAT_TOOLBAR_OVERFLOW_MENU_BASE_CLASS =
-  "rounded-[12px] border border-zinc-200 bg-white p-2 shadow-lg dark:border-zinc-700 dark:bg-zinc-900 w-[151px] min-w-[151px]";
+const FORMAT_TOOLBAR_OVERFLOW_MENU_BASE_CLASS = `rounded-[12px] p-2 w-[151px] min-w-[151px] ${FROSTED_POPOVER_SURFACE_CLASS}`;
 
 const FORMAT_TOOLBAR_OVERFLOW_MENU_CLASS =
   `${FORMAT_TOOLBAR_OVERFLOW_MENU_BASE_CLASS} overflow-hidden`;

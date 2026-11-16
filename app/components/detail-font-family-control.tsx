@@ -9,6 +9,7 @@ import {
   type DetailFontFamilyId,
 } from "./detail-fonts";
 import { FORMAT_TOOLBAR_FONT_FAMILY_ITEM_CLASS } from "./detail-format-toolbar-menus";
+import { FROSTED_POPOVER_SURFACE_CLASS } from "@/lib/frosted-popover-surface";
 import { TASK_DETAILS_HEADER_ICON_HOVER_CLASS } from "@/lib/task-details-header-icon-hover";
 
 type DetailFontFamilyControlProps = {
@@ -22,8 +23,7 @@ type DetailFontFamilyControlProps = {
   onPreviewFamilyClear?: () => void;
 };
 
-const menuPanelClassName =
-  "overflow-hidden rounded-lg border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900";
+const menuPanelClassName = `overflow-hidden rounded-lg py-1 ${FROSTED_POPOVER_SURFACE_CLASS}`;
 
 const menuItemClassName =
   "flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-zinc-900 hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800 cursor-pointer";

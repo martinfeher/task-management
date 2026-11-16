@@ -10,6 +10,7 @@ import { BiSolidCheckboxChecked } from "react-icons/bi";
 import { BsArchiveFill } from "react-icons/bs";
 import { IoIosSearch } from "react-icons/io";
 import { LABEL_PRESET_COLORS } from "@/lib/label-colors";
+import { FROSTED_POPOVER_SURFACE_CLASS } from "@/lib/frosted-popover-surface";
 import { getInboxListId } from "@/lib/inbox-list";
 import { getLabelDotColor } from "@/lib/label-colors";
 import { IoMdPricetag } from "react-icons/io";
@@ -2041,7 +2042,7 @@ export function Sidebar({
                   <div
                     role="menu"
                     aria-label="Add list or folder"
-                    className="w-[152px] overflow-hidden border border-zinc-200 bg-white py-1 rounded-[20px]! shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
+                    className={`w-[152px] overflow-hidden py-1 rounded-[20px]! ${FROSTED_POPOVER_SURFACE_CLASS}`}
                   >
                   <button
                     type="button"

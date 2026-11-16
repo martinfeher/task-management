@@ -18,6 +18,7 @@ import type { Label } from "./task-label-selector";
 import { TaskLabelSelector } from "./task-label-selector";
 import { TaskPrioritySelector } from "./task-priority-selector";
 import type { TaskListItem, TodoList } from "./todo-app";
+import { FROSTED_POPOVER_SURFACE_CLASS } from "@/lib/frosted-popover-surface";
 import {
   TASK_CONTEXT_MENU_COLORS,
   taskContextMenuTextColor,
@@ -66,8 +67,7 @@ type TaskRowContextMenuProps = {
   dateShortcutVariant?: TaskContextMenuDateShortcutVariant;
 };
 
-const menuClassName =
-  "overflow-visible rounded-[23px] bg-white p-[5px] shadow-[0_12px_32px_rgba(0,0,0,0.12)] dark:bg-zinc-900 dark:shadow-[0_12px_32px_rgba(0,0,0,0.32)]";
+const menuClassName = `overflow-visible rounded-[23px] p-[5px] ${FROSTED_POPOVER_SURFACE_CLASS}`;
 
 const menuItemClassName =
   "tcm-menu-item flex h-[35px] w-full items-center px-3 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800";

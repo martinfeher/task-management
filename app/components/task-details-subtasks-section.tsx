@@ -11,6 +11,7 @@ import {
   saveCompletedSubtasksExpanded,
   saveSubtasksExpanded,
 } from "@/lib/task-subtasks";
+import { FROSTED_POPOVER_SURFACE_CLASS } from "@/lib/frosted-popover-surface";
 import { TaskCompletionCheckbox } from "./task-completion-checkbox";
 
 export type TaskDetailsSubtask = {
@@ -502,7 +503,7 @@ export function TaskDetailsSubtasksSection({
             <div
               ref={contextMenuRef}
               role="menu"
-              className="fixed z-[120] w-40 overflow-hidden rounded-[23px] bg-white py-1 shadow-[0_12px_32px_rgba(0,0,0,0.12)] dark:bg-zinc-900 dark:shadow-[0_12px_32px_rgba(0,0,0,0.32)]"
+              className={`fixed z-[120] w-40 overflow-hidden rounded-[23px] py-1 ${FROSTED_POPOVER_SURFACE_CLASS}`}
               style={{
                 top: contextMenu.top,
                 left: contextMenu.left,

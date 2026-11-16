@@ -1,5 +1,6 @@
 "use client";
 
+import { FROSTED_POPOVER_SURFACE_CLASS } from "@/lib/frosted-popover-surface";
 import type { TaskPriorityLevel } from "@/lib/task-priority";
 import { TaskPrioritySelector } from "./task-priority-selector";
 
@@ -17,7 +18,7 @@ export function TaskPriorityMenu({
   return (
     <div
       role="menu"
-      className="overflow-visible rounded-[16px] bg-white shadow-[0_12px_32px_rgba(0,0,0,0.12)] dark:bg-zinc-900 dark:shadow-[0_12px_32px_rgba(0,0,0,0.32)]"
+      className={`overflow-visible rounded-[16px] ${FROSTED_POPOVER_SURFACE_CLASS}`}
     >
       <TaskPrioritySelector
         selectedPriority={selectedPriority}

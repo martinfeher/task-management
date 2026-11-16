@@ -13,6 +13,7 @@ import {
   FORMAT_TOOLBAR_ICON_COLOR,
   FORMAT_TOOLBAR_TRIGGER_LABEL_COLOR,
 } from "./detail-format-toolbar-menus";
+import { FROSTED_POPOVER_SURFACE_CLASS } from "@/lib/frosted-popover-surface";
 import { TASK_DETAILS_HEADER_ICON_HOVER_CLASS } from "@/lib/task-details-header-icon-hover";
 
 type DetailFontSizeControlProps = {
@@ -27,8 +28,7 @@ type DetailFontSizeControlProps = {
 
 const FORMAT_TOOLBAR_FONT_SIZE_HOVER_CLOSE_MS = 120;
 
-const menuClassName =
-  "absolute top-full z-50 mt-1 overflow-hidden rounded-lg border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900";
+const menuClassName = `absolute top-full z-50 mt-1 overflow-hidden rounded-lg py-1 ${FROSTED_POPOVER_SURFACE_CLASS}`;
 
 const menuItemClassName =
   "flex w-full items-center px-3 py-1.5 text-left text-sm text-zinc-900 hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800";

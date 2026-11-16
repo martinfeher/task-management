@@ -30,6 +30,7 @@ import {
   isTaskDatePickerTriggerElement,
   isTaskPriorityTriggerElement,
 } from "./task-list-task-row";
+import { FROSTED_POPOVER_SURFACE_CLASS } from "@/lib/frosted-popover-surface";
 import { TaskLabelSelector, type Label } from "./task-label-selector";
 import { TaskPrioritySelector } from "./task-priority-selector";
 import { TaskPriorityFlagIcon } from "./task-priority-icon";
@@ -3363,7 +3364,9 @@ export function TaskListPanel({
                       priority
                     </span>
                     {isAddTaskPriorityMenuOpen ? (
-                      <div className="absolute left-1/2 top-full z-[1000] mt-1 w-[180px] -translate-x-1/2 overflow-visible rounded-[19px] border border-zinc-200 bg-white pb-[4px] shadow-[0_7px_17px_rgba(0,0,0,0.06)] dark:border-zinc-700 dark:bg-zinc-900">
+                      <div
+                        className={`absolute left-1/2 top-full z-[1000] mt-1 w-[180px] -translate-x-1/2 overflow-visible rounded-[19px] pb-[4px] ${FROSTED_POPOVER_SURFACE_CLASS}`}
+                      >
                         <TaskPrioritySelector
                           selectedPriority={newTaskPriority}
                           onSelectPriority={(priority) => {

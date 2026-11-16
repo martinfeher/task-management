@@ -389,9 +389,8 @@ export function CalendarTaskModal({
     document.body.style.overflow = "hidden";
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        void handleClose();
-      }
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      void handleClose();
     }
 
     document.addEventListener("keydown", handleKeyDown);

@@ -17,6 +17,7 @@ import {
   LuSparkles,
 } from "react-icons/lu";
 import { FiSettings } from "react-icons/fi";
+import { FROSTED_POPOVER_SURFACE_CLASS } from "@/lib/frosted-popover-surface";
 import { MacCmdIcon } from "./mac-cmd-icon";
 
 const USER_AVATAR_COLOR = "#7c3aed";
@@ -197,7 +198,7 @@ export function SidebarAccountMenu({
       {isOpen ? (
         <div className="absolute bottom-full left-0 right-0 z-20 pb-2">
           <div
-            className="overflow-hidden rounded-[20px] border border-[#e3e3e3] bg-white text-left shadow-[0_10px_40px_rgba(15,23,42,0.12)] dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-[0_10px_40px_rgba(0,0,0,0.45)]"
+            className={`overflow-hidden rounded-[20px] text-left ${FROSTED_POPOVER_SURFACE_CLASS}`}
             role="menu"
             aria-label="Account menu"
           >

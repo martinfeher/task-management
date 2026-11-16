@@ -29,6 +29,10 @@
 }
 
 @layer utilities {
+  .frosted-popover-surface {
+    @apply bg-white/[0.6] shadow-[0_10px_23px_rgba(0,0,0,0.09)] ring-1 ring-zinc-200/80 backdrop-blur-[4px] dark:bg-zinc-950/[0.6] dark:ring-zinc-800;
+  }
+
   .ptxt-50 {
     color: var(--panel-text-50);
   }
@@ -2453,20 +2457,25 @@ body {
   z-index: 100;
 }
 
+.task-item-date-picker-popover,
+.task-details-block-menu,
+.task-list-sort-menu,
+.sidebar-context-menu {
+  background-color: rgb(255 255 255 / 0.6);
+  box-shadow:
+    0 10px 23px rgba(0, 0, 0, 0.09),
+    0 0 0 1px rgb(228 228 231 / 0.8);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+
 .task-item-date-picker-popover {
   border-radius: 16px;
-  border: 1px solid #ebecef;
-  box-shadow:
-    0 12px 40px -8px rgba(15, 23, 42, 0.18),
-    0 2px 8px rgba(15, 23, 42, 0.06);
 }
 
 .task-details-block-menu {
   overflow: hidden;
   border-radius: 24px;
-  border: 1px solid #ebebeb;
-  background-color: #ffffff;
-  box-shadow: var(--calendar-task-hover-preview-shadow);
   padding-block: 0.375rem;
 }
 
@@ -2474,9 +2483,18 @@ body {
 .sidebar-context-menu {
   overflow: hidden;
   border-radius: 24px;
-  border: 1px solid rgb(235 235 235);
-  background-color: #ffffff;
-  box-shadow: var(--calendar-task-hover-preview-shadow);
+}
+
+@media (prefers-color-scheme: dark) {
+  .task-item-date-picker-popover,
+  .task-details-block-menu,
+  .task-list-sort-menu,
+  .sidebar-context-menu {
+    background-color: rgb(9 9 11 / 0.6);
+    box-shadow:
+      0 10px 23px rgba(0, 0, 0, 0.09),
+      0 0 0 1px rgb(39 39 42);
+  }
 }
 
 .checkbox-wrapper-29 {
@@ -3027,31 +3045,7 @@ body {
   .calendar-task-hover-preview,
   .calendar-add-task-popover,
   .calendar-task-modal,
-  .list-name-modal-panel,
-  .task-list-sort-menu,
-  .sidebar-context-menu {
+  .list-name-modal-panel {
     border-color: rgb(63 63 70);
-  }
-
-  .task-item-date-picker-popover {
-    border-color: rgb(63 63 70);
-  }
-
-  .task-details-block-menu {
-    border-color: rgb(63 63 70);
-    background-color: rgb(24 24 27);
-    box-shadow:
-      0 1.5px 3px rgba(0, 0, 0, 0.1),
-      0 6px 18px rgba(0, 0, 0, 0.18),
-      0 18px 36px rgba(0, 0, 0, 0.24);
-  }
-
-  .task-list-sort-menu,
-  .sidebar-context-menu {
-    background-color: rgb(24 24 27);
-    box-shadow:
-      0 1.5px 3px rgba(0, 0, 0, 0.1),
-      0 6px 18px rgba(0, 0, 0, 0.18),
-      0 18px 36px rgba(0, 0, 0, 0.24);
   }
 }

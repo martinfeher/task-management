@@ -11,6 +11,7 @@ import {
   LABEL_PRESET_COLORS,
   normalizeLabelColorHex,
 } from "@/lib/label-colors";
+import { FROSTED_POPOVER_SURFACE_CLASS } from "@/lib/frosted-popover-surface";
 import { taskContextMenuTextColor } from "@/lib/task-context-menu-colors";
 
 export type Label = {
@@ -32,7 +33,14 @@ type TaskLabelSelectorProps = {
   tone?: "default" | "contextMenu";
   /** Scrollable label list max height in px (default 260). */
   listMaxHeightPx?: number;
+  surface?: "solid" | "frosted";
 };
+
+const LABEL_SELECTOR_SURFACE_CLASS = {
+  solid:
+    "bg-white shadow-[0_12px_32px_rgba(0,0,0,0.12)] dark:bg-zinc-900 dark:shadow-[0_12px_32px_rgba(0,0,0,0.32)]",
+  frosted: FROSTED_POPOVER_SURFACE_CLASS,
+} as const;
 
 function hasExactLabelMatch(labels: Label[], query: string) {
   const normalized = query.trim().toLowerCase();
@@ -87,7 +95,9 @@ function LabelCreateColorPicker({
       </label>
 
       {showPresets ? (
-        <div className="absolute left-0 top-full z-10 mt-1 flex items-center gap-1 rounded-md border border-zinc-200 bg-white p-1.5 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+        <div
+          className={`absolute left-0 top-full z-10 mt-1 flex items-center gap-1 rounded-md p-1.5 ${FROSTED_POPOVER_SURFACE_CLASS}`}
+        >
           {LABEL_PRESET_COLORS.map((preset) => (
             <button
               key={preset.dot}
@@ -120,8 +130,10 @@ export function TaskLabelSelector({
   onCancel,
   tone = "default",
   listMaxHeightPx = 260,
+  surface = "frosted",
 }: TaskLabelSelectorProps) {
   const isContextMenuTone = tone === "contextMenu";
+  const isFrostedSurface = surface === "frosted";
   const inputRef = useRef<HTMLInputElement>(null);
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const trimmedQuery = query.trim();
@@ -236,8 +248,8 @@ export function TaskLabelSelector({
       role="dialog"
       aria-label="Add label"
       data-task-label-menu
-      className={`w-[220px] overflow-hidden rounded-3xl bg-white shadow-[0_12px_32px_rgba(0,0,0,0.12)] dark:bg-zinc-900 dark:shadow-[0_12px_32px_rgba(0,0,0,0.32)]${
-        isContextMenuTone ? "" : " border border-[#e3e3e6]"
+      className={`w-[220px] overflow-hidden rounded-3xl ${LABEL_SELECTOR_SURFACE_CLASS[surface]}${
+        isContextMenuTone || isFrostedSurface ? "" : " border border-[#e3e3e6]"
       }`}
       onMouseDown={(event) => event.stopPropagation()}
       onClick={(event) => event.stopPropagation()}

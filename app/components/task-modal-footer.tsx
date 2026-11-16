@@ -13,6 +13,7 @@ import {
   APP_HOVER_TOOLTIP_ABOVE_CENTER,
   APP_HOVER_TOOLTIP_SHOWN,
 } from "@/lib/app-hover-tooltip-classes";
+import { FROSTED_POPOVER_SURFACE_CLASS } from "@/lib/frosted-popover-surface";
 import { buildTodoPath } from "@/lib/todo-routes";
 import {
   isTaskPriorityLevel,
@@ -40,7 +41,7 @@ const MODAL_FOOTER_ICON_TOOLTIP_Z_CLASS = "z-[10060]";
 const MODAL_FOOTER_ICON_TOOLTIP_CLASS = `add-task-date-tooltip ${APP_HOVER_TOOLTIP_ABOVE_CENTER} pointer-events-none fixed whitespace-nowrap px-3 py-1.5 text-[11px] font-medium ${MODAL_FOOTER_ICON_TOOLTIP_Z_CLASS}`;
 
 const MODAL_FOOTER_ICON_BUTTON_CLASS =
-  "flex h-6 mr-1 shrink-0 cursor-pointer items-center justify-center rounded-md text-[#C6C5D1] transition-colors hover:bg-zinc-100 hover:text-slate-450 dark:hover:bg-zinc-800 dark:hover:text-zinc-200";
+  "flex h-7 mr-1 shrink-0 cursor-pointer items-center justify-center rounded-md text-[#C6C5D1] transition-colors hover:bg-zinc-100 hover:text-slate-450 dark:hover:bg-zinc-800 dark:hover:text-zinc-200";
 
 type TaskModalFooterProps = {
   taskId: string;
@@ -218,7 +219,7 @@ function FooterTextButton({
       aria-haspopup={ariaHaspopup}
       aria-expanded={ariaExpanded}
       onClick={onClick}
-      className="cursor-pointer text-[13px] mb-[1px] transition-opacity hover:opacity-80"
+      className="flex h-7 cursor-pointer items-center text-[13px] transition-opacity hover:opacity-80"
       style={{ color: MODAL_FOOTER_ACTION_COLOR }}
     >
       {children}
@@ -347,6 +348,35 @@ export function TaskModalFooter({
     setIsMoveMenuOpen(false);
   }
 
+  const hasOpenFooterOverlay =
+    isPriorityMenuOpen ||
+    isLabelMenuOpen ||
+    isMoveMenuOpen ||
+    deleteConfirmOpen;
+
+  useEffect(() => {
+    if (!hasOpenFooterOverlay) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (deleteConfirmOpen) {
+        setDeleteConfirmOpen(false);
+        return;
+      }
+
+      setIsPriorityMenuOpen(false);
+      setIsLabelMenuOpen(false);
+      setIsMoveMenuOpen(false);
+    }
+
+    document.addEventListener("keydown", handleKeyDown, true);
+    return () => document.removeEventListener("keydown", handleKeyDown, true);
+  }, [deleteConfirmOpen, hasOpenFooterOverlay]);
+
   async function handleCopyLink() {
     const url = `${window.location.origin}${buildTodoPath({ kind: "task", taskId })}`;
 
@@ -460,7 +490,7 @@ export function TaskModalFooter({
             <TaskLabelPills
               labels={assignedLabels}
               truncateAtPx={null}
-              className="px-1 py-0.5"
+              className="flex items-center px-1 py-0"
               onClick={(event) => {
                 event.stopPropagation();
                 openLabelMenu();
@@ -511,7 +541,7 @@ export function TaskModalFooter({
 
   return (
     <>
-    <div ref={footerRef} className="flex min-w-0 flex-1 items-center gap-4">
+    <div ref={footerRef} className="flex min-h-[26px] min-w-0 flex-1 items-center gap-4 self-stretch">
       {hasPriorityActions ? (
         <div
           className="relative shrink-0"
@@ -547,7 +577,9 @@ export function TaskModalFooter({
 
           {isPriorityMenuOpen ? (
             <div className="absolute bottom-full left-0 z-50 mb-px pb-1">
-              <div className="w-[196px] overflow-visible rounded-lg border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+              <div
+                className={`w-[196px] overflow-visible rounded-lg ${FROSTED_POPOVER_SURFACE_CLASS}`}
+              >
                 {openMenusOnHover ? (
                   <p className="px-3 pt-1 text-[10px] text-[#dedede]">Priority</p>
                 ) : null}
@@ -617,6 +649,7 @@ export function TaskModalFooter({
                 onQueryChange={setMoveQuery}
                 onSelectList={handleMoveToList}
                 onCancel={() => setIsMoveMenuOpen(false)}
+                surface="frosted"
               />
             </div>
           ) : null}
@@ -631,7 +664,7 @@ export function TaskModalFooter({
           onClick={() => void handleCopyLink()}
           className={`${MODAL_FOOTER_ICON_BUTTON_CLASS} w-7`}
         >
-          <CiLink className="size-5 mt-0.5" strokeWidth={0.5} />
+          <CiLink className="size-5" strokeWidth={0.5} />
         </ModalFooterPortaledIconButton>
       ) : (
         <FooterTextButton
@@ -649,7 +682,7 @@ export function TaskModalFooter({
             ariaLabel="Delete task"
             tooltipText="Delete task"
             onClick={handleDeleteClick}
-            className={`${MODAL_FOOTER_ICON_BUTTON_CLASS} ml-auto w-5 -mr-1.5 hover:text-red-500 dark:hover:text-red-400`}
+            className={`${MODAL_FOOTER_ICON_BUTTON_CLASS} ml-auto -mr-1.5 hover:text-red-500 dark:hover:text-red-400`}
           >
             <MdDeleteOutline className="size-[18px]" />
           </ModalFooterPortaledIconButton>

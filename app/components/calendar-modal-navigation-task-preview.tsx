@@ -122,7 +122,7 @@ export function CalendarModalNavigationTaskPreview({
 
   return createPortal(
     <div
-      className="calendar-task-hover-preview calendar-modal-navigation-task-preview pointer-events-auto fixed z-[10060] cursor-pointer overflow-hidden bg-white/[0.6] shadow-[0_10px_23px_rgba(0,0,0,0.09)] ring-1 ring-zinc-200/80 backdrop-blur-[4px] transition-shadow hover:shadow-[0_12px_26px_rgba(0,0,0,0.12)] dark:bg-zinc-950/[0.6] dark:ring-zinc-800"
+      className="calendar-task-hover-preview calendar-modal-navigation-task-preview pointer-events-auto fixed z-[10060] cursor-pointer overflow-hidden frosted-popover-surface transition-shadow hover:shadow-[0_12px_26px_rgba(0,0,0,0.12)]"
       style={{
         width: CALENDAR_TASK_HOVER_PREVIEW_WIDTH_PX,
         left: position.left,

@@ -421,7 +421,7 @@ type AddBlockMenuState = {
 };
 
 const FORMAT_TOOLBAR_SURFACE_CLASS =
-  "format-toolbar-popover-surface overflow-visible rounded-[30px] border border-zinc-200/70 bg-white/89 shadow-[0_8px_24px_rgba(15,23,42,0.12)] backdrop-blur-[1px] dark:border-zinc-700 dark:bg-zinc-900/89 dark:shadow-[0_8px_24px_rgba(0,0,0,0.32)]";
+  "format-toolbar-popover-surface overflow-visible rounded-[30px] frosted-popover-surface";
 
 function getFormatToolbarPopoverClass(formatMenu: FormatMenuState) {
   const placement = formatMenu.placement === "below" ? "below" : "above";
@@ -9296,7 +9296,7 @@ export function TaskDetailsPanel({
       />
 
       {isModalLayout && task && modalFooterConfig ? (
-        <footer className="flex shrink-0 items-center justify-between gap-2 px-[22px] py-2.5 dark:border-zinc-800">
+        <footer className="flex min-h-[52px] shrink-0 items-center justify-between gap-2 px-[22px] py-0 dark:border-zinc-800">
           <TaskModalFooter taskId={task.id} {...modalFooterConfig} />
           {modalCreateAction ? (
             <div className="flex shrink-0 flex-col items-end gap-1">

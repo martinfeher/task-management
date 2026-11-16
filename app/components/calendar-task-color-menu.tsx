@@ -16,6 +16,7 @@ import {
   CALENDAR_TASK_COLOR_OPTIONS,
   normalizeCalendarTaskColor,
 } from "@/lib/calendar-task-colors";
+import { FROSTED_POPOVER_SURFACE_CLASS } from "@/lib/frosted-popover-surface";
 import { useCalendarTaskDefaultColor } from "@/lib/calendar-task-default-color-settings";
 import type { TaskListItem } from "./todo-app";
 
@@ -161,7 +162,7 @@ export function CalendarTaskColorMenuProvider({
               ref={menuRef}
               role="menu"
               aria-label="Change calendar color"
-              className="fixed z-[5000] rounded-2xl border border-zinc-200 bg-white p-3 shadow-[0_12px_32px_rgba(0,0,0,0.14)] dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-[0_12px_32px_rgba(0,0,0,0.36)]"
+              className={`fixed z-[5000] rounded-2xl p-3 ${FROSTED_POPOVER_SURFACE_CLASS}`}
               style={{ top: menu.top, left: menu.left, width: MENU_WIDTH }}
               onMouseDown={(event) => event.stopPropagation()}
               onClick={(event) => event.stopPropagation()}
