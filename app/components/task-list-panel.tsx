@@ -1741,15 +1741,16 @@ export function TaskListPanel({
       return;
     }
 
-    commitTitleEdit(task);
-
     const nextTask = keyboardNavigableTasks[nextIndex];
-    startTitleEdit(nextTask);
+
+    commitTitleEdit(task);
 
     const selectTaskForNavigation = isListCalendarOpen
       ? onSelectTask
-      : (onSelectTaskImmediate ?? onSelectTaskQuiet ?? onSelectTask);
+      : (onSelectTaskImmediate ?? onSelectTask);
     selectTaskForNavigation(nextTask.id);
+
+    startTitleEdit(nextTask);
     scrollTaskRowIntoView(nextTask.id);
   }
 

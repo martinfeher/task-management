@@ -447,7 +447,13 @@ export function TaskListTaskRow({
       isPointerMenuOpen ||
       rowMenuView !== null);
   const isSelected = task.id === selectedTaskId;
-  const showRowHoverActions = isRowMenuOpen || isSelected;
+  const isTitleEditFocusRow =
+    editingTaskId !== null && editingTaskId === task.id;
+  const isListFocusRow =
+    editingTaskId !== null ? isTitleEditFocusRow : isSelected;
+  const suppressRowHoverChrome =
+    editingTaskId !== null && editingTaskId !== task.id;
+  const showRowHoverActions = isRowMenuOpen || isListFocusRow;
   const rowActionsPointerClass = showRowHoverActions
     ? "pointer-events-auto"
     : "pointer-events-none group-hover:pointer-events-auto";
@@ -455,7 +461,10 @@ export function TaskListTaskRow({
   const basePaddingLeft = useWiderRowPadding ? 1 : 0;
   const rowOuterPaddingLeft = depth * SUBTASK_INDENT_PX;
   const rowContentPaddingLeft = basePaddingLeft;
-  const leftBorderClass = getTaskRowLeftBorderClass(task.id, selectedTaskId);
+  const leftBorderClass = getTaskRowLeftBorderClass(
+    task.id,
+    editingTaskId ?? selectedTaskId,
+  );
   const dividerClass = getTaskListItemDividerClass(task);
   const hideDueDate = isCheckAnimating || isCompleting;
   const checkedContentDim = hideDueDate ? "opacity-50" : "opacity-100";
@@ -660,7 +669,9 @@ export function TaskListTaskRow({
   return (
     <li
       data-task-id={task.id}
-      aria-current={task.id === selectedTaskId ? "true" : undefined}
+      aria-current={
+        task.id === (editingTaskId ?? selectedTaskId) ? "true" : undefined
+      }
       aria-label={isCompleting ? `${task.name} completed` : undefined}
       onClick={isCompleting ? undefined : (event) => onTaskClick(task, event)}
       onContextMenu={
@@ -683,9 +694,11 @@ export function TaskListTaskRow({
       } ${
         isCompleting
           ? ""
-          : isSelected
+          : isListFocusRow
             ? "bg-[#e9ebee]/50 hover:bg-[#e9ebee]/80"
-            : "hover:bg-[#faf6ff]"
+            : suppressRowHoverChrome
+              ? ""
+              : "hover:bg-[#faf6ff]"
       }`}
       style={{
         paddingLeft: rowOuterPaddingLeft,
@@ -695,7 +708,9 @@ export function TaskListTaskRow({
       {showDragHandle && depth === 0 ? (
         <span
           className={`flex size-[19px] shrink-0 cursor-move items-center justify-center ${
-            hideDueDate ? "" : "group-hover:opacity-100"
+            hideDueDate || suppressRowHoverChrome
+              ? ""
+              : "group-hover:opacity-100"
           } ${checkedContentDim}`}
           style={{ transition: dimTransition }}
         >

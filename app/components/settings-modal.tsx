@@ -656,7 +656,7 @@ export function SettingsModal({
             type="button"
             aria-label="Close settings"
             onClick={onClose}
-            className="flex size-8 items-center justify-center rounded-full text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-50"
+            className="-mt-[3px] -mr-[3px] flex size-8 cursor-pointer items-center justify-center rounded-full text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-50"
           >
             <LuX className="size-4" aria-hidden="true" />
           </button>

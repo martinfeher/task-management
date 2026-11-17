@@ -2488,10 +2488,12 @@ body {
 
 /* Selection formatting bar (task details + calendar task modal). */
 .format-toolbar-popover-surface.frosted-popover-surface {
-  background-color: rgb(255 255 255 / 0.85);
+  @apply backdrop-blur-[3px];
+  background-color: rgb(255 255 255 / 0.8);
 }
 
 .dark .format-toolbar-popover-surface.frosted-popover-surface {
+  @apply backdrop-blur-[3px];
   background-color: rgb(9 9 11 / 0.85);
 }
 

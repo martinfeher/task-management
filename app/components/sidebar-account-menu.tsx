@@ -121,7 +121,7 @@ function AccountMenuRow({
       className={`flex w-full items-center ${ACCOUNT_MENU_ROW_GAP} cursor-pointer! rounded-lg ${ACCOUNT_MENU_BTN_X} ${ACCOUNT_MENU_BTN_Y} text-left text-[13px] text-zinc-800 transition-colors hover:bg-zinc-100 dark:text-zinc-100 dark:hover:bg-zinc-800/80 ${className}`}
       onClick={onClick}
     >
-      <span className="flex size-[18px] shrink-0 items-center justify-center text-zinc-500 dark:text-zinc-400">
+      <span className="flex size-[18px] shrink-0 items-center justify-center text-[#afafba] dark:text-zinc-400">
         {icon}
       </span>
       <span className="min-w-0 flex-1">{label}</span>
@@ -198,7 +198,7 @@ export function SidebarAccountMenu({
       {isOpen ? (
         <div className="absolute bottom-full left-0 right-0 z-20 pb-2">
           <div
-            className={`overflow-hidden rounded-[20px] text-left ${FROSTED_POPOVER_SURFACE_CLASS}`}
+            className={`overflow-hidden rounded-[20px] border border-zinc-200 text-left backdrop-blur-[4px] dark:border-zinc-700 ${FROSTED_POPOVER_SURFACE_CLASS}`}
             role="menu"
             aria-label="Account menu"
           >
