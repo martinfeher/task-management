@@ -155,6 +155,7 @@ import {
 import {
   applyDetailFontFamily,
   applyDetailFontSize,
+  applyDetailTextColor,
   getAppFontFamilyId,
   getDefaultDetailFontSizeOption,
   getDetailFontFamilyValue,
@@ -4016,17 +4017,22 @@ export function TaskDetailsPanel({
       if (!previewRange || previewRange.collapsed) return;
 
       const resolvedColor = resolveTextColorOption(color);
-      editor.focus({ preventScroll: true });
-      restoreEditorSelectionRange(previewRange);
-
-      document.execCommand("styleWithCSS", false, "true");
-      document.execCommand("foreColor", false, resolvedColor);
+      if (
+        !applyDetailTextColor(editor, resolvedColor, previewRange.cloneRange())
+      ) {
+        return;
+      }
       normalizeTextColorPreviewEditorStructure(editor);
 
       const styledRange = getTextColorPreviewContentRange(editor);
       if (styledRange) {
         rememberFormatSelection(editor, styledRange);
       }
+
+      setFormatMenuInlineFormats((current) => ({
+        ...current,
+        textColor: resolvedColor,
+      }));
     },
     [ensureTextColorPreviewSetup, rememberFormatSelection],
   );
@@ -4974,8 +4980,10 @@ export function TaskDetailsPanel({
       }
 
       const resolvedColor = resolveTextColorOption(color);
-      document.execCommand("styleWithCSS", false, "true");
-      document.execCommand("foreColor", false, resolvedColor);
+      if (!applyDetailTextColor(editor, resolvedColor, savedRange)) {
+        return;
+      }
+
       removeEmptyDetailLineBeforeFirstFormatLine(
         editor,
         savedFormatLineIdsRef.current,
@@ -4999,6 +5007,11 @@ export function TaskDetailsPanel({
         }),
       );
 
+      setFormatMenuInlineFormats((current) => ({
+        ...current,
+        textColor: resolvedColor,
+      }));
+
       const selection = window.getSelection();
       if (
         selection?.rangeCount &&
@@ -5012,6 +5025,9 @@ export function TaskDetailsPanel({
         selection.addRange(range);
       }
 
+      setOpenFormatDropdown((current) =>
+        current === "textColor" ? null : current,
+      );
       closeFormatMenu({ clearSavedSelection: true });
     },
     [
@@ -5814,6 +5830,14 @@ export function TaskDetailsPanel({
           "[data-task-date-picker-root], [data-task-date-picker-menu]",
         )
       ) {
+        return;
+      }
+
+      // Toolbar dropdown menus (text color, highlight, …) are portaled to
+      // document.body, so they are not inside `formatMenuRef`. Treating a click
+      // on them as "outside" closed the toolbar and reverted the selection
+      // before the swatch `click` could apply the color.
+      if (targetElement?.closest("[data-format-toolbar-dropdown-portal]")) {
         return;
       }
 
@@ -9530,16 +9554,16 @@ export function TaskDetailsPanel({
       {!isModalLayout &&
       taskId &&
       saveStatus !== "loading" &&
-      (saveStatus !== "idle" ||
+      (saveStatus === "error" ||
         showClipboardNotice ||
-        lastSavedAt !== null) ? (
+        metadataError ||
+        (lastSavedAt !== null && saveStatus === "saved")) ? (
         <div className="pointer-events-none absolute bottom-3 right-4 z-10">
           <span className="flex flex-wrap items-center justify-end gap-2 text-xs text-[#82828a] dark:text-[#acacb4]">
             {showClipboardNotice ? <span>{clipboardNoticeMessage}</span> : null}
             {metadataError ? (
               <span className="text-red-600 dark:text-red-400">{metadataError}</span>
             ) : null}
-            {saveStatus === "pending" ? <span>Unsaved changes</span> : null}
             {saveStatus === "error" ? (
               <span className="pointer-events-auto flex items-center gap-2 text-red-600 dark:text-red-400">
                 <span>{saveErrorMessage ?? "Something went wrong"}</span>

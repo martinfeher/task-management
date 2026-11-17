@@ -539,6 +539,7 @@ function FormatToolbarDropdownShell({
         {open && typeof document !== "undefined"
           ? createPortal(
               <div
+                data-format-toolbar-dropdown-portal
                 className={`fixed ${FORMAT_TOOLBAR_DROPDOWN_PORTAL_Z_CLASS}`}
                 style={{
                   top: menuPosition?.top ?? -10000,
@@ -792,7 +793,6 @@ export function DetailFormatTextColorDropdown({
                     onPreviewHover={handlePreviewHover}
                     onSelect={() => {
                       onSelectTextColor(entry.color);
-                      onOpenChange(false);
                     }}
                   />
                 ))}
@@ -816,7 +816,6 @@ export function DetailFormatTextColorDropdown({
                   onPreviewHover={handlePreviewHover}
                   onSelect={() => {
                     onSelectTextColor(option.value);
-                    onOpenChange(false);
                   }}
                 />
               ))}

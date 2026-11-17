@@ -55,7 +55,7 @@ export function TaskListEntityFilterActiveChip({
   return (
     <div className="px-1 -mt-[2px]">
       <div
-        className="inline-flex max-w-full items-center gap-1 rounded-full border border-[#d8e4f8] bg-[#e8f0fe] py-[0.5px] pl-2 pr-0.5 text-[9px] font-medium leading-none text-[#4873c7] dark:border-[#2a4a7a] dark:bg-[#1e3a5f] dark:text-[#7da2ff]"
+        className="inline-flex max-w-full items-center gap-1 rounded-full border border-[#d8e4f8] bg-[#e8f0fe] py-[1px] pl-2 pr-0.5 text-[9px] font-medium leading-none text-[#4873c7] dark:border-[#2a4a7a] dark:bg-[#1e3a5f] dark:text-[#7da2ff]"
         role="status"
       >
         <Icon className="size-3 shrink-0" aria-hidden="true" />

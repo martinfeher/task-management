@@ -630,7 +630,7 @@ function canApplyDetailFont(editor: HTMLElement, range?: Range | null) {
 
 function removeStylePropertyFromRange(
   range: Range,
-  property: "fontFamily" | "fontSize",
+  property: "fontFamily" | "fontSize" | "color",
 ) {
   const elements = new Set<HTMLElement>();
   const walker = document.createTreeWalker(
@@ -664,10 +664,15 @@ function removeStylePropertyFromRange(
       if (element.tagName === "FONT") {
         element.removeAttribute("face");
       }
-    } else {
+    } else if (property === "fontSize") {
       element.style.removeProperty("font-size");
       if (element.tagName === "FONT") {
         element.removeAttribute("size");
+      }
+    } else {
+      element.style.removeProperty("color");
+      if (element.tagName === "FONT") {
+        element.removeAttribute("color");
       }
     }
 
@@ -841,7 +846,11 @@ function getRangeForTextNode(textNode: Text, parentRange: Range) {
   return range;
 }
 
-function createStyledSpan(styles: { fontFamily?: string; fontSize?: string }) {
+function createStyledSpan(styles: {
+  fontFamily?: string;
+  fontSize?: string;
+  color?: string;
+}) {
   const span = document.createElement("span");
 
   if (styles.fontFamily) {
@@ -850,6 +859,10 @@ function createStyledSpan(styles: { fontFamily?: string; fontSize?: string }) {
 
   if (styles.fontSize) {
     span.style.fontSize = styles.fontSize;
+  }
+
+  if (styles.color) {
+    span.style.color = styles.color;
   }
 
   return span;
@@ -925,7 +938,7 @@ function resolveApplyRange(editor: HTMLElement, savedRange?: Range | null) {
 
 function applyStyleToSelection(
   editor: HTMLElement,
-  styles: { fontFamily?: string; fontSize?: string },
+  styles: { fontFamily?: string; fontSize?: string; color?: string },
   savedRange?: Range | null,
 ) {
   if (savedRange) {
@@ -1021,6 +1034,28 @@ export function stripDefaultAppFontFamiliesInEditor(editor: HTMLElement) {
     element.style.removeProperty("font-family");
     cleanupStyledElement(element);
   }
+}
+
+export function applyDetailTextColor(
+  editor: HTMLElement,
+  color: string,
+  savedRange?: Range | null,
+) {
+  const range = resolveApplyRange(editor, savedRange);
+  if (!range) return false;
+
+  editor.focus();
+  restoreSelectionRange(range);
+
+  if (!canApplyDetailFont(editor, range)) return false;
+
+  if (!color.trim()) {
+    removeStylePropertyFromRange(range.cloneRange(), "color");
+    restoreSelectionRange(range);
+    return true;
+  }
+
+  return applyStyleToSelection(editor, { color }, range);
 }
 
 export function applyDetailFontSize(
