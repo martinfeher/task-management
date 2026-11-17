@@ -33,6 +33,10 @@
     @apply bg-white/[0.6] shadow-[0_10px_23px_rgba(0,0,0,0.09)] backdrop-blur-[5px] dark:bg-zinc-950/[0.6] dark:ring-zinc-800;
   }
 
+  [data-task-label-menu].frosted-popover-surface {
+    @apply bg-white/[0.85] dark:bg-zinc-950/[0.85];
+  }
+
   .ptxt-50 {
     color: var(--panel-text-50);
   }

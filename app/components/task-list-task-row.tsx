@@ -504,8 +504,7 @@ export function TaskListTaskRow({
     !task.isNote &&
     !hasDueTime &&
     !task.dueDate &&
-    task.labels.length === 0 &&
-    task.priority == null;
+    task.labels.length === 0;
   const showHoverLabelIcon =
     !isCompleting && task.labels.length === 0 && hasLabelActions;
   const showHoverPriorityIcon =
@@ -513,16 +512,24 @@ export function TaskListTaskRow({
     task.labels.length === 0 &&
     task.priority == null &&
     hasPriorityActions;
+  const showPriorityPillInHoverRow =
+    !isCompleting &&
+    task.labels.length === 0 &&
+    task.priority != null &&
+    hasPriorityActions;
   const taskRowHoverActionSlotPx = 24;
   const taskRowHoverActionCount =
     (showSetDateOnHover ? 1 : 0) +
-    (showHoverPriorityIcon ? 1 : 0) +
+    (showHoverPriorityIcon || showPriorityPillInHoverRow ? 1 : 0) +
     (showHoverLabelIcon ? 1 : 0) +
     1;
   const taskRowMetaMarginRightPx =
-    task.labels.length > 0 || task.priority != null
+    task.labels.length > 0
       ? Math.max(20, taskRowHoverActionCount * taskRowHoverActionSlotPx)
       : 0;
+  const rowActionHoverVisibilityClass = isRowMenuOpen
+    ? "opacity-100"
+    : "opacity-0 transition-opacity group-hover:opacity-100";
   const dueScheduleSubline = formatTaskListScheduleSubline(
     task.dueDate,
     dueTimeLabel,
@@ -945,7 +952,7 @@ export function TaskListTaskRow({
       <div
         className="relative ml-auto flex min-h-[19px] shrink-0 self-center items-center justify-end gap-1.5 pl-2"
       >
-        {task.labels.length > 0 || task.priority != null ? (
+        {task.labels.length > 0 ? (
           <span
             ref={labelPillsAnchorRef}
             className={`relative z-10 flex min-w-0 max-w-[180px] items-center gap-1 ${checkedContentDim}`}
@@ -954,41 +961,37 @@ export function TaskListTaskRow({
               marginRight: taskRowMetaMarginRightPx,
             }}
           >
-            {task.labels.length > 0 ? (
-              <TaskLabelPills
-                labels={task.labels}
-                className="min-w-0"
-                onClick={
-                  hasLabelActions
-                    ? (event) => {
-                        event.stopPropagation();
-                        labelMenuAnchorRef.current =
-                          resolveClickedLabelPillAnchor(event);
-                        onOpenLabelMenu(task.id);
-                      }
-                    : undefined
-                }
+            <TaskLabelPills
+              labels={task.labels}
+              className="min-w-0"
+              onClick={
+                hasLabelActions
+                  ? (event) => {
+                      event.stopPropagation();
+                      labelMenuAnchorRef.current =
+                        resolveClickedLabelPillAnchor(event);
+                      onOpenLabelMenu(task.id);
+                    }
+                  : undefined
+              }
+            />
+            {task.priority != null ? (
+              <TaskPriorityPill
+                priority={task.priority}
+                interactive={hasPriorityActions}
+                menuOpen={isPriorityMenuOpen}
+                buttonRef={priorityMenuButtonRef}
+                onToggleMenu={() => onTogglePriorityMenu(task.id)}
               />
             ) : null}
-            <TaskPriorityPill
-              priority={task.priority}
-              interactive={hasPriorityActions}
-              menuOpen={isPriorityMenuOpen}
-              buttonRef={priorityMenuButtonRef}
-              onToggleMenu={() => onTogglePriorityMenu(task.id)}
-            />
           </span>
         ) : null}
 
-        <div
-          className={`absolute inset-y-0 -right-[5px] z-20 flex items-center pointer-events-none transition-opacity ${
-            isRowMenuOpen
-              ? "opacity-100"
-              : "opacity-0 group-hover:opacity-100"
-          }`}
-        >
+        <div className="absolute inset-y-0 -right-[5px] z-20 flex items-center pointer-events-none">
           {showSetDateOnHover ? (
-            <div className={`group/set-date relative ${rowActionsPointerClass}`}>
+            <div
+              className={`group/set-date relative ${rowActionsPointerClass} ${rowActionHoverVisibilityClass}`}
+            >
               <button
                 ref={datePickerAnchorRef}
                 type="button"
@@ -1065,7 +1068,9 @@ export function TaskListTaskRow({
             : null}
 
           {showHoverPriorityIcon ? (
-            <div className={`group/add-priority ml-[2px] relative ${rowActionsPointerClass}`}>
+            <div
+              className={`group/add-priority ml-[2px] relative ${rowActionsPointerClass} ${rowActionHoverVisibilityClass}`}
+            >
               <button
                 ref={priorityMenuButtonRef}
                 type="button"
@@ -1096,8 +1101,24 @@ export function TaskListTaskRow({
             </div>
           ) : null}
 
+          {showPriorityPillInHoverRow ? (
+            <div
+              className={`ml-[2px] mr-1 flex shrink-0 items-center justify-center ${rowActionsPointerClass}`}
+            >
+              <TaskPriorityPill
+                priority={task.priority}
+                interactive={hasPriorityActions}
+                menuOpen={isPriorityMenuOpen}
+                buttonRef={priorityMenuButtonRef}
+                onToggleMenu={() => onTogglePriorityMenu(task.id)}
+              />
+            </div>
+          ) : null}
+
           {showHoverLabelIcon ? (
-            <div className={`group/add-label ml-[2px] relative ${rowActionsPointerClass}`}>
+            <div
+              className={`group/add-label ml-[2px] relative ${rowActionsPointerClass} ${rowActionHoverVisibilityClass}`}
+            >
               <button
                 ref={labelHoverTriggerRef}
                 type="button"
@@ -1130,7 +1151,7 @@ export function TaskListTaskRow({
           ) : null}
 
           <div
-            className={`relative ${rowActionsPointerClass}`}
+            className={`relative ${rowActionsPointerClass} ${rowActionHoverVisibilityClass}`}
             ref={rowMenuView ? taskContextMenuRef : null}
           >
             <button

@@ -40,6 +40,7 @@ function TaskPrioritySelectorButton({
   tooltipId,
   tooltipAlign = "center",
   portaledTooltip = false,
+  suppressBackground = false,
   onClick,
   children,
 }: {
@@ -48,6 +49,7 @@ function TaskPrioritySelectorButton({
   tooltipId: string;
   tooltipAlign?: "start" | "center" | "end";
   portaledTooltip?: boolean;
+  suppressBackground?: boolean;
   onClick: (event: MouseEvent<HTMLButtonElement>) => void;
   children: ReactNode;
 }) {
@@ -175,8 +177,11 @@ function TaskPrioritySelectorButton({
         aria-label={label}
         aria-describedby={tooltipId}
         aria-pressed={isSelected}
-        className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800 ${
-          isSelected ? "bg-zinc-100 dark:bg-zinc-800" : ""
+        className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors ${
+          suppressBackground
+            ? ""
+            : "hover:bg-zinc-100 dark:hover:bg-zinc-800" +
+              (isSelected ? " bg-zinc-100 dark:bg-zinc-800" : "")
         }`}
         onClick={onClick}
       >
@@ -226,6 +231,7 @@ export function TaskPrioritySelector({
         <TaskPrioritySelectorButton
           label="Clear"
           isSelected={selectedPriority == null}
+          suppressBackground
           tooltipId={`${tooltipBaseId}-priority-clear`}
           tooltipAlign="end"
           portaledTooltip={portaledOptionTooltips}

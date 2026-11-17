@@ -4023,29 +4023,57 @@ export function TodoApp({
     async (taskId: string) => {
       await detailsSaveControllerRef.current?.flushSave();
 
-      if (isListCalendarOpen || isListCalendarPreview) {
-        listCalendarReturnTaskIdRef.current = null;
-        if (isListCalendarPreview && !isListCalendarOpen) {
-          setIsListCalendarPreview(false);
-          setIsListCalendarOpen(true);
-        }
-        setListCalendarShowingDetails(true);
-        await selectTask(taskId);
-        return;
-      }
+      const listId =
+        findListIdForTask(taskId, tasksByList) ??
+        calendarTasks.find((task) => task.id === taskId)?.listId ??
+        (isListCalendarOpen || isListCalendarPreview ? selectedListId : null);
 
-      if (activeView === "calendar") {
+      const openListCalendarTaskDetails = async () => {
+        if (!listId) return false;
+
+        cancelListCalendarPreviewClose();
         setSidebarHoverPreview(null);
-        const listId =
-          findListIdForTask(taskId, tasksByList) ??
-          calendarTasks.find((task) => task.id === taskId)?.listId ??
-          null;
+        setIsListCalendarPreview(false);
+        setActiveView(null);
+        setSelectedLabelId(null);
+        setSelectedListId(listId);
+        setIsListCalendarOpen(true);
+        setListCalendarShowingDetails(true);
+        listCalendarReturnTaskIdRef.current = null;
 
-        if (listId) {
-          setActiveView(null);
-          setSelectedLabelId(null);
-          setSelectedListId(listId);
-          selectTaskImmediate(taskId);
+        if (activeView === "calendar") {
+          setListCalendarPanelView(calendarPanelView);
+          setListCalendarView(calendarPanelView);
+          setListCalendarMultiDayCount(calendarMultiDayCount);
+          setListCalendarMultiWeekCount(calendarMultiWeekCount);
+        } else if (!isListCalendarOpen) {
+          const listCalendarEntrySession = resolveCalendarSessionForEntry(
+            resolveCalendarViewSession(readCalendarViewSession()),
+          );
+          setListCalendarPanelView(listCalendarEntrySession.activeView);
+          setListCalendarView(listCalendarEntrySession.activeView);
+          setListCalendarMultiDayCount(listCalendarEntrySession.multiDayCount);
+          setListCalendarMultiWeekCount(
+            listCalendarEntrySession.multiWeekCount,
+          );
+        }
+
+        if (isNarrowDesktop && !hasResizedTaskList) {
+          setTaskListWidth(
+            clampTaskListWidth(TASK_LIST_PANEL_NARROW_DEFAULT_WIDTH),
+          );
+        }
+
+        await selectTask(taskId);
+        return true;
+      };
+
+      if (
+        isListCalendarOpen ||
+        isListCalendarPreview ||
+        activeView === "calendar"
+      ) {
+        if (await openListCalendarTaskDetails()) {
           return;
         }
       }
@@ -4054,11 +4082,19 @@ export function TodoApp({
     },
     [
       activeView,
+      calendarMultiDayCount,
+      calendarMultiWeekCount,
+      calendarPanelView,
       calendarTasks,
+      cancelListCalendarPreviewClose,
+      clampTaskListWidth,
+      hasResizedTaskList,
       isListCalendarOpen,
       isListCalendarPreview,
+      isNarrowDesktop,
+      resolveCalendarSessionForEntry,
       selectTask,
-      selectTaskImmediate,
+      selectedListId,
       tasksByList,
     ],
   );

@@ -126,12 +126,11 @@ export function CalendarShortcutModal({
         className="absolute inset-0 bg-zinc-900/30 backdrop-brightness-[0.98]"
         onClick={handleClose}
       />
-
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Calendar"
-        className="absolute inset-10 z-10 flex min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-[#fbfbfc] shadow-2xl dark:border-zinc-700 dark:bg-zinc-950"
+        className="absolute inset-x-10 top-[3vh] z-10 flex h-[94vh] min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-[#fbfbfc] shadow-2xl dark:border-zinc-700 dark:bg-zinc-950"
         onMouseDown={(event) => event.stopPropagation()}
       >
         <button
