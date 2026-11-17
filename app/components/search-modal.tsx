@@ -30,6 +30,10 @@ import {
 import { TaskCompletionCheckbox } from "./task-completion-checkbox";
 import { highlightSearchMatch } from "@/lib/highlight-search-match";
 import type { SearchTask } from "./todo-app";
+import {
+  SearchModalPreviewContentSkeleton,
+  SearchModalResultsSkeleton,
+} from "./search-modal-skeleton";
 
 type SearchModalProps = {
   open: boolean;
@@ -404,9 +408,7 @@ function SearchTaskPreviewPanel({
         className="min-h-0 flex-1 overflow-y-auto bg-[#fafafc] px-3.5 py-1.5 text-left transition-colors hover:bg-zinc-100/60 dark:bg-zinc-950/40 dark:hover:bg-zinc-800/30 cursor-pointer"
       >
         {isLoading ? (
-          <p className="text-sm text-zinc-400 dark:text-zinc-500">
-            Loading content...
-          </p>
+          <SearchModalPreviewContentSkeleton />
         ) : (
           <div
             className={`min-h-full w-full ${
@@ -447,6 +449,7 @@ export function SearchModal({
   const [activeIndex, setActiveIndex] = useState(-1);
   const [detailsVersion, setDetailsVersion] = useState(0);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+  const [isHydratingQuery, setIsHydratingQuery] = useState(false);
   const [isMounted, setIsMounted] = useState(open);
   const [isEntered, setIsEntered] = useState(false);
   const deferredQuery = useDeferredValue(query);
@@ -512,6 +515,7 @@ export function SearchModal({
       setActiveIndex(-1);
       setDetailsVersion(0);
       setIsLoadingDetails(false);
+      setIsHydratingQuery(false);
     }
   }, [isMounted]);
 
@@ -526,9 +530,13 @@ export function SearchModal({
   }, [open, isMounted]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setIsHydratingQuery(false);
+      return;
+    }
 
     let cancelled = false;
+    setIsHydratingQuery(true);
 
     void fetchLastSearchQuery()
       .then((savedQuery) => {
@@ -543,6 +551,11 @@ export function SearchModal({
         requestAnimationFrame(() => {
           focusSearchInputSelectAll();
         });
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsHydratingQuery(false);
+        }
       });
 
     return () => {
@@ -735,6 +748,9 @@ export function SearchModal({
     searchScope === "all" ||
     searchScope === "tasks" ||
     searchScope === "notes";
+  const showResultsSkeleton =
+    isHydratingQuery ||
+    (isLoadingDetails && Boolean(trimmedQuery) && isSearchingContent);
   const origin = revealOrigin ?? getDefaultSearchRevealOrigin();
   const revealStyle = {
     "--search-reveal-x": `${origin.x}px`,
@@ -817,17 +833,19 @@ export function SearchModal({
             <div
               className={`min-h-0 flex-1 transition-opacity ${
                 isFiltering ? "opacity-70" : "opacity-100"
-              } ${showSplitLayout ? "flex" : "overflow-y-auto"}`}
+              } ${showSplitLayout || showResultsSkeleton ? "flex" : "overflow-y-auto"}`}
             >
-          {!trimmedQuery ? (
+          {showResultsSkeleton ? (
+            <SearchModalResultsSkeleton
+              splitLayout={Boolean(trimmedQuery) || isHydratingQuery}
+            />
+          ) : !trimmedQuery ? (
             <p className="px-4 py-6 text-sm text-zinc-500 dark:text-zinc-400">
               {emptyStateMessage}
             </p>
           ) : results.length === 0 ? (
             <p className="px-4 py-6 text-sm text-zinc-500 dark:text-zinc-400">
-              {isLoadingDetails && isSearchingContent
-                ? "Searching content..."
-                : noResultsMessage}
+              {noResultsMessage}
             </p>
           ) : (
             <>

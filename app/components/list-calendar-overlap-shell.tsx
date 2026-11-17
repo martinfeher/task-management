@@ -19,6 +19,9 @@ import { TASK_LIST_PANEL_MIN_WIDTH } from "./task-list-panel";
 export const LIST_CALENDAR_OVERLAP_MAX_WIDTH_PX = 1800;
 export const LIST_CALENDAR_OVERLAP_LEFT_INSET_PX = 44;
 export const LIST_CALENDAR_OVERLAP_TRANSITION_MS = 400;
+/** Docked → default layout (leaving overlap / “extended” docked form). */
+export const LIST_CALENDAR_OVERLAP_RETURN_TRANSITION_MS =
+  LIST_CALENDAR_OVERLAP_TRANSITION_MS - 300;
 
 type ListCalendarOverlapContextValue = {
   canToggleLayout: boolean;
@@ -122,9 +125,12 @@ export function ListCalendarOverlapShell({
 
   useEffect(() => {
     if (!canToggleLayout) return;
+    const transitionMs = isSlideExpanded
+      ? LIST_CALENDAR_OVERLAP_RETURN_TRANSITION_MS
+      : LIST_CALENDAR_OVERLAP_TRANSITION_MS;
     const timer = window.setTimeout(() => {
       window.dispatchEvent(new Event("resize"));
-    }, LIST_CALENDAR_OVERLAP_TRANSITION_MS);
+    }, transitionMs);
     return () => window.clearTimeout(timer);
   }, [isSlideExpanded, canToggleLayout]);
 
@@ -217,8 +223,12 @@ export function ListCalendarOverlapShell({
     shellElement.style.transition = "none";
     shellElement.style.transform = `translate3d(${deltaX}px, ${deltaY}px, 0) scaleX(${scaleX})`;
 
+    const transitionMs = isSlideExpanded
+      ? LIST_CALENDAR_OVERLAP_RETURN_TRANSITION_MS
+      : LIST_CALENDAR_OVERLAP_TRANSITION_MS;
+
     requestAnimationFrame(() => {
-      shellElement.style.transition = `transform ${LIST_CALENDAR_OVERLAP_TRANSITION_MS}ms cubic-bezier(0.16, 1, 0.3, 1)`;
+      shellElement.style.transition = `transform ${transitionMs}ms cubic-bezier(0.16, 1, 0.3, 1)`;
       shellElement.style.transform = "";
 
       function onTransitionEnd(event: TransitionEvent) {

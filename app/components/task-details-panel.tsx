@@ -2283,8 +2283,7 @@ const TASK_DETAILS_EDITOR_MODAL_MIN_HEIGHT_PX = 88;
 const TASK_DETAILS_EDITOR_BOTTOM_INSET_PX = 30;
 /** Space between the modal editor and footer (8px tighter than the default editor inset). */
 const TASK_DETAILS_EDITOR_MODAL_BOTTOM_INSET_PX = 14;
-const TASK_DETAILS_EDITOR_MODAL_MAX_HEIGHT_PX = 560;
-const TASK_DETAILS_EDITOR_MODAL_MAX_HEIGHT_VH = 0.6;
+const TASK_DETAILS_EDITOR_MODAL_MAX_HEIGHT_VH = 0.85;
 
 function getEditorReservedBelowSpacePx(
   editor: HTMLElement,
@@ -2331,22 +2330,20 @@ function getModalEditorChromeHeightPx(
 }
 
 function getEditorMinHeightPx(
-  contentHeight: number,
+  _contentHeight: number,
   maxHeight: number,
   isModalLayout: boolean,
 ) {
-  if (isModalLayout) {
-    return TASK_DETAILS_EDITOR_MODAL_MIN_HEIGHT_PX;
-  }
-
-  if (contentHeight > TASK_DETAILS_EDITOR_MIN_HEIGHT_PX) {
-    return TASK_DETAILS_EDITOR_MIN_HEIGHT_PX;
-  }
-
   const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
-  const screenMinHeight = viewportHeight * TASK_DETAILS_EDITOR_SHORT_CONTENT_MIN_HEIGHT_VH;
+  const screenMinHeight =
+    viewportHeight * TASK_DETAILS_EDITOR_SHORT_CONTENT_MIN_HEIGHT_VH;
+  const desiredMin = Math.min(screenMinHeight, maxHeight);
 
-  return Math.min(screenMinHeight, maxHeight);
+  if (isModalLayout) {
+    return Math.max(TASK_DETAILS_EDITOR_MODAL_MIN_HEIGHT_PX, desiredMin);
+  }
+
+  return desiredMin;
 }
 
 function getEditorMaxHeightPx(
@@ -2373,10 +2370,7 @@ function getEditorMaxHeightPx(
     return viewportMax;
   }
 
-  const modalCap = Math.min(
-    viewportHeight * TASK_DETAILS_EDITOR_MODAL_MAX_HEIGHT_VH,
-    TASK_DETAILS_EDITOR_MODAL_MAX_HEIGHT_PX,
-  );
+  const modalCap = viewportHeight * TASK_DETAILS_EDITOR_MODAL_MAX_HEIGHT_VH;
 
   return Math.max(
     TASK_DETAILS_EDITOR_MODAL_MIN_HEIGHT_PX,
@@ -8944,7 +8938,7 @@ export function TaskDetailsPanel({
               onKeyDown={handleEditorKeyDown}
               onKeyUp={handleEditorKeyUp}
               onScroll={updateLineControls}
-              className={`task-details-editor w-full h-[496px]! resize-none rounded-xl pt-[8px] pl-[25px] pr-3 pb-4! text-[#555555] outline-none transition-colors focus:border-[#7f7f7f] dark:text-zinc-300 [&_.detail-line[data-line-type=bullet]]:pl-1 [&_.detail-line[data-line-type=checklist]]:cursor-pointer [&_.detail-line[data-line-type=checklist]]:pl-1 [&_.detail-line[data-line-type=h1]]:text-[26px] [&_.detail-line[data-line-type=h1]]:font-bold [&_.detail-line[data-line-type=h1]]:leading-[36px] [&_.detail-line[data-line-type=h1]]:text-[#4B4B4B] dark:[&_.detail-line[data-line-type=h1]]:text-[#F5F5F5] [&_.detail-line[data-line-type=h2]]:text-[23px] [&_.detail-line[data-line-type=h2]]:font-semibold [&_.detail-line[data-line-type=h2]]:leading-[30px] [&_.detail-line[data-line-type=h3]]:text-[19px] [&_.detail-line[data-line-type=h3]]:font-semibold [&_.detail-line[data-line-type=h3]]:leading-[26px] [&_.detail-line[data-line-type=numbered]]:pl-1 [&_mark]:bg-yellow-200 dark:[&_mark]:bg-yellow-300/30 [&_s]:line-through [&_strike]:line-through [&_u]:underline ${
+              className={`task-details-editor w-full min-h-[85vh] resize-none rounded-xl pt-[8px] pl-[25px] pr-3 pb-4! text-[#555555] outline-none transition-colors focus:border-[#7f7f7f] dark:text-zinc-300 [&_.detail-line[data-line-type=bullet]]:pl-1 [&_.detail-line[data-line-type=checklist]]:cursor-pointer [&_.detail-line[data-line-type=checklist]]:pl-1 [&_.detail-line[data-line-type=h1]]:text-[26px] [&_.detail-line[data-line-type=h1]]:font-bold [&_.detail-line[data-line-type=h1]]:leading-[36px] [&_.detail-line[data-line-type=h1]]:text-[#4B4B4B] dark:[&_.detail-line[data-line-type=h1]]:text-[#F5F5F5] [&_.detail-line[data-line-type=h2]]:text-[23px] [&_.detail-line[data-line-type=h2]]:font-semibold [&_.detail-line[data-line-type=h2]]:leading-[30px] [&_.detail-line[data-line-type=h3]]:text-[19px] [&_.detail-line[data-line-type=h3]]:font-semibold [&_.detail-line[data-line-type=h3]]:leading-[26px] [&_.detail-line[data-line-type=numbered]]:pl-1 [&_mark]:bg-yellow-200 dark:[&_mark]:bg-yellow-300/30 [&_s]:line-through [&_strike]:line-through [&_u]:underline ${
                 isModalLayout
                   ? "min-h-0 shrink-0 overflow-hidden"
                   : "min-h-0 overflow-auto"

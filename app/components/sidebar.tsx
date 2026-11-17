@@ -79,9 +79,11 @@ import { SidebarFolderIcon } from "./sidebar-folder-icon";
 import { TodayCalendarIcon } from "./today-calendar-icon";
 
 
+import { SearchModalLoadingShell } from "./search-modal-skeleton";
+
 const SearchModal = dynamic(
   () => import("./search-modal").then((module) => module.SearchModal),
-  { ssr: false },
+  { ssr: false, loading: () => <SearchModalLoadingShell /> },
 );
 
 const SettingsModal = dynamic(
@@ -2384,19 +2386,21 @@ export function Sidebar({
         </div>
       </aside>
 
-      <SearchModal
-        open={isSearchOpen}
-        revealOrigin={searchRevealOrigin}
-        tasks={searchTasks}
-        completingTaskIds={completingTaskIds}
-        checkAnimatingTaskIds={checkAnimatingTaskIds}
-        onClose={() => setIsSearchOpen(false)}
-        onSelectTask={(taskId, listId) => {
-          onSelectSearchTask(taskId, listId);
-          closeDrawer();
-        }}
-        onToggleTask={onToggleTask}
-      />
+      {isSearchOpen ? (
+        <SearchModal
+          open
+          revealOrigin={searchRevealOrigin}
+          tasks={searchTasks}
+          completingTaskIds={completingTaskIds}
+          checkAnimatingTaskIds={checkAnimatingTaskIds}
+          onClose={() => setIsSearchOpen(false)}
+          onSelectTask={(taskId, listId) => {
+            onSelectSearchTask(taskId, listId);
+            closeDrawer();
+          }}
+          onToggleTask={onToggleTask}
+        />
+      ) : null}
 
       <SettingsModal
         key={settingsModalNonce}
