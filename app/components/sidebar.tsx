@@ -105,6 +105,14 @@ const ArchiveModal = dynamic(
   { ssr: false },
 );
 
+const CompletedTasksModal = dynamic(
+  () =>
+    import("./completed-tasks-modal").then(
+      (module) => module.CompletedTasksModal,
+    ),
+  { ssr: false },
+);
+
 type SettingsModalSection =
   | "account"
   | "general"
@@ -204,6 +212,7 @@ type SidebarProps = {
   onSelectCompletedTask: (taskId: string, listId: string) => void;
   onSelectSearchTask: (taskId: string, listId: string) => void;
   onToggleTask: (taskId: string) => void;
+  onArchiveTask: (taskId: string) => void | Promise<void>;
   onAddList: (name: string) => void;
   onAddFolder: (name: string) => void;
   onAddLabel: (name: string, color: string) => void;
@@ -279,12 +288,8 @@ function shouldStartListDrag(target: EventTarget | null) {
 const itemClassName =
   "flex ml-[2px] gap-[6px]! mb-px w-[230px] pl-[14px]! items-center rounded-r-[6px]! rounded-l-[7px] text-left text-sm transition-colors cursor-pointer";
 
-const completedItemClassName =
-  "flex mx-[4px] mb-px min-h-[44px] w-auto flex-col items-start justify-center gap-0 rounded-[3px] px-4 py-1 text-left text-sm transition-colors";
-
 function getItemClassName(isSelected: boolean, baseClassName = itemClassName) {
-  const heightClass =
-    baseClassName === completedItemClassName ? "" : SIDEBAR_NAV_ITEM_SIZE_CLASS;
+  const heightClass = SIDEBAR_NAV_ITEM_SIZE_CLASS;
 
   return `${baseClassName} ${heightClass} ${
     isSelected
@@ -326,6 +331,7 @@ export function Sidebar({
   onSelectCompletedTask,
   onSelectSearchTask,
   onToggleTask,
+  onArchiveTask,
   onAddList,
   onAddFolder,
   onAddLabel,
@@ -368,7 +374,11 @@ export function Sidebar({
   const [labelDropIndicatorTop, setLabelDropIndicatorTop] = useState<
     number | null
   >(null);
-  const [isCompletedOpen, setIsCompletedOpen] = useState(false);
+  const [isCompletedModalOpen, setIsCompletedModalOpen] = useState(false);
+  const [completedRevealOrigin, setCompletedRevealOrigin] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
   const [isLabelsOpen, setIsLabelsOpen] = useState(true);
   const [isAddLabelOpen, setIsAddLabelOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -396,7 +406,6 @@ export function Sidebar({
     x: number;
     y: number;
   } | null>(null);
-  const completedFooterRef = useRef<HTMLDivElement>(null);
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const [openMenuListId, setOpenMenuListId] = useState<string | null>(null);
   const [listMenuPosition, setListMenuPosition] = useState<{
@@ -486,7 +495,6 @@ export function Sidebar({
       resizeObserver.disconnect();
     };
   }, [
-    isCompletedOpen,
     isLabelsOpen,
     labels.length,
     folders.length,
@@ -589,7 +597,13 @@ export function Sidebar({
   function openArchiveModal(origin: { x: number; y: number }) {
     setArchiveRevealOrigin(origin);
     setIsArchiveOpen(true);
-    setIsCompletedOpen(false);
+    setIsCompletedModalOpen(false);
+  }
+
+  function openCompletedModal(origin: { x: number; y: number }) {
+    setCompletedRevealOrigin(origin);
+    setIsCompletedModalOpen(true);
+    setIsArchiveOpen(false);
   }
 
   useEffect(() => {
@@ -625,13 +639,6 @@ export function Sidebar({
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (
-        isCompletedOpen &&
-        completedFooterRef.current &&
-        !completedFooterRef.current.contains(event.target as Node)
-      ) {
-        setIsCompletedOpen(false);
-      }
-      if (
         isProfileMenuOpen &&
         profileMenuRef.current &&
         !profileMenuRef.current.contains(event.target as Node)
@@ -654,7 +661,7 @@ export function Sidebar({
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [isCompletedOpen, isProfileMenuOpen]);
+  }, [isProfileMenuOpen]);
 
   useEffect(() => {
     function handleEscape(event: KeyboardEvent) {
@@ -2244,61 +2251,22 @@ export function Sidebar({
             ) : null}
           </div>
 
-        <div
-          ref={completedFooterRef}
-          className="relative mt-auto shrink-0 border-t border-zinc-150 dark:border-zinc-800"
-        >
-          {isCompletedOpen ? (
-            <div className="absolute bottom-full left-0 right-0 z-10 border-t border-zinc-200 bg-inherit shadow-[0_-8px_24px_rgba(15,23,42,0.08)] dark:border-zinc-800 dark:shadow-[0_-8px_24px_rgba(0,0,0,0.35)]">
-              {completedTasks.length === 0 ? (
-                <p className="px-4 py-3 text-xs ptxt-400 dark:ptxt-500">
-                  No completed tasks
-                </p>
-              ) : (
-                <div className="list-panel-scroll list-panel-scroll--sidebar-leading max-h-[280px] overflow-x-hidden overflow-y-auto py-1">
-                  {completedTasks.map((task) => (
-                    <button
-                      key={task.id}
-                      type="button"
-                      className={getItemClassName(
-                        task.id === selectedTaskId,
-                        completedItemClassName,
-                      )}
-                      onClick={() => {
-                        onSelectCompletedTask(task.id, task.listId);
-                        closeDrawer();
-                      }}
-                    >
-                      <span className="w-full truncate ptxt-400 line-through dark:ptxt-500">
-                        {task.name}
-                      </span>
-                      <span className="w-full truncate text-xs ptxt-400 dark:ptxt-500">
-                        {task.listName}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : null}
-
+        <div className="relative mt-auto shrink-0 border-t border-zinc-150 dark:border-zinc-800">
           <div className="flex flex-col gap-0.5 px-4 pb-1 pt-[3px]">
             <div className="flex min-w-0 flex-col gap-px">
               <button
                 type="button"
-                aria-expanded={isCompletedOpen}
                 className="group flex w-full items-center gap-1.5 rounded-md py-0.5 text-left text-[10.5px] transition-colors hover:bg-zinc-100/80 dark:hover:bg-zinc-800/50"
-                onClick={() => {
-                  setIsCompletedOpen((open) => !open);
-                  setIsArchiveOpen(false);
+                onClick={(event) => {
+                  openCompletedModal({
+                    x: event.clientX,
+                    y: event.clientY,
+                  });
+                  closeDrawer();
                 }}
               >
                 <BiSolidCheckboxChecked
-                  className={`size-[15px] shrink-0 -ml-[2px] ${
-                    isCompletedOpen
-                      ? "ptxt-950 dark:ptxt-50"
-                      : "text-[#acacb1] group-hover:text-[#9d9da3]"
-                  }`}
+                  className="size-[15px] shrink-0 -ml-[2px] text-[#acacb1] transition-colors group-hover:text-[#9d9da3]"
                 />
                 <span className="text-[11px] text-[#acacb1] transition-colors group-hover:text-[#9d9da3]">
                   Completed
@@ -2421,6 +2389,16 @@ export function Sidebar({
         revealOrigin={archiveRevealOrigin}
         onClose={() => setIsArchiveOpen(false)}
         onTasksRestored={onArchivedTasksRestored}
+      />
+
+      <CompletedTasksModal
+        open={isCompletedModalOpen}
+        revealOrigin={completedRevealOrigin}
+        tasks={completedTasks}
+        onClose={() => setIsCompletedModalOpen(false)}
+        onUndoTask={onToggleTask}
+        onArchiveTask={onArchiveTask}
+        onOpenTask={onSelectCompletedTask}
       />
 
       {openListMenuItem && listMenuPosition ? (

@@ -3513,7 +3513,7 @@ export function syncEditorBodyPlaceholderVisibility(
       ? activeEmptyLine
       : null;
 
-  const placeholderLine = focusedPlaceholderLine ?? hoverPlaceholderLine;
+  const placeholderLine = hoverPlaceholderLine ?? focusedPlaceholderLine;
 
   if (placeholderLine) {
     placeholderLine.dataset.showBodyPlaceholder = "true";

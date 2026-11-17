@@ -4425,6 +4425,7 @@ export function TodoApp({
           onSelectCompletedTask={selectCompletedTask}
           onSelectSearchTask={selectSearchTask}
           onToggleTask={toggleTask}
+          onArchiveTask={deleteTaskById}
           folders={folders}
           onAddList={addList}
           onAddFolder={addFolder}

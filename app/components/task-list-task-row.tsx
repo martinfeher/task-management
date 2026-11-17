@@ -515,23 +515,18 @@ export function TaskListTaskRow({
     !hasDueTime &&
     !task.dueDate &&
     task.labels.length === 0;
-  const showHoverLabelIcon =
-    !isCompleting && task.labels.length === 0 && hasLabelActions;
+  const showHoverLabelIcon = !isCompleting && hasLabelActions;
   const showHoverPriorityIcon =
-    !isCompleting &&
-    task.labels.length === 0 &&
-    task.priority == null &&
-    hasPriorityActions;
-  const showPriorityPillInHoverRow =
-    !isCompleting &&
-    task.labels.length === 0 &&
-    task.priority != null &&
-    hasPriorityActions;
+    !isCompleting && task.priority == null && hasPriorityActions;
+  const showPriorityPillInActionColumn =
+    !isCompleting && task.priority != null;
+  const showPriorityActionSlot =
+    showHoverPriorityIcon || showPriorityPillInActionColumn;
   const taskRowHoverActionSlotPx = 24;
   const taskRowHoverActionCount =
     (showSetDateOnHover ? 1 : 0) +
-    (showHoverPriorityIcon || showPriorityPillInHoverRow ? 1 : 0) +
     (showHoverLabelIcon ? 1 : 0) +
+    (showPriorityActionSlot ? 1 : 0) +
     1;
   const taskRowMetaMarginRightPx =
     task.labels.length > 0
@@ -991,15 +986,6 @@ export function TaskListTaskRow({
                   : undefined
               }
             />
-            {task.priority != null ? (
-              <TaskPriorityPill
-                priority={task.priority}
-                interactive={hasPriorityActions}
-                menuOpen={isPriorityMenuOpen}
-                buttonRef={priorityMenuButtonRef}
-                onToggleMenu={() => onTogglePriorityMenu(task.id)}
-              />
-            ) : null}
           </span>
         ) : null}
 
@@ -1083,9 +1069,44 @@ export function TaskListTaskRow({
               )
             : null}
 
+          {showHoverLabelIcon ? (
+            <div
+              className={`group/add-label relative z-[1] ml-[2px] mr-1 flex w-[25px] shrink-0 items-center justify-center ${rowActionsPointerClass} ${rowActionHoverVisibilityClass}`}
+            >
+              <button
+                ref={labelHoverTriggerRef}
+                type="button"
+                data-task-label-trigger
+                aria-label="Add label"
+                aria-haspopup="dialog"
+                aria-expanded={isLabelMenuOpen}
+                aria-describedby={`set-label-tooltip-${task.id}`}
+                className="flex h-[19px] w-[19px] shrink-0 items-center justify-center rounded-md cursor-pointer transition-colors hover:opacity-80 dark:hover:bg-zinc-800"
+                onPointerDown={(event) => {
+                  if (event.button !== 0) return;
+                  event.stopPropagation();
+                }}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  labelMenuAnchorRef.current = event.currentTarget;
+                  onOpenLabelMenu(task.id);
+                }}
+              >
+                <LiaTagSolid className="size-[17px]! text-[#c1c1d8]! group-hover/add-label:text-zinc-450 dark:text-zinc-400" />
+              </button>
+              <span
+                id={`set-label-tooltip-${task.id}`}
+                role="tooltip"
+                className="add-task-date-tooltip app-hover-tooltip app-hover-tooltip-above-center pointer-events-none absolute bottom-[calc(100%+10px)] z-40 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium"
+              >
+                Add label
+              </span>
+            </div>
+          ) : null}
+
           {showHoverPriorityIcon ? (
             <div
-              className={`group/add-priority ml-[2px] relative ${rowActionsPointerClass} ${rowActionHoverVisibilityClass}`}
+              className={`group/add-priority relative z-0 ml-[2px] mr-1 flex w-[25px] shrink-0 items-center justify-center ${rowActionsPointerClass} ${rowActionHoverVisibilityClass}`}
             >
               <button
                 ref={priorityMenuButtonRef}
@@ -1095,7 +1116,7 @@ export function TaskListTaskRow({
                 aria-haspopup="menu"
                 aria-expanded={isPriorityMenuOpen}
                 aria-describedby={`set-priority-tooltip-${task.id}`}
-                className="flex h-[19px] w-[19px] shrink-0 mr-1 items-center justify-center rounded-md cursor-pointer transition-colors hover:opacity-80 dark:hover:bg-zinc-800"
+                className="flex h-[19px] w-[19px] shrink-0 items-center justify-center rounded-md cursor-pointer transition-colors hover:opacity-80 dark:hover:bg-zinc-800"
                 onPointerDown={(event) => {
                   if (event.button !== 0) return;
                   event.stopPropagation();
@@ -1117,9 +1138,9 @@ export function TaskListTaskRow({
             </div>
           ) : null}
 
-          {showPriorityPillInHoverRow ? (
+          {showPriorityPillInActionColumn ? (
             <div
-              className={`ml-[2px] mr-1 flex shrink-0 items-center justify-center ${rowActionsPointerClass}`}
+              className={`relative z-0 ml-[2px] mr-1 flex w-[25px] shrink-0 items-center justify-center ${rowActionsPointerClass}`}
             >
               <TaskPriorityPill
                 priority={task.priority}
@@ -1128,41 +1149,6 @@ export function TaskListTaskRow({
                 buttonRef={priorityMenuButtonRef}
                 onToggleMenu={() => onTogglePriorityMenu(task.id)}
               />
-            </div>
-          ) : null}
-
-          {showHoverLabelIcon ? (
-            <div
-              className={`group/add-label ml-[2px] relative ${rowActionsPointerClass} ${rowActionHoverVisibilityClass}`}
-            >
-              <button
-                ref={labelHoverTriggerRef}
-                type="button"
-                data-task-label-trigger
-                aria-label="Add label"
-                aria-haspopup="dialog"
-                aria-expanded={isLabelMenuOpen}
-                aria-describedby={`set-label-tooltip-${task.id}`}
-                className="flex h-[19px] w-[19px] shrink-0 mr-1 items-center justify-center rounded-md cursor-pointer transition-colors hover:opacity-80 dark:hover:bg-zinc-800"
-                onPointerDown={(event) => {
-                  if (event.button !== 0) return;
-                  event.stopPropagation();
-                }}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  labelMenuAnchorRef.current = event.currentTarget;
-                  onOpenLabelMenu(task.id);
-                }}
-              >
-                <LiaTagSolid className="size-[17px]! text-[#c1c1d8]! group-hover/add-label:text-zinc-450 dark:text-zinc-400" />
-              </button>
-              <span
-                id={`set-label-tooltip-${task.id}`}
-                role="tooltip"
-                className="add-task-date-tooltip app-hover-tooltip app-hover-tooltip-above-center pointer-events-none absolute bottom-[calc(100%+10px)] z-40 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium"
-              >
-                Add label
-              </span>
             </div>
           ) : null}
 

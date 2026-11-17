@@ -12,6 +12,11 @@
 @source inline("text-[13.5px]");
 @source inline("text-[14px]");
 @source inline("text-[7px]");
+@source inline("text-[10px]");
+@source inline("text-[11px]");
+@source inline("text-[13px]");
+@source inline("max-w-[730px]");
+@source inline("w-[11rem]");
 @source inline("text-[#7474bb]");
 @source inline("text-[#afafaf]");
 @source inline("text-[#b2b2b2]");
@@ -38,7 +43,15 @@
   }
 
   [data-task-label-menu].frosted-popover-surface {
-    @apply bg-white/[0.85] dark:bg-zinc-950/[0.85];
+    @apply bg-white/[0.85] backdrop-blur-[5px] dark:bg-zinc-950/[0.85];
+  }
+
+  [data-task-priority-menu] .frosted-popover-surface {
+    @apply backdrop-blur-[5px];
+  }
+
+  .task-list-context-menu .frosted-popover-surface {
+    @apply backdrop-blur-[5px];
   }
 
   .task-modal-context-surface {

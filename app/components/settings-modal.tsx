@@ -56,6 +56,9 @@ function getDefaultSettingsRevealOrigin() {
   };
 }
 
+const SETTINGS_SECTION_DESCRIPTION_CLASS =
+  "text-[13px] text-zinc-400 dark:text-zinc-400";
+
 function getSettingsSectionNavClassName(isSelected: boolean) {
   return `flex w-full items-center rounded-md px-3 py-2 text-left text-sm transition-colors cursor-pointer ${
     isSelected
@@ -176,11 +179,11 @@ function AccountSettingsContent() {
 
   return (
     <div className="space-y-5">
-      <div className="space-y-1">
+      <div className="space-y-[3px]">
         <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
           Account
         </h3>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+        <p className={SETTINGS_SECTION_DESCRIPTION_CLASS}>
           Manage your profile and session.
         </p>
       </div>
@@ -189,13 +192,13 @@ function AccountSettingsContent() {
         <div className="h-16 animate-pulse rounded-lg bg-zinc-100 dark:bg-zinc-800" />
       ) : user ? (
         <>
-          <div className="flex items-center gap-3 rounded-lg border border-zinc-200 p-3 dark:border-zinc-700">
+          <div className="flex items-center gap-3 rounded-lg border border-zinc-200 p-2 mb-2.5  dark:border-zinc-700">
             {user.image ? (
               <img
                 src={user.image}
                 alt=""
                 referrerPolicy="no-referrer"
-                className="size-11 shrink-0 rounded-full object-cover"
+                className="size-9 shrink-0 rounded-full object-cover text-[#cbcbde]!"
               />
             ) : (
               <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-zinc-200 text-sm font-semibold text-zinc-700 dark:bg-zinc-700 dark:text-zinc-200">
@@ -218,32 +221,32 @@ function AccountSettingsContent() {
           </div>
 
           {memberSince ? (
-            <p className="flex items-center gap-1.5 px-1 text-xs text-zinc-500 dark:text-zinc-400">
+            <p className="flex items-center gap-1.5 px-1 text-xs text-zinc-400 dark:text-zinc-400">
               <LuCalendarDays className="size-3.5 shrink-0" aria-hidden="true" />
               Member since {memberSince}
             </p>
           ) : null}
 
-          <div className="space-y-2 rounded-lg border border-zinc-200 p-3 dark:border-zinc-700">
+          <div className="space-y-2 rounded-lg border border-zinc-200 p-2 dark:border-zinc-700">
             <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
               Session
             </p>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            <p className={SETTINGS_SECTION_DESCRIPTION_CLASS}>
               Sign out of Todolist on this device.
             </p>
             <button
               type="button"
               onClick={() => void handleSignOut()}
               disabled={isSigningOut}
-              className="flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-800 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+              className="flex w-full items-center justify-center gap-2 rounded-[9px] cursor-pointer border border-zinc-200 bg-white px-3 py-[6px] text-[14px] font-medium text-zinc-800 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
             >
               <LuLogOut className="size-4 shrink-0" aria-hidden="true" />
               {isSigningOut ? "Signing out…" : "Sign out"}
             </button>
           </div>
 
-          <div className="space-y-2 rounded-lg border border-red-200 bg-red-50/40 p-3 dark:border-red-900/50 dark:bg-red-950/10">
-            <p className="text-xs text-red-600/80 dark:text-red-300/70">
+          <div className="space-y-1.5 rounded-lg border border-red-200 bg-red-50/40 p-2.5 dark:border-red-900/50 dark:bg-red-950/10">
+            <p className="text-[10.5px] leading-snug text-red-600/80 dark:text-red-300/70">
               Permanently delete your account and all of your lists, tasks,
               labels, and settings. This cannot be undone.
             </p>
@@ -253,19 +256,19 @@ function AccountSettingsContent() {
                 setDeleteError(null);
                 setIsDeleteOpen(true);
               }}
-              className="flex w-full items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-800 transition-colors hover:bg-red-100 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200 dark:hover:bg-red-950/60"
+              className="flex w-full h-[34px] items-center justify-center gap-1.5 cursor-pointer rounded-[9px] border border-red-200 bg-red-50 px-2.5 py-1.5 text-[11px] font-medium text-red-800 transition-colors hover:bg-red-100 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200 dark:hover:bg-red-950/60"
             >
               Delete account
             </button>
             {deleteError ? (
-              <p className="text-xs text-red-600 dark:text-red-400">
+              <p className="text-[10px] text-red-600 dark:text-red-400">
                 {deleteError}
               </p>
             ) : null}
           </div>
         </>
       ) : (
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+        <p className={SETTINGS_SECTION_DESCRIPTION_CLASS}>
           You&apos;re not signed in.
         </p>
       )}
@@ -294,7 +297,7 @@ function GeneralSettingsContent() {
         <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
           General
         </h3>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+        <p className={SETTINGS_SECTION_DESCRIPTION_CLASS}>
           General app preferences.
         </p>
       </div>
@@ -484,7 +487,7 @@ function CalendarSettingsContent() {
         <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
           Calendar
         </h3>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+        <p className={SETTINGS_SECTION_DESCRIPTION_CLASS}>
           Choose which calendar opens by default from the sidebar and shortcut
           modal.
         </p>
@@ -520,7 +523,7 @@ function TasksSettingsContent() {
         <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
           Tasks
         </h3>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+        <p className={SETTINGS_SECTION_DESCRIPTION_CLASS}>
           Task-related preferences.
         </p>
       </div>
@@ -566,7 +569,7 @@ function SettingsSectionContent({ section }: { section: SettingsSection }) {
           <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
             Labels
           </h3>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          <p className={SETTINGS_SECTION_DESCRIPTION_CLASS}>
             Label settings will appear here.
           </p>
         </div>
@@ -640,7 +643,7 @@ export function SettingsModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="settings-modal-title"
-        className={`search-modal-panel flex max-h-[min(75vh,600px)] w-full max-w-4xl flex-col overflow-hidden bg-white dark:bg-zinc-900 ${
+        className={`search-modal-panel flex max-h-[min(75vh,600px)] w-full max-w-[730px] flex-col overflow-hidden bg-white dark:bg-zinc-900 ${
           isEntered ? "is-entered" : ""
         }`}
         style={revealStyle}
@@ -666,7 +669,7 @@ export function SettingsModal({
           <div className="search-modal-body-inner flex min-h-0">
             <nav
               aria-label="Settings sections"
-              className="flex w-[20%] shrink-0 flex-col gap-0.5 overflow-y-auto border-r border-zinc-200 px-2 py-3 dark:border-zinc-800"
+              className="flex w-[11rem] shrink-0 flex-col gap-0.5 overflow-y-auto border-r border-zinc-200 px-2 py-3 dark:border-zinc-800"
             >
               {SETTINGS_SECTIONS.map((section, index) => (
                 <div key={section.id} className="contents">

@@ -28,6 +28,9 @@ const ACCOUNT_MENU_BTN_Y = "py-[7px]";
 const ACCOUNT_MENU_SECTION_X = "px-[7px]";
 const ACCOUNT_MENU_SECTION_Y = "py-[7px]";
 const ACCOUNT_MENU_ROW_GAP = "gap-[8.8px]";
+/** Right-aligned shortcut / badge column in account menu rows. */
+const ACCOUNT_MENU_TRAILING_CLASS =
+  "flex w-[30px] shrink-0 items-center justify-end text-xs text-zinc-400 dark:text-zinc-500";
 const ACCOUNT_MENU_HOVER_CLOSE_MS = 160;
 
 type AccountUser = {
@@ -126,9 +129,7 @@ function AccountMenuRow({
       </span>
       <span className="min-w-0 flex-1">{label}</span>
       {trailing ? (
-        <span className="shrink-0 text-xs text-zinc-400 dark:text-zinc-500">
-          {trailing}
-        </span>
+        <span className={ACCOUNT_MENU_TRAILING_CLASS}>{trailing}</span>
       ) : null}
     </button>
   );

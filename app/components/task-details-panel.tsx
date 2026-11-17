@@ -565,10 +565,10 @@ function getFormatToolbarPopoverClass(formatMenu: FormatMenuState) {
 }
 
 const TASK_DETAILS_BLOCK_MENU_CLASS =
-  "task-details-block-menu min-w-[168px] px-0 py-0!";
+  "task-details-block-menu min-w-[168px] pl-[7px] pr-0 py-0!";
 
 const TASK_DETAILS_BLOCK_MENU_ITEM_CLASS =
-  "menu-item-hover-focus flex w-full items-center gap-2 py-2 pl-[6px] pr-2 text-left text-sm text-zinc-900 hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800";
+  "menu-item-hover-focus flex w-full items-center gap-2 py-2 pl-3 pr-2 cursor-pointer text-left text-sm text-zinc-900 hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800";
 
 const FORMAT_TOOLBAR_ROW_CLASS = "flex items-center gap-0.5 px-2 py-1";
 
@@ -8889,6 +8889,7 @@ export function TaskDetailsPanel({
               onClick={handleEditorClick}
               onKeyDown={handleEditorKeyDown}
               onKeyUp={handleEditorKeyUp}
+              onMouseMove={handleEditorWrapperMouseMove}
               onScroll={updateLineControls}
               className={`task-details-editor w-full resize-none rounded-xl pt-[8px] pl-[25px] pr-3 pb-4! text-[#555555] outline-none transition-colors focus:border-[#7f7f7f] dark:text-zinc-300 [&_.detail-line[data-line-type=bullet]]:pl-1 [&_.detail-line[data-line-type=checklist]]:cursor-pointer [&_.detail-line[data-line-type=checklist]]:pl-1 [&_.detail-line[data-line-type=h1]]:text-[26px] [&_.detail-line[data-line-type=h1]]:font-bold [&_.detail-line[data-line-type=h1]]:leading-[36px] [&_.detail-line[data-line-type=h1]]:text-[#4B4B4B] dark:[&_.detail-line[data-line-type=h1]]:text-[#F5F5F5] [&_.detail-line[data-line-type=h2]]:text-[23px] [&_.detail-line[data-line-type=h2]]:font-semibold [&_.detail-line[data-line-type=h2]]:leading-[30px] [&_.detail-line[data-line-type=h3]]:text-[19px] [&_.detail-line[data-line-type=h3]]:font-semibold [&_.detail-line[data-line-type=h3]]:leading-[26px] [&_.detail-line[data-line-type=numbered]]:pl-1 [&_mark]:bg-yellow-200 dark:[&_mark]:bg-yellow-300/30 [&_s]:line-through [&_strike]:line-through [&_u]:underline ${
                 isModalLayout
