@@ -29,6 +29,7 @@ import {
 import {
   CALENDAR_TASK_ID_DATA_ATTR,
   useCalendarTaskColorMenu,
+  useCalendarTaskColorMenuActions,
 } from "./calendar-task-color-menu";
 import type { TaskListItem } from "./todo-app";
 
@@ -383,6 +384,14 @@ export function CalendarTaskHoverPreviewProvider({
     activeElementRef.current = null;
     setPreview(null);
   }, []);
+
+  const colorMenuActions = useCalendarTaskColorMenuActions();
+
+  useEffect(() => {
+    if (colorMenuActions?.isOpen) {
+      hide();
+    }
+  }, [colorMenuActions?.isOpen, hide]);
 
   const beginTaskDrag = useCallback(() => {
     dragPreviewActiveRef.current = true;

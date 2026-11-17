@@ -165,7 +165,7 @@ export function buildTasksByDate(
     const map = new Map<string, CalendarTaskOccurrence[]>();
 
     for (const task of tasks) {
-      if (!task.dueDate) continue;
+      if (!task.dueDate || !task.name.trim()) continue;
 
       const date = fromDateKey(task.dueDate.slice(0, 10));
       if (!date) continue;

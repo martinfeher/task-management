@@ -2438,6 +2438,11 @@ body {
   }
 }
 
+.format-toolbar-dropdown-menu {
+  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter: blur(5px);
+}
+
 .format-text-color-trigger[aria-expanded="true"],
 .format-highlight-trigger[aria-expanded="true"] {
   background-color: #f6f7f8 !important;

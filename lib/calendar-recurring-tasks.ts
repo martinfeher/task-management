@@ -55,14 +55,16 @@ export function getCalendarRangeFromDays(days: Date[]): CalendarDateRange | null
 export function filterCalendarDisplayTasks(
   tasks: TaskListItem[],
 ): TaskListItem[] {
-  return tasks.filter((task) => !task.completed && task.dueDate);
+  return tasks.filter(
+    (task) => !task.completed && task.dueDate && task.name.trim().length > 0,
+  );
 }
 
 export function expandTaskForCalendarRange(
   task: TaskListItem,
   range: CalendarDateRange,
 ): CalendarTaskOccurrence[] {
-  if (!task.dueDate) return [];
+  if (!task.dueDate || !task.name.trim()) return [];
 
   const anchorDateKey = task.dueDate.slice(0, 10);
   const rule = parseRecurrenceRule(task.recurrenceRule);

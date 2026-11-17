@@ -20,7 +20,7 @@ import { FROSTED_POPOVER_SURFACE_CLASS } from "@/lib/frosted-popover-surface";
 import { useCalendarTaskDefaultColor } from "@/lib/calendar-task-default-color-settings";
 import type { TaskListItem } from "./todo-app";
 
-const MENU_WIDTH = 168;
+const MENU_WIDTH = 188;
 const MENU_HEIGHT = 196;
 const VIEWPORT_PADDING = 8;
 
@@ -32,6 +32,7 @@ type ColorMenuState = {
 
 type CalendarTaskColorMenuContextValue = {
   enabled: boolean;
+  isOpen: boolean;
   open: (task: TaskListItem, clientX: number, clientY: number) => void;
   close: () => void;
 };
@@ -145,8 +146,8 @@ export function CalendarTaskColorMenuProvider({
   const enabled = Boolean(onSetTaskCalendarColor);
 
   const contextValue = useMemo(
-    () => ({ enabled, open, close }),
-    [close, enabled, open],
+    () => ({ enabled, isOpen: menu !== null, open, close }),
+    [close, enabled, menu, open],
   );
 
   const selectedColor = menu

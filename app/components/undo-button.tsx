@@ -5,7 +5,7 @@ import { LuUndo2 } from "react-icons/lu";
 /** Keep in sync with `w-[244px]` on the main list sidebar. */
 const SIDEBAR_PANEL_WIDTH_PX = 244;
 const UNDO_AFTER_SIDEBAR_GAP_PX = 8;
-const UNDO_EXTRA_OFFSET_PX = 150;
+const UNDO_EXTRA_OFFSET_PX = 48;
 
 type UndoButtonProps = {
   visible: boolean;

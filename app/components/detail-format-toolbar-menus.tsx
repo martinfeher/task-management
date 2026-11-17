@@ -2,8 +2,10 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type ComponentType,
@@ -60,10 +62,12 @@ const FORMAT_TOOLBAR_TEXT_COLOR_ICON_COLOR = "text-zinc-700 dark:text-zinc-200";
 export const FORMAT_TOOLBAR_DROPDOWN_TRIGGER_CLASS =
   `flex h-8 cursor-pointer items-center gap-0.5 rounded-lg px-2 text-sm ${FORMAT_TOOLBAR_ICON_COLOR} transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800`;
 
-export const FORMAT_TOOLBAR_DROPDOWN_MENU_CLASS = `overflow-hidden rounded-[12px] py-1 min-w-[168px] cursor-pointer ${FROSTED_POPOVER_SURFACE_CLASS}`;
+const FORMAT_TOOLBAR_DROPDOWN_MENU_SURFACE_CLASS = `format-toolbar-dropdown-menu backdrop-blur-[5px] ${FROSTED_POPOVER_SURFACE_CLASS}`;
+
+export const FORMAT_TOOLBAR_DROPDOWN_MENU_CLASS = `overflow-hidden rounded-[12px] py-1 min-w-[168px] cursor-pointer ${FORMAT_TOOLBAR_DROPDOWN_MENU_SURFACE_CLASS}`;
 
 /** List, heading, and font-family menus: 8px inset on all sides. */
-export const FORMAT_TOOLBAR_LIST_BLOCK_MENU_CLASS = `overflow-hidden rounded-[12px] p-2 min-w-[168px] cursor-pointer ${FROSTED_POPOVER_SURFACE_CLASS}`;
+export const FORMAT_TOOLBAR_LIST_BLOCK_MENU_CLASS = `overflow-hidden rounded-[12px] p-2 min-w-[168px] cursor-pointer ${FORMAT_TOOLBAR_DROPDOWN_MENU_SURFACE_CLASS}`;
 
 export const FORMAT_TOOLBAR_DROPDOWN_ITEM_CLASS =
   "flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm text-zinc-900 transition-colors hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800";
@@ -88,7 +92,7 @@ export const FORMAT_TOOLBAR_FONT_SIZE_TRIGGER_CLASS =
 const FORMAT_TOOLBAR_OVERFLOW_MENU_ICON_CLASS =
   `inline-flex h-[18px] w-[22px] shrink-0 items-center justify-center leading-none ${FORMAT_TOOLBAR_ICON_COLOR}`;
 
-const FORMAT_TOOLBAR_OVERFLOW_MENU_BASE_CLASS = `rounded-[12px] p-2 w-[151px] min-w-[151px] ${FROSTED_POPOVER_SURFACE_CLASS}`;
+const FORMAT_TOOLBAR_OVERFLOW_MENU_BASE_CLASS = `rounded-[12px] p-2 w-[151px] min-w-[151px] ${FORMAT_TOOLBAR_DROPDOWN_MENU_SURFACE_CLASS}`;
 
 const FORMAT_TOOLBAR_OVERFLOW_MENU_CLASS =
   `${FORMAT_TOOLBAR_OVERFLOW_MENU_BASE_CLASS} overflow-hidden`;
@@ -139,24 +143,6 @@ function getFormatToolbarTooltipPositionClass(
   }
 
   return `${FORMAT_TOOLBAR_TOOLTIP_CHROME} ${motion}app-hover-tooltip-below-center add-task-date-tooltip-below top-[calc(100%+6px)]`;
-}
-
-function getFormatToolbarDropdownAnchorClass(
-  placement: FormatToolbarAnchorPlacement,
-  extraGapPx = 0,
-) {
-  const gapClass =
-    extraGapPx > 0
-      ? placement === "above"
-        ? "pb-[7px]"
-        : "pt-[7px]"
-      : placement === "above"
-        ? "pb-1"
-        : "pt-1";
-
-  return placement === "above"
-    ? `absolute bottom-full z-10 ${gapClass}`
-    : `absolute top-full z-10 ${gapClass}`;
 }
 
 /** @deprecated Use placement-aware tooltips via FormatToolbarAnchorPlacementProvider */
@@ -398,6 +384,15 @@ type DropdownShellProps = {
 };
 
 const FORMAT_TOOLBAR_DROPDOWN_HOVER_CLOSE_MS = 120;
+const FORMAT_TOOLBAR_DROPDOWN_PORTAL_Z_CLASS = "z-[10080]";
+const FORMAT_TOOLBAR_DROPDOWN_GAP_PX = 4;
+const FORMAT_TOOLBAR_DROPDOWN_EXTRA_GAP_PX = 7;
+
+function getFormatToolbarDropdownGapPx(menuAnchorExtraGapPx: number) {
+  return menuAnchorExtraGapPx > 0
+    ? FORMAT_TOOLBAR_DROPDOWN_EXTRA_GAP_PX
+    : FORMAT_TOOLBAR_DROPDOWN_GAP_PX;
+}
 
 function FormatToolbarDropdownShell({
   open,
@@ -418,6 +413,56 @@ function FormatToolbarDropdownShell({
 }: DropdownShellProps) {
   const placement = useFormatToolbarAnchorPlacement();
   const closeTimerRef = useRef<number | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const internalMenuRef = useRef<HTMLDivElement>(null);
+  const resolvedMenuRef = menuRef ?? internalMenuRef;
+  const [menuPosition, setMenuPosition] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
+
+  const updateMenuPosition = useCallback(() => {
+    const trigger = triggerRef.current;
+    const menu = resolvedMenuRef.current;
+    if (!trigger || !menu) return;
+
+    const triggerRect = trigger.getBoundingClientRect();
+    const menuRect = menu.getBoundingClientRect();
+    const gap = getFormatToolbarDropdownGapPx(menuAnchorExtraGapPx);
+    const top =
+      placement === "above"
+        ? triggerRect.top - gap - menuRect.height
+        : triggerRect.bottom + gap;
+
+    let left: number;
+    if (align === "right") {
+      left = triggerRect.right - menuRect.width;
+    } else if (align === "center") {
+      left = triggerRect.left + triggerRect.width / 2 - menuRect.width / 2;
+    } else {
+      left = triggerRect.left;
+    }
+
+    setMenuPosition({ top, left });
+  }, [align, menuAnchorExtraGapPx, placement, resolvedMenuRef]);
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setMenuPosition(null);
+      return;
+    }
+
+    updateMenuPosition();
+    const frame = window.requestAnimationFrame(updateMenuPosition);
+    window.addEventListener("resize", updateMenuPosition);
+    window.addEventListener("scroll", updateMenuPosition, true);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", updateMenuPosition);
+      window.removeEventListener("scroll", updateMenuPosition, true);
+    };
+  }, [open, updateMenuPosition, children]);
 
   function clearCloseTimer() {
     if (closeTimerRef.current !== null) {
@@ -447,6 +492,7 @@ function FormatToolbarDropdownShell({
     >
       <div className="relative">
         <button
+          ref={triggerRef}
           type="button"
           aria-label={ariaLabel}
           aria-describedby={tooltipId}
@@ -468,31 +514,53 @@ function FormatToolbarDropdownShell({
 
         {open ? (
           <div
-            className={`${getFormatToolbarDropdownAnchorClass(
-              placement,
-              menuAnchorExtraGapPx,
-            )} ${
+            aria-hidden="true"
+            className={`absolute z-10 ${
               align === "right"
                 ? "right-0"
                 : align === "center"
-                  ? "left-1/2 -translate-x-1/2"
+                  ? "left-1/2 -translate-x-1/2 w-8"
                   : "left-0"
+            } ${
+              placement === "above"
+                ? "bottom-full"
+                : "top-full"
             }`}
+            style={{
+              height: getFormatToolbarDropdownGapPx(menuAnchorExtraGapPx),
+              width: align === "center" ? undefined : "100%",
+              minWidth: align === "center" ? 32 : undefined,
+            }}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
-          >
-            <div
-              ref={menuRef}
-              role="menu"
-              aria-label={ariaLabel}
-              className={menuClassName}
-              style={menuStyle}
-              onMouseDown={(event) => event.preventDefault()}
-            >
-              {children}
-            </div>
-          </div>
+          />
         ) : null}
+
+        {open && typeof document !== "undefined"
+          ? createPortal(
+              <div
+                className={`fixed ${FORMAT_TOOLBAR_DROPDOWN_PORTAL_Z_CLASS}`}
+                style={{
+                  top: menuPosition?.top ?? -10000,
+                  left: menuPosition?.left ?? -10000,
+                }}
+                onMouseEnter={handleMouseEnter}
+                onMouseLeave={handleMouseLeave}
+              >
+                <div
+                  ref={resolvedMenuRef}
+                  role="menu"
+                  aria-label={ariaLabel}
+                  className={menuClassName}
+                  style={menuStyle}
+                  onMouseDown={(event) => event.preventDefault()}
+                >
+                  {children}
+                </div>
+              </div>,
+              document.body,
+            )
+          : null}
       </div>
     </FormatToolbarTooltipWrap>
   );
