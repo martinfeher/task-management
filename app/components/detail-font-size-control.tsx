@@ -31,10 +31,10 @@ const FORMAT_TOOLBAR_FONT_SIZE_HOVER_CLOSE_MS = 120;
 const menuClassName = `absolute top-full z-50 mt-1 overflow-hidden rounded-lg py-1 ${FROSTED_POPOVER_SURFACE_CLASS}`;
 
 const menuItemClassName =
-  "flex w-full items-center px-3 py-1.5 text-left text-sm text-zinc-900 hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800";
+  "flex w-full cursor-pointer items-center px-3 py-1.5 text-left text-sm text-zinc-900 hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800";
 
 const formatToolbarMenuItemClassName =
-  `flex w-full items-center px-3 py-1.5 text-left ${FORMAT_TOOLBAR_FONT_SIZE_TEXT_CLASS} text-zinc-900 hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800`;
+  `flex w-full cursor-pointer items-center px-3 py-1.5 text-left ${FORMAT_TOOLBAR_FONT_SIZE_TEXT_CLASS} text-zinc-900 hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800`;
 
 export function DetailFontSizeControl({
   value,
@@ -124,7 +124,7 @@ export function DetailFontSizeControl({
                     type="button"
                     role="option"
                     aria-selected={option === value}
-                    className={`rounded-md px-1 py-1 text-center ${FORMAT_TOOLBAR_FONT_SIZE_TEXT_CLASS} transition-colors hover:bg-zinc-100/50 dark:hover:bg-zinc-800 ${
+                    className={`menu-item-hover-focus cursor-pointer rounded-md px-1 py-1 text-center ${FORMAT_TOOLBAR_FONT_SIZE_TEXT_CLASS} hover:bg-zinc-100/50 dark:hover:bg-zinc-800 ${
                       option === value
                         ? `bg-zinc-100 font-medium ${FORMAT_TOOLBAR_FONT_SIZE_SELECTED_COLOR} dark:bg-zinc-800`
                         : FORMAT_TOOLBAR_TRIGGER_LABEL_COLOR

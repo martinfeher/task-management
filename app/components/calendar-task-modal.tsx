@@ -510,7 +510,7 @@ export function CalendarTaskModal({
           <button
             type="button"
             aria-label="Close task editor"
-            className={`fixed ${CALENDAR_TASK_MODAL_PINNED_BACKDROP_CLASS} ${
+            className={`calendar-task-modal-backdrop-fade-in fixed ${CALENDAR_TASK_MODAL_PINNED_BACKDROP_CLASS} ${
               leaveSidebarInteractive ? "pointer-events-auto" : ""
             } ${backdropClipStyle ? "" : "inset-0"}`}
             style={backdropClipStyle ?? undefined}

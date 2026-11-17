@@ -196,7 +196,7 @@ export function SlashCommandBlockPreview({
   return (
     <div
       aria-hidden="true"
-      className="w-[196px] shrink-0 overflow-hidden rounded-[14px] border-1 border-slate-800 bg-slate-700 p-1.5 shadow-[0_10px_28px_rgba(0,0,0,0.22)] dark:border-zinc-600"
+      className="w-[196px] shrink-0 overflow-hidden rounded-[14px] border-1 border-slate-800 bg-slate-700 px-2 py-1.5 shadow-[0_10px_28px_rgba(0,0,0,0.22)] dark:border-zinc-600"
     >
       <div
         className="box-border overflow-hidden rounded-[10px] bg-white dark:bg-zinc-950"
@@ -209,7 +209,7 @@ export function SlashCommandBlockPreview({
           <PreviewEditorContent type={type} />
         </div>
       </div>
-      <p className="px-1 pb-0.5 pt-1.5 text-[11px] leading-tight text-white">
+      <p className="px-0 pb-0.5 pt-1.5 text-[11px] leading-tight text-white">
         {PREVIEW_CAPTIONS[type]}
       </p>
     </div>

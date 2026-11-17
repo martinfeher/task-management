@@ -850,6 +850,7 @@ function createStyledSpan(styles: {
   fontFamily?: string;
   fontSize?: string;
   color?: string;
+  backgroundColor?: string;
 }) {
   const span = document.createElement("span");
 
@@ -863,6 +864,10 @@ function createStyledSpan(styles: {
 
   if (styles.color) {
     span.style.color = styles.color;
+  }
+
+  if (styles.backgroundColor) {
+    span.style.backgroundColor = styles.backgroundColor;
   }
 
   return span;
@@ -938,7 +943,12 @@ function resolveApplyRange(editor: HTMLElement, savedRange?: Range | null) {
 
 function applyStyleToSelection(
   editor: HTMLElement,
-  styles: { fontFamily?: string; fontSize?: string; color?: string },
+  styles: {
+    fontFamily?: string;
+    fontSize?: string;
+    color?: string;
+    backgroundColor?: string;
+  },
   savedRange?: Range | null,
 ) {
   if (savedRange) {
@@ -1034,6 +1044,72 @@ export function stripDefaultAppFontFamiliesInEditor(editor: HTMLElement) {
     element.style.removeProperty("font-family");
     cleanupStyledElement(element);
   }
+}
+
+/**
+ * Highlights the selection by wrapping its text nodes in background-color spans.
+ * Unlike `document.execCommand("hiliteColor")` this never restructures block
+ * lines, so multi-line selections cannot gain extra lines.
+ */
+export function applyDetailBackgroundColor(
+  editor: HTMLElement,
+  color: string,
+  savedRange?: Range | null,
+) {
+  const range = resolveApplyRange(editor, savedRange);
+  if (!range || range.collapsed) return false;
+
+  editor.focus();
+  restoreSelectionRange(range);
+
+  if (!canApplyDetailFont(editor, range)) return false;
+
+  return applyStyleToSelection(editor, { backgroundColor: color }, range);
+}
+
+export function removeDetailBackgroundColor(
+  editor: HTMLElement,
+  savedRange?: Range | null,
+) {
+  const range = resolveApplyRange(editor, savedRange);
+  if (!range) return false;
+
+  editor.focus();
+  restoreSelectionRange(range);
+
+  const startContainer = range.startContainer;
+  const startOffset = range.startOffset;
+  const endContainer = range.endContainer;
+  const endOffset = range.endOffset;
+
+  const elements = Array.from(
+    editor.querySelectorAll<HTMLElement>("mark, span, font"),
+  ).filter((element) => range.intersectsNode(element));
+
+  for (const element of elements) {
+    if (shouldSkipFontNormalization(element)) continue;
+
+    if (element.tagName === "MARK") {
+      unwrapElement(element);
+      continue;
+    }
+
+    if (!element.style.backgroundColor) continue;
+
+    element.style.removeProperty("background-color");
+    cleanupStyledElement(element);
+  }
+
+  try {
+    const nextRange = document.createRange();
+    nextRange.setStart(startContainer, startOffset);
+    nextRange.setEnd(endContainer, endOffset);
+    restoreSelectionRange(nextRange);
+  } catch {
+    restoreSelectionRange(range);
+  }
+
+  return true;
 }
 
 export function applyDetailTextColor(

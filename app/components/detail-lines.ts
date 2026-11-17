@@ -1620,6 +1620,53 @@ export function removeLeadingEmptyBodyLineOnBackspace(
   return true;
 }
 
+function isCaretAtVisualStartOfLine(line: HTMLElement) {
+  const selection = window.getSelection();
+  if (!selection?.rangeCount || !selection.isCollapsed) return false;
+
+  const caret = selection.getRangeAt(0);
+  if (!line.contains(caret.startContainer)) return false;
+
+  const beforeCaret = document.createRange();
+  beforeCaret.selectNodeContents(line);
+  beforeCaret.setEnd(caret.startContainer, caret.startOffset);
+
+  if (beforeCaret.toString().replace(/[\u200B\uFEFF]/g, "") !== "") {
+    return false;
+  }
+
+  return !beforeCaret.cloneContents().querySelector(".detail-image-wrapper");
+}
+
+/**
+ * Backspace at the start of a text line whose previous line is empty removes
+ * that empty line, so the current line (and everything below it) moves up.
+ */
+export function removeEmptyLineAboveOnBackspace(editor: HTMLElement): boolean {
+  const activeLine = getActiveLineElement(editor);
+  if (!activeLine || isTitleLine(editor, activeLine)) return false;
+  if (isCodeLine(activeLine) || isListBlockLine(activeLine)) return false;
+  if (activeLine.querySelector(".detail-image-wrapper")) return false;
+
+  const lines = getLineElements(editor);
+  const lineIndex = lines.indexOf(activeLine);
+  if (lineIndex < 2) return false;
+
+  const previousLine = lines[lineIndex - 1];
+  if (
+    !isEmptyEditableBodyLine(editor, previousLine) ||
+    previousLine.querySelector(".detail-image-wrapper")
+  ) {
+    return false;
+  }
+
+  if (!isCaretAtVisualStartOfLine(activeLine)) return false;
+
+  previousLine.remove();
+  renumberNumberedLines(editor);
+  return true;
+}
+
 function mergeLineHtml(existingHtml: string, appendedHtml: string) {
   const left = existingHtml.trim();
   const right = appendedHtml.trim();

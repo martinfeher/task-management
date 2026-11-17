@@ -14,7 +14,7 @@ import { BiLink, BiLeftArrowAlt, BiRedo, BiUndo } from "react-icons/bi";
 import { MdKeyboardArrowUp, MdOutlineKeyboardArrowDown } from "react-icons/md";
 import { LuCheck, LuCode, LuHeading1, LuHeading2, LuHeading3, LuHistory, LuPilcrow, LuRemoveFormatting, LuType, LuX } from "react-icons/lu";
 import { RxEnterFullScreen } from "react-icons/rx";
-import { HiItalic } from "react-icons/hi2";
+import { HiItalic, HiOutlineNumberedList } from "react-icons/hi2";
 import { VscChecklist } from "react-icons/vsc";
 import { renameTask, updateTaskDueDate, updateTaskDueTime, updateTaskRecurrence } from "@/app/actions/todo";
 import type { TaskRecurrenceRule } from "@/lib/task-recurrence";
@@ -24,7 +24,7 @@ import {
   TaskRowContextMenu,
   type TaskRowContextMenuView,
 } from "./task-row-context-menu";
-import { PiDotsThreeBold } from "react-icons/pi";
+import { PiDotsThreeBold, PiListBulletsThin } from "react-icons/pi";
 import { serializeRecurrenceRule } from "@/lib/task-recurrence";
 import type { TaskReminderOptionId } from "@/lib/task-reminder";
 import {
@@ -104,6 +104,7 @@ import {
   splitBlockLinesOnBreaks,
   splitLineAtCursor,
   enterFromTitleLine,
+  removeEmptyLineAboveOnBackspace,
   removeLeadingEmptyBodyLineOnBackspace,
   syncEditorBodyPlaceholderVisibility,
   flattenNestedDetailLines,
@@ -153,6 +154,7 @@ import {
   type DetailLineHeightOption,
 } from "./detail-line-height";
 import {
+  applyDetailBackgroundColor,
   applyDetailFontFamily,
   applyDetailFontSize,
   applyDetailTextColor,
@@ -163,6 +165,7 @@ import {
   isDefaultAppFont,
   isDefaultDetailFontSize,
   pastedHtmlHasFormatting,
+  removeDetailBackgroundColor,
   sanitizePastedHtml,
   stripDefaultAppFontFamiliesInEditor,
   stripFormattingInSelection,
@@ -233,11 +236,8 @@ import {
   SlashCommandBlockPreview,
 } from "./slash-command-block-preview";
 import {
-  BulletListIcon,
-  ChecklistIcon,
   getLineControlsPositionForLine,
   InteractIcon,
-  NumberedListIcon,
   PlusIcon,
 } from "./line-control-icons";
 
@@ -565,10 +565,10 @@ function getFormatToolbarPopoverClass(formatMenu: FormatMenuState) {
 }
 
 const TASK_DETAILS_BLOCK_MENU_CLASS =
-  "task-details-block-menu min-w-[168px] py-0!";
+  "task-details-block-menu min-w-[168px] px-2 py-0!";
 
 const TASK_DETAILS_BLOCK_MENU_ITEM_CLASS =
-  "flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-900 hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800";
+  "menu-item-hover-focus flex w-full items-center gap-2 px-0 py-2 text-left text-sm text-zinc-900 hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800";
 
 const FORMAT_TOOLBAR_ROW_CLASS = "flex items-center gap-0.5 px-2 py-1";
 
@@ -719,9 +719,9 @@ const ADD_BLOCK_OPTIONS: {
   Icon: typeof LuPilcrow;
 }[] = [
   ...TEXT_BLOCK_OPTIONS,
-  { type: "bullet", label: "Bullet list", Icon: BulletListIcon },
-  { type: "numbered", label: "Numbered list", Icon: NumberedListIcon },
-  { type: "checklist", label: "Checklist", Icon: ChecklistIcon },
+  { type: "bullet", label: "Bullet list", Icon: PiListBulletsThin },
+  { type: "numbered", label: "Numbered list", Icon: HiOutlineNumberedList },
+  { type: "checklist", label: "Checklist", Icon: VscChecklist },
   { type: "code", label: "Code", Icon: LuCode },
 ];
 
@@ -1379,39 +1379,11 @@ function unwrapElement(element: HTMLElement) {
 }
 
 function removeHighlightFromSelection(editor: HTMLElement) {
-  const selection = window.getSelection();
-  if (!selection || selection.rangeCount === 0) return;
-
-  document.execCommand("styleWithCSS", false, "true");
-  document.execCommand("removeFormat", false, "hiliteColor");
-  document.execCommand("removeFormat", false, "backColor");
-
-  const range = selection.getRangeAt(0);
-  const elements = Array.from(editor.querySelectorAll("mark, span[style]"));
-
-  for (const element of elements) {
-    if (!(element instanceof HTMLElement)) continue;
-    if (!range.intersectsNode(element)) continue;
-
-    const inlineBg = element.style.backgroundColor;
-    const computedBg = window.getComputedStyle(element).backgroundColor;
-
-    if (
-      element.tagName === "MARK" ||
-      isHighlightColor(inlineBg) ||
-      isHighlightColor(computedBg)
-    ) {
-      unwrapElement(element);
-    }
-  }
+  removeDetailBackgroundColor(editor);
 }
 
 function applyHighlight(editor: HTMLElement, color: string = HIGHLIGHT_COLOR) {
-  document.execCommand("styleWithCSS", false, "true");
-  const applied = document.execCommand("hiliteColor", false, color);
-  if (!applied) {
-    document.execCommand("backColor", false, color);
-  }
+  applyDetailBackgroundColor(editor, color);
 }
 
 function restoreEditorSelectionRange(range: Range) {
@@ -1443,135 +1415,7 @@ function createTextColorPreviewMarker(kind: "start" | "end") {
   return marker;
 }
 
-function detailLineHasNoVisibleText(line: HTMLElement) {
-  const clone = line.cloneNode(true) as HTMLElement;
-  clone
-    .querySelectorAll("[data-text-color-preview]")
-    .forEach((marker) => marker.remove());
-  return (
-    !(clone.textContent ?? "").replace(/\u00a0|\u200B/g, " ").trim() &&
-    !clone.querySelector(".detail-image-wrapper")
-  );
-}
-
-function removeEmptyDetailLinesWithinIndexRange(
-  editor: HTMLElement,
-  startIdx: number,
-  endIdx: number,
-) {
-  if (startIdx >= endIdx) return;
-
-  const lines = getLineElements(editor);
-  for (let index = endIdx; index > startIdx; index -= 1) {
-    const line = lines[index];
-    if (
-      !line ||
-      isTitleLine(editor, line) ||
-      isCodeLine(line) ||
-      line.querySelector(".detail-image-wrapper") ||
-      !detailLineHasNoVisibleText(line)
-    ) {
-      continue;
-    }
-
-    line.remove();
-    lines.splice(index, 1);
-  }
-}
-
-function removeEmptyDetailLinesWithinMarkerBounds(editor: HTMLElement) {
-  const startMarker = editor.querySelector('[data-text-color-preview="start"]');
-  const endMarker = editor.querySelector('[data-text-color-preview="end"]');
-  if (!(startMarker instanceof HTMLElement && endMarker instanceof HTMLElement)) {
-    return;
-  }
-
-  const startLine = startMarker.closest(".detail-line");
-  const endLine = endMarker.closest(".detail-line");
-  if (!(startLine instanceof HTMLElement && endLine instanceof HTMLElement)) {
-    return;
-  }
-
-  const lines = getLineElements(editor);
-  let startIdx = lines.indexOf(startLine);
-  let endIdx = lines.indexOf(endLine);
-  if (startIdx === -1 || endIdx === -1) return;
-
-  if (startIdx > endIdx) {
-    [startIdx, endIdx] = [endIdx, startIdx];
-  }
-
-  removeEmptyDetailLinesWithinIndexRange(editor, startIdx, endIdx);
-}
-
-function removeEmptyDetailLineBeforeFirstFormatLine(
-  editor: HTMLElement,
-  lineIds: string[],
-) {
-  const lines = getLineElements(editor);
-  const indices = lineIds
-    .map((lineId) => lines.findIndex((line) => line.dataset.lineId === lineId))
-    .filter((index) => index > 0);
-
-  if (indices.length === 0) return;
-
-  const firstIdx = Math.min(...indices);
-  const previousLine = lines[firstIdx - 1];
-  if (
-    !previousLine ||
-    isTitleLine(editor, previousLine) ||
-    isCodeLine(previousLine) ||
-    previousLine.querySelector(".detail-image-wrapper") ||
-    !detailLineHasNoVisibleText(previousLine)
-  ) {
-    return;
-  }
-
-  previousLine.remove();
-}
-
-function removeEmptyDetailLinesAmongSavedFormatLines(
-  editor: HTMLElement,
-  lineIds: string[],
-) {
-  if (lineIds.length < 2) return;
-
-  const lines = getLineElements(editor);
-  const indices = lineIds
-    .map((lineId) => lines.findIndex((line) => line.dataset.lineId === lineId))
-    .filter((index) => index > 0)
-    .sort((a, b) => a - b);
-
-  if (indices.length < 2) return;
-
-  removeEmptyDetailLinesWithinIndexRange(
-    editor,
-    indices[0],
-    indices[indices.length - 1],
-  );
-}
-
 function normalizeTextColorPreviewEditorStructure(editor: HTMLElement) {
-  editor
-    .querySelectorAll('[data-text-color-preview="start"]')
-    .forEach((marker) => {
-      const line = marker.closest(".detail-line");
-      if (!(line instanceof HTMLElement)) return;
-
-      let previous = line.previousElementSibling;
-      while (
-        previous instanceof HTMLElement &&
-        previous.classList.contains("detail-line") &&
-        detailLineHasNoVisibleText(previous)
-      ) {
-        const toRemove = previous;
-        previous = previous.previousElementSibling;
-        toRemove.remove();
-      }
-    });
-
-  removeEmptyDetailLinesWithinMarkerBounds(editor);
-
   const lines = new Set<HTMLElement>();
   editor.querySelectorAll("[data-text-color-preview]").forEach((marker) => {
     const line = marker.closest(".detail-line");
@@ -1583,6 +1427,54 @@ function normalizeTextColorPreviewEditorStructure(editor: HTMLElement) {
   lines.forEach((line) => {
     stripTrailingBreakFromNonEmptyLine(line);
   });
+}
+
+/**
+ * Keeps a format range's boundaries inside `.detail-line` elements so inserting
+ * preview markers can never create stray content directly under the editor
+ * (which would later be wrapped into an extra empty line).
+ */
+function normalizeFormatRangeBoundaries(editor: HTMLElement, range: Range) {
+  const next = range.cloneRange();
+
+  if (next.startContainer === editor) {
+    const line = editor.childNodes[next.startOffset];
+    if (line instanceof HTMLElement && line.classList.contains("detail-line")) {
+      next.setStart(line, 0);
+    }
+  }
+
+  if (next.endContainer === editor) {
+    const line = editor.childNodes[next.endOffset - 1];
+    if (line instanceof HTMLElement && line.classList.contains("detail-line")) {
+      next.setEnd(line, line.childNodes.length);
+    }
+  }
+
+  // A selection that ends at the very start of a later line (e.g. triple click
+  // or drag to the next line) should not touch that following line.
+  const endLine = getDetailLineFromNode(next.endContainer, editor);
+  const startLine = getDetailLineFromNode(next.startContainer, editor);
+  if (endLine && startLine && endLine !== startLine) {
+    const beforeEnd = document.createRange();
+    beforeEnd.selectNodeContents(endLine);
+    beforeEnd.setEnd(next.endContainer, next.endOffset);
+    const hasTextBeforeEnd =
+      beforeEnd.toString().replace(/[\u200B\uFEFF]/g, "") !== "" ||
+      Boolean(beforeEnd.cloneContents().querySelector(".detail-image-wrapper"));
+
+    if (!hasTextBeforeEnd) {
+      const previousLine = endLine.previousElementSibling;
+      if (
+        previousLine instanceof HTMLElement &&
+        previousLine.classList.contains("detail-line")
+      ) {
+        next.setEnd(previousLine, previousLine.childNodes.length);
+      }
+    }
+  }
+
+  return next;
 }
 
 function getTextColorPreviewContentRange(editor: HTMLElement) {
@@ -2284,7 +2176,8 @@ const TASK_DETAILS_EDITOR_MODAL_MIN_HEIGHT_PX = 88;
 const TASK_DETAILS_EDITOR_BOTTOM_INSET_PX = 30;
 /** Space between the modal editor and footer (8px tighter than the default editor inset). */
 const TASK_DETAILS_EDITOR_MODAL_BOTTOM_INSET_PX = 14;
-const TASK_DETAILS_EDITOR_MODAL_MAX_HEIGHT_VH = 0.85;
+const TASK_DETAILS_EDITOR_MODAL_MAX_HEIGHT_PX = 560;
+const TASK_DETAILS_EDITOR_MODAL_MAX_HEIGHT_VH = 0.6;
 
 function getEditorReservedBelowSpacePx(
   editor: HTMLElement,
@@ -2335,16 +2228,17 @@ function getEditorMinHeightPx(
   maxHeight: number,
   isModalLayout: boolean,
 ) {
+  // Task modal (calendar view): fixed compact editor, independent of the
+  // 85%-of-screen height used by the task detail window.
+  if (isModalLayout) {
+    return TASK_DETAILS_EDITOR_MODAL_MIN_HEIGHT_PX;
+  }
+
   const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
   const screenMinHeight =
     viewportHeight * TASK_DETAILS_EDITOR_SHORT_CONTENT_MIN_HEIGHT_VH;
-  const desiredMin = Math.min(screenMinHeight, maxHeight);
 
-  if (isModalLayout) {
-    return Math.max(TASK_DETAILS_EDITOR_MODAL_MIN_HEIGHT_PX, desiredMin);
-  }
-
-  return desiredMin;
+  return Math.min(screenMinHeight, maxHeight);
 }
 
 function getEditorMaxHeightPx(
@@ -2371,7 +2265,10 @@ function getEditorMaxHeightPx(
     return viewportMax;
   }
 
-  const modalCap = viewportHeight * TASK_DETAILS_EDITOR_MODAL_MAX_HEIGHT_VH;
+  const modalCap = Math.min(
+    viewportHeight * TASK_DETAILS_EDITOR_MODAL_MAX_HEIGHT_VH,
+    TASK_DETAILS_EDITOR_MODAL_MAX_HEIGHT_PX,
+  );
 
   return Math.max(
     TASK_DETAILS_EDITOR_MODAL_MIN_HEIGHT_PX,
@@ -2612,7 +2509,7 @@ export function TaskDetailsPanel({
   const linkTextInputRef = useRef<HTMLInputElement>(null);
   const savedLinkSelectionRef = useRef<Range | null>(null);
   const savedFormatSelectionRef = useRef<Range | null>(null);
-  const textColorPreviewBaselineRef = useRef<DocumentFragment | null>(null);
+  const textColorPreviewBaselineRef = useRef<string | null>(null);
   const textColorPreviewMarkersPlacedRef = useRef(false);
   const savedFormatLineIdsRef = useRef<string[]>([]);
   const openFormatDropdownRef = useRef<FormatToolbarDropdown | null>(null);
@@ -2684,6 +2581,8 @@ export function TaskDetailsPanel({
   } | null>(null);
   const activeLineControlsRef = useRef<HTMLElement | null>(null);
   const isMouseOverEditorRef = useRef(false);
+  /** Keyboard navigation: line controls follow the caret line, not the mouse. */
+  const lineControlsFollowCaretRef = useRef(false);
   const pointerInGutterRef = useRef(false);
   const isEditorPointerDownRef = useRef(false);
   const dragStateRef = useRef<{
@@ -3487,6 +3386,16 @@ export function TaskDetailsPanel({
       line = activeLineControlsRef.current;
     } else if (addBlockMenu && activeLineControlsRef.current) {
       line = activeLineControlsRef.current;
+    } else if (lineControlsFollowCaretRef.current && activeLine) {
+      // The caret moved (keyboard): the + icon follows the caret line and is
+      // hidden when the caret is on a line with content.
+      if (focusedEmptyBodyLine) {
+        line = focusedEmptyBodyLine;
+      } else {
+        activeLineControlsRef.current = null;
+        setLineControls([]);
+        return;
+      }
     } else if (
       isMouseOverEditorRef.current &&
       hoveredLine &&
@@ -3922,6 +3831,21 @@ export function TaskDetailsPanel({
     }
   }, [rememberFormatSelection]);
 
+  /**
+   * Restores the editor to the snapshot taken when the preview started (markers
+   * included). Restoring the whole HTML avoids re-inserting cloned multi-line
+   * fragments, which nested `.detail-line` elements and produced extra lines.
+   */
+  const restoreTextColorPreviewBaseline = useCallback((editor: HTMLElement) => {
+    const baselineHtml = textColorPreviewBaselineRef.current;
+    if (baselineHtml === null) return null;
+
+    const scrollTop = editor.scrollTop;
+    editor.innerHTML = baselineHtml;
+    editor.scrollTop = scrollTop;
+    return getTextColorPreviewContentRange(editor);
+  }, []);
+
   const clearTextColorLivePreview = useCallback(
     (options?: { keepContent?: boolean }) => {
       const editor = editorRef.current;
@@ -3931,7 +3855,7 @@ export function TaskDetailsPanel({
         return;
       }
 
-      const contentRange = getTextColorPreviewContentRange(editor);
+      let contentRange = getTextColorPreviewContentRange(editor);
       if (!contentRange) {
         removeTextColorPreviewMarkers(editor);
         textColorPreviewBaselineRef.current = null;
@@ -3939,14 +3863,8 @@ export function TaskDetailsPanel({
         return;
       }
 
-      if (!options?.keepContent && textColorPreviewBaselineRef.current) {
-        contentRange.deleteContents();
-        contentRange.insertNode(
-          textColorPreviewBaselineRef.current.cloneNode(true),
-        );
-        normalizeTextColorPreviewEditorStructure(editor);
-      } else {
-        removeEmptyDetailLinesWithinMarkerBounds(editor);
+      if (!options?.keepContent && textColorPreviewBaselineRef.current !== null) {
+        contentRange = restoreTextColorPreviewBaseline(editor) ?? contentRange;
       }
 
       const selectionRange = contentRange.cloneRange();
@@ -3968,17 +3886,24 @@ export function TaskDetailsPanel({
         setFormatMenuInlineFormats(getDetailSelectionInlineFormatState(editor));
       }
     },
-    [captureFormatSelectionFromEditor, rememberFormatSelection],
+    [
+      captureFormatSelectionFromEditor,
+      rememberFormatSelection,
+      restoreTextColorPreviewBaseline,
+    ],
   );
 
   const ensureTextColorPreviewSetup = useCallback(() => {
     const editor = editorRef.current;
-    const savedRange = savedFormatSelectionRef.current?.cloneRange();
-    if (!editor || !savedRange || savedRange.collapsed) return null;
+    const rawSavedRange = savedFormatSelectionRef.current?.cloneRange();
+    if (!editor || !rawSavedRange || rawSavedRange.collapsed) return null;
 
     if (textColorPreviewMarkersPlacedRef.current) {
       return getTextColorPreviewContentRange(editor);
     }
+
+    const savedRange = normalizeFormatRangeBoundaries(editor, rawSavedRange);
+    if (savedRange.collapsed) return null;
 
     const startMarker = createTextColorPreviewMarker("start");
     const endMarker = createTextColorPreviewMarker("end");
@@ -3994,7 +3919,7 @@ export function TaskDetailsPanel({
     const contentRange = getTextColorPreviewContentRange(editor);
     if (!contentRange) return null;
 
-    textColorPreviewBaselineRef.current = contentRange.cloneContents();
+    textColorPreviewBaselineRef.current = editor.innerHTML;
     rememberFormatSelection(editor, contentRange);
     return contentRange;
   }, [rememberFormatSelection]);
@@ -4005,15 +3930,9 @@ export function TaskDetailsPanel({
       if (!editor) return;
 
       const contentRange = ensureTextColorPreviewSetup();
-      if (!contentRange || !textColorPreviewBaselineRef.current) return;
+      if (!contentRange || textColorPreviewBaselineRef.current === null) return;
 
-      contentRange.deleteContents();
-      contentRange.insertNode(
-        textColorPreviewBaselineRef.current.cloneNode(true),
-      );
-      normalizeTextColorPreviewEditorStructure(editor);
-
-      const previewRange = getTextColorPreviewContentRange(editor);
+      const previewRange = restoreTextColorPreviewBaseline(editor);
       if (!previewRange || previewRange.collapsed) return;
 
       const resolvedColor = resolveTextColorOption(color);
@@ -4034,7 +3953,11 @@ export function TaskDetailsPanel({
         textColor: resolvedColor,
       }));
     },
-    [ensureTextColorPreviewSetup, rememberFormatSelection],
+    [
+      ensureTextColorPreviewSetup,
+      rememberFormatSelection,
+      restoreTextColorPreviewBaseline,
+    ],
   );
 
   const previewHighlightColorOnSelection = useCallback(
@@ -4043,15 +3966,9 @@ export function TaskDetailsPanel({
       if (!editor) return;
 
       const contentRange = ensureTextColorPreviewSetup();
-      if (!contentRange || !textColorPreviewBaselineRef.current) return;
+      if (!contentRange || textColorPreviewBaselineRef.current === null) return;
 
-      contentRange.deleteContents();
-      contentRange.insertNode(
-        textColorPreviewBaselineRef.current.cloneNode(true),
-      );
-      normalizeTextColorPreviewEditorStructure(editor);
-
-      const previewRange = getTextColorPreviewContentRange(editor);
+      const previewRange = restoreTextColorPreviewBaseline(editor);
       if (!previewRange || previewRange.collapsed) return;
 
       editor.focus({ preventScroll: true });
@@ -4076,7 +3993,11 @@ export function TaskDetailsPanel({
         highlightColor: resolvedColor,
       }));
     },
-    [ensureTextColorPreviewSetup, rememberFormatSelection],
+    [
+      ensureTextColorPreviewSetup,
+      rememberFormatSelection,
+      restoreTextColorPreviewBaseline,
+    ],
   );
 
   const previewFontFamilyOnSelection = useCallback(
@@ -4085,15 +4006,9 @@ export function TaskDetailsPanel({
       if (!editor) return;
 
       const contentRange = ensureTextColorPreviewSetup();
-      if (!contentRange || !textColorPreviewBaselineRef.current) return;
+      if (!contentRange || textColorPreviewBaselineRef.current === null) return;
 
-      contentRange.deleteContents();
-      contentRange.insertNode(
-        textColorPreviewBaselineRef.current.cloneNode(true),
-      );
-      normalizeTextColorPreviewEditorStructure(editor);
-
-      const previewRange = getTextColorPreviewContentRange(editor);
+      const previewRange = restoreTextColorPreviewBaseline(editor);
       if (!previewRange || previewRange.collapsed) return;
 
       if (
@@ -4109,7 +4024,11 @@ export function TaskDetailsPanel({
         }
       }
     },
-    [ensureTextColorPreviewSetup, rememberFormatSelection],
+    [
+      ensureTextColorPreviewSetup,
+      rememberFormatSelection,
+      restoreTextColorPreviewBaseline,
+    ],
   );
 
   const setFormatDropdownOpen = useCallback(
@@ -4984,14 +4903,6 @@ export function TaskDetailsPanel({
         return;
       }
 
-      removeEmptyDetailLineBeforeFirstFormatLine(
-        editor,
-        savedFormatLineIdsRef.current,
-      );
-      removeEmptyDetailLinesAmongSavedFormatLines(
-        editor,
-        savedFormatLineIdsRef.current,
-      );
       syncEditorLineEmptyState(editor);
       syncEditorContent();
       recordHistorySnapshot("Text color");
@@ -5067,14 +4978,6 @@ export function TaskDetailsPanel({
         applyHighlight(editor, resolveHighlightColorOption(color));
       }
 
-      removeEmptyDetailLineBeforeFirstFormatLine(
-        editor,
-        savedFormatLineIdsRef.current,
-      );
-      removeEmptyDetailLinesAmongSavedFormatLines(
-        editor,
-        savedFormatLineIdsRef.current,
-      );
       syncEditorLineEmptyState(editor);
       syncEditorContent();
       recordHistorySnapshot("Highlight color");
@@ -6695,6 +6598,9 @@ export function TaskDetailsPanel({
     }
 
     const line = getLineElementAtPoint(editor, event.clientY);
+    if (line !== hoveredLineRef.current) {
+      lineControlsFollowCaretRef.current = false;
+    }
     hoveredLineRef.current = line;
     pointerInGutterRef.current = isPointerInLineControlsGutter(
       event.clientX,
@@ -6710,6 +6616,7 @@ export function TaskDetailsPanel({
     event: React.MouseEvent<HTMLDivElement>,
   ) {
     isMouseOverEditorRef.current = true;
+    lineControlsFollowCaretRef.current = false;
 
     const editor = editorRef.current;
     if (!editor || dragStateRef.current) return;
@@ -6778,6 +6685,7 @@ export function TaskDetailsPanel({
   }
 
   function handleEditorMouseDown(event: React.MouseEvent<HTMLDivElement>) {
+    lineControlsFollowCaretRef.current = false;
     const editor = editorRef.current;
     if (!editor) return;
 
@@ -7097,6 +7005,15 @@ export function TaskDetailsPanel({
 
   function handleEditorKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
     if (
+      event.key !== "Shift" &&
+      event.key !== "Meta" &&
+      event.key !== "Control" &&
+      event.key !== "Alt"
+    ) {
+      lineControlsFollowCaretRef.current = true;
+    }
+
+    if (
       (event.metaKey || event.ctrlKey) &&
       event.key.toLowerCase() === "a" &&
       !event.shiftKey
@@ -7294,6 +7211,17 @@ export function TaskDetailsPanel({
       if (!editor) return;
 
       if (removeLeadingEmptyBodyLineOnBackspace(editor)) {
+        event.preventDefault();
+        syncEditorLineEmptyState(editor);
+        syncEditorContent();
+        recordHistorySnapshot("Delete line");
+        scheduleAutoSave();
+        updateLineControls();
+        scheduleEditorHeightSync();
+        return;
+      }
+
+      if (removeEmptyLineAboveOnBackspace(editor)) {
         event.preventDefault();
         syncEditorLineEmptyState(editor);
         syncEditorContent();
@@ -8962,10 +8890,10 @@ export function TaskDetailsPanel({
               onKeyDown={handleEditorKeyDown}
               onKeyUp={handleEditorKeyUp}
               onScroll={updateLineControls}
-              className={`task-details-editor w-full min-h-[85vh] resize-none rounded-xl pt-[8px] pl-[25px] pr-3 pb-4! text-[#555555] outline-none transition-colors focus:border-[#7f7f7f] dark:text-zinc-300 [&_.detail-line[data-line-type=bullet]]:pl-1 [&_.detail-line[data-line-type=checklist]]:cursor-pointer [&_.detail-line[data-line-type=checklist]]:pl-1 [&_.detail-line[data-line-type=h1]]:text-[26px] [&_.detail-line[data-line-type=h1]]:font-bold [&_.detail-line[data-line-type=h1]]:leading-[36px] [&_.detail-line[data-line-type=h1]]:text-[#4B4B4B] dark:[&_.detail-line[data-line-type=h1]]:text-[#F5F5F5] [&_.detail-line[data-line-type=h2]]:text-[23px] [&_.detail-line[data-line-type=h2]]:font-semibold [&_.detail-line[data-line-type=h2]]:leading-[30px] [&_.detail-line[data-line-type=h3]]:text-[19px] [&_.detail-line[data-line-type=h3]]:font-semibold [&_.detail-line[data-line-type=h3]]:leading-[26px] [&_.detail-line[data-line-type=numbered]]:pl-1 [&_mark]:bg-yellow-200 dark:[&_mark]:bg-yellow-300/30 [&_s]:line-through [&_strike]:line-through [&_u]:underline ${
+              className={`task-details-editor w-full resize-none rounded-xl pt-[8px] pl-[25px] pr-3 pb-4! text-[#555555] outline-none transition-colors focus:border-[#7f7f7f] dark:text-zinc-300 [&_.detail-line[data-line-type=bullet]]:pl-1 [&_.detail-line[data-line-type=checklist]]:cursor-pointer [&_.detail-line[data-line-type=checklist]]:pl-1 [&_.detail-line[data-line-type=h1]]:text-[26px] [&_.detail-line[data-line-type=h1]]:font-bold [&_.detail-line[data-line-type=h1]]:leading-[36px] [&_.detail-line[data-line-type=h1]]:text-[#4B4B4B] dark:[&_.detail-line[data-line-type=h1]]:text-[#F5F5F5] [&_.detail-line[data-line-type=h2]]:text-[23px] [&_.detail-line[data-line-type=h2]]:font-semibold [&_.detail-line[data-line-type=h2]]:leading-[30px] [&_.detail-line[data-line-type=h3]]:text-[19px] [&_.detail-line[data-line-type=h3]]:font-semibold [&_.detail-line[data-line-type=h3]]:leading-[26px] [&_.detail-line[data-line-type=numbered]]:pl-1 [&_mark]:bg-yellow-200 dark:[&_mark]:bg-yellow-300/30 [&_s]:line-through [&_strike]:line-through [&_u]:underline ${
                 isModalLayout
-                  ? "min-h-0 shrink-0 overflow-hidden"
-                  : "min-h-0 overflow-auto"
+                  ? "h-[496px]! min-h-0 shrink-0 overflow-hidden"
+                  : "min-h-[85vh] min-h-0 overflow-auto"
               }`}
             />
 

@@ -99,7 +99,7 @@ export function DetailLineHeightControl({
             role="option"
             aria-selected={selected}
             data-line-height-option={option}
-            className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-sm transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800 ${
+            className={`menu-item-hover-focus flex w-full cursor-pointer items-center justify-between px-3 py-1.5 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800 ${
               selected
                 ? `font-medium ${FORMAT_TOOLBAR_FONT_SIZE_SELECTED_COLOR}`
                 : FORMAT_TOOLBAR_TRIGGER_LABEL_COLOR

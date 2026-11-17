@@ -70,7 +70,7 @@ export const FORMAT_TOOLBAR_DROPDOWN_MENU_CLASS = `overflow-hidden rounded-[12px
 export const FORMAT_TOOLBAR_LIST_BLOCK_MENU_CLASS = `overflow-hidden rounded-[12px] p-2 min-w-[168px] cursor-pointer ${FORMAT_TOOLBAR_DROPDOWN_MENU_SURFACE_CLASS}`;
 
 export const FORMAT_TOOLBAR_DROPDOWN_ITEM_CLASS =
-  "flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm text-zinc-900 transition-colors hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800";
+  "menu-item-hover-focus flex w-full cursor-pointer items-center gap-2 px-2 py-1.5 text-left text-sm text-zinc-900 hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800";
 
 export const FORMAT_TOOLBAR_LIST_BLOCK_MENU_ITEM_CLASS =
   FORMAT_TOOLBAR_DROPDOWN_ITEM_CLASS;
@@ -79,7 +79,7 @@ export const FORMAT_TOOLBAR_FONT_FAMILY_TRIGGER_CLASS =
   `flex h-8 cursor-pointer items-center gap-0.5 rounded-lg px-1 text-[13px] ${FORMAT_TOOLBAR_ICON_COLOR} transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800`;
 
 export const FORMAT_TOOLBAR_FONT_FAMILY_ITEM_CLASS =
-  "flex w-full items-center pl-[14px] pr-2 py-1.5 text-left text-[14px] text-[#48484a] hover:text-[#292929] transition-colors hover:bg-zinc-100 dark:text-[#fbfbfb] dark:hover:bg-zinc-800 cursor-pointer";
+  "menu-item-hover-focus flex w-full items-center pl-[14px] pr-2 py-1.5 text-left text-[14px] text-[#48484a] hover:text-[#292929] hover:bg-zinc-100 dark:text-[#fbfbfb] dark:hover:bg-zinc-800 cursor-pointer";
 
 export const FORMAT_TOOLBAR_FONT_SIZE_TEXT_CLASS = "text-[14px] px-0";
 /** 15% brighter than #83a1e0 / Tailwind blue-300 (#93c5fd) */
@@ -104,7 +104,7 @@ const FORMAT_TOOLBAR_OVERFLOW_MENU_TRIGGER_CLASS =
   "flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800";
 
 const FORMAT_TOOLBAR_OVERFLOW_MENU_ITEM_CLASS =
-  "flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm text-zinc-900 transition-colors hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800";
+  "menu-item-hover-focus flex w-full cursor-pointer items-center gap-2 px-2 py-1.5 text-left text-sm text-zinc-900 hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800";
 
 /** Where the format toolbar sits relative to the text selection. */
 export type FormatToolbarAnchorPlacement = "above" | "below";
@@ -642,7 +642,7 @@ function HighlightColorSwatchButton({
       role="menuitem"
       aria-label={option.label}
       title={option.label}
-      className={`size-6 rounded-full border transition-transform hover:scale-110 ${
+      className={`size-6 cursor-pointer rounded-full border transition-transform hover:scale-110 ${
         option.value.toLowerCase() === "#ffffff"
           ? "border-zinc-300 dark:border-zinc-500"
           : "border-zinc-200/80 dark:border-zinc-600"
@@ -1189,7 +1189,7 @@ export function DetailFormatFontSizeDropdown({
             key={option}
             type="button"
             role="menuitem"
-            className={`rounded-md px-1 py-1 text-center ${FORMAT_TOOLBAR_FONT_SIZE_TEXT_CLASS} transition-colors hover:bg-zinc-100/50 dark:hover:bg-zinc-800 ${
+            className={`menu-item-hover-focus cursor-pointer rounded-md px-1 py-1 text-center ${FORMAT_TOOLBAR_FONT_SIZE_TEXT_CLASS} hover:bg-zinc-100/50 dark:hover:bg-zinc-800 ${
               option === size
                 ? `bg-zinc-100 font-medium ${FORMAT_TOOLBAR_FONT_SIZE_SELECTED_COLOR} dark:bg-zinc-800`
                 : FORMAT_TOOLBAR_TRIGGER_LABEL_COLOR
