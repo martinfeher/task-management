@@ -20,7 +20,11 @@
 @source inline("size-[18px]");
 @source inline("size-[22px]");
 @source inline("size-[24px]");
+@source inline("pl-[6px]");
+@source inline("pt-[7px]");
 @source inline("pt-[12px]");
+@source inline("backdrop-blur-[4px]");
+@source inline("backdrop-blur-[5px]");
 
 @layer base {
   * {
@@ -30,11 +34,22 @@
 
 @layer utilities {
   .frosted-popover-surface {
-    @apply bg-white/[0.6] shadow-[0_10px_23px_rgba(0,0,0,0.09)] backdrop-blur-[5px] dark:bg-zinc-950/[0.6] dark:ring-zinc-800;
+    @apply bg-white/[0.92] shadow-[0_10px_23px_rgba(0,0,0,0.09)] dark:bg-zinc-950/[0.92] dark:ring-zinc-800;
   }
 
   [data-task-label-menu].frosted-popover-surface {
     @apply bg-white/[0.85] dark:bg-zinc-950/[0.85];
+  }
+
+  .task-modal-context-surface {
+    border: 1px solid #e7e7ef;
+    @apply backdrop-blur-[4px] shadow-[0_10px_23px_rgba(0,0,0,0.09)];
+    background-color: rgb(246 246 246 / 0.85);
+  }
+
+  .dark .task-modal-context-surface {
+    border-color: rgb(63 63 70);
+    background-color: rgb(9 9 11 / 0.85);
   }
 
   .ptxt-50 {
@@ -766,18 +781,20 @@ body {
   font-family: var(--font-app), ui-sans-serif, system-ui, sans-serif !important;
 }
 
+/* Hide the idle trailing placeholder while editing, but never on the line the
+   cursor is in or the empty line being hovered (those carry data-show-body-placeholder). */
 .task-details-editor[data-hide-body-placeholder="true"]
-  .detail-line[data-empty="true"]:last-child:not([data-line-type="h1"]):not([data-line-type="code"]):not(
+  .detail-line[data-empty="true"]:last-child:not([data-show-body-placeholder="true"]):not([data-line-type="h1"]):not([data-line-type="code"]):not(
     :has(.detail-image-wrapper)
   ):not([data-line-type="bullet"]):not([data-line-type="numbered"]):not(
     [data-line-type="checklist"]
   )::before,
 .task-details-editor[data-hide-body-placeholder="true"]
-  .detail-line[data-empty="true"]:last-child[data-line-type="bullet"]::after,
+  .detail-line[data-empty="true"]:last-child:not([data-show-body-placeholder="true"])[data-line-type="bullet"]::after,
 .task-details-editor[data-hide-body-placeholder="true"]
-  .detail-line[data-empty="true"]:last-child[data-line-type="numbered"]::after,
+  .detail-line[data-empty="true"]:last-child:not([data-show-body-placeholder="true"])[data-line-type="numbered"]::after,
 .task-details-editor[data-hide-body-placeholder="true"]
-  .detail-line[data-empty="true"]:last-child[data-line-type="checklist"]::after {
+  .detail-line[data-empty="true"]:last-child:not([data-show-body-placeholder="true"])[data-line-type="checklist"]::after {
   content: none;
 }
 
@@ -1369,21 +1386,24 @@ body {
   color: var(--tcm-clear-date-hover, var(--tcm-clear-date)) !important;
 }
 
-.task-list-context-menu .frosted-popover-surface {
-  -webkit-backdrop-filter: blur(5px);
-  backdrop-filter: blur(5px);
-}
-
 .add-task-form .frosted-popover-surface,
 .add-task-form [data-task-date-picker-root].frosted-popover-surface {
-  background-color: rgb(255 255 255 / 0.9);
-  -webkit-backdrop-filter: blur(2px) saturate(1.15);
-  backdrop-filter: blur(2px) saturate(1.15);
+  @apply backdrop-blur-[5px];
+  background-color: rgb(255 255 255 / 0.94);
+  z-index: 100000;
 }
 
 .dark .add-task-form .frosted-popover-surface,
 .dark .add-task-form [data-task-date-picker-root].frosted-popover-surface {
-  background-color: rgb(9 9 11 / 0.9);
+  background-color: rgb(9 9 11 / 0.92);
+}
+
+[data-task-date-picker-root].frosted-popover-surface {
+  background-color: rgb(255 255 255 / 0.89);
+}
+
+.dark [data-task-date-picker-root].frosted-popover-surface {
+  background-color: rgb(9 9 11 / 0.89);
 }
 
 .task-priority-tooltip::after {
@@ -2138,6 +2158,14 @@ body {
   box-shadow: 0 10px 23px rgba(0, 0, 0, 0.09);
 }
 
+.calendar-task-modal .task-details-panel-background {
+  background-color: #F6F6F6;
+}
+
+.dark .calendar-task-modal .task-details-panel-background {
+  background-color: rgb(9 9 11);
+}
+
 .calendar-task-modal footer {
   align-items: center;
 }
@@ -2483,28 +2511,14 @@ body {
   }
 }
 
-.format-toolbar-dropdown-menu {
-  -webkit-backdrop-filter: blur(5px);
-  backdrop-filter: blur(5px);
-}
-
 .format-toolbar-dropdown-menu :is(button, [role="menuitem"], [role="option"]) {
   cursor: pointer;
 }
 
-/* Submenu items: while one is hovered, the others recede (less opaque + slightly blurred). */
 .menu-item-hover-focus {
   transition:
-    opacity 120ms ease,
-    filter 120ms ease,
     background-color 150ms ease,
     color 150ms ease;
-}
-
-:is([role="menu"], [role="listbox"]):has(.menu-item-hover-focus:hover)
-  .menu-item-hover-focus:not(:hover) {
-  opacity: 0.55;
-  filter: blur(0.6px);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2552,30 +2566,26 @@ body {
   box-shadow:
     0 10px 23px rgba(0, 0, 0, 0.09),
     0 0 0 1px rgb(228 228 231 / 0.8);
-  -webkit-backdrop-filter: blur(4px);
-  backdrop-filter: blur(4px);
 }
 
 .task-list-sort-menu,
 .sidebar-context-menu {
-  background-color: rgb(255 255 255 / 0.6);
+  background-color: rgb(255 255 255 / 0.95);
 }
 
 .task-item-date-picker-popover {
   border-radius: 16px;
-  background-color: rgb(255 255 255 / 0.9);
+  background-color: rgb(255 255 255 / 0.89);
   box-shadow:
     0 10px 23px rgba(0, 0, 0, 0.09),
     0 0 0 1px rgb(228 228 231 / 0.8);
-  -webkit-backdrop-filter: blur(4px);
-  backdrop-filter: blur(4px);
 }
 
 .task-details-block-menu {
   overflow: hidden;
   border-radius: 24px;
   padding-block: 0.375rem;
-  background-color: rgb(255 255 255 / 0.77);
+  background-color: rgb(255 255 255 / 0.95);
 }
 
 .task-list-sort-menu,
@@ -2587,7 +2597,7 @@ body {
 @media (prefers-color-scheme: dark) {
   .task-list-sort-menu,
   .sidebar-context-menu {
-    background-color: rgb(9 9 11 / 0.6);
+    background-color: rgb(9 9 11 / 0.95);
   }
 
   .task-details-block-menu {
@@ -2603,7 +2613,7 @@ body {
   }
 
   .task-item-date-picker-popover {
-    background-color: rgb(9 9 11 / 0.9);
+    background-color: rgb(9 9 11 / 0.89);
     box-shadow:
       0 10px 23px rgba(0, 0, 0, 0.09),
       0 0 0 1px rgb(39 39 42);

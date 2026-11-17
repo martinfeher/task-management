@@ -5,6 +5,7 @@ import { BiSearch } from "react-icons/bi";
 import { LuCheck, LuInbox, LuList } from "react-icons/lu";
 import type { TodoList } from "./todo-app";
 import { FROSTED_POPOVER_SURFACE_CLASS } from "@/lib/frosted-popover-surface";
+import { TASK_MODAL_CONTEXT_SURFACE_CLASS } from "@/lib/task-modal-context-surface";
 import { taskContextMenuTextColor } from "@/lib/task-context-menu-colors";
 
 type TaskMoveToSelectorProps = {
@@ -18,13 +19,14 @@ type TaskMoveToSelectorProps = {
   autoFocus?: boolean;
   tone?: "default" | "contextMenu";
   /** Calendar task modal: match sidebar task preview frosted surface. */
-  surface?: "solid" | "frosted";
+  surface?: "solid" | "frosted" | "modalContext";
 };
 
 const MOVE_TO_SURFACE_CLASS = {
   solid:
     "bg-white shadow-[0_12px_32px_rgba(0,0,0,0.12)] dark:bg-zinc-900 dark:shadow-[0_12px_32px_rgba(0,0,0,0.32)]",
   frosted: FROSTED_POPOVER_SURFACE_CLASS,
+  modalContext: TASK_MODAL_CONTEXT_SURFACE_CLASS,
 } as const;
 
 function getListIcon(name: string) {
@@ -48,7 +50,8 @@ export function TaskMoveToSelector({
   surface = "frosted",
 }: TaskMoveToSelectorProps) {
   const isContextMenuTone = tone === "contextMenu";
-  const isFrostedSurface = surface === "frosted";
+  const isFrostedSurface =
+    surface === "frosted" || surface === "modalContext";
   const inputRef = useRef<HTMLInputElement>(null);
   const trimmedQuery = query.trim();
 
@@ -152,11 +155,13 @@ export function TaskMoveToSelector({
                 className={`flex h-[38px] w-full items-center gap-2.5 px-4 text-left text-sm transition-colors ${
                   showCurrentList && isCurrent
                     ? "cursor-default text-[#4873c7] dark:text-[#7da2ff]"
-                    : isFrostedSurface
-                      ? "text-zinc-800 hover:bg-white/45 dark:text-zinc-100 dark:hover:bg-white/[0.08]"
-                      : isContextMenuTone
-                        ? "hover:bg-zinc-50 dark:text-zinc-100 dark:hover:bg-zinc-800/70"
-                        : "text-zinc-800 hover:bg-zinc-50 dark:text-zinc-100 dark:hover:bg-zinc-800/70"
+                    : `cursor-pointer ${
+                        isFrostedSurface
+                          ? "text-zinc-800 hover:bg-white/45 dark:text-zinc-100 dark:hover:bg-white/[0.08]"
+                          : isContextMenuTone
+                            ? "hover:bg-zinc-50 dark:text-zinc-100 dark:hover:bg-zinc-800/70"
+                            : "text-zinc-800 hover:bg-zinc-50 dark:text-zinc-100 dark:hover:bg-zinc-800/70"
+                      }`
                 }`}
                 style={
                   isContextMenuTone && !(showCurrentList && isCurrent)

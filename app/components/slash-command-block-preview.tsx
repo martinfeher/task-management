@@ -196,20 +196,19 @@ export function SlashCommandBlockPreview({
   return (
     <div
       aria-hidden="true"
-      className="w-[196px] shrink-0 overflow-hidden rounded-[14px] border-1 border-slate-800 bg-slate-700 px-2 py-1.5 shadow-[0_10px_28px_rgba(0,0,0,0.22)] dark:border-zinc-600"
+      className="w-[196px] shrink-0 overflow-hidden rounded-[14px] border-1 border-slate-800 bg-slate-700 px-[8px] pt-[7px] pb-1.5 shadow-[0_10px_28px_rgba(0,0,0,0.22)] dark:border-zinc-600"
     >
       <div
         className="box-border overflow-hidden rounded-[10px] bg-white dark:bg-zinc-950"
         style={{ height: SLASH_COMMAND_PREVIEW_CONTENT_HEIGHT_PX }}
       >
         <div
-          className="task-details-editor pointer-events-none box-border h-full overflow-hidden p-[5px] text-[13px] leading-snug [&_.detail-line[data-line-type=h1]]:text-[18px] [&_.detail-line[data-line-type=h1]]:leading-[22px] [&_.detail-line[data-line-type=h2]]:text-[15px] [&_.detail-line[data-line-type=h2]]:leading-[19px] [&_.detail-line[data-line-type=h3]]:text-[14px] [&_.detail-line[data-line-type=h3]]:leading-[18px] [&_.detail-line[data-line-type=bullet]]:leading-[18px] [&_.detail-line[data-line-type=numbered]]:leading-[18px] [&_.detail-line[data-line-type=checklist]]:leading-[18px]"
-          data-hide-body-placeholder="true"
+          className="task-details-editor pointer-events-none box-border h-full overflow-hidden border-0 bg-transparent py-[5px] px-[8px]! text-[13px] leading-snug [&_.detail-line[data-line-type=h1]]:text-[18px] [&_.detail-line[data-line-type=h1]]:leading-[22px] [&_.detail-line[data-line-type=h2]]:text-[15px] [&_.detail-line[data-line-type=h2]]:leading-[19px] [&_.detail-line[data-line-type=h3]]:text-[14px] [&_.detail-line[data-line-type=h3]]:leading-[18px] [&_.detail-line[data-line-type=bullet]]:leading-[18px] [&_.detail-line[data-line-type=numbered]]:leading-[18px] [&_.detail-line[data-line-type=checklist]]:leading-[18px]"
         >
           <PreviewEditorContent type={type} />
         </div>
       </div>
-      <p className="px-0 pb-0.5 pt-1.5 text-[11px] leading-tight text-white">
+      <p className="mb-0 mt-0 pb-0.5 pl-[7px] pr-0 pt-1.5 text-[11px] leading-tight text-white">
         {PREVIEW_CAPTIONS[type]}
       </p>
     </div>

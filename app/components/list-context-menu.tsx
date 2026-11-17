@@ -34,7 +34,7 @@ const MENU_WIDTH = 176;
 const MENU_HEIGHT = 155;
 
 const menuItemClassName =
-  "flex h-[35px] w-full items-center px-3 text-left text-sm text-zinc-700 hover:bg-zinc-100 dark:ptxt-50 dark:hover:bg-zinc-800";
+  "flex h-[35px] w-full cursor-pointer items-center px-3 text-left text-sm text-zinc-700 hover:bg-zinc-100 dark:ptxt-50 dark:hover:bg-zinc-800";
 
 export function clampListContextMenuPosition(
   top: number,

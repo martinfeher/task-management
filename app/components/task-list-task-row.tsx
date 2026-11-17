@@ -446,14 +446,15 @@ export function TaskListTaskRow({
       isPriorityMenuOpen ||
       isPointerMenuOpen ||
       rowMenuView !== null);
-  const rowActionsPointerClass = isRowMenuOpen
+  const isSelected = task.id === selectedTaskId;
+  const showRowHoverActions = isRowMenuOpen || isSelected;
+  const rowActionsPointerClass = showRowHoverActions
     ? "pointer-events-auto"
     : "pointer-events-none group-hover:pointer-events-auto";
 
   const basePaddingLeft = useWiderRowPadding ? 1 : 0;
   const rowOuterPaddingLeft = depth * SUBTASK_INDENT_PX;
   const rowContentPaddingLeft = basePaddingLeft;
-  const isSelected = task.id === selectedTaskId;
   const leftBorderClass = getTaskRowLeftBorderClass(task.id, selectedTaskId);
   const dividerClass = getTaskListItemDividerClass(task);
   const hideDueDate = isCheckAnimating || isCompleting;
@@ -527,7 +528,7 @@ export function TaskListTaskRow({
     task.labels.length > 0
       ? Math.max(20, taskRowHoverActionCount * taskRowHoverActionSlotPx)
       : 0;
-  const rowActionHoverVisibilityClass = isRowMenuOpen
+  const rowActionHoverVisibilityClass = showRowHoverActions
     ? "opacity-100"
     : "opacity-0 transition-opacity group-hover:opacity-100";
   const dueScheduleSubline = formatTaskListScheduleSubline(

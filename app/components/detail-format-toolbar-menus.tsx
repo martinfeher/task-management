@@ -62,7 +62,7 @@ const FORMAT_TOOLBAR_TEXT_COLOR_ICON_COLOR = "text-zinc-700 dark:text-zinc-200";
 export const FORMAT_TOOLBAR_DROPDOWN_TRIGGER_CLASS =
   `flex h-8 cursor-pointer items-center gap-0.5 rounded-lg px-2 text-sm ${FORMAT_TOOLBAR_ICON_COLOR} transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800`;
 
-const FORMAT_TOOLBAR_DROPDOWN_MENU_SURFACE_CLASS = `format-toolbar-dropdown-menu backdrop-blur-[5px] ${FROSTED_POPOVER_SURFACE_CLASS}`;
+const FORMAT_TOOLBAR_DROPDOWN_MENU_SURFACE_CLASS = `format-toolbar-dropdown-menu ${FROSTED_POPOVER_SURFACE_CLASS}`;
 
 export const FORMAT_TOOLBAR_DROPDOWN_MENU_CLASS = `overflow-hidden rounded-[12px] py-1 min-w-[168px] cursor-pointer ${FORMAT_TOOLBAR_DROPDOWN_MENU_SURFACE_CLASS}`;
 

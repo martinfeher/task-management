@@ -565,10 +565,10 @@ function getFormatToolbarPopoverClass(formatMenu: FormatMenuState) {
 }
 
 const TASK_DETAILS_BLOCK_MENU_CLASS =
-  "task-details-block-menu min-w-[168px] px-2 py-0!";
+  "task-details-block-menu min-w-[168px] px-0 py-0!";
 
 const TASK_DETAILS_BLOCK_MENU_ITEM_CLASS =
-  "menu-item-hover-focus flex w-full items-center gap-2 px-0 py-2 text-left text-sm text-zinc-900 hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800";
+  "menu-item-hover-focus flex w-full items-center gap-2 py-2 pl-[6px] pr-2 text-left text-sm text-zinc-900 hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800";
 
 const FORMAT_TOOLBAR_ROW_CLASS = "flex items-center gap-0.5 px-2 py-1";
 
@@ -8493,7 +8493,7 @@ export function TaskDetailsPanel({
       <div
         className={
           isModalLayout
-            ? "sticky top-0 z-30 shrink-0 overflow-visible bg-white dark:bg-zinc-950"
+            ? "sticky top-0 z-30 shrink-0 overflow-visible bg-[#efefef] dark:bg-zinc-950"
             : undefined
         }
       >
@@ -8911,7 +8911,7 @@ export function TaskDetailsPanel({
               {lineControls.map(({ lineId, top, showPlus, showDrag }) => (
                   <div
                     key={lineId}
-                    className="pointer-events-none absolute left-1 flex h-[1.75em] -translate-y-1/2 items-center"
+                    className="pointer-events-none absolute mt-[1px] left-1 flex h-[1.75em] -translate-y-1/2 items-center"
                     style={{ top }}
                   >
                     {showPlus ? (

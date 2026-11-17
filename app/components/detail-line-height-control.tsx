@@ -11,7 +11,7 @@ import {
 } from "./detail-format-toolbar-menus";
 import { FROSTED_POPOVER_SURFACE_CLASS } from "@/lib/frosted-popover-surface";
 
-const DETAIL_LINE_HEIGHT_LIST_CLASS = `format-toolbar-dropdown-menu min-w-[168px] overflow-y-auto overscroll-contain rounded-lg py-1 backdrop-blur-[5px] ${FROSTED_POPOVER_SURFACE_CLASS}`;
+const DETAIL_LINE_HEIGHT_LIST_CLASS = `format-toolbar-dropdown-menu min-w-[168px] overflow-y-auto overscroll-contain rounded-lg py-1 ${FROSTED_POPOVER_SURFACE_CLASS}`;
 
 type DetailLineHeightControlProps = {
   value: DetailLineHeightOption;

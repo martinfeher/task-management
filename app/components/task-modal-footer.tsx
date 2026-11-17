@@ -12,7 +12,7 @@ import {
   APP_HOVER_TOOLTIP_ABOVE_CENTER,
   APP_HOVER_TOOLTIP_SHOWN,
 } from "@/lib/app-hover-tooltip-classes";
-import { FROSTED_POPOVER_SURFACE_CLASS } from "@/lib/frosted-popover-surface";
+import { TASK_MODAL_CONTEXT_SURFACE_CLASS } from "@/lib/task-modal-context-surface";
 import { buildTodoPath } from "@/lib/todo-routes";
 import {
   isTaskPriorityLevel,
@@ -531,6 +531,7 @@ export function TaskModalFooter({
                 void handleCreateLabel(label, color)
               }
               onCancel={() => setIsLabelMenuOpen(false)}
+              surface="modalContext"
             />
           </div>
         ) : null}
@@ -542,7 +543,7 @@ export function TaskModalFooter({
     <>
     <div
       ref={footerRef}
-      className="flex h-full min-h-0 min-w-0 flex-1 items-center gap-4 self-stretch"
+      className="flex h-full min-h-0 min-w-0 flex-1 items-center gap-2 self-stretch"
     >
       {hasPriorityActions ? (
         <div
@@ -580,10 +581,10 @@ export function TaskModalFooter({
           {isPriorityMenuOpen ? (
             <div className="absolute bottom-full left-0 z-50 mb-px pb-1">
               <div
-                className={`w-[196px] overflow-visible rounded-lg ${FROSTED_POPOVER_SURFACE_CLASS}`}
+                className={`w-[196px] overflow-visible rounded-[14px] ${TASK_MODAL_CONTEXT_SURFACE_CLASS}`}
               >
                 {openMenusOnHover ? (
-                  <p className="px-3 pt-1 text-[10px] text-[#dedede]">Priority</p>
+                  <p className="px-3 pt-1 text-[10px] text-[#7e7e85]">Priority</p>
                 ) : null}
                 <TaskPrioritySelector
                   selectedPriority={priorityLevel}
@@ -624,7 +625,7 @@ export function TaskModalFooter({
             }}
           >
             {currentList ? (
-              <span className="flex max-w-[180px] items-center gap-0.5">
+              <span className="flex max-w-[180px] items-center gap-1">
                 {isInboxList(currentList) ? (
                   <LuInbox className="size-3.5 shrink-0" aria-hidden="true" />
                 ) : (
@@ -650,7 +651,7 @@ export function TaskModalFooter({
                 onQueryChange={setMoveQuery}
                 onSelectList={handleMoveToList}
                 onCancel={() => setIsMoveMenuOpen(false)}
-                surface="frosted"
+                surface="modalContext"
               />
             </div>
           ) : null}

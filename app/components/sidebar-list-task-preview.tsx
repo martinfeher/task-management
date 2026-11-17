@@ -66,7 +66,7 @@ export function SidebarListTaskPreview({
       }}
     >
       <div
-        className="box-border flex h-full flex-col overflow-hidden border border-[#a3a3cf] bg-[#a2a2b5] shadow-[0_10px_28px_rgba(0,0,0,0.22)] backdrop-blur-[2px]"
+        className="box-border flex h-full flex-col overflow-hidden border border-[#a3a3cf] bg-[#a2a2b5] shadow-[0_10px_28px_rgba(0,0,0,0.22)]"
         style={{
           borderRadius: PREVIEW_OUTER_RADIUS_PX,
           paddingTop: PREVIEW_FRAME_SIDE_PADDING_PX,
@@ -76,7 +76,7 @@ export function SidebarListTaskPreview({
         }}
       >
         <div
-          className={`sidebar-list-task-preview-surface min-h-0 w-full flex-1 overflow-hidden bg-white/92 backdrop-blur-[2px] dark:bg-zinc-950/92 ${taskListBackground.className}`}
+          className={`sidebar-list-task-preview-surface min-h-0 w-full flex-1 overflow-hidden bg-white dark:bg-zinc-950 ${taskListBackground.className}`}
           style={{
             borderRadius: PREVIEW_INNER_RADIUS_PX,
             ...taskListBackground.style,

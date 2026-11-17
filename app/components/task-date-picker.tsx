@@ -1103,7 +1103,7 @@ function TaskTimeMenu({
           onPointerDown={(event) => event.stopPropagation()}
           placeholder="Type a time — 9, 930, 6pm"
           aria-invalid={timeInputError}
-          className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-zinc-400"
+          className="min-w-0 flex-1 bg-transparent text-[12px] outline-none placeholder:text-zinc-300"
           style={{
             color:
               draftMinutes != null && !timeInputError
@@ -1549,9 +1549,8 @@ export function TaskDatePicker({
         >
           <Sparkles
             className="size-4 shrink-0"
-            strokeWidth={2}
-            aria-hidden="true"
-            style={{ color: "#bfbfd5" }}
+            strokeWidth={0.5}
+            style={{ color: "#b7b7bb" }}
           />
           <input
             ref={dateInputRef}
