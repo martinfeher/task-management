@@ -248,7 +248,7 @@ export function TaskLabelSelector({
       role="dialog"
       aria-label="Add label"
       data-task-label-menu
-      className={`w-[220px] overflow-hidden rounded-3xl ${LABEL_SELECTOR_SURFACE_CLASS[surface]}${
+      className={`w-[220px] shrink-0 overflow-hidden rounded-3xl ${LABEL_SELECTOR_SURFACE_CLASS[surface]}${
         isContextMenuTone || isFrostedSurface ? "" : " border border-[#e3e3e6]"
       }`}
       onMouseDown={(event) => event.stopPropagation()}

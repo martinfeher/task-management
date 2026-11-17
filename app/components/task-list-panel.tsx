@@ -32,6 +32,7 @@ import {
 } from "./task-list-task-row";
 import { TaskLabelSelector, type Label } from "./task-label-selector";
 import { TaskPriorityMenu } from "./task-priority-menu";
+import { FROSTED_POPOVER_SURFACE_CLASS } from "@/lib/frosted-popover-surface";
 import { TaskPriorityFlagIcon } from "./task-priority-icon";
 import {
   TaskListEntityFilter,
@@ -468,6 +469,7 @@ function sortTasks(
 
 const TASK_ROW_CONTEXT_MENU_WIDTH = 220;
 const TASK_ROW_CONTEXT_MENU_HEIGHT = 350;
+const ADD_TASK_METADATA_MENU_HOVER_CLOSE_MS = 120;
 
 function clampPointerContextMenuPosition(x: number, y: number) {
   if (typeof window === "undefined") {
@@ -761,6 +763,9 @@ export function TaskListPanel({
   const addTaskDatePickerRef = useRef<HTMLDivElement>(null);
   const addTaskLabelMenuRef = useRef<HTMLDivElement>(null);
   const addTaskPriorityMenuRef = useRef<HTMLDivElement>(null);
+  const addTaskDateMenuCloseTimerRef = useRef<number | null>(null);
+  const addTaskLabelMenuCloseTimerRef = useRef<number | null>(null);
+  const addTaskPriorityMenuCloseTimerRef = useRef<number | null>(null);
   const isAddTaskDatePickerOpenRef = useRef(false);
   const keepAddTaskOpenRef = useRef(false);
   const titleEditReadyRef = useRef(false);
@@ -1351,6 +1356,98 @@ export function TaskListPanel({
     };
   }, [isAddTaskLabelMenuOpen, isAddTaskPriorityMenuOpen]);
 
+  function clearAddTaskDateMenuCloseTimer() {
+    if (addTaskDateMenuCloseTimerRef.current !== null) {
+      window.clearTimeout(addTaskDateMenuCloseTimerRef.current);
+      addTaskDateMenuCloseTimerRef.current = null;
+    }
+  }
+
+  function clearAddTaskLabelMenuCloseTimer() {
+    if (addTaskLabelMenuCloseTimerRef.current !== null) {
+      window.clearTimeout(addTaskLabelMenuCloseTimerRef.current);
+      addTaskLabelMenuCloseTimerRef.current = null;
+    }
+  }
+
+  function clearAddTaskPriorityMenuCloseTimer() {
+    if (addTaskPriorityMenuCloseTimerRef.current !== null) {
+      window.clearTimeout(addTaskPriorityMenuCloseTimerRef.current);
+      addTaskPriorityMenuCloseTimerRef.current = null;
+    }
+  }
+
+  function clearAllAddTaskMetadataMenuCloseTimers() {
+    clearAddTaskDateMenuCloseTimer();
+    clearAddTaskLabelMenuCloseTimer();
+    clearAddTaskPriorityMenuCloseTimer();
+  }
+
+  function closeOtherAddTaskMetadataMenus(
+    except: "date" | "label" | "priority",
+  ) {
+    if (except !== "date") {
+      clearAddTaskDateMenuCloseTimer();
+      setIsAddTaskDatePickerOpen(false);
+    }
+    if (except !== "label") {
+      clearAddTaskLabelMenuCloseTimer();
+      setIsAddTaskLabelMenuOpen(false);
+    }
+    if (except !== "priority") {
+      clearAddTaskPriorityMenuCloseTimer();
+      setIsAddTaskPriorityMenuOpen(false);
+    }
+  }
+
+  function openAddTaskDateMenu() {
+    closeOtherAddTaskMetadataMenus("date");
+    clearAddTaskDateMenuCloseTimer();
+    setIsAddTaskDatePickerOpen(true);
+  }
+
+  function scheduleAddTaskDateMenuClose() {
+    clearAddTaskDateMenuCloseTimer();
+    addTaskDateMenuCloseTimerRef.current = window.setTimeout(() => {
+      addTaskDateMenuCloseTimerRef.current = null;
+      setIsAddTaskDatePickerOpen(false);
+    }, ADD_TASK_METADATA_MENU_HOVER_CLOSE_MS);
+  }
+
+  function openAddTaskLabelMenu() {
+    closeOtherAddTaskMetadataMenus("label");
+    clearAddTaskLabelMenuCloseTimer();
+    setIsAddTaskLabelMenuOpen(true);
+  }
+
+  function scheduleAddTaskLabelMenuClose() {
+    clearAddTaskLabelMenuCloseTimer();
+    addTaskLabelMenuCloseTimerRef.current = window.setTimeout(() => {
+      addTaskLabelMenuCloseTimerRef.current = null;
+      setIsAddTaskLabelMenuOpen(false);
+    }, ADD_TASK_METADATA_MENU_HOVER_CLOSE_MS);
+  }
+
+  function openAddTaskPriorityMenu() {
+    closeOtherAddTaskMetadataMenus("priority");
+    clearAddTaskPriorityMenuCloseTimer();
+    setIsAddTaskPriorityMenuOpen(true);
+  }
+
+  function scheduleAddTaskPriorityMenuClose() {
+    clearAddTaskPriorityMenuCloseTimer();
+    addTaskPriorityMenuCloseTimerRef.current = window.setTimeout(() => {
+      addTaskPriorityMenuCloseTimerRef.current = null;
+      setIsAddTaskPriorityMenuOpen(false);
+    }, ADD_TASK_METADATA_MENU_HOVER_CLOSE_MS);
+  }
+
+  useEffect(() => {
+    return () => {
+      clearAllAddTaskMetadataMenuCloseTimers();
+    };
+  }, []);
+
   function focusAddTaskInput() {
     requestAnimationFrame(() => {
       newTaskInputRef.current?.focus();
@@ -1360,6 +1457,7 @@ export function TaskListPanel({
   function resetNewTaskSchedule() {
     setNewTaskDueDate(null);
     setNewTaskDueTime(null);
+    clearAddTaskDateMenuCloseTimer();
     setIsAddTaskDatePickerOpen(false);
   }
 
@@ -1367,6 +1465,8 @@ export function TaskListPanel({
     setNewTaskPriority(null);
     setAddTaskLabelIds(preselectedLabelId ? [preselectedLabelId] : []);
     setAddTaskLabelQuery("");
+    clearAddTaskLabelMenuCloseTimer();
+    clearAddTaskPriorityMenuCloseTimer();
     setIsAddTaskLabelMenuOpen(false);
     setIsAddTaskPriorityMenuOpen(false);
   }
@@ -3205,6 +3305,8 @@ export function TaskListPanel({
                   <div
                     className="group/date-picker relative shrink-0"
                     ref={addTaskDateMenuRef}
+                    onMouseEnter={openAddTaskDateMenu}
+                    onMouseLeave={scheduleAddTaskDateMenuClose}
                   >
                     <button
                       type="button"
@@ -3217,12 +3319,8 @@ export function TaskListPanel({
                       aria-expanded={isAddTaskDatePickerOpen}
                       aria-describedby="add-task-calendar-tooltip"
                       onMouseDown={(event) => event.preventDefault()}
-                      onClick={() => {
-                        setIsAddTaskLabelMenuOpen(false);
-                        setIsAddTaskPriorityMenuOpen(false);
-                        setIsAddTaskDatePickerOpen((open) => !open);
-                      }}
-                      className={`flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-full hover:bg-rgb(244 245 246)3]  transition-colors dark:hover:bg-zinc-800 ${
+                      onClick={openAddTaskDateMenu}
+                      className={`flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-[#eef0f3] dark:hover:bg-zinc-800 ${
                         newTaskDueDate || newTaskDueTime
                           ? "text-[#4873c7] dark:text-[#7da2ff]"
                           : ""
@@ -3233,22 +3331,26 @@ export function TaskListPanel({
                     <span
                       id="add-task-calendar-tooltip"
                       role="tooltip"
-                      className={`add-task-date-tooltip ${APP_HOVER_TOOLTIP_ABOVE_CENTER} pointer-events-none absolute bottom-[calc(100%+10px)] z-40 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium`}
+                      className={`add-task-date-tooltip ${APP_HOVER_TOOLTIP_ABOVE_CENTER} pointer-events-none absolute bottom-[calc(100%+10px)] z-40 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium ${
+                        isAddTaskDatePickerOpen ? "opacity-0" : ""
+                      }`}
                     >
                       date
                     </span>
                     {isAddTaskDatePickerOpen ? (
-                      <div
-                        ref={addTaskDatePickerRef}
-                        className="absolute left-1/2 top-full z-[100] mt-1 -translate-x-1/2"
-                        onKeyDown={(event) => {
-                          if (event.key !== "Escape") return;
-                          event.stopPropagation();
-                          setIsAddTaskDatePickerOpen(false);
-                          newTaskInputRef.current?.focus();
-                        }}
-                      >
+                      <div className="absolute left-0 right-0 top-full z-[1000] mt-1 flex justify-center">
+                        <div
+                          ref={addTaskDatePickerRef}
+                          className="w-fit"
+                          onKeyDown={(event) => {
+                            if (event.key !== "Escape") return;
+                            event.stopPropagation();
+                            setIsAddTaskDatePickerOpen(false);
+                            newTaskInputRef.current?.focus();
+                          }}
+                        >
                         <TaskDatePicker
+                          className={`relative z-50 overflow-visible rounded-2xl ${FROSTED_POPOVER_SURFACE_CLASS}`}
                           dueDate={newTaskDueDate}
                           dueTimeMinutes={
                             newTaskDueTime?.dueTimeMinutes ?? null
@@ -3267,6 +3369,7 @@ export function TaskListPanel({
                             setNewTaskDueTime(dueTime);
                           }}
                         />
+                        </div>
                       </div>
                     ) : null}
                   </div>
@@ -3274,6 +3377,8 @@ export function TaskListPanel({
                   <div
                     className="group/add-label relative shrink-0"
                     ref={addTaskLabelMenuRef}
+                    onMouseEnter={openAddTaskLabelMenu}
+                    onMouseLeave={scheduleAddTaskLabelMenuClose}
                   >
                     <button
                       type="button"
@@ -3282,11 +3387,7 @@ export function TaskListPanel({
                       aria-expanded={isAddTaskLabelMenuOpen}
                       aria-describedby="add-task-label-tooltip"
                       onMouseDown={(event) => event.preventDefault()}
-                      onClick={() => {
-                        setIsAddTaskDatePickerOpen(false);
-                        setIsAddTaskPriorityMenuOpen(false);
-                        setIsAddTaskLabelMenuOpen((open) => !open);
-                      }}
+                      onClick={openAddTaskLabelMenu}
                       className={`flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-[#eef0f3] dark:hover:bg-zinc-800 ${
                         addTaskLabelIds.length > 0
                           ? "text-[#4873c7] dark:text-[#7da2ff]"
@@ -3298,12 +3399,15 @@ export function TaskListPanel({
                     <span
                       id="add-task-label-tooltip"
                       role="tooltip"
-                      className={`add-task-date-tooltip ${APP_HOVER_TOOLTIP_ABOVE_CENTER} pointer-events-none absolute bottom-[calc(100%+10px)] z-40 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium`}
+                      className={`add-task-date-tooltip ${APP_HOVER_TOOLTIP_ABOVE_CENTER} pointer-events-none absolute bottom-[calc(100%+10px)] z-40 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium ${
+                        isAddTaskLabelMenuOpen ? "opacity-0" : ""
+                      }`}
                     >
                       label
                     </span>
                     {isAddTaskLabelMenuOpen ? (
-                      <div className="absolute left-1/2 top-full z-[1000] mt-1 w-fit -translate-x-1/2">
+                      <div className="absolute left-1/2 top-full z-[1000] mt-1 w-max -translate-x-1/2">
+                        <div className="w-fit shrink-0">
                         <TaskLabelSelector
                           surface="frosted"
                           labels={addTaskAvailableLabels}
@@ -3324,6 +3428,7 @@ export function TaskListPanel({
                           }
                           onCancel={() => setIsAddTaskLabelMenuOpen(false)}
                         />
+                        </div>
                       </div>
                     ) : null}
                   </div>
@@ -3331,6 +3436,8 @@ export function TaskListPanel({
                   <div
                     className="group/add-priority relative shrink-0"
                     ref={addTaskPriorityMenuRef}
+                    onMouseEnter={openAddTaskPriorityMenu}
+                    onMouseLeave={scheduleAddTaskPriorityMenuClose}
                   >
                     <button
                       type="button"
@@ -3339,11 +3446,7 @@ export function TaskListPanel({
                       aria-expanded={isAddTaskPriorityMenuOpen}
                       aria-describedby="add-task-priority-tooltip"
                       onMouseDown={(event) => event.preventDefault()}
-                      onClick={() => {
-                        setIsAddTaskDatePickerOpen(false);
-                        setIsAddTaskLabelMenuOpen(false);
-                        setIsAddTaskPriorityMenuOpen((open) => !open);
-                      }}
+                      onClick={openAddTaskPriorityMenu}
                       className={`flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-[#eef0f3] dark:hover:bg-zinc-800 ${
                         newTaskPriority !== null
                           ? "text-[#4873c7] dark:text-[#7da2ff]"
@@ -3359,12 +3462,15 @@ export function TaskListPanel({
                     <span
                       id="add-task-priority-tooltip"
                       role="tooltip"
-                      className={`add-task-date-tooltip ${APP_HOVER_TOOLTIP_ABOVE_CENTER} pointer-events-none absolute bottom-[calc(100%+10px)] z-40 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium`}
+                      className={`add-task-date-tooltip ${APP_HOVER_TOOLTIP_ABOVE_CENTER} pointer-events-none absolute bottom-[calc(100%+10px)] z-40 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium ${
+                        isAddTaskPriorityMenuOpen ? "opacity-0" : ""
+                      }`}
                     >
                       priority
                     </span>
                     {isAddTaskPriorityMenuOpen ? (
-                      <div className="absolute left-1/2 top-full z-[1000] mt-1 w-fit -translate-x-1/2">
+                      <div className="absolute left-1/2 top-full z-[1000] mt-1 w-max -translate-x-1/2">
+                        <div className="w-fit shrink-0">
                         <TaskPriorityMenu
                           selectedPriority={newTaskPriority}
                           onSelectPriority={(priority) => {
@@ -3376,6 +3482,7 @@ export function TaskListPanel({
                             setIsAddTaskPriorityMenuOpen(false);
                           }}
                         />
+                        </div>
                       </div>
                     ) : null}
                   </div>

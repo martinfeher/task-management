@@ -137,7 +137,7 @@ export function TaskListEntityFilter({
       {indicator ? (
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute rounded-full bg-[#e8f0fe] transition-[left,width,top,height] duration-[400ms] ease-in-out motion-reduce:transition-none dark:bg-[#1e3a5f]"
+          className="pointer-events-none absolute rounded-full bg-[#e8f0fe] transition-[left,width,top,height] duration-200 ease-out motion-reduce:transition-none dark:bg-[#1e3a5f]"
           style={{
             left: indicator.left,
             width: indicator.width,
@@ -154,7 +154,7 @@ export function TaskListEntityFilter({
           <span key={tab.id} className="relative z-[1] flex items-center">
             {index > 0 ? (
               <span
-                className={`mx-0.5 h-3.5 w-px shrink-0 bg-[#e3e6ec] transition-opacity duration-[400ms] ease-in-out motion-reduce:transition-none dark:bg-zinc-600 ${
+                className={`mx-0.5 h-3.5 w-px shrink-0 bg-[#e3e6ec] transition-opacity duration-200 ease-out motion-reduce:transition-none dark:bg-zinc-600 ${
                   value === "all" ? "opacity-100" : "opacity-0"
                 }`}
                 aria-hidden="true"
@@ -170,7 +170,7 @@ export function TaskListEntityFilter({
                 aria-label={tab.label}
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => onChange(tab.id)}
-                className={`flex h-[21px] min-w-[22px] mb-[1px] mt-px cursor-pointer items-center justify-center gap-1 rounded-full px-1.5 py-[2px] leading-none transition-[color,font-size,font-weight] duration-[400ms] ease-in-out motion-reduce:transition-none ${
+                className={`flex h-[21px] min-w-[26px] mb-[1px] mt-px cursor-pointer items-center justify-center gap-1 rounded-full px-1.5 py-[2px] leading-none transition-[color,font-size,font-weight] duration-200 ease-out motion-reduce:transition-none ${
                   isSelected
                     ? "text-[11px] font-medium text-[#4873c7] dark:text-[#7da2ff]"
                     : "text-[9px] font-normal text-[#8b8f98] hover:bg-zinc-100 hover:text-[#5c616b] dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"

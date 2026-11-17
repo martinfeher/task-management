@@ -1529,9 +1529,10 @@ export function TaskDatePicker({
   return (
     <div
       data-task-date-picker-root
-      className={`relative z-50 overflow-visible bg-white border border-zinc-300 dark:border-zinc-700 ${
-        className ?? "rounded-2xl border"
-      }`}
+      className={
+        className ??
+        "relative z-50 overflow-visible rounded-2xl border border-zinc-300 bg-white dark:border-zinc-700 dark:bg-zinc-950"
+      }
       style={{
         width: TASK_DATE_PICKER_WIDTH,
         borderColor: className ? undefined : PICKER_BORDER,
