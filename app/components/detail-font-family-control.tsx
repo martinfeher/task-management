@@ -25,6 +25,14 @@ type DetailFontFamilyControlProps = {
 
 const menuPanelClassName = `overflow-hidden rounded-lg py-1 ${FROSTED_POPOVER_SURFACE_CLASS}`;
 
+const formatToolbarMenuPanelClassName = `format-toolbar-dropdown-menu overflow-hidden rounded-[11px] py-1 cursor-pointer ${FROSTED_POPOVER_SURFACE_CLASS}`;
+
+const FORMAT_TOOLBAR_HEADER_TRIGGER_ACTIVE_CLASS =
+  "bg-[var(--panel-text-task-detail-header-icon-hover-background)] dark:bg-zinc-800";
+
+const FORMAT_TOOLBAR_HEADER_TRIGGER_GROUP_HOVER_CLASS =
+  "group-hover/control:bg-[var(--panel-text-task-detail-header-icon-hover-background)] dark:group-hover/control:bg-zinc-800";
+
 const menuItemClassName =
   "flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-zinc-900 hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800 cursor-pointer";
 
@@ -46,7 +54,9 @@ export function DetailFontFamilyControl({
   const selectedFontFamily = getDetailFontFamilyValue(value);
 
   const buttonClassName = formatToolbar
-    ? `flex h-8 min-w-[80px] cursor-pointer items-center justify-center rounded-[14px] text-[13px] text-zinc-700 transition-colors disabled:cursor-not-allowed disabled:opacity-50 dark:text-zinc-200 ${TASK_DETAILS_HEADER_ICON_HOVER_CLASS}`
+    ? `flex h-8 min-w-[80px] cursor-pointer items-center justify-center rounded-[14px] text-[13px] text-zinc-700 transition-colors disabled:cursor-not-allowed disabled:opacity-50 dark:text-zinc-200 ${TASK_DETAILS_HEADER_ICON_HOVER_CLASS} ${FORMAT_TOOLBAR_HEADER_TRIGGER_GROUP_HOVER_CLASS} ${
+        open ? FORMAT_TOOLBAR_HEADER_TRIGGER_ACTIVE_CLASS : ""
+      }`
     : "flex h-8 min-w-[125px] cursor-pointer items-center justify-between gap-1 rounded-md border border-zinc-200 bg-white px-2.5 text-sm text-zinc-800 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800";
 
   function clearCloseTimer() {
@@ -73,8 +83,15 @@ export function DetailFontFamilyControl({
     }, FORMAT_TOOLBAR_FONT_FAMILY_HOVER_CLOSE_MS);
   }
 
+  const rootMouseHandlers = formatToolbar
+    ? { onMouseEnter: handleMouseEnter, onMouseLeave: handleMouseLeave }
+    : {};
+
   return (
-    <div className="relative">
+    <div
+      className={formatToolbar ? "group/control relative" : "relative"}
+      {...rootMouseHandlers}
+    >
       <button
         type="button"
         disabled={disabled}
@@ -83,8 +100,6 @@ export function DetailFontFamilyControl({
         aria-label={`Font family: ${label}`}
         className={buttonClassName}
         onMouseDown={(event) => event.preventDefault()}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
         onClick={() => {
           if (!open) {
             onOpenChange?.(true);
@@ -106,14 +121,18 @@ export function DetailFontFamilyControl({
 
       {open ? (
         <div
-          className="absolute top-full left-0 z-50 pt-1"
-          onMouseEnter={handleMouseEnter}
-          onMouseLeave={handleMouseLeave}
+          className={`absolute top-full z-50 pt-1 ${
+            formatToolbar
+              ? "left-1/2 -translate-x-1/2"
+              : "left-0"
+          }`}
         >
           <div
             role="listbox"
             aria-label="Font family"
-            className={`${menuPanelClassName} min-w-[168px] max-h-64 overflow-y-auto`}
+            className={`${
+              formatToolbar ? formatToolbarMenuPanelClassName : menuPanelClassName
+            } min-w-[168px] max-h-64 overflow-y-auto`}
             onMouseLeave={() => onPreviewFamilyClear?.()}
           >
             {fontOptions.map((option) => (

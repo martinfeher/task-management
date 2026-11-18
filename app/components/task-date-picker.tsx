@@ -1657,7 +1657,7 @@ export function TaskDatePicker({
               type="button"
               aria-label="Next month"
               onClick={() => shiftMonth(1)}
-              className="flex size-7 items-center justify-center rounded-full text-zinc-500 cursor-pointer! transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              className="flex size-7 items-center justify-center rounded-full text-zinc-500 mr-2 cursor-pointer! transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800"
             >
               <BiChevronRight className="size-5" />
             </button>

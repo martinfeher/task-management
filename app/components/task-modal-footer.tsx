@@ -1,6 +1,14 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import { createPortal } from "react-dom";
 import { CiLink } from "react-icons/ci";
 import { LiaTagSolid } from "react-icons/lia";
@@ -41,6 +49,119 @@ const MODAL_FOOTER_ICON_TOOLTIP_CLASS = `add-task-date-tooltip ${APP_HOVER_TOOLT
 
 const MODAL_FOOTER_ICON_BUTTON_CLASS =
   "flex h-7 mr-1 shrink-0 cursor-pointer items-center justify-center rounded-md text-[#C6C5D1] transition-colors hover:bg-zinc-100 hover:text-slate-450 dark:hover:bg-zinc-800 dark:hover:text-zinc-200";
+
+const MODAL_FOOTER_CONTEXT_MENU_GAP_PX = 1;
+const MODAL_FOOTER_CONTEXT_MENU_VIEWPORT_PADDING_PX = 8;
+const MODAL_FOOTER_CONTEXT_MENU_Z_CLASS = MODAL_FOOTER_ICON_TOOLTIP_Z_CLASS;
+
+function computeModalFooterContextMenuPosition(
+  anchorRect: DOMRect,
+  menuRect: DOMRect,
+) {
+  const padding = MODAL_FOOTER_CONTEXT_MENU_VIEWPORT_PADDING_PX;
+  const gap = MODAL_FOOTER_CONTEXT_MENU_GAP_PX;
+  const anchorCenterX = anchorRect.left + anchorRect.width / 2;
+
+  let left = anchorCenterX - menuRect.width / 2;
+  left = Math.max(
+    padding,
+    Math.min(left, window.innerWidth - menuRect.width - padding),
+  );
+
+  let top = anchorRect.top - menuRect.height - gap;
+  if (top < padding) {
+    top = anchorRect.bottom + gap;
+  }
+
+  return { top, left };
+}
+
+function ModalFooterPortaledContextMenu({
+  anchorRef,
+  menuRef,
+  isOpen,
+  onMouseEnter,
+  onMouseLeave,
+  children,
+}: {
+  anchorRef: RefObject<HTMLElement | null>;
+  menuRef: RefObject<HTMLDivElement | null>;
+  isOpen: boolean;
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
+  children: ReactNode;
+}) {
+  const [position, setPosition] = useState<{ top: number; left: number } | null>(
+    null,
+  );
+
+  useLayoutEffect(() => {
+    if (!isOpen) {
+      setPosition(null);
+      return;
+    }
+
+    let frameId = 0;
+
+    function updatePosition() {
+      const anchor = anchorRef.current;
+      const menu = menuRef.current;
+      if (!anchor || !menu) {
+        frameId = window.requestAnimationFrame(updatePosition);
+        return;
+      }
+
+      const next = computeModalFooterContextMenuPosition(
+        anchor.getBoundingClientRect(),
+        menu.getBoundingClientRect(),
+      );
+      setPosition((current) =>
+        current?.top === next.top && current.left === next.left ? current : next,
+      );
+    }
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+
+    const menu = menuRef.current;
+    const resizeObserver =
+      menu && typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(updatePosition)
+        : null;
+    if (resizeObserver && menu) {
+      resizeObserver.observe(menu);
+    }
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+      resizeObserver?.disconnect();
+    };
+  }, [anchorRef, isOpen, menuRef]);
+
+  if (!isOpen || typeof document === "undefined") return null;
+
+  return createPortal(
+    <div
+      ref={menuRef}
+      className={`fixed w-fit pb-1 ${MODAL_FOOTER_CONTEXT_MENU_Z_CLASS} ${
+        position ? "" : "invisible"
+      }`}
+      style={
+        position
+          ? { top: position.top, left: position.left }
+          : { top: -9999, left: -9999 }
+      }
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+    >
+      {children}
+    </div>,
+    document.body,
+  );
+}
 
 type TaskModalFooterProps = {
   taskId: string;
@@ -252,6 +373,10 @@ export function TaskModalFooter({
   const [copyLinkMessage, setCopyLinkMessage] = useState<string | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const footerRef = useRef<HTMLDivElement>(null);
+  const labelMenuAnchorRef = useRef<HTMLDivElement>(null);
+  const labelMenuPortalRef = useRef<HTMLDivElement>(null);
+  const moveMenuAnchorRef = useRef<HTMLDivElement>(null);
+  const moveMenuPortalRef = useRef<HTMLDivElement>(null);
   const copyLinkTimerRef = useRef<number | null>(null);
   const footerMenuHoverCloseTimerRef = useRef<number | null>(null);
 
@@ -329,6 +454,8 @@ export function TaskModalFooter({
     function handlePointerDown(event: MouseEvent) {
       const target = event.target as Node;
       if (footerRef.current?.contains(target)) return;
+      if (labelMenuPortalRef.current?.contains(target)) return;
+      if (moveMenuPortalRef.current?.contains(target)) return;
 
       setIsPriorityMenuOpen(false);
       setIsLabelMenuOpen(false);
@@ -478,6 +605,7 @@ export function TaskModalFooter({
 
     return (
       <div
+        ref={labelMenuAnchorRef}
         className={`relative shrink-0 ${anchorClassName}`}
         onMouseEnter={openLabelMenuFromHover}
         onMouseLeave={() =>
@@ -517,24 +645,30 @@ export function TaskModalFooter({
           </button>
         )}
 
-        {isLabelMenuOpen ? (
-          <div className="absolute bottom-full left-0 z-50 mb-px w-fit pb-1">
-            <TaskLabelSelector
-              labels={sortedLabels}
-              assignedLabelIds={assignedLabelIds}
-              query={labelQuery}
-              isSubmitting={isLabelSubmitting}
-              listMaxHeightPx={270}
-              onQueryChange={setLabelQuery}
-              onToggleLabel={(labelId) => void handleToggleLabel(labelId)}
-              onCreateLabel={(label, color) =>
-                void handleCreateLabel(label, color)
-              }
-              onCancel={() => setIsLabelMenuOpen(false)}
-              surface="modalContext"
-            />
-          </div>
-        ) : null}
+        <ModalFooterPortaledContextMenu
+          anchorRef={labelMenuAnchorRef}
+          menuRef={labelMenuPortalRef}
+          isOpen={isLabelMenuOpen}
+          onMouseEnter={cancelFooterMenuHoverClose}
+          onMouseLeave={() =>
+            scheduleFooterMenuHoverClose(() => setIsLabelMenuOpen(false))
+          }
+        >
+          <TaskLabelSelector
+            labels={sortedLabels}
+            assignedLabelIds={assignedLabelIds}
+            query={labelQuery}
+            isSubmitting={isLabelSubmitting}
+            listMaxHeightPx={270}
+            onQueryChange={setLabelQuery}
+            onToggleLabel={(labelId) => void handleToggleLabel(labelId)}
+            onCreateLabel={(label, color) =>
+              void handleCreateLabel(label, color)
+            }
+            onCancel={() => setIsLabelMenuOpen(false)}
+            surface="modalContext"
+          />
+        </ModalFooterPortaledContextMenu>
       </div>
     );
   }
@@ -606,6 +740,7 @@ export function TaskModalFooter({
 
       {hasMoveActions ? (
         <div
+          ref={moveMenuAnchorRef}
           className="relative shrink-0"
           onMouseEnter={openMoveMenuFromHover}
           onMouseLeave={() =>
@@ -641,20 +776,26 @@ export function TaskModalFooter({
             )}
           </FooterTextButton>
 
-          {isMoveMenuOpen ? (
-            <div className="absolute bottom-full left-0 z-50 mb-px pb-1">
-              <TaskMoveToSelector
-                lists={lists}
-                currentListId={listId}
-                showCurrentList
-                query={moveQuery}
-                onQueryChange={setMoveQuery}
-                onSelectList={handleMoveToList}
-                onCancel={() => setIsMoveMenuOpen(false)}
-                surface="modalContext"
-              />
-            </div>
-          ) : null}
+          <ModalFooterPortaledContextMenu
+            anchorRef={moveMenuAnchorRef}
+            menuRef={moveMenuPortalRef}
+            isOpen={isMoveMenuOpen}
+            onMouseEnter={cancelFooterMenuHoverClose}
+            onMouseLeave={() =>
+              scheduleFooterMenuHoverClose(() => setIsMoveMenuOpen(false))
+            }
+          >
+            <TaskMoveToSelector
+              lists={lists}
+              currentListId={listId}
+              showCurrentList
+              query={moveQuery}
+              onQueryChange={setMoveQuery}
+              onSelectList={handleMoveToList}
+              onCancel={() => setIsMoveMenuOpen(false)}
+              surface="modalContext"
+            />
+          </ModalFooterPortaledContextMenu>
         </div>
       ) : null}
 

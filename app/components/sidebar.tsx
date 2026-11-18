@@ -1698,6 +1698,7 @@ export function Sidebar({
           className={`${SIDEBAR_ROW_COUNT_CLASS} ${
             openMenuListId === list.id ? "opacity-0" : ""
           }`}
+          style={{ color: getListColor(list) }}
         >
           {taskCountByListId[list.id] ?? 0}
         </span>

@@ -14,10 +14,73 @@ export const CALENDAR_TASK_MODAL_CONTENT_SWITCH_TOTAL_MS = 250;
 export const CALENDAR_TASK_MODAL_MIN_WIDTH_PX = CALENDAR_TASK_MODAL_WIDTH_PX;
 export const CALENDAR_TASK_MODAL_MAX_WIDTH_PX = CALENDAR_TASK_MODAL_WIDTH_PX;
 
+/** Calendar task item -> task modal "resize" transition. */
+export const CALENDAR_TASK_MODAL_OPEN_TRANSITION_MS = 100;
+export const CALENDAR_TASK_MODAL_OPEN_TRANSITION_EASING =
+  "cubic-bezier(0.22, 1, 0.36, 1)";
+/** A remembered click origin is only valid for the modal that opens right after it. */
+const CALENDAR_TASK_OPEN_ORIGIN_MAX_AGE_MS = 1000;
+
 export type CalendarTaskModalAnchorRect = Pick<
   DOMRect,
   "top" | "left" | "right" | "bottom" | "width" | "height"
 >;
+
+export type CalendarTaskOpenOrigin = {
+  rect: CalendarTaskModalAnchorRect;
+  backgroundColor: string;
+  borderRadius: string;
+  capturedAt: number;
+};
+
+let lastCalendarTaskOpenOrigin: CalendarTaskOpenOrigin | null = null;
+
+/**
+ * Records the geometry/color of the calendar task item that was just activated
+ * so the task modal can grow out of it. Call from a capture-phase listener so it
+ * runs before the click handler opens the modal.
+ */
+export function rememberCalendarTaskOpenOrigin(target: EventTarget | null) {
+  if (typeof window === "undefined" || !(target instanceof Element)) return;
+  if (target.closest(".calendar-task-checkbox")) return;
+
+  const item = target.closest<HTMLElement>(".calendar-task-item");
+  if (!item) return;
+
+  const rect = item.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return;
+
+  const style = window.getComputedStyle(item);
+  lastCalendarTaskOpenOrigin = {
+    rect: {
+      top: rect.top,
+      left: rect.left,
+      right: rect.right,
+      bottom: rect.bottom,
+      width: rect.width,
+      height: rect.height,
+    },
+    backgroundColor: style.backgroundColor,
+    borderRadius: style.borderTopLeftRadius,
+    capturedAt: performance.now(),
+  };
+}
+
+/**
+ * Returns the most recent click origin if it is fresh. Intentionally not
+ * cleared on read so React Strict Mode's double effect run still animates.
+ */
+export function peekCalendarTaskOpenOrigin(): CalendarTaskOpenOrigin | null {
+  if (!lastCalendarTaskOpenOrigin) return null;
+  if (
+    performance.now() - lastCalendarTaskOpenOrigin.capturedAt >
+    CALENDAR_TASK_OPEN_ORIGIN_MAX_AGE_MS
+  ) {
+    lastCalendarTaskOpenOrigin = null;
+    return null;
+  }
+  return lastCalendarTaskOpenOrigin;
+}
 
 export function getCalendarTaskClickAnchorRect(
   element: HTMLElement,

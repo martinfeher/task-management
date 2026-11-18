@@ -7,7 +7,6 @@ import {
   type DetailFontSizeOption,
 } from "./detail-fonts";
 import {
-  FORMAT_TOOLBAR_DROPDOWN_MENU_CLASS,
   FORMAT_TOOLBAR_FONT_SIZE_SELECTED_COLOR,
   FORMAT_TOOLBAR_FONT_SIZE_TEXT_CLASS,
   FORMAT_TOOLBAR_ICON_COLOR,
@@ -28,7 +27,15 @@ type DetailFontSizeControlProps = {
 
 const FORMAT_TOOLBAR_FONT_SIZE_HOVER_CLOSE_MS = 120;
 
+const FORMAT_TOOLBAR_HEADER_TRIGGER_ACTIVE_CLASS =
+  "bg-[var(--panel-text-task-detail-header-icon-hover-background)] dark:bg-zinc-800";
+
+const FORMAT_TOOLBAR_HEADER_TRIGGER_GROUP_HOVER_CLASS =
+  "group-hover/control:bg-[var(--panel-text-task-detail-header-icon-hover-background)] dark:group-hover/control:bg-zinc-800";
+
 const menuClassName = `absolute top-full z-50 mt-1 overflow-hidden rounded-lg py-1 ${FROSTED_POPOVER_SURFACE_CLASS}`;
+
+const formatToolbarMenuPanelClassName = `overflow-hidden rounded-[11px] py-1 ${FROSTED_POPOVER_SURFACE_CLASS}`;
 
 const menuItemClassName =
   "flex w-full cursor-pointer items-center px-3 py-1.5 text-left text-sm text-zinc-900 hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800";
@@ -48,10 +55,8 @@ export function DetailFontSizeControl({
   const closeTimerRef = useRef<number | null>(null);
 
   const buttonClassName = formatToolbar
-    ? `flex h-8 min-w-[28px] text-[14px]! cursor-pointer items-center justify-center rounded-lg px-2 ${FORMAT_TOOLBAR_FONT_SIZE_TEXT_CLASS} ${FORMAT_TOOLBAR_ICON_COLOR} transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${TASK_DETAILS_HEADER_ICON_HOVER_CLASS} ${
-        open
-          ? "bg-[var(--panel-text-task-detail-header-icon-hover-background)] dark:bg-zinc-800"
-          : ""
+    ? `flex h-8 min-w-[28px] text-[14px]! cursor-pointer items-center justify-center rounded-lg px-2 ${FORMAT_TOOLBAR_FONT_SIZE_TEXT_CLASS} ${FORMAT_TOOLBAR_ICON_COLOR} transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${TASK_DETAILS_HEADER_ICON_HOVER_CLASS} ${FORMAT_TOOLBAR_HEADER_TRIGGER_GROUP_HOVER_CLASS} ${
+        open ? FORMAT_TOOLBAR_HEADER_TRIGGER_ACTIVE_CLASS : ""
       }`
     : compact
       ? "flex h-[30px] min-w-[44px] cursor-pointer items-center justify-between gap-0.5 rounded border border-zinc-200 bg-white px-1.5 text-sm text-zinc-800 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
@@ -81,8 +86,15 @@ export function DetailFontSizeControl({
     }, FORMAT_TOOLBAR_FONT_SIZE_HOVER_CLOSE_MS);
   }
 
+  const rootMouseHandlers = formatToolbar
+    ? { onMouseEnter: handleMouseEnter, onMouseLeave: handleMouseLeave }
+    : {};
+
   return (
-    <div className="relative">
+    <div
+      className={formatToolbar ? "group/control relative" : "relative"}
+      {...rootMouseHandlers}
+    >
       <button
         type="button"
         disabled={disabled}
@@ -91,8 +103,6 @@ export function DetailFontSizeControl({
         aria-label={`Font size: ${value}`}
         className={buttonClassName}
         onMouseDown={(event) => event.preventDefault()}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
         onClick={() => {
           if (!open) {
             onOpenChange?.(true);
@@ -107,15 +117,17 @@ export function DetailFontSizeControl({
 
       {open ? (
         <div
-          className={`absolute top-full z-50 ${formatToolbar ? "left-0 pt-1" : "left-0 mt-1"}`}
-          onMouseEnter={handleMouseEnter}
-          onMouseLeave={handleMouseLeave}
+          className={`absolute top-full z-50 ${
+            formatToolbar
+              ? "left-1/2 -translate-x-1/2 pt-1"
+              : "left-0 mt-1"
+          }`}
         >
           {formatToolbar ? (
             <div
               role="listbox"
               aria-label="Font size"
-              className={`${FORMAT_TOOLBAR_DROPDOWN_MENU_CLASS} min-w-[168px]`}
+              className={`format-toolbar-dropdown-menu ${formatToolbarMenuPanelClassName} min-w-[168px] cursor-pointer ${FROSTED_POPOVER_SURFACE_CLASS}`}
             >
               <div className="grid grid-cols-4 gap-0.5 px-1 py-1">
                 {DETAIL_FONT_SIZE_OPTIONS.map((option) => (

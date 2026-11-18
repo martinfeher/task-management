@@ -74,7 +74,10 @@ export function SidebarFolderListsPreview({
                       <span className="min-w-0 flex-1 truncate text-xs font-medium text-zinc-800 dark:text-zinc-100">
                         {list.name}
                       </span>
-                      <span className="shrink-0 text-[10px] tabular-nums text-zinc-400">
+                      <span
+                        className="shrink-0 text-[10px] tabular-nums"
+                        style={{ color: getListColor(list) }}
+                      >
                         {tasksByList[list.id]?.filter(
                           (t) => !t.completed && !t.parentId,
                         ).length ?? 0}

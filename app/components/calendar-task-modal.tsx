@@ -24,8 +24,11 @@ import type { TaskRecurrenceRule } from "@/lib/task-recurrence";
 import {
   CALENDAR_TASK_MODAL_CONTENT_SWITCH_MS,
   CALENDAR_TASK_MODAL_MIN_HEIGHT_PX,
+  CALENDAR_TASK_MODAL_OPEN_TRANSITION_EASING,
+  CALENDAR_TASK_MODAL_OPEN_TRANSITION_MS,
   CALENDAR_TASK_MODAL_VIEWPORT_PADDING_PX,
   CALENDAR_TASK_MODAL_WIDTH_PX,
+  peekCalendarTaskOpenOrigin,
   type CalendarTaskModalAnchorRect,
 } from "@/lib/calendar-task-modal-position";
 import {
@@ -461,6 +464,89 @@ export function CalendarTaskModal({
   useLayoutEffect(() => {
     dialogRef.current?.scrollTo({ top: 0 });
   }, [taskId]);
+
+  // Calendar item -> modal: a ghost in the item's color grows from the clicked
+  // item's rectangle to the modal's rectangle while the modal fades in on top.
+  useLayoutEffect(() => {
+    if (isHoverPreview || isNewTaskDraft || !showBackdrop) return;
+
+    const dialog = dialogRef.current;
+    const container = dialog?.parentElement;
+    if (!dialog || !container || typeof dialog.animate !== "function") return;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+
+    const origin = peekCalendarTaskOpenOrigin();
+    if (!origin) return;
+
+    const target = dialog.getBoundingClientRect();
+    if (target.width <= 0 || target.height <= 0) return;
+
+    const surface =
+      dialog.querySelector<HTMLElement>(".task-details-panel-background") ??
+      dialog;
+    const targetBackground = window.getComputedStyle(surface).backgroundColor;
+    const targetRadius = window.getComputedStyle(dialog).borderTopLeftRadius;
+
+    const ghost = document.createElement("div");
+    ghost.setAttribute("aria-hidden", "true");
+    Object.assign(ghost.style, {
+      position: "fixed",
+      zIndex: "5",
+      pointerEvents: "none",
+      left: `${origin.rect.left}px`,
+      top: `${origin.rect.top}px`,
+      width: `${origin.rect.width}px`,
+      height: `${origin.rect.height}px`,
+      backgroundColor: origin.backgroundColor,
+      borderRadius: origin.borderRadius,
+    });
+    container.insertBefore(ghost, dialog);
+
+    const ghostAnimation = ghost.animate(
+      [
+        {
+          left: `${origin.rect.left}px`,
+          top: `${origin.rect.top}px`,
+          width: `${origin.rect.width}px`,
+          height: `${origin.rect.height}px`,
+          backgroundColor: origin.backgroundColor,
+          borderRadius: origin.borderRadius,
+          boxShadow: "0 0 0 rgba(0, 0, 0, 0)",
+        },
+        {
+          left: `${target.left}px`,
+          top: `${target.top}px`,
+          width: `${target.width}px`,
+          height: `${target.height}px`,
+          backgroundColor: targetBackground,
+          borderRadius: targetRadius,
+          boxShadow: "0 10px 23px rgba(0, 0, 0, 0.09)",
+        },
+      ],
+      {
+        duration: CALENDAR_TASK_MODAL_OPEN_TRANSITION_MS,
+        easing: CALENDAR_TASK_MODAL_OPEN_TRANSITION_EASING,
+        fill: "forwards",
+      },
+    );
+    ghostAnimation.onfinish = () => ghost.remove();
+
+    // Hold the real modal back until the ghost is nearly full size, then fade in.
+    const dialogAnimation = dialog.animate(
+      [{ opacity: 0 }, { opacity: 0, offset: 0.4 }, { opacity: 1 }],
+      {
+        duration: CALENDAR_TASK_MODAL_OPEN_TRANSITION_MS,
+        easing: "linear",
+        fill: "backwards",
+      },
+    );
+
+    return () => {
+      ghostAnimation.cancel();
+      dialogAnimation.cancel();
+      ghost.remove();
+    };
+  }, [isHoverPreview, isNewTaskDraft, showBackdrop]);
 
   /** While an image preview covers the modal, shrink it to a small clickable chip bottom-right. */
   const isMinimizedForImagePreview = isImagePreviewOpen && !isHoverPreview;

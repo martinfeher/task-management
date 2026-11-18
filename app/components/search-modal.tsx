@@ -227,7 +227,7 @@ function filterTasks(
 
 function SearchModalShortcutKey({ children }: { children: ReactNode }) {
   return (
-    <kbd className="inline-flex h-5 min-w-5 items-center justify-center rounded-[5px] border border-zinc-200 bg-white px-1 text-zinc-500 shadow-[0_1px_0_#e4e4e7] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:shadow-[0_1px_0_#3f3f46]">
+    <kbd className="inline-flex h-[1.0625rem] min-w-[1.0625rem] items-center justify-center rounded-[4.25px] border border-zinc-200 bg-white px-[0.2125rem] text-zinc-500 shadow-[0_1px_0_#e4e4e7] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:shadow-[0_1px_0_#3f3f46]">
       {children}
     </kbd>
   );
@@ -253,23 +253,23 @@ function SearchModalFooter() {
     <div className="flex shrink-0 flex-wrap items-center gap-x-8 gap-y-2 rounded-b-[24px] border-t border-zinc-200 bg-zinc-100/40 px-6 py-3.5 text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-800/40 dark:text-zinc-400">
       <SearchModalFooterAction label="Select">
         <SearchModalShortcutKey>
-          <LuArrowUp className="h-3.5 w-3.5" aria-hidden="true" />
+          <LuArrowUp className="size-[0.74375rem]" aria-hidden="true" />
         </SearchModalShortcutKey>
         <SearchModalShortcutKey>
-          <LuArrowDown className="h-3.5 w-3.5" aria-hidden="true" />
+          <LuArrowDown className="size-[0.74375rem]" aria-hidden="true" />
         </SearchModalShortcutKey>
       </SearchModalFooterAction>
       <SearchModalFooterAction label="Open">
         <SearchModalShortcutKey>
-          <LuCornerDownLeft className="h-3.5 w-3.5" aria-hidden="true" />
+          <LuCornerDownLeft className="size-[0.74375rem]" aria-hidden="true" />
         </SearchModalShortcutKey>
       </SearchModalFooterAction>
       <SearchModalFooterAction label="Open in New Window">
         <SearchModalShortcutKey>
-          <LuCommand className="h-3 w-3" aria-hidden="true" />
+          <LuCommand className="size-[0.6375rem]" aria-hidden="true" />
         </SearchModalShortcutKey>
         <SearchModalShortcutKey>
-          <LuCornerDownLeft className="h-3.5 w-3.5" aria-hidden="true" />
+          <LuCornerDownLeft className="size-[0.74375rem]" aria-hidden="true" />
         </SearchModalShortcutKey>
       </SearchModalFooterAction>
     </div>

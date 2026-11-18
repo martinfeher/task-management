@@ -2135,7 +2135,8 @@ function escapeHtml(text: string) {
 function createImageDeleteButton() {
   const button = document.createElement("button");
   button.type = "button";
-  button.className = "detail-image-delete";
+  button.className =
+    "detail-image-delete task-detail-image-control-surface";
   button.setAttribute("aria-label", "Delete image");
   button.setAttribute("title", "Delete image");
   button.contentEditable = "false";
@@ -2147,12 +2148,24 @@ function createImageDeleteButton() {
 function createImageCropButton() {
   const button = document.createElement("button");
   button.type = "button";
-  button.className = "detail-image-crop";
+  button.className = "detail-image-crop task-detail-image-control-surface";
   button.setAttribute("aria-label", "Crop image");
   button.setAttribute("title", "Crop image");
   button.contentEditable = "false";
   button.innerHTML =
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2v14a2 2 0 0 0 2 2h14" /><path d="M18 22V8a2 2 0 0 0-2-2H2" /></svg>';
+  return button;
+}
+
+function createImageAnnotateButton() {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "detail-image-annotate task-detail-image-control-surface";
+  button.setAttribute("aria-label", "Add text to image");
+  button.setAttribute("title", "Add text to image");
+  button.contentEditable = "false";
+  button.innerHTML =
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 7 4 4 20 4 20 7" /><line x1="9" x2="15" y1="20" y2="20" /><line x1="12" x2="12" y1="4" y2="20" /></svg>';
   return button;
 }
 
@@ -2175,6 +2188,18 @@ function wrapImageWithControls(image: HTMLImageElement) {
   if (!wrapper.querySelector(".detail-image-crop")) {
     wrapper.appendChild(createImageCropButton());
   }
+
+  if (!wrapper.querySelector(".detail-image-annotate")) {
+    wrapper.appendChild(createImageAnnotateButton());
+  }
+
+  wrapper
+    .querySelectorAll(
+      ".detail-image-delete, .detail-image-crop, .detail-image-annotate",
+    )
+    .forEach((control) => {
+      control.classList.add("task-detail-image-control-surface");
+    });
 
   ensureImageResizeHandles(wrapper);
 
@@ -2212,6 +2237,7 @@ function createImageWrapper(src: string) {
   wrapper.appendChild(image);
   wrapper.appendChild(createImageDeleteButton());
   wrapper.appendChild(createImageCropButton());
+  wrapper.appendChild(createImageAnnotateButton());
   ensureImageResizeHandles(wrapper);
   prepareBlockImageWrapper(wrapper);
 

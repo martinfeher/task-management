@@ -163,6 +163,14 @@ import { CalendarTaskDefaultColorBootstrap } from "./calendar-task-default-color
 import { TaskEditorDefaultsBootstrap } from "./task-editor-defaults-bootstrap";
 import { TemplateOptionsDrawer } from "./template-options-drawer";
 import { UndoButton } from "./undo-button";
+import {
+  TASK_DETAILS_FULLSCREEN_DETAILS_OVERLAP_PX,
+  TASK_DETAILS_FULLSCREEN_MARGIN_TRANSITION_CLASS,
+  TASK_DETAILS_FULLSCREEN_SIDEBAR_WIDTH_PX,
+  TASK_DETAILS_FULLSCREEN_STRIP_WIDTH_PX,
+  TASK_DETAILS_FULLSCREEN_TRANSITION_MS,
+  TASK_DETAILS_FULLSCREEN_WIDTH_TRANSITION_CLASS,
+} from "@/lib/task-details-fullscreen-layout";
 import { LuMenu } from "react-icons/lu";
 
 const MIN_PANEL_WIDTH = TASK_LIST_PANEL_MIN_WIDTH;
@@ -4246,6 +4254,16 @@ export function TodoApp({
     }
   }, [isCompactLayout, selectedTaskId]);
 
+  useEffect(() => {
+    if (isCompactLayout || !showTaskDetails) return;
+
+    const timer = window.setTimeout(() => {
+      window.dispatchEvent(new Event("resize"));
+    }, TASK_DETAILS_FULLSCREEN_TRANSITION_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [isCompactLayout, showTaskDetails, taskDetailsFullscreen]);
+
   const taskDetailsPanelLayoutProps = !isCompactLayout
     ? {
         detailsFullscreen: taskDetailsFullscreenLayout,
@@ -4429,7 +4447,7 @@ export function TodoApp({
   return (
     <>
       <div className="flex h-dvh overflow-hidden">
-        {!taskDetailsFullscreenLayout ? (
+        {isCompactLayout ? (
         <Sidebar
           lists={lists}
           labels={labels}
@@ -4487,7 +4505,75 @@ export function TodoApp({
           onDrawerClose={() => setSidebarDrawerOpen(false)}
           taskDropHighlightListId={sidebarListDropTarget?.listId ?? null}
         />
-        ) : null}
+        ) : (
+          <div
+            className={`shrink-0 overflow-hidden ${TASK_DETAILS_FULLSCREEN_WIDTH_TRANSITION_CLASS}${
+              taskDetailsFullscreenLayout ? " pointer-events-none" : ""
+            }`}
+            style={{
+              width: taskDetailsFullscreenLayout
+                ? 0
+                : TASK_DETAILS_FULLSCREEN_SIDEBAR_WIDTH_PX,
+            }}
+            aria-hidden={taskDetailsFullscreenLayout || undefined}
+          >
+            <Sidebar
+              lists={lists}
+              labels={labels}
+              taskCountByListId={taskCountByListId}
+              taskCountByLabelId={taskCountByLabelId}
+              navTaskCounts={navTaskCounts}
+              completedTasks={completedTasks}
+              searchTasks={searchTasks}
+              completingTaskIds={completingTaskIds}
+              checkAnimatingTaskIds={checkAnimatingTaskIds}
+              calendarTasks={calendarTasks}
+              selectedListId={selectedListId}
+              suppressListSelectionHighlightId={suppressListSelectionHighlightId}
+              selectedLabelId={selectedLabelId}
+              isTodaySelected={activeView === "today"}
+              isUpcomingSelected={activeView === "upcoming"}
+              isInboxSelected={activeView === "inbox"}
+              isImportantSelected={activeView === "important"}
+              isCalendarSelected={activeView === "calendar"}
+              selectedTaskId={selectedTaskId}
+              onSelectList={selectList}
+              onSelectLabel={selectLabel}
+              onSelectToday={selectToday}
+              onSelectUpcoming={selectUpcoming}
+              onSelectInbox={selectInbox}
+              onSelectImportant={selectImportant}
+              onSelectCalendar={selectCalendar}
+              onSelectCompletedTask={selectCompletedTask}
+              onSelectSearchTask={selectSearchTask}
+              onToggleTask={toggleTask}
+              onArchiveTask={deleteTaskById}
+              folders={folders}
+              onAddList={addList}
+              onAddFolder={addFolder}
+              onAddLabel={addLabel}
+              onRenameList={renameList}
+              onUpdateList={updateList}
+              onRenameFolder={renameFolder}
+              onRemoveList={removeList}
+              onRemoveFolder={removeFolder}
+              onMoveListToFolder={moveListToFolder}
+              onRenameLabel={renameLabel}
+              onRemoveLabel={removeLabel}
+              onUpdateLabelColor={updateLabelColor}
+              onReorderLists={reorderLists}
+              onReorderLabels={reorderLabels}
+              onArchivedTasksRestored={restoreArchivedTasks}
+              onSidebarHoverStart={handleSidebarHoverStart}
+              onSidebarHoverEnd={handleSidebarHoverEnd}
+              sidebarHoverPreview={sidebarHoverPreview}
+              compactDrawer={false}
+              drawerOpen={sidebarDrawerOpen}
+              onDrawerClose={() => setSidebarDrawerOpen(false)}
+              taskDropHighlightListId={sidebarListDropTarget?.listId ?? null}
+            />
+          </div>
+        )}
         {showingCalendarMonth ? (
           <div
             className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
@@ -4610,17 +4696,26 @@ export function TodoApp({
           >
             {compactShowTaskList ? (
               <div
-                className={`flex min-h-0 shrink-0 ${
-                  taskDetailsFullscreenLayout
-                    ? "relative w-[45px] overflow-hidden"
+                className={`relative flex min-h-0 shrink-0 overflow-hidden${
+                  !isCompactLayout
+                    ? ` ${TASK_DETAILS_FULLSCREEN_WIDTH_TRANSITION_CLASS}`
                     : ""
                 }`}
+                style={
+                  isCompactLayout
+                    ? undefined
+                    : {
+                        width: taskDetailsFullscreenLayout
+                          ? TASK_DETAILS_FULLSCREEN_STRIP_WIDTH_PX
+                          : taskListWidth,
+                      }
+                }
               >
                 <div
                   ref={taskListPanelRef}
                   inert={taskDetailsFullscreenLayout}
                   aria-hidden={taskDetailsFullscreenLayout || undefined}
-                  className={`flex min-h-0 shrink-0 self-stretch ${
+                  className={`flex min-h-0 shrink-0 rounded-l-xl! self-stretch ${
                     isListCalendarOverlapLayout ? "relative z-0" : ""
                   }${taskDetailsFullscreenLayout ? " pointer-events-none" : ""}`}
                   onMouseEnter={commitSidebarHoverSelection}
@@ -4720,6 +4815,16 @@ export function TodoApp({
                     onClick={handleExitTaskDetailsFullscreen}
                   />
                 ) : null}
+                {taskDetailsFullscreenLayout ? (
+                  <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-y-0 right-3 z-[1000] w-[13px]"
+                    style={{
+                      background:
+                        "linear-gradient(to left, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0))",
+                    }}
+                  />
+                ) : null}
               </div>
             ) : null}
             {!isCompactLayout || compactDetailView ? (
@@ -4730,12 +4835,16 @@ export function TodoApp({
                 isCompactLayout || taskDetailsFullscreenLayout
                   ? "min-w-0"
                   : "min-w-[344px]"
-              }${taskDetailsFullscreenLayout ? " relative z-10" : ""}`}
-              style={
+              }${
                 taskDetailsFullscreenLayout
-                  ? { boxShadow: "-4px 0 14px rgba(0, 0, 0, 0.12)" }
-                  : undefined
-              }
+                  ? " relative z-10 overflow-hidden rounded-l-[12px]"
+                  : ""
+              } ${TASK_DETAILS_FULLSCREEN_MARGIN_TRANSITION_CLASS}`}
+              style={{
+                marginLeft: taskDetailsFullscreenLayout
+                  ? -TASK_DETAILS_FULLSCREEN_DETAILS_OVERLAP_PX
+                  : 0,
+              }}
             >
               {showListCalendarPanel ? (
                 <ListCalendarOverlapShell
@@ -4801,7 +4910,9 @@ export function TodoApp({
               {showTaskDetails && (
                 <div
                   className={`flex min-h-0 flex-1 flex-col overflow-hidden${
-                    taskDetailsFullscreenLayout ? " min-w-0 w-full" : ""
+                    taskDetailsFullscreenLayout
+                      ? " min-w-0 w-full rounded-l-[12px]"
+                      : ""
                   }`}
                 >
                   <TaskDetailsPanel
@@ -4992,7 +5103,9 @@ export function TodoApp({
             ) : null}
             {showTaskDetails ? (
               <div
-                className="flex min-h-0 flex-1 flex-col overflow-hidden"
+                className={`flex min-h-0 flex-1 flex-col overflow-hidden${
+                  taskDetailsFullscreenLayout ? " rounded-l-[12px]" : ""
+                }`}
                 style={
                   taskDetailsFullscreenLayout
                     ? undefined

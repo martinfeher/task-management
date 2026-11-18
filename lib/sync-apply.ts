@@ -23,6 +23,7 @@ import {
   stampTaskFields,
   type TaskClockField,
 } from "@/lib/task-field-clock";
+import { extractTaskDetailImageSrcs } from "@/lib/task-details-content";
 import { normalizeDueTimeZone } from "@/lib/task-due-time";
 import { getPriorityFromTaskTags, LABEL_CATEGORY } from "@/lib/task-tags";
 import {
@@ -63,6 +64,7 @@ export type SyncTaskPayload = {
   labels: { id: string; label: string; color: string | null }[];
   listId: string;
   listName: string;
+  previewImage: string | null;
   details: string;
   detailsDoc: unknown;
   schemaVersion: number;
@@ -134,6 +136,7 @@ function toSyncTask(task: SyncTaskRecord): SyncTaskPayload {
       .map((entry) => ({ id: entry.tag.id, label: entry.tag.label, color: entry.tag.color })),
     listId: task.listId,
     listName: task.list?.name ?? "",
+    previewImage: extractTaskDetailImageSrcs(task.details)[0] ?? null,
     details: task.details,
     detailsDoc: task.detailsDoc ?? null,
     schemaVersion: task.schemaVersion,

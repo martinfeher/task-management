@@ -65,6 +65,8 @@ export type MobileTaskItem = {
   labels: { id: string; label: string }[];
   listId: string;
   listName?: string;
+  /** Path of the first image in the task content (`/api/task-images/...`), if any. */
+  previewImage: string | null;
 };
 
 export type TasksApiResponse = {
@@ -89,6 +91,7 @@ type TaskSource = {
   priority?: number | null;
   parentId: string | null;
   labels: { id: string; label: string }[];
+  imageSrcs?: string[];
 };
 
 function mapToMobileTask(
@@ -115,6 +118,7 @@ function mapToMobileTask(
     labels: task.labels,
     listId,
     ...(listName ? { listName } : {}),
+    previewImage: task.imageSrcs?.[0] ?? null,
   };
 }
 

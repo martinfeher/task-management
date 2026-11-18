@@ -76,6 +76,7 @@ const DEFAULT_FONT_SIZE_PX = 17;
 const UI_CHROME_CLASSES = [
   "detail-image-delete",
   "detail-image-crop",
+  "detail-image-annotate",
   "detail-image-resize-handles",
   "detail-image-resize-handle",
 ];

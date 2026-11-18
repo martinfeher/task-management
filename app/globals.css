@@ -373,6 +373,7 @@
   --calendar-task-time-color: #D3D3D3;
   --calendar-task-title-brightness: 0.3;
   --calendar-task-modal-content-switch-ms: 125ms;
+  --task-detail-image-shadow: 0 3px 6px rgba(0, 0, 0, 0.04);
 }
 
 html[data-app-font="sf-pro"] {
@@ -472,6 +473,21 @@ body {
 
 .task-details-panel-background {
   background-color: var(--panel-text-task-detail-background);
+}
+
+.task-details-panel-fullscreen {
+  border-top-left-radius: 12px;
+  border-bottom-left-radius: 12px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .task-details-fullscreen-width-transition {
+    transition: width 50ms ease-out;
+  }
+
+  .task-details-fullscreen-margin-transition {
+    transition: margin-left 50ms ease-out;
+  }
 }
 
 .task-details-skeleton-bar {
@@ -909,8 +925,9 @@ body {
   display: block;
   max-width: 100%;
   height: auto;
-  border: 1px solid #f4f4f7;
+  border: none;
   border-radius: 0.5rem;
+  box-shadow: var(--task-detail-image-shadow);
   cursor: pointer;
   -webkit-user-drag: none;
   user-select: none;
@@ -1506,8 +1523,27 @@ body {
   }
 }
 
+/* Crop / close on editor images — match image preview lightbox controls */
+.task-detail-image-control-surface {
+  border: none;
+  background: rgb(122 122 134 / 0.7);
+  color: #ffffff;
+  backdrop-filter: blur(1px);
+  -webkit-backdrop-filter: blur(1px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
+  transition:
+    opacity 150ms ease,
+    background-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.task-detail-image-control-surface:hover {
+  background: rgb(120 120 137 / 0.95);
+}
+
 .detail-image-delete,
-.detail-image-crop {
+.detail-image-crop,
+.detail-image-annotate {
   position: absolute;
   top: 0.5rem;
   right: 0.5rem;
@@ -1516,44 +1552,47 @@ body {
   height: 1.75rem;
   align-items: center;
   justify-content: center;
-  border: none;
   border-radius: 9999px;
-  background: rgb(24 24 27 / 0.72);
-  color: #ffffff;
   cursor: pointer;
   opacity: 0;
-  transition: opacity 150ms ease, background-color 150ms ease;
 }
 
 .detail-image-crop {
   right: 2.5rem;
 }
 
+.detail-image-annotate {
+  right: 4.5rem;
+}
+
 .detail-image-wrapper:hover .detail-image-delete,
 .detail-image-wrapper:hover .detail-image-crop,
+.detail-image-wrapper:hover .detail-image-annotate,
 .detail-image-wrapper[data-resizing="true"] .detail-image-delete,
 .detail-image-wrapper[data-resizing="true"] .detail-image-crop,
+.detail-image-wrapper[data-resizing="true"] .detail-image-annotate,
 .detail-image-delete:focus-visible,
-.detail-image-crop:focus-visible {
+.detail-image-crop:focus-visible,
+.detail-image-annotate:focus-visible {
   opacity: 1;
 }
 
-.detail-image-delete:hover,
-.detail-image-crop:hover {
-  background: rgb(24 24 27 / 0.9);
-}
-
 .detail-image-delete svg,
-.detail-image-crop svg {
+.detail-image-crop svg,
+.detail-image-annotate svg {
   width: 0.875rem;
   height: 0.875rem;
 }
 
-/* Animated GIFs / SVGs cannot be cropped without flattening them. */
+/* Animated GIFs / SVGs cannot be cropped or annotated without flattening them. */
 .detail-image[src*=".gif"] ~ .detail-image-crop,
 .detail-image[src*="image/gif"] ~ .detail-image-crop,
 .detail-image[src*=".svg"] ~ .detail-image-crop,
-.detail-image[src*="image/svg"] ~ .detail-image-crop {
+.detail-image[src*="image/svg"] ~ .detail-image-crop,
+.detail-image[src*=".gif"] ~ .detail-image-annotate,
+.detail-image[src*="image/gif"] ~ .detail-image-annotate,
+.detail-image[src*=".svg"] ~ .detail-image-annotate,
+.detail-image[src*="image/svg"] ~ .detail-image-annotate {
   display: none;
 }
 
@@ -1685,6 +1724,7 @@ body {
 
 .search-result-content-preview .detail-image-delete,
 .search-result-content-preview .detail-image-crop,
+.search-result-content-preview .detail-image-annotate,
 .search-result-content-preview .detail-image-resize-handles {
   display: none !important;
 }
@@ -2182,6 +2222,12 @@ body {
 
 .calendar-task-modal footer {
   align-items: center;
+}
+
+.calendar-task-modal .task-details-editor .detail-image {
+  border: none;
+  border-radius: 0.5rem;
+  box-shadow: var(--task-detail-image-shadow);
 }
 
 /* Task switch (header up/down arrows): very subtle fade-in only. */
@@ -2802,6 +2848,25 @@ body {
     transparent 15%,
     var(--panel-text-task-item-divider) 15%
   );
+}
+
+/* Task list row image previews: square; 20px default (+2 vs former 18px), 22px on row hover. */
+.task-list-image-thumbs {
+  --task-list-image-thumb-size: 20px;
+  --task-list-image-thumb-hover-size: 22px;
+}
+
+.task-list-image-thumb {
+  box-sizing: border-box;
+  width: var(--task-list-image-thumb-size);
+  height: var(--task-list-image-thumb-size);
+  aspect-ratio: 1 / 1;
+}
+
+.group:hover .task-list-image-thumb,
+.task-list-image-thumb[data-active="true"] {
+  width: var(--task-list-image-thumb-hover-size);
+  height: var(--task-list-image-thumb-hover-size);
 }
 
 .task-list-checkbox {

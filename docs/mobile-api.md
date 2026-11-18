@@ -93,6 +93,7 @@ Response:
 | `labels` | `{ id, label }[]` | |
 | `listId` | string | |
 | `listName` | string | Optional on some views |
+| `previewImage` | string \| null | Path of the first image in the task content (`/api/task-images/...`); fetch with the bearer token |
 
 ### `POST /api/tasks`
 

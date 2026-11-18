@@ -31,6 +31,7 @@ import {
 import { useCalendarHoveredTaskId } from "./calendar-task-hover-preview";
 import { CalendarModalNavigationTaskPreview } from "./calendar-modal-navigation-task-preview";
 import { CALENDAR_SIDEBAR_HOVER_PREVIEW_CLEAR_MS } from "@/lib/calendar-sidebar-hover-preview";
+import { rememberCalendarTaskOpenOrigin } from "@/lib/calendar-task-modal-position";
 import type { ToggleTaskOptions } from "@/lib/toggle-task-options";
 import { useListCalendarOverlapLayout } from "./list-calendar-overlap-shell";
 import type { CalendarDateNavigationSnapshot } from "@/lib/calendar-date-navigation-undo";
@@ -473,6 +474,26 @@ export function CalendarViewSidebarLayout({
     anchorRect: DOMRect;
   } | null>(null);
   const calendarSidebarRef = useRef<HTMLElement | null>(null);
+
+  // Remember which calendar item was activated so the task modal can animate
+  // out of it. Capture phase: runs before the item's own click handler.
+  useEffect(() => {
+    function handleClick(event: MouseEvent) {
+      rememberCalendarTaskOpenOrigin(event.target);
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      rememberCalendarTaskOpenOrigin(event.target);
+    }
+
+    document.addEventListener("click", handleClick, true);
+    document.addEventListener("keydown", handleKeyDown, true);
+    return () => {
+      document.removeEventListener("click", handleClick, true);
+      document.removeEventListener("keydown", handleKeyDown, true);
+    };
+  }, []);
 
   useEffect(() => {
     return () => {

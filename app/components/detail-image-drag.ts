@@ -308,6 +308,7 @@ export function getImageDragTarget(element: EventTarget | null) {
   if (!(element instanceof HTMLElement)) return null;
   if (element.closest(".detail-image-delete")) return null;
   if (element.closest(".detail-image-crop")) return null;
+  if (element.closest(".detail-image-annotate")) return null;
   if (element.closest("[data-resize]")) return null;
 
   const wrapper = element.closest(".detail-image-wrapper");

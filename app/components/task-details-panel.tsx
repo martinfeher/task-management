@@ -135,8 +135,13 @@ import {
 } from "./detail-image-resize";
 import { TaskDetailImageLightbox } from "./task-detail-image-lightbox";
 import { TaskDetailImageCropModal } from "./task-detail-image-crop-modal";
+import { TaskDetailImageAnnotateModal } from "./task-detail-image-annotate-modal";
 import { ConfirmModal } from "./confirm-modal";
 import { isCroppableImageSrc, type RenderedCrop } from "@/lib/image-crop";
+import {
+  isAnnotatableImageSrc,
+  type RenderedAnnotation,
+} from "@/lib/image-annotate";
 import {
   applyLinkToSelection,
   findDetailLinkFromTarget,
@@ -207,6 +212,7 @@ import {
   APP_HOVER_TOOLTIP_BELOW_START,
   APP_HOVER_TOOLTIP_SHOWN,
 } from "@/lib/app-hover-tooltip-classes";
+import { LayoutThreeColumnsIcon } from "./layout-three-columns-icon";
 import { TASK_DETAILS_HEADER_ICON_HOVER_CLASS } from "@/lib/task-details-header-icon-hover";
 import {
   blockTypeHistoryLabel,
@@ -2438,6 +2444,10 @@ export function TaskDetailsPanel({
   }, [imagePreviewCloseRequest]);
 
   const [imageCrop, setImageCrop] = useState<{
+    wrapper: HTMLElement;
+    src: string;
+  } | null>(null);
+  const [imageAnnotate, setImageAnnotate] = useState<{
     wrapper: HTMLElement;
     src: string;
   } | null>(null);
@@ -7523,11 +7533,27 @@ export function TaskDetailsPanel({
     setImageCrop({ wrapper, src });
   }
 
+  function handleImageLightboxAnnotate() {
+    const current = imageLightbox?.items[imageLightbox.index];
+    if (!current || !isAnnotatableImageSrc(current.src)) return;
+
+    const { wrapper, src } = current;
+    const editor = editorRef.current;
+    if (!editor?.contains(wrapper)) {
+      setImageLightbox(null);
+      return;
+    }
+
+    setImageLightbox(null);
+    setImageAnnotate({ wrapper, src });
+  }
+
   function handleEditorDoubleClick(event: React.MouseEvent<HTMLDivElement>) {
     const target = event.target as HTMLElement;
     if (
       target.closest(".detail-image-delete") ||
       target.closest(".detail-image-crop") ||
+      target.closest(".detail-image-annotate") ||
       target.closest("[data-resize]")
     ) {
       scheduleFormatMenuReveal();
@@ -7613,6 +7639,55 @@ export function TaskDetailsPanel({
     updateLineControls();
   }
 
+  async function handleImageAnnotateApply(result: RenderedAnnotation) {
+    const annotateTarget = imageAnnotate;
+    const currentTaskId = taskIdRef.current;
+    if (!annotateTarget || !currentTaskId) {
+      setImageAnnotate(null);
+      return;
+    }
+
+    const image = annotateTarget.wrapper.querySelector("img.detail-image");
+    if (!(image instanceof HTMLImageElement)) {
+      setImageAnnotate(null);
+      return;
+    }
+
+    const extension =
+      result.blob.type === "image/png"
+        ? "png"
+        : result.blob.type === "image/webp"
+          ? "webp"
+          : "jpg";
+    const file = new File([result.blob], `annotated.${extension}`, {
+      type: result.blob.type,
+    });
+
+    // Throws on failure so the annotate dialog can show the error and stay open.
+    const url = await uploadImageFile(currentTaskId, file);
+
+    const editor = editorRef.current;
+    if (
+      taskIdRef.current !== currentTaskId ||
+      !editor ||
+      !editor.contains(annotateTarget.wrapper)
+    ) {
+      setImageAnnotate(null);
+      return;
+    }
+
+    // Same pixel dimensions as before, so the displayed size is left untouched.
+    image.removeAttribute("srcset");
+    image.setAttribute("src", url);
+
+    setImageAnnotate(null);
+    syncEditorContent();
+    recordHistorySnapshot("Add text to image");
+    requestSave("flush");
+    scheduleEditorHeightSync();
+    updateLineControls();
+  }
+
   function confirmPendingImageDelete() {
     const pending = imageDeleteConfirm;
     const editor = editorRef.current;
@@ -7664,6 +7739,26 @@ export function TaskDetailsPanel({
     if (link && (event.metaKey || event.ctrlKey)) {
       event.preventDefault();
       openDetailLinkInNewTab(link);
+      return;
+    }
+
+    const annotateButton = (event.target as HTMLElement).closest(
+      ".detail-image-annotate",
+    );
+    if (annotateButton) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const imageWrapper = annotateButton.closest(".detail-image-wrapper");
+      if (!(imageWrapper instanceof HTMLElement)) return;
+
+      const image = imageWrapper.querySelector("img.detail-image");
+      if (!(image instanceof HTMLImageElement)) return;
+
+      const imageSrc = image.currentSrc || image.getAttribute("src") || "";
+      if (!imageSrc || !isAnnotatableImageSrc(imageSrc)) return;
+
+      setImageAnnotate({ wrapper: imageWrapper, src: imageSrc });
       return;
     }
 
@@ -8444,7 +8539,7 @@ export function TaskDetailsPanel({
               onClick={() => onExpandFromModal()}
               className={`flex size-[29px] -mt-[2px] cursor-pointer items-center justify-center rounded-full text-zinc-500 transition-colors bg-zinc-200/30 hover:text-zinc-600 dark:text-zinc-400 dark:hover:text-zinc-100 ${TASK_DETAILS_HEADER_ICON_HOVER_CLASS}`}
             >
-              <RxEnterFullScreen className="size-[15px]" aria-hidden="true" />
+              <LayoutThreeColumnsIcon className="size-[14px] text-[#bababf]" />
             </ModalHeaderPortaledTooltipButton>
           ) : null}
           {onClose ? (
@@ -8533,9 +8628,10 @@ export function TaskDetailsPanel({
       ref={panelRef}
       data-task-details-panel
       data-task-details-layout={layout}
+      data-details-fullscreen={detailsFullscreen ? "true" : undefined}
       className={`task-details-panel-background relative flex min-h-0 min-w-[300px] flex-1 flex-col${
         isModalLayout ? " h-full" : ""
-      }`}
+      }${detailsFullscreen ? " task-details-panel-fullscreen overflow-hidden rounded-l-[12px]" : ""}`}
       aria-busy={saveStatus === "loading" ? true : undefined}
     >
       <div
@@ -8838,11 +8934,10 @@ export function TaskDetailsPanel({
                       aria-label="Exit full width note"
                       aria-describedby="task-details-exit-fullscreen-tooltip"
                       onClick={onExitDetailsFullscreen}
-                      className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-[#d0d0d0] px-1 text-[#ffffff] shadow-sm transition-[background-color,box-shadow] duration-150 ease-out hover:bg-[#bcbcbc] hover:shadow-md active:bg-[#b0b0b0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/60 focus-visible:ring-offset-2 dark:bg-[#bfbfca] dark:hover:bg-[#a8a8b5] dark:active:bg-[#9c9caa] dark:focus-visible:ring-zinc-500/50"
+                      className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-[#d0d0d0] px-1 text-[#ffffff] shadow-sm transition-[background-color,box-shadow] duration-150 ease-out hover:bg-[#bcbcbc] hover:shadow-md active:bg-[#b0b0b0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/60 focus-visible:ring-offset-2 dark:bg-[#bfbfca] dark:hover:bg-[#a8a8b5] dark:active:bg-[#9c9caa] dark:focus-visible:ring-zinc-500/50"
                     >
                       <RxExitFullScreen
                         className="size-[16px]"
-                        aria-hidden="true"
                       />
                     </button>
                     <span
@@ -8986,7 +9081,7 @@ export function TaskDetailsPanel({
               onScroll={updateLineControls}
               className={`task-details-editor w-full resize-none rounded-xl pt-[8px] pl-[25px] pr-3 pb-4! text-[#555555] outline-none transition-colors focus:border-[#7f7f7f] dark:text-zinc-300 [&_.detail-line[data-line-type=bullet]]:pl-1 [&_.detail-line[data-line-type=checklist]]:cursor-pointer [&_.detail-line[data-line-type=checklist]]:pl-1 [&_.detail-line[data-line-type=h1]]:text-[26px] [&_.detail-line[data-line-type=h1]]:font-bold [&_.detail-line[data-line-type=h1]]:leading-[36px] [&_.detail-line[data-line-type=h1]]:text-[#4B4B4B] dark:[&_.detail-line[data-line-type=h1]]:text-[#F5F5F5] [&_.detail-line[data-line-type=h2]]:text-[23px] [&_.detail-line[data-line-type=h2]]:font-semibold [&_.detail-line[data-line-type=h2]]:leading-[30px] [&_.detail-line[data-line-type=h3]]:text-[19px] [&_.detail-line[data-line-type=h3]]:font-semibold [&_.detail-line[data-line-type=h3]]:leading-[26px] [&_.detail-line[data-line-type=numbered]]:pl-1 [&_mark]:bg-yellow-200 dark:[&_mark]:bg-yellow-300/30 [&_s]:line-through [&_strike]:line-through [&_u]:underline ${
                 isModalLayout
-                  ? "h-[496px]! min-h-0 shrink-0 overflow-hidden"
+                  ? "h-[496px]! min-h-0 shrink-0 overflow-x-hidden overflow-y-auto"
                   : "min-h-[85vh] min-h-0 overflow-auto"
               }`}
             />
@@ -9635,6 +9730,13 @@ export function TaskDetailsPanel({
               ? handleImageLightboxCrop
               : undefined
           }
+          onAnnotate={
+            isAnnotatableImageSrc(
+              imageLightbox.items[imageLightbox.index].src,
+            )
+              ? handleImageLightboxAnnotate
+              : undefined
+          }
         />
       ) : null}
       {imageCrop ? (
@@ -9642,6 +9744,13 @@ export function TaskDetailsPanel({
           src={imageCrop.src}
           onCancel={() => setImageCrop(null)}
           onApply={handleImageCropApply}
+        />
+      ) : null}
+      {imageAnnotate ? (
+        <TaskDetailImageAnnotateModal
+          src={imageAnnotate.src}
+          onCancel={() => setImageAnnotate(null)}
+          onApply={handleImageAnnotateApply}
         />
       ) : null}
       <ConfirmModal

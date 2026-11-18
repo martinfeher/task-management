@@ -2,13 +2,20 @@
 
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
-import { LuChevronLeft, LuChevronRight, LuCrop, LuX } from "react-icons/lu";
+import {
+  LuChevronLeft,
+  LuChevronRight,
+  LuCrop,
+  LuType,
+  LuX,
+} from "react-icons/lu";
 
 type TaskDetailImageLightboxProps = {
   src: string;
   alt: string;
   onClose: () => void;
   onCrop?: () => void;
+  onAnnotate?: () => void;
   imageIndex?: number;
   imageCount?: number;
   hasPrevious?: boolean;
@@ -22,16 +29,17 @@ type TaskDetailImageLightboxProps = {
 const TASK_DETAIL_IMAGE_LIGHTBOX_Z_CLASS = "z-[10070]";
 
 const LIGHTBOX_CONTROL_BUTTON_CLASS =
-  "flex size-6.5 cursor-pointer items-center justify-center rounded-full border-0 bg-zinc-900/75 text-white shadow-[0_6px_18px_rgba(0,0,0,0.28)] transition-colors hover:bg-zinc-900/92 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:cursor-not-allowed disabled:opacity-35";
+  "task-detail-image-control-surface flex size-7 cursor-pointer items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:cursor-not-allowed disabled:opacity-35";
 
 const LIGHTBOX_GALLERY_NAV_BUTTON_CLASS =
-  "flex size-11 cursor-pointer items-center justify-center rounded-full border-0 bg-zinc-900/65 text-white shadow-[0_8px_24px_rgba(0,0,0,0.25)] transition-colors hover:bg-zinc-900/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:cursor-not-allowed disabled:opacity-30";
+  "flex size-11 cursor-pointer items-center justify-center rounded-full border-0 bg-zinc-900/65 text-white shadow-[0_8px_24px_rgba(0,0,0,0.1)] transition-colors hover:bg-zinc-900/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:cursor-not-allowed disabled:opacity-30";
 
 export function TaskDetailImageLightbox({
   src,
   alt,
   onClose,
   onCrop,
+  onAnnotate,
   imageIndex = 0,
   imageCount = 1,
   hasPrevious = false,
@@ -138,10 +146,24 @@ export function TaskDetailImageLightbox({
             }}
             className={`absolute top-1/2 left-0 z-20 -translate-x-[calc(100%+10px)] -translate-y-1/2 ${LIGHTBOX_GALLERY_NAV_BUTTON_CLASS}`}
           >
-            <LuChevronLeft className="size-6" aria-hidden="true" />
+            <LuChevronLeft className="size-6" />
           </button>
         ) : null}
         <div className="absolute inset-x-3 top-3 z-10 flex items-center justify-end gap-2">
+          {onAnnotate ? (
+            <button
+              type="button"
+              aria-label="Add text to image"
+              title="Add text to image"
+              onClick={(event) => {
+                event.stopPropagation();
+                onAnnotate();
+              }}
+              className={LIGHTBOX_CONTROL_BUTTON_CLASS}
+            >
+              <LuType className="size-[12px]" aria-hidden="true" />
+            </button>
+          ) : null}
           {onCrop ? (
             <button
               type="button"
@@ -173,7 +195,7 @@ export function TaskDetailImageLightbox({
         <img
           src={src}
           alt={alt}
-          className="task-detail-image-lightbox-image h-auto max-h-[92vh] w-auto max-w-[92vw] select-none rounded-[4px] object-contain shadow-[0_18px_50px_rgba(15,23,42,0.18)] dark:shadow-[0_18px_50px_rgba(0,0,0,0.45)]"
+          className="task-detail-image-lightbox-image h-auto max-h-[92vh] w-auto max-w-[92vw] select-none rounded-[8px] object-contain shadow-[0_18px_50px_rgba(15,23,42,0.18)] dark:shadow-[0_18px_50px_rgba(0,0,0,0.45)]"
           draggable={false}
         />
         {showGalleryNav ? (

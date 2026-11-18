@@ -988,11 +988,12 @@ export function TaskListTaskRow({
 
       {!hideDueDate ? (
       <div
-        className="relative ml-auto flex min-h-[19px] shrink-0 self-center items-center justify-end gap-1.5 pl-2"
+        className="relative ml-auto flex min-h-[22px] shrink-0 self-center items-center justify-end gap-1.5 pl-2"
       >
         {task.imageSrcs && task.imageSrcs.length > 0 ? (
           <TaskListImageThumbs
             srcs={task.imageSrcs}
+            active={isListFocusRow}
             className={checkedContentDim}
             style={{
               transition: dimTransition,

@@ -197,7 +197,7 @@ export function SidebarAccountMenu({
       onMouseLeave={handleAccountAreaPointerLeave}
     >
       {isOpen ? (
-        <div className="absolute bottom-full left-0 right-0 z-20 pb-2">
+        <div className="absolute bottom-full left-0 right-0 z-20 translate-y-[5px] pb-2">
           <div
             className={`overflow-hidden rounded-[20px] border border-zinc-200 text-left backdrop-blur-[4px] dark:border-zinc-700 ${FROSTED_POPOVER_SURFACE_CLASS}`}
             role="menu"
