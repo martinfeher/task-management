@@ -7,6 +7,7 @@ import {
   PRIORITY_TAGS,
 } from "@/lib/task-tags";
 import { normalizeDueTimeZone } from "@/lib/task-due-time";
+import { extractTaskDetailImageSrcs } from "@/lib/task-details-content";
 
 /**
  * Creates this user's priority tags (high/medium/low, etc.) if they don't
@@ -94,6 +95,21 @@ export async function getTodoData(userId: string) {
   `;
   const hasDetailsByTaskId = Object.fromEntries(
     detailFlags.map((row) => [row.id, Boolean(row.hasDetails)]),
+  );
+
+  const tasksWithImages = await prisma.task.findMany({
+    where: {
+      userId,
+      deletedAt: null,
+      details: { contains: "/api/task-images/" },
+    },
+    select: { id: true, details: true },
+  });
+  const imageSrcsByTaskId = new Map(
+    tasksWithImages.map((task) => [
+      task.id,
+      extractTaskDetailImageSrcs(task.details),
+    ]),
   );
 
   const [lists, folders] = await Promise.all([
@@ -188,6 +204,7 @@ export async function getTodoData(userId: string) {
             completed,
             details: "",
             hasDetails: hasDetailsByTaskId[id] ?? false,
+            imageSrcs: imageSrcsByTaskId.get(id) ?? [],
             dueDate: dueDate ? dueDate.toISOString() : null,
             dueTimeMinutes,
             dueDurationMinutes,

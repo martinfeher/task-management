@@ -22,7 +22,7 @@ type TaskDetailImageLightboxProps = {
 const TASK_DETAIL_IMAGE_LIGHTBOX_Z_CLASS = "z-[10070]";
 
 const LIGHTBOX_CONTROL_BUTTON_CLASS =
-  "flex size-9 cursor-pointer items-center justify-center rounded-full border-0 bg-zinc-900/75 text-white shadow-[0_6px_18px_rgba(0,0,0,0.28)] transition-colors hover:bg-zinc-900/92 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:cursor-not-allowed disabled:opacity-35";
+  "flex size-6.5 cursor-pointer items-center justify-center rounded-full border-0 bg-zinc-900/75 text-white shadow-[0_6px_18px_rgba(0,0,0,0.28)] transition-colors hover:bg-zinc-900/92 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:cursor-not-allowed disabled:opacity-35";
 
 const LIGHTBOX_GALLERY_NAV_BUTTON_CLASS =
   "flex size-11 cursor-pointer items-center justify-center rounded-full border-0 bg-zinc-900/65 text-white shadow-[0_8px_24px_rgba(0,0,0,0.25)] transition-colors hover:bg-zinc-900/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:cursor-not-allowed disabled:opacity-30";
@@ -104,10 +104,10 @@ export function TaskDetailImageLightbox({
       }
     >
       {showGalleryNav && galleryTitle ? (
-        <header className="shrink-0 px-6 pt-3.5 pb-2">
+        <header className="shrink-0 px-6 pt-2 pb-2">
           <h2
             id="task-detail-image-lightbox-title"
-            className="mx-auto max-w-[min(92vw,48rem)] truncate mr-[32%] text-[19px] font-semibold leading-snug text-zinc-800 dark:text-zinc-100"
+            className="w-fit max-w-[min(92vw,48rem)] rounded-[17px] bg-[#ffffff]/70 px-[16px] py-[6px] text-[14px] font-semibold leading-snug text-zinc-700 backdrop-blur-[4px] dark:bg-zinc-900/55 dark:text-zinc-100"
             title={galleryTitle}
           >
             {galleryTitle}
@@ -123,7 +123,7 @@ export function TaskDetailImageLightbox({
         }}
       >
         <div
-          className="task-detail-image-lightbox-frame relative w-fit max-h-[min(85vh,100%)] max-w-[92vw] -translate-y-[20px] overflow-visible"
+          className="task-detail-image-lightbox-frame relative flex w-fit max-h-[92vh] max-w-[92vw] -translate-y-[20px] items-center justify-center overflow-visible"
           onMouseDown={(event) => event.stopPropagation()}
         >
         {showGalleryNav ? (
@@ -153,7 +153,7 @@ export function TaskDetailImageLightbox({
               }}
               className={LIGHTBOX_CONTROL_BUTTON_CLASS}
             >
-              <LuCrop className="size-[15px]" aria-hidden="true" />
+              <LuCrop className="size-[12px]" aria-hidden="true" />
             </button>
           ) : null}
           <button
@@ -166,14 +166,14 @@ export function TaskDetailImageLightbox({
             }}
             className={LIGHTBOX_CONTROL_BUTTON_CLASS}
           >
-            <LuX className="size-[15px]" aria-hidden="true" />
+            <LuX className="size-[12px]" aria-hidden="true" />
           </button>
         </div>
         {/* eslint-disable-next-line @next/next/no-img-element -- user-uploaded task detail URLs */}
         <img
           src={src}
           alt={alt}
-          className="task-detail-image-lightbox-image h-auto max-h-[85vh] w-auto max-w-[92vw] select-none rounded-lg object-contain shadow-[0_18px_50px_rgba(15,23,42,0.18)] dark:shadow-[0_18px_50px_rgba(0,0,0,0.45)]"
+          className="task-detail-image-lightbox-image h-auto max-h-[92vh] w-auto max-w-[92vw] select-none rounded-[4px] object-contain shadow-[0_18px_50px_rgba(15,23,42,0.18)] dark:shadow-[0_18px_50px_rgba(0,0,0,0.45)]"
           draggable={false}
         />
         {showGalleryNav ? (

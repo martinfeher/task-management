@@ -42,6 +42,25 @@ export function plainTextToTaskDetails(text: string) {
     .join("");
 }
 
+const TASK_IMAGE_URL_PATTERN =
+  /\/api\/task-images\/[a-z0-9]+\/[a-z0-9-]+\.(?:jpe?g|png|gif|webp|svg)/gi;
+
+/** Stored task image URLs referenced in details HTML, in document order (unique). */
+export function extractTaskDetailImageSrcs(details: string): string[] {
+  if (!details || !details.includes("/api/task-images/")) return [];
+
+  const srcs: string[] = [];
+  const seen = new Set<string>();
+
+  for (const match of details.matchAll(TASK_IMAGE_URL_PATTERN)) {
+    if (seen.has(match[0])) continue;
+    seen.add(match[0]);
+    srcs.push(match[0]);
+  }
+
+  return srcs;
+}
+
 export function taskDetailsHasContent(details: string) {
   const trimmed = details.trim();
   if (!trimmed || EMPTY_DETAILS_HTML.has(trimmed)) {

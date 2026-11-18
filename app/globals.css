@@ -490,7 +490,7 @@ body {
   color: #333333;
   /* color: #2e2e2e; */
   color-scheme: light;
-  caret-color: #171717;
+  caret-color: #777777;
   cursor: text;
   scrollbar-gutter: stable;
   background-color: var(--panel-text-task-detail-textarea-background);
@@ -516,7 +516,7 @@ body {
 .dark .task-details-editor {
   color: #d4d4d8;
   color-scheme: dark;
-  caret-color: #fafafa;
+  caret-color: #777777;
 }
 
 .task-details-editor {
@@ -531,7 +531,7 @@ body {
     --detail-line-height,
     var(--task-editor-default-line-height, 1.7)
   );
-  caret-color: #171717;
+  caret-color: #777777;
   -webkit-user-drag: none;
 }
 
@@ -909,6 +909,7 @@ body {
   display: block;
   max-width: 100%;
   height: auto;
+  border: 1px solid #f4f4f7;
   border-radius: 0.5rem;
   cursor: pointer;
   -webkit-user-drag: none;
@@ -1569,7 +1570,7 @@ body {
   content: "";
   position: absolute;
   inset: 0;
-  border: 2px solid #8b5cf6;
+  border: 2px solid #B3B9FA;
   border-radius: 0.5rem;
   pointer-events: none;
 }
@@ -2507,6 +2508,17 @@ body {
 
 .dark .format-toolbar-popover-surface.frosted-popover-surface {
   @apply backdrop-blur-[3px];
+  background-color: rgb(9 9 11 / 0.85);
+}
+
+/* Text color + highlight swatch submenus (format toolbar). */
+.format-toolbar-color-submenu.frosted-popover-surface {
+  @apply backdrop-blur-[4px];
+  background-color: rgb(255 255 255 / 0.8);
+}
+
+.dark .format-toolbar-color-submenu.frosted-popover-surface {
+  @apply backdrop-blur-[4px];
   background-color: rgb(9 9 11 / 0.85);
 }
 

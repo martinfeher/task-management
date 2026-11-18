@@ -44,6 +44,10 @@ export {
   type CalendarTaskModalAnchorRect,
 } from "@/lib/calendar-task-modal-position";
 
+/** Width of the modal when shrunk behind an image preview overlay. */
+const CALENDAR_TASK_MODAL_MINIMIZED_WIDTH_PX = 100;
+const CALENDAR_TASK_MODAL_MINIMIZED_MARGIN_PX = 20;
+
 export type CalendarTaskSnapshot = {
   name: string;
   completed: boolean;
@@ -127,6 +131,11 @@ export function CalendarTaskModal({
   onToggleTask,
 }: CalendarTaskModalProps) {
   const [focusNoteAtEndRequest, setFocusNoteAtEndRequest] = useState(0);
+  const [isImagePreviewOpen, setIsImagePreviewOpen] = useState(false);
+  const [imagePreviewCloseRequest, setImagePreviewCloseRequest] = useState(0);
+  const [minimizedTransform, setMinimizedTransform] = useState<string | null>(
+    null,
+  );
   const detailsSaveControllerRef = useRef<TaskDetailsSaveController | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const skipTaskContentSwitchAnimationRef = useRef(true);
@@ -453,6 +462,50 @@ export function CalendarTaskModal({
     dialogRef.current?.scrollTo({ top: 0 });
   }, [taskId]);
 
+  /** While an image preview covers the modal, shrink it to a small clickable chip bottom-right. */
+  const isMinimizedForImagePreview = isImagePreviewOpen && !isHoverPreview;
+
+  useLayoutEffect(() => {
+    if (!isMinimizedForImagePreview) {
+      setMinimizedTransform(null);
+      return;
+    }
+
+    function updateMinimizedTransform() {
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+
+      const width = dialog.offsetWidth;
+      const height = dialog.offsetHeight;
+      if (width === 0 || height === 0) return;
+
+      const scale = CALENDAR_TASK_MODAL_MINIMIZED_WIDTH_PX / width;
+      const scaledHeight = height * scale;
+      // The dialog is centered in the viewport (symmetric padding), so offsets are
+      // measured from the viewport center to the target chip center.
+      const targetCenterX =
+        window.innerWidth -
+        CALENDAR_TASK_MODAL_MINIMIZED_MARGIN_PX -
+        CALENDAR_TASK_MODAL_MINIMIZED_WIDTH_PX / 2;
+      const targetCenterY =
+        window.innerHeight -
+        CALENDAR_TASK_MODAL_MINIMIZED_MARGIN_PX -
+        scaledHeight / 2;
+      const dx = targetCenterX - window.innerWidth / 2;
+      const dy = targetCenterY - window.innerHeight / 2;
+
+      setMinimizedTransform(`translate(${dx}px, ${dy}px) scale(${scale})`);
+    }
+
+    updateMinimizedTransform();
+    window.addEventListener("resize", updateMinimizedTransform);
+    return () => window.removeEventListener("resize", updateMinimizedTransform);
+  }, [isMinimizedForImagePreview]);
+
+  const handleRestoreFromImagePreview = useCallback(() => {
+    setImagePreviewCloseRequest((current) => current + 1);
+  }, []);
+
   useLayoutEffect(() => {
     const clipConfig = sidebarBackdropClip;
     if (!clipSidebarBackdrop || !clipConfig) {
@@ -493,8 +546,12 @@ export function CalendarTaskModal({
 
   return createPortal(
     <div
-      className={`fixed inset-0 z-[10050] flex items-center justify-center ${
-        allowBackgroundInteraction || leaveSidebarInteractive
+      className={`fixed inset-0 flex items-center justify-center ${
+        isMinimizedForImagePreview ? "z-[10080]" : "z-[10050]"
+      } ${
+        allowBackgroundInteraction ||
+        leaveSidebarInteractive ||
+        isMinimizedForImagePreview
           ? "pointer-events-none"
           : ""
       }`}
@@ -511,8 +568,13 @@ export function CalendarTaskModal({
             type="button"
             aria-label="Close task editor"
             className={`calendar-task-modal-backdrop-fade-in fixed ${CALENDAR_TASK_MODAL_PINNED_BACKDROP_CLASS} ${
-              leaveSidebarInteractive ? "pointer-events-auto" : ""
+              isMinimizedForImagePreview
+                ? "pointer-events-none invisible"
+                : leaveSidebarInteractive
+                  ? "pointer-events-auto"
+                  : ""
             } ${backdropClipStyle ? "" : "inset-0"}`}
+            tabIndex={isMinimizedForImagePreview ? -1 : undefined}
             style={backdropClipStyle ?? undefined}
             onClick={() => void handleClose()}
           />
@@ -531,9 +593,11 @@ export function CalendarTaskModal({
                   ? "scale-100 opacity-100"
                   : "scale-[0.985] opacity-0"
               }`
-            : leaveSidebarInteractive
-              ? "pointer-events-auto"
-              : ""
+            : `transition-transform duration-[420ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
+                leaveSidebarInteractive || isMinimizedForImagePreview
+                  ? "pointer-events-auto"
+                  : ""
+              }`
         }`}
         style={{
           width: CALENDAR_TASK_MODAL_WIDTH_PX,
@@ -544,13 +608,27 @@ export function CalendarTaskModal({
               }
             : {
                 ["--calendar-task-modal-height" as string]: `${CALENDAR_TASK_MODAL_MIN_HEIGHT_PX}px`,
+                transform: minimizedTransform ?? "none",
+                ...(isMinimizedForImagePreview
+                  ? { boxShadow: "0 12px 36px rgba(0, 0, 0, 0.35)" }
+                  : null),
               }),
         }}
         onMouseDown={(event) => event.stopPropagation()}
         onMouseEnter={isHoverPreview ? onHoverPreviewPointerEnter : undefined}
         onMouseLeave={isHoverPreview ? onHoverPreviewPointerLeave : undefined}
       >
+        {isMinimizedForImagePreview ? (
+          <button
+            type="button"
+            aria-label="Restore task editor"
+            title="Back to task"
+            onClick={handleRestoreFromImagePreview}
+            className="absolute inset-0 z-[60] cursor-pointer rounded-[inherit] border-0 bg-transparent p-0 transition-colors hover:bg-black/5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-400/70"
+          />
+        ) : null}
         <div
+          inert={isMinimizedForImagePreview}
           className={`flex h-full min-h-0 flex-1 flex-col ${
             contentSwitchPhase === "in"
               ? "calendar-task-modal-content-transition--in"
@@ -583,6 +661,8 @@ export function CalendarTaskModal({
             modalCreateAction={modalCreateAction}
             modalTaskNavigation={modalTaskNavigation}
             hideModalFormatToggle
+            onImagePreviewOpenChange={setIsImagePreviewOpen}
+            imagePreviewCloseRequest={imagePreviewCloseRequest}
           />
         </div>
       </div>

@@ -64,7 +64,10 @@ import {
 } from "@/lib/use-media-query";
 import type { CalendarExternalDragTarget } from "@/lib/calendar-time-grid";
 import type { SidebarListDragTarget } from "@/lib/sidebar-list-drag";
-import { taskDetailsHasContent } from "@/lib/task-details-content";
+import {
+  extractTaskDetailImageSrcs,
+  taskDetailsHasContent,
+} from "@/lib/task-details-content";
 import { invalidateTaskDetailsFetchCache } from "@/lib/task-details-api";
 import {
   buildTodoPath,
@@ -177,6 +180,8 @@ export type Task = {
   completed: boolean;
   details: string;
   hasDetails: boolean;
+  /** Stored image URLs found in the task content (for list row previews). */
+  imageSrcs?: string[];
   dueDate: string | null;
   dueTimeMinutes: number | null;
   dueDurationMinutes: number | null;
@@ -306,6 +311,7 @@ function withPinnedDefaults(tasksByList: Record<string, Task[]>) {
 }
 
 const UNDO_VISIBLE_MS = 7000;
+const COMPLETION_UNDO_VISIBLE_MS = 6000;
 const CHECKBOX_COMPLETE_ANIMATION_MS = 280;
 const COMPLETION_TEXT_REMOVE_EARLY_MS = 1500;
 const COMPLETION_REMOVE_MS = Math.max(
@@ -920,6 +926,7 @@ export function TodoApp({
   );
   const [listCalendarShowingDetails, setListCalendarShowingDetails] =
     useState(false);
+  const [taskDetailsFullscreen, setTaskDetailsFullscreen] = useState(false);
   const isCompactLayout = useMediaQuery(COMPACT_LAYOUT_MEDIA_QUERY);
   const isNarrowDesktop = useMediaQuery(NARROW_DESKTOP_TASK_LIST_MEDIA_QUERY);
   const taskListDefaultWidth = useMemo(
@@ -1516,7 +1523,7 @@ export function TodoApp({
   );
 
   const scheduleUndo = useCallback(
-    (undo: PendingUndo, visibleMs: number = UNDO_VISIBLE_MS) => {
+    (undo: PendingUndo, visibleMs: number = COMPLETION_UNDO_VISIBLE_MS) => {
       clearUndoTimer();
       dismissRecurrenceUndo();
       setPendingUndo(undo);
@@ -3179,12 +3186,15 @@ export function TodoApp({
 
   const handleDetailsSaved = useCallback((taskId: string, details: string) => {
     const hasDetails = taskDetailsHasContent(details);
+    const imageSrcs = extractTaskDetailImageSrcs(details);
     setTasksByList((current) => {
       const next = { ...current };
 
       for (const listId of Object.keys(next)) {
         next[listId] = next[listId].map((task) =>
-          task.id === taskId ? { ...task, details, hasDetails } : task,
+          task.id === taskId
+            ? { ...task, details, hasDetails, imageSrcs }
+            : task,
         );
       }
 
@@ -4192,15 +4202,19 @@ export function TodoApp({
       displayedActiveView === "inbox" ||
       displayedActiveView === "important");
   const showListCalendar = isListCalendarOpen || isListCalendarPreview;
+  const showTaskDetails =
+    selectedTaskId !== null &&
+    (!showListCalendar || (isListCalendarOpen && listCalendarShowingDetails));
+  const taskDetailsFullscreenLayout =
+    taskDetailsFullscreen && !isCompactLayout && showTaskDetails;
   const showListCalendarPanel =
-    showListCalendar && !(isListCalendarOpen && listCalendarShowingDetails);
+    showListCalendar &&
+    !(isListCalendarOpen && listCalendarShowingDetails) &&
+    !taskDetailsFullscreenLayout;
   /** List-calendar dock-over-task-list (chevron + 40px gap); all views, not only month */
   const listCalendarOverlapEnabled = showListCalendarPanel && !isCompactLayout;
   const showRightPanel =
     selectedTaskId !== null || showListCalendar || useFixedWidthTaskListPanel;
-  const showTaskDetails =
-    selectedTaskId !== null &&
-    (!showListCalendar || (isListCalendarOpen && listCalendarShowingDetails));
   const compactDetailView =
     isCompactLayout && (selectedTaskId !== null || showListCalendar);
   const compactShowTaskList = !isCompactLayout || !compactDetailView;
@@ -4217,6 +4231,28 @@ export function TodoApp({
     }
     setSelectedTaskId(null);
   }, [isListCalendarOpen, listCalendarShowingDetails]);
+
+  const handleEnterTaskDetailsFullscreen = useCallback(() => {
+    setTaskDetailsFullscreen(true);
+  }, []);
+
+  const handleExitTaskDetailsFullscreen = useCallback(() => {
+    setTaskDetailsFullscreen(false);
+  }, []);
+
+  useEffect(() => {
+    if (!selectedTaskId || isCompactLayout) {
+      setTaskDetailsFullscreen(false);
+    }
+  }, [isCompactLayout, selectedTaskId]);
+
+  const taskDetailsPanelLayoutProps = !isCompactLayout
+    ? {
+        detailsFullscreen: taskDetailsFullscreenLayout,
+        onEnterDetailsFullscreen: handleEnterTaskDetailsFullscreen,
+        onExitDetailsFullscreen: handleExitTaskDetailsFullscreen,
+      }
+    : {};
 
   const selectedTaskSnapshot = useMemo(() => {
     if (!selectedTaskId) return null;
@@ -4393,6 +4429,7 @@ export function TodoApp({
   return (
     <>
       <div className="flex h-dvh overflow-hidden">
+        {!taskDetailsFullscreenLayout ? (
         <Sidebar
           lists={lists}
           labels={labels}
@@ -4450,6 +4487,7 @@ export function TodoApp({
           onDrawerClose={() => setSidebarDrawerOpen(false)}
           taskDropHighlightListId={sidebarListDropTarget?.listId ?? null}
         />
+        ) : null}
         {showingCalendarMonth ? (
           <div
             className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
@@ -4571,12 +4609,20 @@ export function TodoApp({
             }`}
           >
             {compactShowTaskList ? (
-              <div className="flex min-h-0 shrink-0">
+              <div
+                className={`flex min-h-0 shrink-0 ${
+                  taskDetailsFullscreenLayout
+                    ? "relative w-[45px] overflow-hidden"
+                    : ""
+                }`}
+              >
                 <div
                   ref={taskListPanelRef}
+                  inert={taskDetailsFullscreenLayout}
+                  aria-hidden={taskDetailsFullscreenLayout || undefined}
                   className={`flex min-h-0 shrink-0 self-stretch ${
                     isListCalendarOverlapLayout ? "relative z-0" : ""
-                  }`}
+                  }${taskDetailsFullscreenLayout ? " pointer-events-none" : ""}`}
                   onMouseEnter={commitSidebarHoverSelection}
                 >
                 <TaskListPanel
@@ -4661,8 +4707,18 @@ export function TodoApp({
                   subtasksEnabled={subtasksEnabled}
                 />
                 </div>
-                {!isCompactLayout ? (
+                {!isCompactLayout && !taskDetailsFullscreenLayout ? (
                   <PanelResizeHandle onPointerDown={handleTaskListResizeStart} />
+                ) : null}
+                {taskDetailsFullscreenLayout ? (
+                  <button
+                    type="button"
+                    aria-label="Exit full width task details"
+                    title="Click to return to the 3-panel layout"
+                    tabIndex={-1}
+                    className="absolute inset-0 z-10 cursor-pointer border-0 bg-transparent p-0"
+                    onClick={handleExitTaskDetailsFullscreen}
+                  />
                 ) : null}
               </div>
             ) : null}
@@ -4670,7 +4726,16 @@ export function TodoApp({
             <div
               className={`flex min-h-0 flex-1 flex-col ${
                 isListCalendarOverlapLayout ? "overflow-visible" : "overflow-hidden"
-              } ${isCompactLayout ? "min-w-0" : "min-w-[344px]"}`}
+              } ${
+                isCompactLayout || taskDetailsFullscreenLayout
+                  ? "min-w-0"
+                  : "min-w-[344px]"
+              }${taskDetailsFullscreenLayout ? " relative z-10" : ""}`}
+              style={
+                taskDetailsFullscreenLayout
+                  ? { boxShadow: "-4px 0 14px rgba(0, 0, 0, 0.12)" }
+                  : undefined
+              }
             >
               {showListCalendarPanel ? (
                 <ListCalendarOverlapShell
@@ -4734,7 +4799,11 @@ export function TodoApp({
                 </ListCalendarOverlapShell>
               ) : null}
               {showTaskDetails && (
-                <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                <div
+                  className={`flex min-h-0 flex-1 flex-col overflow-hidden${
+                    taskDetailsFullscreenLayout ? " min-w-0 w-full" : ""
+                  }`}
+                >
                   <TaskDetailsPanel
                     taskId={selectedTaskId}
                     taskSnapshot={selectedTaskSnapshot}
@@ -4757,6 +4826,7 @@ export function TodoApp({
                     onEditSubtask={handleEditSubtaskFromDetails}
                     onBack={isCompactLayout ? handleCompactBack : undefined}
                     noteMenu={noteDetailsMenu}
+                    {...taskDetailsPanelLayoutProps}
                   />
                 </div>
               )}
@@ -4769,6 +4839,7 @@ export function TodoApp({
               isListCalendarOverlapLayout ? "overflow-visible" : "overflow-hidden"
             }`}
           >
+            {!taskDetailsFullscreenLayout ? (
             <div
               ref={taskListPanelRef}
               className={`flex min-h-0 shrink-0 self-stretch ${
@@ -4849,6 +4920,7 @@ export function TodoApp({
                 subtasksEnabled={subtasksEnabled}
               />
             </div>
+            ) : null}
             {showListCalendarPanel ? (
               <div
                 className={`flex min-h-0 min-w-0 flex-1 flex-col ${
@@ -4921,7 +4993,11 @@ export function TodoApp({
             {showTaskDetails ? (
               <div
                 className="flex min-h-0 flex-1 flex-col overflow-hidden"
-                style={{ minWidth: TASK_LIST_PANEL_MIN_WIDTH }}
+                style={
+                  taskDetailsFullscreenLayout
+                    ? undefined
+                    : { minWidth: TASK_LIST_PANEL_MIN_WIDTH }
+                }
               >
                 <TaskDetailsPanel
                   taskId={selectedTaskId}
@@ -4945,6 +5021,7 @@ export function TodoApp({
                   onEditSubtask={handleEditSubtaskFromDetails}
                   onBack={isCompactLayout ? handleCompactBack : undefined}
                   noteMenu={noteDetailsMenu}
+                  {...taskDetailsPanelLayoutProps}
                 />
               </div>
             ) : null}

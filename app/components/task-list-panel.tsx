@@ -683,6 +683,7 @@ export function TaskListPanel({
     Record<string, boolean>
   >(() => readSubtasksExpandedByTask());
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [isKeyboardNavigating, setIsKeyboardNavigating] = useState(false);
   const [selectAllTitleEditTaskId, setSelectAllTitleEditTaskId] = useState<
     string | null
   >(null);
@@ -1743,6 +1744,7 @@ export function TaskListPanel({
 
     const nextTask = keyboardNavigableTasks[nextIndex];
 
+    setIsKeyboardNavigating(true);
     commitTitleEdit(task);
 
     const selectTaskForNavigation = isListCalendarOpen
@@ -2848,6 +2850,7 @@ export function TaskListPanel({
           )}
           isCheckAnimating={checkAnimatingTaskIds?.has(task.id) ?? false}
           selectedTaskId={selectedTaskId}
+          isKeyboardNavigating={isKeyboardNavigating}
           editingTaskId={editingTaskId}
           titleDraft={titleDraft}
           selectAllTitleOnEdit={selectAllTitleEditTaskId === task.id}
@@ -3052,7 +3055,11 @@ export function TaskListPanel({
           : undefined
       }
       onMouseEnter={onPanelMouseEnter}
-      className={`panel-text-scope relative shrink-0 dark:bg-zinc-950 border-l border-l-[#ffffff] ${
+      onMouseMove={(event) => {
+        if (event.movementX === 0 && event.movementY === 0) return;
+        setIsKeyboardNavigating(false);
+      }}
+      className={`group/tasklist panel-text-scope relative shrink-0 dark:bg-zinc-950 border-l border-l-[#ffffff] ${
         taskListBackground.className
       } ${isListHovered ? "border-l border-l-[#bbbbbb]" : ""} ${
         panelWidth != null || title

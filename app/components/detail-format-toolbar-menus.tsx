@@ -386,6 +386,7 @@ type DropdownShellProps = {
 const FORMAT_TOOLBAR_DROPDOWN_HOVER_CLOSE_MS = 120;
 const FORMAT_TOOLBAR_DROPDOWN_PORTAL_Z_CLASS = "z-[10080]";
 const FORMAT_TOOLBAR_DROPDOWN_GAP_PX = 4;
+const FORMAT_TOOLBAR_DROPDOWN_VIEWPORT_PADDING_PX = 8;
 const FORMAT_TOOLBAR_DROPDOWN_EXTRA_GAP_PX = 7;
 
 function getFormatToolbarDropdownGapPx(menuAnchorExtraGapPx: number) {
@@ -419,6 +420,7 @@ function FormatToolbarDropdownShell({
   const [menuPosition, setMenuPosition] = useState<{
     top: number;
     left: number;
+    side: FormatToolbarAnchorPlacement;
   } | null>(null);
 
   const updateMenuPosition = useCallback(() => {
@@ -429,10 +431,25 @@ function FormatToolbarDropdownShell({
     const triggerRect = trigger.getBoundingClientRect();
     const menuRect = menu.getBoundingClientRect();
     const gap = getFormatToolbarDropdownGapPx(menuAnchorExtraGapPx);
-    const top =
-      placement === "above"
-        ? triggerRect.top - gap - menuRect.height
-        : triggerRect.bottom + gap;
+    const aboveTop = triggerRect.top - gap - menuRect.height;
+    const belowTop = triggerRect.bottom + gap;
+    const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+
+    // The toolbar itself never moves when a submenu opens; instead the submenu
+    // opens on the opposite side when it would not fit on the preferred one.
+    let side: FormatToolbarAnchorPlacement = placement;
+    if (placement === "above" && aboveTop < FORMAT_TOOLBAR_DROPDOWN_VIEWPORT_PADDING_PX) {
+      side = "below";
+    } else if (
+      placement === "below" &&
+      belowTop + menuRect.height >
+        viewportHeight - FORMAT_TOOLBAR_DROPDOWN_VIEWPORT_PADDING_PX &&
+      aboveTop >= FORMAT_TOOLBAR_DROPDOWN_VIEWPORT_PADDING_PX
+    ) {
+      side = "above";
+    }
+
+    const top = side === "above" ? aboveTop : belowTop;
 
     let left: number;
     if (align === "right") {
@@ -443,7 +460,14 @@ function FormatToolbarDropdownShell({
       left = triggerRect.left;
     }
 
-    setMenuPosition({ top, left });
+    setMenuPosition((current) =>
+      current &&
+      current.top === top &&
+      current.left === left &&
+      current.side === side
+        ? current
+        : { top, left, side },
+    );
   }, [align, menuAnchorExtraGapPx, placement, resolvedMenuRef]);
 
   useLayoutEffect(() => {
@@ -522,7 +546,7 @@ function FormatToolbarDropdownShell({
                   ? "left-1/2 -translate-x-1/2 w-8"
                   : "left-0"
             } ${
-              placement === "above"
+              (menuPosition?.side ?? placement) === "above"
                 ? "bottom-full"
                 : "top-full"
             }`}
@@ -756,7 +780,7 @@ export function DetailFormatTextColorDropdown({
         tooltipLabel="Text color"
         openClassName=""
         menuRef={menuRef}
-        menuClassName={`${FORMAT_TOOLBAR_DROPDOWN_MENU_CLASS} min-w-[260px]`}
+        menuClassName={`format-toolbar-color-submenu ${FORMAT_TOOLBAR_DROPDOWN_MENU_CLASS} min-w-[260px]`}
         triggerClassName={`format-text-color-trigger flex h-8 cursor-pointer items-center gap-0.5 rounded-lg px-2 text-sm ${FORMAT_TOOLBAR_ICON_COLOR} transition-[background-color] duration-150`}
         trigger={
           <>
@@ -895,7 +919,7 @@ export function DetailFormatHighlightColorDropdown({
       tooltipId="format-toolbar-highlight-tooltip"
       tooltipLabel="Highlight color"
       openClassName=""
-      menuClassName={`${FORMAT_TOOLBAR_DROPDOWN_MENU_CLASS} min-w-[220px]`}
+      menuClassName={`format-toolbar-color-submenu ${FORMAT_TOOLBAR_DROPDOWN_MENU_CLASS} min-w-[220px]`}
       triggerClassName={`format-highlight-trigger flex h-8 cursor-pointer items-center gap-0.5 rounded-lg px-2 text-sm ${FORMAT_TOOLBAR_ICON_COLOR} transition-[background-color] duration-150`}
       trigger={
         <>

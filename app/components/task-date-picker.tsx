@@ -1633,7 +1633,7 @@ export function TaskDatePicker({
       </div>
       <div className="border-t border-zinc-200 dark:border-zinc-700">
         <div className="flex items-center justify-between px-[11px] py-[6px]">
-          <h4 className="text-sm font-semibold text-zinc-750 dark:text-zinc-50">
+          <h4 className="text-sm font-semibold text-zinc-600 dark:text-zinc-50">
             {formatMonthYear(viewMonth)}
           </h4>
           <div className="flex items-center gap-1">
@@ -1649,7 +1649,7 @@ export function TaskDatePicker({
               aria-label="Previous month"
               disabled={!canGoToPreviousMonth}
               onClick={() => shiftMonth(-1)}
-              className="flex size-7 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-zinc-100 cursor-pointer disabled:opacity-30 dark:hover:bg-zinc-800 "
+              className="flex size-7 items-center justify-center rounded-full text-zinc-500 cursor-pointer! transition-colors hover:bg-zinc-100 disabled:opacity-30 dark:hover:bg-zinc-800 "
             >
               <BiChevronLeft className="size-5" />
             </button>
@@ -1657,7 +1657,7 @@ export function TaskDatePicker({
               type="button"
               aria-label="Next month"
               onClick={() => shiftMonth(1)}
-              className="flex size-7 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              className="flex size-7 items-center justify-center rounded-full text-zinc-500 cursor-pointer! transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800"
             >
               <BiChevronRight className="size-5" />
             </button>

@@ -21,7 +21,7 @@ const RESIZE_HANDLES: ImageResizeHandle[] = [
 
 const MIN_IMAGE_WIDTH = 80;
 const MIN_IMAGE_HEIGHT = 60;
-export const DEFAULT_MAX_IMAGE_DISPLAY_WIDTH = 500;
+export const DEFAULT_IMAGE_DISPLAY_HEIGHT = 400;
 
 const CURSOR_BY_HANDLE: Record<ImageResizeHandle, string> = {
   n: "ns-resize",
@@ -342,13 +342,12 @@ export function applyInitialImageDisplaySize(image: HTMLImageElement) {
   const naturalHeight = image.naturalHeight;
 
   if (!naturalWidth || !naturalHeight) return false;
-  if (naturalWidth <= DEFAULT_MAX_IMAGE_DISPLAY_WIDTH) return false;
 
-  const scale = DEFAULT_MAX_IMAGE_DISPLAY_WIDTH / naturalWidth;
+  const scale = DEFAULT_IMAGE_DISPLAY_HEIGHT / naturalHeight;
   applyImageSize(
     image,
-    DEFAULT_MAX_IMAGE_DISPLAY_WIDTH,
-    naturalHeight * scale,
+    naturalWidth * scale,
+    DEFAULT_IMAGE_DISPLAY_HEIGHT,
   );
 
   return true;

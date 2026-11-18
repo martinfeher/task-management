@@ -22,6 +22,7 @@ import {
 } from "./task-row-context-menu";
 import { TaskLabelSelector, type Label } from "./task-label-selector";
 import { TaskLabelPills } from "./task-label-pills";
+import { TaskListImageThumbs } from "./task-list-image-thumbs";
 import { TaskPriorityMenu } from "./task-priority-menu";
 import { TaskPriorityPill } from "./task-priority-pill";
 import { TaskPriorityFlagIcon } from "./task-priority-icon";
@@ -54,6 +55,8 @@ type TaskListTaskRowProps = {
   useFastCompletionAnimation?: boolean;
   isCheckAnimating?: boolean;
   selectedTaskId: string | null;
+  /** True after arrow-key row navigation until the pointer moves. */
+  isKeyboardNavigating?: boolean;
   editingTaskId: string | null;
   titleDraft: string;
   selectAllTitleOnEdit?: boolean;
@@ -346,6 +349,7 @@ export function TaskListTaskRow({
   useFastCompletionAnimation = false,
   isCheckAnimating = false,
   selectedTaskId,
+  isKeyboardNavigating = false,
   editingTaskId,
   titleDraft,
   selectAllTitleOnEdit = false,
@@ -454,9 +458,22 @@ export function TaskListTaskRow({
   const suppressRowHoverChrome =
     editingTaskId !== null && editingTaskId !== task.id;
   const showRowHoverActions = isRowMenuOpen || isListFocusRow;
-  const rowActionsPointerClass = showRowHoverActions
-    ? "pointer-events-auto"
-    : "pointer-events-none group-hover:pointer-events-auto";
+  /** Selected row: hide action icons while the pointer is over the list panel, unless this row is hovered or has a menu open. */
+  const hideSelectedActionsOnPanelHover =
+    isSelected &&
+    !isRowMenuOpen &&
+    editingTaskId === null &&
+    !isKeyboardNavigating;
+  /** After arrow-key navigation (pointer not moved): only the active row shows actions, not the row under the pointer. */
+  const suppressPointerHoverActions =
+    isKeyboardNavigating && !showRowHoverActions;
+  const rowActionsPointerClass = suppressPointerHoverActions
+    ? "pointer-events-none"
+    : hideSelectedActionsOnPanelHover
+      ? "pointer-events-auto group-hover/tasklist:pointer-events-none group-hover:pointer-events-auto"
+      : showRowHoverActions
+        ? "pointer-events-auto"
+        : "pointer-events-none group-hover:pointer-events-auto";
 
   const basePaddingLeft = useWiderRowPadding ? 1 : 0;
   const rowOuterPaddingLeft = depth * SUBTASK_INDENT_PX;
@@ -515,7 +532,8 @@ export function TaskListTaskRow({
     !hasDueTime &&
     !task.dueDate &&
     task.labels.length === 0;
-  const showHoverLabelIcon = !isCompleting && hasLabelActions;
+  const showHoverLabelIcon =
+    !isCompleting && task.labels.length === 0 && hasLabelActions;
   const showHoverPriorityIcon =
     !isCompleting && task.priority == null && hasPriorityActions;
   const showPriorityPillInActionColumn =
@@ -532,9 +550,18 @@ export function TaskListTaskRow({
     task.labels.length > 0
       ? Math.max(20, taskRowHoverActionCount * taskRowHoverActionSlotPx)
       : 0;
-  const rowActionHoverVisibilityClass = showRowHoverActions
-    ? "opacity-100"
-    : "opacity-0 transition-opacity group-hover:opacity-100";
+  /** Real widths of the hover action slots (icon + side margins), so previews clear them. */
+  const taskRowImageMarginRightPx =
+    (showSetDateOnHover ? 23 : 0) +
+    (showHoverLabelIcon ? 31 : 0) +
+    (showPriorityActionSlot ? 31 : 0) +
+    23 +
+    4;
+  const rowActionHoverVisibilityClass = hideSelectedActionsOnPanelHover
+    ? "opacity-100 transition-opacity group-hover/tasklist:opacity-0 group-hover:opacity-100"
+    : showRowHoverActions
+      ? "opacity-100"
+      : "opacity-0 transition-opacity group-hover:opacity-100";
   const dueScheduleSubline = formatTaskListScheduleSubline(
     task.dueDate,
     dueTimeLabel,
@@ -963,10 +990,24 @@ export function TaskListTaskRow({
       <div
         className="relative ml-auto flex min-h-[19px] shrink-0 self-center items-center justify-end gap-1.5 pl-2"
       >
+        {task.imageSrcs && task.imageSrcs.length > 0 ? (
+          <TaskListImageThumbs
+            srcs={task.imageSrcs}
+            className={checkedContentDim}
+            style={{
+              transition: dimTransition,
+              // Clear the absolutely positioned hover actions (date, label,
+              // priority, ⋮) so they never sit on top of the previews.
+              marginRight:
+                task.labels.length > 0 ? undefined : taskRowImageMarginRightPx,
+            }}
+          />
+        ) : null}
+
         {task.labels.length > 0 ? (
           <span
             ref={labelPillsAnchorRef}
-            className={`relative z-10 flex min-w-0 max-w-[180px] items-center gap-1 ${checkedContentDim}`}
+            className={`relative z-10 flex min-w-0 max-w-[180px] mr-[54px]! items-center gap-1 ${checkedContentDim}`}
             style={{
               transition: dimTransition,
               marginRight: taskRowMetaMarginRightPx,

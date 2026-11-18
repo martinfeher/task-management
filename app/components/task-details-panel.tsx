@@ -13,7 +13,7 @@ import { createPortal } from "react-dom";
 import { BiLink, BiLeftArrowAlt, BiRedo, BiUndo } from "react-icons/bi";
 import { MdKeyboardArrowUp, MdOutlineKeyboardArrowDown } from "react-icons/md";
 import { LuCheck, LuCode, LuHeading1, LuHeading2, LuHeading3, LuHistory, LuPilcrow, LuRemoveFormatting, LuType, LuX } from "react-icons/lu";
-import { RxEnterFullScreen } from "react-icons/rx";
+import { RxEnterFullScreen, RxExitFullScreen } from "react-icons/rx";
 import { HiItalic, HiOutlineNumberedList } from "react-icons/hi2";
 import { VscChecklist } from "react-icons/vsc";
 import { renameTask, updateTaskDueDate, updateTaskDueTime, updateTaskRecurrence } from "@/app/actions/todo";
@@ -372,6 +372,14 @@ type TaskDetailsPanelProps = {
   onClose?: () => void;
   /** Calendar task modal: open this task in the list + details panel layout. */
   onExpandFromModal?: () => void;
+  /** Desktop side panel: hide sidebar + list and use full viewport width for the note. */
+  detailsFullscreen?: boolean;
+  onEnterDetailsFullscreen?: () => void;
+  onExitDetailsFullscreen?: () => void;
+  /** Fires when the image preview overlay opens or closes (modal layout shrinks itself while open). */
+  onImagePreviewOpenChange?: (open: boolean) => void;
+  /** Increment to close the image preview overlay from the parent. */
+  imagePreviewCloseRequest?: number;
   noteMenu?: TaskDetailsNoteMenuProps | null;
 };
 
@@ -2301,6 +2309,8 @@ function clampFormatMenuPosition(
   menuWidth: number,
   menuHeight: number,
   bounds: FormatMenuClampBounds = getDefaultFormatMenuClampBounds(),
+  /** Height of an open toolbar submenu that opens above the toolbar (0 when closed). */
+  submenuAboveHeight = 0,
 ): FormatMenuState {
   const { alignLeft, anchorBottom } = position;
   let { x, y } = position;
@@ -2313,7 +2323,7 @@ function clampFormatMenuPosition(
     x = Math.max(bounds.left + half, Math.min(x, bounds.right - half));
   }
 
-  const aboveTop = y - menuHeight;
+  const aboveTop = y - menuHeight - submenuAboveHeight;
   if (placement === "above" && aboveTop < bounds.top) {
     placement = "below";
     y =
@@ -2321,7 +2331,10 @@ function clampFormatMenuPosition(
   } else if (placement === "below" && y + menuHeight > bounds.bottom) {
     if (
       !position.preferBelow &&
-      (anchorBottom ?? y) - menuHeight - FORMAT_MENU_ABOVE_SELECTION_GAP >=
+      (anchorBottom ?? y) -
+        menuHeight -
+        submenuAboveHeight -
+        FORMAT_MENU_ABOVE_SELECTION_GAP >=
         bounds.top
     ) {
       placement = "above";
@@ -2380,6 +2393,11 @@ export function TaskDetailsPanel({
   modalTaskNavigation = null,
   onClose,
   onExpandFromModal,
+  detailsFullscreen = false,
+  onEnterDetailsFullscreen,
+  onExitDetailsFullscreen,
+  onImagePreviewOpenChange,
+  imagePreviewCloseRequest = 0,
   noteMenu = null,
 }: TaskDetailsPanelProps) {
   const isModalLayout = layout === "modal";
@@ -2398,6 +2416,27 @@ export function TaskDetailsPanel({
     items: DetailImageLightboxItem[];
     index: number;
   } | null>(null);
+  const isImageLightboxOpen = imageLightbox !== null;
+  const onImagePreviewOpenChangeRef = useRef(onImagePreviewOpenChange);
+  onImagePreviewOpenChangeRef.current = onImagePreviewOpenChange;
+  const lastImagePreviewCloseRequestRef = useRef(imagePreviewCloseRequest);
+
+  useEffect(() => {
+    onImagePreviewOpenChangeRef.current?.(isImageLightboxOpen);
+  }, [isImageLightboxOpen]);
+
+  useEffect(() => {
+    return () => onImagePreviewOpenChangeRef.current?.(false);
+  }, []);
+
+  useEffect(() => {
+    if (lastImagePreviewCloseRequestRef.current === imagePreviewCloseRequest) {
+      return;
+    }
+    lastImagePreviewCloseRequestRef.current = imagePreviewCloseRequest;
+    setImageLightbox(null);
+  }, [imagePreviewCloseRequest]);
+
   const [imageCrop, setImageCrop] = useState<{
     wrapper: HTMLElement;
     src: string;
@@ -2609,6 +2648,8 @@ export function TaskDetailsPanel({
   const formatMenuRevealTimerRef = useRef<number | null>(null);
   const formatMenuRevealFrameRef = useRef<number | null>(null);
   const formatMenuVisibleRef = useRef(false);
+  /** True while the pointer is over the floating toolbar (or its portaled submenus). */
+  const formatMenuPointerInsideRef = useRef(false);
   const lineControlsTimerRef = useRef<number | null>(null);
   const titleSyncTimerRef = useRef<number | null>(null);
   const clipboardNoticeTimerRef = useRef<number | null>(null);
@@ -3755,6 +3796,7 @@ export function TaskDetailsPanel({
   }) => {
     setFormatMenu(null);
     formatMenuVisibleRef.current = false;
+    formatMenuPointerInsideRef.current = false;
     if (options?.preserveToolbarDropdowns) {
       setOpenFormatDropdown(null);
     } else {
@@ -4496,7 +4538,7 @@ export function TaskDetailsPanel({
     selection.addRange(savedRange);
   }, []);
 
-  const updateFormatMenu = useCallback(() => {
+  const updateFormatMenu = useCallback((options?: { force?: boolean }) => {
     if (showLinkMenuRef.current) return;
 
     if (
@@ -4597,7 +4639,16 @@ export function TaskDetailsPanel({
     rememberFormatSelection(editor, range);
     setShowLinkMenu(false);
     showLinkMenuRef.current = false;
-    setFormatMenu(getFormatMenuPositionFromRange(range, editor));
+    // Hovering the toolbar (live previews, submenu open/close) mutates the
+    // selection and fires `selectionchange`; keep the toolbar anchored instead
+    // of letting it follow those transient changes.
+    const keepToolbarAnchored =
+      !options?.force &&
+      formatMenuVisibleRef.current &&
+      formatMenuPointerInsideRef.current;
+    if (!keepToolbarAnchored) {
+      setFormatMenu(getFormatMenuPositionFromRange(range, editor));
+    }
     formatMenuVisibleRef.current = true;
 
     const fontState = getDetailSelectionFontState(editor);
@@ -5923,6 +5974,8 @@ export function TaskDetailsPanel({
       ? getModalFormatMenuClampBounds(panelRef.current) ??
         getDefaultFormatMenuClampBounds()
       : getDefaultFormatMenuClampBounds();
+    // The toolbar must not move when a submenu opens on hover; the submenu
+    // picks its own side (see `FormatToolbarDropdownShell`) instead.
     const clamped = clampFormatMenuPosition(
       formatMenu,
       rect.width,
@@ -5937,18 +5990,13 @@ export function TaskDetailsPanel({
     ) {
       setFormatMenu(clamped);
     }
-  }, [
-    formatMenu,
-    isModalLayout,
-    openFormatDropdown,
-    showLinkMenu,
-  ]);
+  }, [formatMenu, isModalLayout, showLinkMenu]);
 
   useEffect(() => {
     if (!formatMenu) return;
 
     const editor = editorRef.current;
-    const reposition = () => updateFormatMenu();
+    const reposition = () => updateFormatMenu({ force: true });
 
     editor?.addEventListener("scroll", reposition, { passive: true });
     window.addEventListener("scroll", reposition, { passive: true });
@@ -8493,7 +8541,7 @@ export function TaskDetailsPanel({
       <div
         className={
           isModalLayout
-            ? "sticky top-0 z-30 shrink-0 overflow-visible bg-[#efefef] dark:bg-zinc-950"
+            ? "sticky top-0 z-30 shrink-0 overflow-visible  dark:bg-zinc-950"
             : undefined
         }
       >
@@ -8783,6 +8831,51 @@ export function TaskDetailsPanel({
             ) : null}
             {!isModalLayout ? (
               <div className="mr-1 flex shrink-0 items-center gap-0.5">
+                {detailsFullscreen && onExitDetailsFullscreen ? (
+                  <div className="group/details-collapse relative">
+                    <button
+                      type="button"
+                      aria-label="Exit full width note"
+                      aria-describedby="task-details-exit-fullscreen-tooltip"
+                      onClick={onExitDetailsFullscreen}
+                      className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-[#d0d0d0] px-1 text-[#ffffff] shadow-sm transition-[background-color,box-shadow] duration-150 ease-out hover:bg-[#bcbcbc] hover:shadow-md active:bg-[#b0b0b0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/60 focus-visible:ring-offset-2 dark:bg-[#bfbfca] dark:hover:bg-[#a8a8b5] dark:active:bg-[#9c9caa] dark:focus-visible:ring-zinc-500/50"
+                    >
+                      <RxExitFullScreen
+                        className="size-[16px]"
+                        aria-hidden="true"
+                      />
+                    </button>
+                    <span
+                      id="task-details-exit-fullscreen-tooltip"
+                      role="tooltip"
+                      className={TASK_DETAILS_TOOLTIP_CLASS}
+                    >
+                      Exit full width
+                    </span>
+                  </div>
+                ) : onEnterDetailsFullscreen ? (
+                  <div className="group/details-expand relative">
+                    <button
+                      type="button"
+                      aria-label="Open note full width"
+                      aria-describedby="task-details-enter-fullscreen-tooltip"
+                      onClick={onEnterDetailsFullscreen}
+                      className={`flex h-10 min-w-[2.25rem] cursor-pointer items-center justify-center rounded-full px-1 text-slate-400 transition-colors hover:text-zinc-600 dark:text-zinc-400 dark:hover:text-zinc-100 ${TASK_DETAILS_HEADER_ICON_HOVER_CLASS}`}
+                    >
+                      <RxEnterFullScreen
+                        className="size-[15px] text-[#b6b6b6]"
+                        aria-hidden="true"
+                      />
+                    </button>
+                    <span
+                      id="task-details-enter-fullscreen-tooltip"
+                      role="tooltip"
+                      className={TASK_DETAILS_TOOLTIP_CLASS}
+                    >
+                      Full width
+                    </span>
+                  </div>
+                ) : null}
                 <div className="group/history relative">
                   <button
                     type="button"
@@ -8926,7 +9019,7 @@ export function TaskDetailsPanel({
                           (slashCommandMenu?.lineId === lineId &&
                             slashCommandMenu.fromContextMenu)
                         }
-                        className="pointer-events-auto flex size-[19px] cursor-pointer items-center justify-center rounded rounded-lg px-[1px] py-[3px] text-zinc-350 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+                        className="pointer-events-auto flex size-[19px] mb-px cursor-pointer items-center justify-center rounded rounded-lg px-[1px] py-[3px] text-[#d5d5d7] transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
                       onMouseDown={(event) => event.preventDefault()}
                       onClick={(event) => handlePlusClick(event, lineId)}
                     >
@@ -9143,6 +9236,12 @@ export function TaskDetailsPanel({
           >
           <div
             className={FORMAT_TOOLBAR_SURFACE_CLASS}
+            onMouseEnter={() => {
+              formatMenuPointerInsideRef.current = true;
+            }}
+            onMouseLeave={() => {
+              formatMenuPointerInsideRef.current = false;
+            }}
             onMouseDownCapture={(event) => {
               if (event.button !== 0) return;
               captureFormatSelectionFromEditor();

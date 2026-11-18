@@ -850,7 +850,7 @@ export function SearchModal({
           ) : (
             <>
               <div className="flex min-h-0 min-w-0 flex-1">
-                <div className="flex min-h-0 w-[42%] shrink-0 flex-col overflow-y-auto border-r border-zinc-200 dark:border-zinc-800">
+                <div className="flex min-h-0 w-[calc(42%-20px)] shrink-0 flex-col overflow-y-auto border-r border-zinc-200 dark:border-zinc-800">
                   <ul
                     role="listbox"
                     aria-activedescendant={

@@ -191,7 +191,7 @@ export function LoginForm({ googleConfigured }: LoginFormProps) {
             </button>
             <button
               type="button"
-              className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium cursor-pointer transition-colors ${
+              className={`flex-1 rounded-[10px] px-3 py-1.5 text-sm font-medium cursor-pointer transition-colors ${
                 mode === "sign-up"
                   ? "bg-[#5274a9] text-white"
                   : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"

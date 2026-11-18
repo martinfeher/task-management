@@ -40,7 +40,7 @@ import {
   highlightSearchMatch,
 } from "@/lib/highlight-search-match";
 
-const CALENDAR_SIDEBAR_COMPLETE_UNDO_MS = 5000;
+const CALENDAR_SIDEBAR_COMPLETE_UNDO_MS = 6000;
 
 /** Month view keeps the task sidebar closed by default below this width (list calendar). */
 export const CALENDAR_MONTH_SIDEBAR_DEFAULT_MIN_VIEWPORT_PX = 1700;
