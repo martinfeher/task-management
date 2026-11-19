@@ -510,6 +510,8 @@ function sortTasks(tasks: TaskListItem[], option: SortOption) {
 const TASK_ROW_CONTEXT_MENU_WIDTH = 220;
 const TASK_ROW_CONTEXT_MENU_HEIGHT = 350;
 const ADD_TASK_METADATA_MENU_HOVER_CLOSE_MS = 120;
+/** Horizontal nudge (px, to the right) of the three-dots menu from its anchor. */
+const TASK_ROW_MENU_OFFSET_X = 18;
 
 function clampPointerContextMenuPosition(x: number, y: number) {
   if (typeof window === "undefined") {
@@ -531,7 +533,7 @@ function clampPointerContextMenuPosition(x: number, y: number) {
 function computeTaskRowMenuAnchorPosition(anchor: HTMLElement) {
   const rect = anchor.getBoundingClientRect();
   return clampPointerContextMenuPosition(
-    rect.right - TASK_ROW_CONTEXT_MENU_WIDTH,
+    rect.right - TASK_ROW_CONTEXT_MENU_WIDTH + TASK_ROW_MENU_OFFSET_X,
     rect.bottom + 4,
   );
 }
@@ -811,6 +813,9 @@ export function TaskListPanel({
   const taskRowDateMenuCloseTimerRef = useRef<number | null>(null);
   const taskRowLabelMenuCloseTimerRef = useRef<number | null>(null);
   const taskRowPriorityMenuCloseTimerRef = useRef<number | null>(null);
+  const taskRowMenuCloseTimerRef = useRef<number | null>(null);
+  /** Task whose three-dots menu was opened by hover and not yet pinned by a click. */
+  const hoverOpenedTaskRowMenuTaskIdRef = useRef<string | null>(null);
   const isAddTaskDatePickerOpenRef = useRef(false);
   const keepAddTaskOpenRef = useRef(false);
   const titleEditReadyRef = useRef(false);
@@ -1515,7 +1520,15 @@ export function TaskListPanel({
     }
   }
 
+  function clearTaskRowMenuCloseTimer() {
+    if (taskRowMenuCloseTimerRef.current !== null) {
+      window.clearTimeout(taskRowMenuCloseTimerRef.current);
+      taskRowMenuCloseTimerRef.current = null;
+    }
+  }
+
   function clearAllTaskRowMetadataMenuCloseTimers() {
+    clearTaskRowMenuCloseTimer();
     clearTaskRowDateMenuCloseTimer();
     clearTaskRowLabelMenuCloseTimer();
     clearTaskRowPriorityMenuCloseTimer();
@@ -2118,6 +2131,7 @@ export function TaskListPanel({
 
   function closeTaskMenus() {
     clearAllTaskRowMetadataMenuCloseTimers();
+    hoverOpenedTaskRowMenuTaskIdRef.current = null;
     setOpenMenuTaskId(null);
     setOpenLabelMenuTaskId(null);
     setOpenMoveMenuTaskId(null);
@@ -2158,14 +2172,26 @@ export function TaskListPanel({
     suppressRowClickRef.current = true;
 
     const currentPointerMenu = getTaskListPointerMenuSnapshot();
+    clearTaskRowMenuCloseTimer();
     if (
       currentPointerMenu?.taskId === task.id &&
       currentPointerMenu.view === "main"
     ) {
+      if (hoverOpenedTaskRowMenuTaskIdRef.current === task.id) {
+        // Menu was opened by hovering: a click pins it open instead of closing it.
+        hoverOpenedTaskRowMenuTaskIdRef.current = null;
+        const selectTaskForMenu =
+          onSelectTaskImmediate ?? onSelectTaskQuiet ?? onSelectTask;
+        if (task.id !== selectedTaskIdRef.current) {
+          selectTaskForMenu(task.id);
+        }
+        return;
+      }
       closeTaskMenus();
       return;
     }
 
+    hoverOpenedTaskRowMenuTaskIdRef.current = null;
     const position = computeTaskRowMenuAnchorPosition(anchor);
     const menuState: TaskListPointerContextMenuState = {
       taskId: task.id,
@@ -2194,6 +2220,53 @@ export function TaskListPanel({
         selectTaskForMenu(taskId);
       }
     });
+  }
+
+  /** Hovering the three-dots icon previews the row menu without selecting the task. */
+  function hoverOpenTaskRowMenu(task: TaskListItem, anchor: HTMLElement) {
+    clearTaskRowMenuCloseTimer();
+
+    const currentPointerMenu = getTaskListPointerMenuSnapshot();
+    if (currentPointerMenu?.taskId === task.id) return;
+
+    const position = computeTaskRowMenuAnchorPosition(anchor);
+
+    clearAllTaskRowMetadataMenuCloseTimers();
+    setOpenDatePickerTaskId(null);
+    setOpenMenuTaskId(null);
+    setOpenLabelMenuTaskId(null);
+    setOpenMoveMenuTaskId(null);
+    setOpenPriorityMenuTaskId(null);
+    resetLabelMenuState();
+    resetMoveMenuState();
+    initLabelMenuForTask(task.id);
+    hoverOpenedTaskRowMenuTaskIdRef.current = task.id;
+    openTaskListPointerMenu({
+      taskId: task.id,
+      task,
+      x: position.x,
+      y: position.y,
+      view: "main",
+    });
+  }
+
+  function scheduleCloseTaskRowMenu() {
+    clearTaskRowMenuCloseTimer();
+    if (hoverOpenedTaskRowMenuTaskIdRef.current === null) return;
+
+    taskRowMenuCloseTimerRef.current = window.setTimeout(() => {
+      taskRowMenuCloseTimerRef.current = null;
+      const hoverTaskId = hoverOpenedTaskRowMenuTaskIdRef.current;
+      hoverOpenedTaskRowMenuTaskIdRef.current = null;
+      if (hoverTaskId === null) return;
+      if (getTaskListPointerMenuSnapshot()?.taskId !== hoverTaskId) return;
+      closeTaskMenus();
+    }, ADD_TASK_METADATA_MENU_HOVER_CLOSE_MS);
+  }
+
+  function pinHoverOpenedTaskRowMenu() {
+    clearTaskRowMenuCloseTimer();
+    hoverOpenedTaskRowMenuTaskIdRef.current = null;
   }
 
   function openLabelMenu(taskId: string) {
@@ -2422,6 +2495,7 @@ export function TaskListPanel({
   ) {
     event.preventDefault();
     event.stopPropagation();
+    pinHoverOpenedTaskRowMenu();
 
     const position = clampPointerContextMenuPosition(
       event.clientX,
@@ -3062,6 +3136,8 @@ export function TaskListPanel({
           onSaveTaskDueTime={handleSaveTaskDueTime}
           onSaveTaskRecurrence={handleSaveTaskRecurrence}
           onOpenTaskRowMenu={openTaskRowMenuFromButton}
+          onHoverOpenTaskRowMenu={hoverOpenTaskRowMenu}
+          onScheduleCloseTaskRowMenu={scheduleCloseTaskRowMenu}
           onTogglePriorityMenu={togglePriorityMenu}
           onToggleTaskImportant={handleToggleTaskImportant}
           onOpenLabelMenu={openLabelMenu}
@@ -3125,8 +3201,14 @@ export function TaskListPanel({
   const pointerContextMenuPortal =
     pointerContextMenu && pointerMenuTask && typeof document !== "undefined"
       ? createPortal(
-          <div ref={pointerContextMenuRef}>
+          <div
+            ref={pointerContextMenuRef}
+            onMouseEnter={clearTaskRowMenuCloseTimer}
+            onMouseLeave={scheduleCloseTaskRowMenu}
+            onMouseDownCapture={pinHoverOpenedTaskRowMenu}
+          >
             <TaskRowContextMenu
+              key={pointerMenuTask.id}
               task={pointerMenuTask}
               view={pointerContextMenu.view}
               lists={moveTargetLists}
@@ -3342,7 +3424,7 @@ export function TaskListPanel({
                   </button>
 
                   {isSortMenuOpen && (
-                    <div className="absolute right-0 top-full z-50 min-w-[300px] pt-1">
+                    <div className="absolute right-0 top-full z-50 min-w-[282px] pt-1">
                       <div
                         role="menu"
                         className="task-list-sort-menu p-1.5"

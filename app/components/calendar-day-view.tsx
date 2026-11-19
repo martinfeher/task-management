@@ -642,7 +642,7 @@ export function CalendarDayView({
   const allDayRowHeightPx = getCalendarAllDayRowHeightPx(allDayStackCount);
 
   return (
-    <div className={CALENDAR_VIEW_WRAPPER_CLASS}>
+    <div className={CALENDAR_VIEW_WRAPPER_CLASS} data-calendar-grid-view="day">
       <div className={getCalendarShellClassName()}>
         <div className={CALENDAR_VIEW_SURFACE_CLASS}>
           <div
@@ -677,7 +677,7 @@ export function CalendarDayView({
             data-calendar-day={dateKey}
             onClick={handleAllDayClick}
             className={calendarAllDayCellClassName(
-              "shrink-0 cursor-pointer border-b border-zinc-200 bg-white transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900/60",
+              "shrink-0 border-b border-zinc-200 bg-white transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900/60",
             )}
             style={{ height: allDayRowHeightPx }}
           >
@@ -812,7 +812,7 @@ export function CalendarDayView({
               {hours.map((hour) => (
                 <div
                   key={hour}
-                  className="cursor-pointer border-b border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900/40"
+                  className="border-b border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900/40"
                   style={{ height: HOUR_HEIGHT_PX }}
                 />
               ))}

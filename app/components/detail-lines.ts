@@ -2221,6 +2221,8 @@ function wrapImageWithControls(image: HTMLImageElement) {
 
   prepareBlockImageWrapper(wrapper);
 
+  ensureImageResizeHandles(wrapper);
+
   if (!wrapper.querySelector(".detail-image-delete")) {
     wrapper.appendChild(createImageDeleteButton());
   }
@@ -2249,9 +2251,9 @@ function wrapImageWithControls(image: HTMLImageElement) {
       } else if (control.classList.contains("detail-image-annotate")) {
         ensureDetailImageControlTooltip(control, "annotate", "Annotate");
       }
+      // Paint above the resize overlay (resize handles use z-index 2).
+      wrapper.appendChild(control);
     });
-
-  ensureImageResizeHandles(wrapper);
 
   return wrapper;
 }
@@ -2267,9 +2269,8 @@ function prepareBlockImageWrapper(wrapper: HTMLElement) {
     wrapper.style.verticalAlign = "top";
   } else {
     wrapper.style.removeProperty("vertical-align");
+    wrapper.style.removeProperty("margin-right");
   }
-  wrapper.style.removeProperty("margin-right");
-
   if (!wrapper.style.marginBottom) {
     wrapper.style.marginBottom = "0.35rem";
   }
@@ -2285,10 +2286,10 @@ function createImageWrapper(src: string) {
   const wrapper = document.createElement("div");
   wrapper.className = "detail-image-wrapper";
   wrapper.appendChild(image);
+  ensureImageResizeHandles(wrapper);
   wrapper.appendChild(createImageDeleteButton());
   wrapper.appendChild(createImageCropButton());
   wrapper.appendChild(createImageAnnotateButton());
-  ensureImageResizeHandles(wrapper);
   prepareBlockImageWrapper(wrapper);
 
   return wrapper;
@@ -2485,11 +2486,17 @@ export function syncImageRowLayout(line: HTMLElement) {
   const wrappers = getLineImageWrappers(line);
   const isRow = wrappers.length > 1;
 
-  for (const wrapper of wrappers) {
+  for (const [index, wrapper] of wrappers.entries()) {
     if (isRow) {
       wrapper.dataset.imageRow = "true";
+      if (index < wrappers.length - 1) {
+        wrapper.style.marginRight = "0.35rem";
+      } else {
+        wrapper.style.removeProperty("margin-right");
+      }
     } else {
       delete wrapper.dataset.imageRow;
+      wrapper.style.removeProperty("margin-right");
     }
     prepareBlockImageWrapper(wrapper);
   }
@@ -3590,11 +3597,41 @@ export function syncEditorBodyPlaceholderVisibility(
       : null;
 
   const placeholderLine = hoverPlaceholderLine ?? focusedPlaceholderLine;
+  const previousPlaceholderLine = lastPlaceholderLineByEditor.get(editor) ?? null;
 
   if (placeholderLine) {
     placeholderLine.dataset.showBodyPlaceholder = "true";
+
+    if (placeholderLine !== previousPlaceholderLine) {
+      // Slide the placeholder in from the row it was previously shown on
+      // (see the `body-placeholder-slide-in` animation in globals.css).
+      let shift = 0;
+      if (
+        previousPlaceholderLine &&
+        previousPlaceholderLine.isConnected &&
+        editor.contains(previousPlaceholderLine)
+      ) {
+        const previousRect = previousPlaceholderLine.getBoundingClientRect();
+        const nextRect = placeholderLine.getBoundingClientRect();
+        shift =
+          previousRect.top +
+          previousRect.height / 2 -
+          (nextRect.top + nextRect.height / 2);
+      }
+      placeholderLine.style.setProperty(
+        "--body-placeholder-shift",
+        `${Math.round(shift)}px`,
+      );
+      previousPlaceholderLine?.style.removeProperty("--body-placeholder-shift");
+    }
+    lastPlaceholderLineByEditor.set(editor, placeholderLine);
+  } else {
+    previousPlaceholderLine?.style.removeProperty("--body-placeholder-shift");
+    lastPlaceholderLineByEditor.delete(editor);
   }
 }
+
+const lastPlaceholderLineByEditor = new WeakMap<HTMLElement, HTMLElement>();
 
 export function ensureTitleLine(editor: HTMLElement) {
   ensureBlockLines(editor);

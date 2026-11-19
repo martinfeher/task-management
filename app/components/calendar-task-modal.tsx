@@ -15,6 +15,7 @@ import {
   CALENDAR_TASK_MODAL_HOVER_BACKDROP_CLASS,
   CALENDAR_TASK_MODAL_PINNED_BACKDROP_CLASS,
 } from "@/lib/calendar-task-modal-backdrop";
+import { playCalendarTaskCloseDisperse } from "@/lib/calendar-task-close-disperse";
 import { createPortal } from "react-dom";
 import {
   TaskDetailsPanel,
@@ -285,6 +286,14 @@ export function CalendarTaskModal({
       ],
       timing,
     );
+
+    playCalendarTaskCloseDisperse({
+      source,
+      target: target.rect,
+      sourceColor: sourceBackground,
+      targetColor: target.backgroundColor,
+      shrinkDurationMs: CALENDAR_TASK_MODAL_CLOSE_TRANSITION_MS,
+    });
 
     // Real modal content fades out early so the ghost reads as the shrinking shape.
     dialog.animate(

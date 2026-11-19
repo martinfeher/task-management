@@ -1,6 +1,7 @@
 "use client";
 
 import { useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { TaskRowMenuTransition } from "./task-row-menu-transition";
 import { createPortal } from "react-dom";
 import { useIsTaskRestoredForFade } from "@/lib/task-restore-fade";
 import { InteractIcon } from "./line-control-icons";
@@ -114,6 +115,8 @@ type TaskListTaskRowProps = {
     rule: TaskRecurrenceRule | null,
   ) => void | Promise<void>;
   onOpenTaskRowMenu: (task: TaskListItem, anchor: HTMLElement) => void;
+  onHoverOpenTaskRowMenu?: (task: TaskListItem, anchor: HTMLElement) => void;
+  onScheduleCloseTaskRowMenu?: () => void;
   onTogglePriorityMenu: (taskId: string) => void;
   onToggleTaskImportant: (task: TaskListItem) => void;
   onOpenLabelMenu: (taskId: string) => void;
@@ -395,6 +398,8 @@ export function TaskListTaskRow({
   onSaveTaskDueTime,
   onSaveTaskRecurrence,
   onOpenTaskRowMenu,
+  onHoverOpenTaskRowMenu,
+  onScheduleCloseTaskRowMenu,
   onTogglePriorityMenu,
   onToggleTaskImportant,
   onOpenLabelMenu,
@@ -683,6 +688,8 @@ export function TaskListTaskRow({
     return () => {
       window.removeEventListener("resize", updateDatePickerPosition);
       window.removeEventListener("scroll", updateDatePickerPosition, true);
+      // Drop the stale position so the next open measures fresh before animating.
+      setDatePickerPosition(null);
     };
   }, [isDatePickerOpen]);
 
@@ -708,6 +715,7 @@ export function TaskListTaskRow({
     return () => {
       window.removeEventListener("resize", updateLabelMenuPosition);
       window.removeEventListener("scroll", updateLabelMenuPosition, true);
+      setLabelMenuPosition(null);
     };
   }, [isLabelMenuOpen]);
 
@@ -735,6 +743,7 @@ export function TaskListTaskRow({
     return () => {
       window.removeEventListener("resize", updatePriorityMenuPosition);
       window.removeEventListener("scroll", updatePriorityMenuPosition, true);
+      setPriorityMenuPosition(null);
     };
   }, [isPriorityMenuOpen]);
 
@@ -1143,8 +1152,9 @@ export function TaskListTaskRow({
 
           {isDatePickerOpen
             ? createPortal(
-                <div
-                  ref={taskDateMenuRef}
+                <TaskRowMenuTransition
+                  innerRef={taskDateMenuRef}
+                  active={datePickerPosition !== null}
                   data-task-date-picker-menu
                   className="fixed z-[100]"
                   style={{
@@ -1182,7 +1192,7 @@ export function TaskListTaskRow({
                       setReminderOptionId(optionId);
                     }}
                   />
-                </div>,
+                </TaskRowMenuTransition>,
                 document.body,
               )
             : null}
@@ -1303,6 +1313,10 @@ export function TaskListTaskRow({
                 if (event.button !== 0) return;
                 event.stopPropagation();
               }}
+              onMouseEnter={(event) =>
+                onHoverOpenTaskRowMenu?.(task, event.currentTarget)
+              }
+              onMouseLeave={() => onScheduleCloseTaskRowMenu?.()}
               onClick={(event) => {
                 event.stopPropagation();
                 onOpenTaskRowMenu(task, event.currentTarget);
@@ -1378,8 +1392,8 @@ export function TaskListTaskRow({
 
         {isLabelMenuOpen && labelMenuPosition
           ? createPortal(
-              <div
-                ref={taskLabelMenuRef}
+              <TaskRowMenuTransition
+                innerRef={taskLabelMenuRef}
                 className="fixed z-50"
                 style={{
                   top: labelMenuPosition.top,
@@ -1398,15 +1412,15 @@ export function TaskListTaskRow({
                   onCreateLabel={onCreateLabel}
                   onCancel={onCloseTaskMenu}
                 />
-              </div>,
+              </TaskRowMenuTransition>,
               document.body,
             )
           : null}
 
         {isPriorityMenuOpen && priorityMenuPosition
           ? createPortal(
-              <div
-                ref={taskPriorityMenuRef}
+              <TaskRowMenuTransition
+                innerRef={taskPriorityMenuRef}
                 data-task-priority-menu
                 className="fixed z-50"
                 style={{
@@ -1424,7 +1438,7 @@ export function TaskListTaskRow({
                   }
                   onClearPriority={() => onClearTaskPriority(task.id)}
                 />
-              </div>,
+              </TaskRowMenuTransition>,
               document.body,
             )
           : null}

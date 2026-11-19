@@ -13,6 +13,7 @@ import {
   type TaskContextMenuDateShortcutVariant,
 } from "./task-context-menu-date-shortcuts";
 import { TaskListSubtaskIcon } from "./task-list-subtask-icon";
+import { TaskRowMenuTransition } from "./task-row-menu-transition";
 import { TaskMoveToSelector } from "./task-move-to-selector";
 import type { Label } from "./task-label-selector";
 import { TaskLabelSelector } from "./task-label-selector";
@@ -674,7 +675,7 @@ export function TaskRowContextMenu({
 
   if (fixedPosition) {
     return (
-      <div
+      <TaskRowMenuTransition
         className="fixed z-[100]"
         style={{
           left: fixedPosition.x + fixedLeftOffset,
@@ -682,7 +683,7 @@ export function TaskRowContextMenu({
         }}
       >
         {menu}
-      </div>
+      </TaskRowMenuTransition>
     );
   }
 

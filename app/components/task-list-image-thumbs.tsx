@@ -8,7 +8,7 @@ type TaskListImageThumbsProps = {
   srcs: string[];
   className?: string;
   style?: React.CSSProperties;
-  /** Row is the active (selected / keyboard-focused) task; enlarges the previews like hover. */
+  /** Selected / keyboard-focused row: preview chrome only (no extra size). */
   active?: boolean;
 };
 

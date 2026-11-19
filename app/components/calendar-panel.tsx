@@ -963,7 +963,10 @@ export function CalendarMonthView({
   const monthGridScrollClassName = getCalendarTimedGridScrollClassName(fullWidth);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+    <div
+      className="flex min-h-0 flex-1 flex-col overflow-hidden"
+      data-calendar-grid-view="month"
+    >
       <div className={getCalendarShellClassName(fullWidth)}>
         <div className={monthGridScrollClassName}>
           <div className="relative min-h-full">
@@ -1015,7 +1018,7 @@ export function CalendarMonthView({
                       handleDaySelect(day);
                     }
                   }}
-                  className={`flex h-full min-h-0 cursor-pointer flex-col py-[5px] pl-[5px] pr-[5px] text-left ${CALENDAR_MONTH_CELL_BORDER_CLASS} ${getCalendarMonthDayColumnDividerClass(index % 7, 7)} ${
+                  className={`flex h-full min-h-0 flex-col py-[5px] pl-[5px] pr-[5px] text-left ${CALENDAR_MONTH_CELL_BORDER_CLASS} ${getCalendarMonthDayColumnDividerClass(index % 7, 7)} ${
                     isDropTarget
                       ? "bg-blue-50 dark:bg-blue-950/30 dark:ring-blue-500"
                       : isSelected

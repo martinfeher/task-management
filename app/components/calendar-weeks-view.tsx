@@ -533,7 +533,7 @@ export function CalendarMultiWeekView({
                       handleDayClick(event, day);
                     }
                   }}
-                  className={`h-full cursor-pointer border-b border-zinc-200 p-2 text-left transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900/60 ${getMultiWeekDayColumnDividerClass(dayIndex, visibleDays, isFocusedWeekDay)} ${
+                  className={`h-full border-b border-zinc-200 p-2 text-left transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900/60 ${getMultiWeekDayColumnDividerClass(dayIndex, visibleDays, isFocusedWeekDay)} ${
                     isDropTarget
                       ? "bg-blue-50 ring-1 ring-inset ring-blue-400 dark:bg-blue-950/30 dark:ring-blue-500"
                       : isFocusedDay

@@ -319,7 +319,7 @@ function withPinnedDefaults(tasksByList: Record<string, Task[]>) {
 }
 
 const UNDO_VISIBLE_MS = 7000;
-const COMPLETION_UNDO_VISIBLE_MS = 6000;
+const COMPLETION_UNDO_VISIBLE_MS = 9000;
 const CHECKBOX_COMPLETE_ANIMATION_MS = 280;
 const COMPLETION_TEXT_REMOVE_EARLY_MS = 1500;
 const COMPLETION_REMOVE_MS = Math.max(

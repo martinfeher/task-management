@@ -506,7 +506,7 @@ body {
   color: #333333;
   /* color: #2e2e2e; */
   color-scheme: light;
-  caret-color: #777777;
+  caret-color: #a7a7ba;
   cursor: text;
   scrollbar-gutter: stable;
   background-color: var(--panel-text-task-detail-textarea-background);
@@ -532,7 +532,7 @@ body {
 .dark .task-details-editor {
   color: #d4d4d8;
   color-scheme: dark;
-  caret-color: #777777;
+  caret-color: #a7a7ba;
 }
 
 .task-details-editor {
@@ -547,7 +547,7 @@ body {
     --detail-line-height,
     var(--task-editor-default-line-height, 1.7)
   );
-  caret-color: #777777;
+  caret-color: #a7a7ba;
   -webkit-user-drag: none;
 }
 
@@ -788,6 +788,35 @@ body {
   user-select: none;
   font-size: 16px;
   font-family: var(--font-app), ui-sans-serif, system-ui, sans-serif !important;
+  animation: body-placeholder-slide-in 50ms ease both;
+}
+
+/* Smoothly move the placeholder from the previous row to the new one. */
+@keyframes body-placeholder-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(calc(-50% + var(--body-placeholder-shift, 0px)));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%);
+  }
+}
+
+@keyframes body-placeholder-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .task-details-editor .detail-line::before,
+  .task-details-editor .detail-line::after {
+    animation: none !important;
+  }
 }
 
 .task-details-editor
@@ -808,6 +837,7 @@ body {
   user-select: none;
   margin-left: 0.25rem;
   font-family: var(--font-app), ui-sans-serif, system-ui, sans-serif !important;
+  animation: body-placeholder-fade-in 50ms ease both;
 }
 
 /* Hide the idle trailing placeholder while editing, but never on the line the
@@ -907,6 +937,15 @@ body {
   margin-bottom: 0.35rem;
   cursor: pointer;
   touch-action: none;
+}
+
+.detail-image-wrapper[data-image-row="true"] {
+  overflow: visible;
+}
+
+.detail-image-wrapper:hover,
+.detail-image-wrapper[data-resizing="true"] {
+  z-index: 5;
 }
 
 .detail-image-wrapper[data-dragging="true"] {
@@ -1559,6 +1598,7 @@ body {
   position: absolute;
   top: 0.5rem;
   right: 0.5rem;
+  z-index: 4;
   display: flex;
   width: calc(1.75rem - 1.5px);
   height: calc(1.75rem - 1.5px);
@@ -1567,6 +1607,15 @@ body {
   border-radius: 9999px;
   cursor: pointer;
   opacity: 0;
+}
+
+/* Side-by-side images are often narrower; tighten spacing so controls stay in-bounds. */
+.detail-image-wrapper[data-image-row="true"] .detail-image-crop {
+  right: 2.125rem;
+}
+
+.detail-image-wrapper[data-image-row="true"] .detail-image-annotate {
+  right: 3.75rem;
 }
 
 .detail-image-crop {
@@ -1876,6 +1925,20 @@ body {
 .calendar-task-timed-column-inset {
   left: var(--calendar-task-column-left-inset);
   right: var(--calendar-task-column-right-inset);
+}
+
+[data-calendar-grid-view] {
+  cursor: auto;
+}
+
+[data-calendar-grid-view] .calendar-task-item,
+[data-calendar-grid-view] .calendar-timed-task-block {
+  cursor: pointer;
+}
+
+[data-calendar-grid-view] .calendar-task-item.cursor-move,
+[data-calendar-grid-view] .calendar-task-dragging {
+  cursor: move;
 }
 
 [data-calendar-grid-view="days"],
@@ -2876,11 +2939,10 @@ body {
   );
 }
 
-/* Task list row image previews: square; 20px default (+2 vs former 18px), 22px on row hover. */
+/* Task list row image previews: square; 20px default, 22px on row hover only. */
 .task-list-image-thumbs {
   --task-list-image-thumb-size: 20px;
   --task-list-image-thumb-hover-size: 22px;
-  --task-list-image-thumb-active-size: 24px;
 }
 
 .task-list-image-thumb {
@@ -2890,17 +2952,9 @@ body {
   aspect-ratio: 1 / 1;
 }
 
-.group:hover .task-list-image-thumb,
-.task-list-image-thumb[data-active="true"] {
+.group:hover .task-list-image-thumb {
   width: var(--task-list-image-thumb-hover-size);
   height: var(--task-list-image-thumb-hover-size);
-}
-
-/* Highlighted (active) row: +2px over the hover size. Same transition as hover. */
-.task-list-image-thumbs .task-list-image-thumb[data-active="true"],
-.group:hover .task-list-image-thumbs .task-list-image-thumb[data-active="true"] {
-  width: var(--task-list-image-thumb-active-size);
-  height: var(--task-list-image-thumb-active-size);
 }
 
 /* Selected task row: hide quick actions while the pointer is elsewhere on the list,

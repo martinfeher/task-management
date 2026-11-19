@@ -844,7 +844,7 @@ export function CalendarWeekView({
                               data-calendar-day={dateKey}
                               onClick={(event) => handleAllDayClick(event, day)}
                               className={calendarAllDayCellClassName(
-                                `cursor-pointer transition-colors ${getWeekDayColumnDividerClass(dayIndex, weekDays, isSelectedWeekDay)} ${
+                                `transition-colors ${getWeekDayColumnDividerClass(dayIndex, weekDays, isSelectedWeekDay)} ${
                                   isSelectedDay
                                     ? `${SELECTED_WEEK_DAY_COLUMN_CLASS} ${SELECTED_WEEK_DAY_ROW_BORDER_CLASS}`
                                     : `${SELECTED_WEEK_DAY_ROW_BORDER_CLASS} bg-white hover:bg-zinc-50 dark:bg-zinc-950 dark:hover:bg-zinc-900/60`
@@ -1055,7 +1055,7 @@ export function CalendarWeekView({
                   {hours.map((hour) => (
                     <div
                       key={hour}
-                      className={`relative cursor-pointer border-b border-zinc-200 dark:border-zinc-800 ${
+                      className={`relative border-b border-zinc-200 dark:border-zinc-800 ${
                         isSelectedDay
                           ? "bg-transparent"
                           : "hover:bg-zinc-50 dark:hover:bg-zinc-900/40"

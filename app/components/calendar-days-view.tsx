@@ -814,7 +814,7 @@ export function CalendarMultiDayView({
                                 event.stopPropagation();
                                 goToNextRange();
                               }}
-                              className="flex shrink-0 cursor-pointer items-center justify-center self-center pr-0.5"
+                              className="flex shrink-0 cursor-pointer items-center mr-1 justify-center self-center pr-0.5"
                             >
                               <MdKeyboardArrowRight
                                 className="size-[22px] text-[#abb1be] hover:text-[#90949e]"
@@ -885,7 +885,7 @@ export function CalendarMultiDayView({
                         data-calendar-day={dateKey}
                         onClick={(event) => handleAllDayClick(event, day)}
                         className={`${calendarAllDayCellClassName(
-                          `cursor-pointer transition-colors ${getSelectedDayColumnDividerClass(dayIndex, visibleDays, isSelectedDay)} ${
+                          `transition-colors ${getSelectedDayColumnDividerClass(dayIndex, visibleDays, isSelectedDay)} ${
                             isDaySelected
                               ? `${SELECTED_DAY_COLUMN_CLASS} ${SELECTED_DAY_ROW_BORDER_CLASS}`
                               : `${SELECTED_DAY_ROW_BORDER_CLASS} bg-white hover:bg-zinc-50 dark:bg-zinc-950 dark:hover:bg-zinc-900/60`
@@ -1087,7 +1087,7 @@ export function CalendarMultiDayView({
                   {hours.map((hour) => (
                     <div
                       key={hour}
-                      className="relative cursor-pointer border-b border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900/40"
+                      className="relative border-b border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900/40"
                       style={{ height: hourHeightPx }}
                     >
                       {showQuarterHourGridLines ? (

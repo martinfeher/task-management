@@ -41,7 +41,7 @@ import {
   highlightSearchMatch,
 } from "@/lib/highlight-search-match";
 
-const CALENDAR_SIDEBAR_COMPLETE_UNDO_MS = 6000;
+const CALENDAR_SIDEBAR_COMPLETE_UNDO_MS = 9000;
 
 /** Month view keeps the task sidebar closed by default below this width (list calendar). */
 export const CALENDAR_MONTH_SIDEBAR_DEFAULT_MIN_VIEWPORT_PX = 1700;
@@ -216,9 +216,14 @@ function CalendarSidebarDayTasks({
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="min-h-0 flex-1 overflow-y-auto px-1.5 py-1">
         {taskGroups.length === 0 ? (
-          <p className="px-1 py-2 text-sm text-zinc-400 dark:text-zinc-500">
-            No tasks scheduled
-          </p>
+          <div className="px-1 py-[5px]">
+            <h4 className="pl-[3px] pr-1 pt-px pb-[1px] text-[11px] font-medium text-zinc-400 dark:text-zinc-500">
+              {formatSelectedDay(focusDate)}
+            </h4>
+            <p className="mt-1 px-1 ml-[5px] text-[13.5px] text-zinc-350 dark:text-zinc-500">
+              No tasks scheduled
+            </p>
+          </div>
         ) : (
           <div className="flex flex-col">
             {taskGroups.map((group, groupIndex) => (
@@ -227,7 +232,7 @@ function CalendarSidebarDayTasks({
                 aria-label={group.label}
                 className={groupIndex > 0 ? "mt-2 border-t border-[#f0f0f0] pt-1" : ""}
               >
-                <h4 className="sticky top-0 z-10 bg-white px-1 pt-[2px] pb-[1px] text-[11.5px] font-medium text-zinc-400 dark:bg-zinc-950 dark:text-zinc-500">
+                <h4 className="sticky top-0 mt-[4px] z-10 bg-white pl-[6px] pr-1 pt-[2px] pb-[3px] text-[11px] font-medium text-zinc-400 dark:bg-zinc-950 dark:text-zinc-500">
                   {group.label}
                 </h4>
                 <ul className="flex flex-col gap-1">  

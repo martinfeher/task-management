@@ -27,7 +27,7 @@ export function UndoButton({
       type="button"
       onClick={onUndo}
       aria-label={ariaLabel ?? `Undo ${message.toLowerCase()}`}
-      className="fixed bottom-1.5 left-2 z-[10060] flex cursor-pointer items-center gap-3 rounded-full bg-zinc-900 px-4 py-2.5 text-[13px] font-medium text-white shadow-[0_7px_17px_rgba(0,0,0,0.25)] ring-1 ring-zinc-700 transition-[background-color] hover:bg-zinc-800 dark:bg-zinc-800 dark:text-zinc-50 dark:ring-zinc-500 dark:hover:bg-zinc-700 lg:left-[var(--undo-after-sidebar-left)]"
+      className="fixed bottom-1.5 left-2 z-[10060] flex cursor-pointer items-center gap-3 rounded-full bg-[#444456]/80 px-4 py-2.5 text-[13px] font-medium text-white backdrop-blur-[4px] shadow-[0_7px_17px_rgba(0,0,0,0.25)] ring-1 ring-zinc-700 transition-[background-color] hover:bg-[#444456]/90 dark:text-zinc-50 dark:ring-zinc-500 lg:left-[var(--undo-after-sidebar-left)]"
       style={
         {
           "--undo-after-sidebar-left": `${SIDEBAR_PANEL_WIDTH_PX + UNDO_AFTER_SIDEBAR_GAP_PX + UNDO_EXTRA_OFFSET_PX}px`,
