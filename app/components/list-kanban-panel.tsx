@@ -2,6 +2,7 @@
 
 import {
   FormEvent,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -43,7 +44,11 @@ import {
   updateKanbanTaskDragGhostPosition,
 } from "./kanban-task-drag";
 import { ConfirmModal } from "./confirm-modal";
-import { TaskDatePicker, TASK_DATE_PICKER_WIDTH } from "./task-date-picker";
+import {
+  TaskDatePicker,
+  TASK_DATE_PICKER_HEIGHT,
+  TASK_DATE_PICKER_WIDTH,
+} from "./task-date-picker";
 import type { Label } from "./task-label-selector";
 import {
   CHECKED_ROW_DIM_MS,
@@ -58,7 +63,6 @@ import type { TaskLabel, TaskListItem, TodoList } from "./todo-app";
 const NOT_ASSIGNED_COLUMN_NAME = "Not assigned";
 const TASK_ROW_CONTEXT_MENU_WIDTH = 220;
 const TASK_ROW_CONTEXT_MENU_HEIGHT = 420;
-const TASK_DATE_PICKER_HEIGHT = 400;
 const KANBAN_TASK_SCHEDULE_COLOR_CLASS = "ptxt-task-datetime";
 const KANBAN_COLUMN_SURFACE_CLASS =
   "shadow-[0_1px_3px_rgba(15,23,42,0.06),0_2px_10px_rgba(15,23,42,0.08)] dark:shadow-[0_2px_6px_rgba(0,0,0,0.22),0_6px_20px_rgba(0,0,0,0.3)]";
@@ -170,10 +174,25 @@ type KanbanDatePickerState = {
   y: number;
 };
 
-export type KanbanBoardColumn = Pick<KanbanColumnRecord, "id" | "name">;
+/** Compact placeholder column that stands in for a run of empty days. */
+export type KanbanGapColumn = {
+  dayCount: number;
+  onExpand?: () => void;
+};
+
+export type KanbanBoardColumn = Pick<KanbanColumnRecord, "id" | "name"> & {
+  gap?: KanbanGapColumn;
+};
+
+/** Distance from the right edge of the board at which `onBoardNearEnd` fires. */
+const KANBAN_BOARD_NEAR_END_THRESHOLD_PX = 640;
 
 type ListKanbanPanelProps = {
   list?: TodoList;
+  /** Called (repeatedly) while the board is scrolled near, or fits within, its right edge. */
+  onBoardNearEnd?: () => void;
+  /** Scrolls the board back to the start whenever this value changes. */
+  boardScrollResetToken?: number;
   /** Replaces the default list-name header. */
   header?: ReactNode;
   lists: TodoList[];
@@ -255,6 +274,8 @@ type ColumnRenameState = {
 
 export function ListKanbanPanel({
   list,
+  onBoardNearEnd,
+  boardScrollResetToken,
   header,
   lists,
   columns,
@@ -306,6 +327,7 @@ export function ListKanbanPanel({
   const taskContextMenuRef = useRef<HTMLDivElement>(null);
   const datePickerRef = useRef<HTMLDivElement>(null);
   const dragStateRef = useRef<KanbanDragState | null>(null);
+  const boardScrollRef = useRef<HTMLDivElement>(null);
   const listColor = getListColor({ color: list?.color ?? null });
 
   const contextMenuTask = taskContextMenu
@@ -317,6 +339,26 @@ export function ListKanbanPanel({
     ? (tasks.find((item) => item.id === openDatePicker.task.id) ??
       openDatePicker.task)
     : null;
+
+  const checkBoardNearEnd = useCallback(() => {
+    const board = boardScrollRef.current;
+    if (!board || !onBoardNearEnd) return;
+
+    const remaining = board.scrollWidth - board.scrollLeft - board.clientWidth;
+    if (remaining < KANBAN_BOARD_NEAR_END_THRESHOLD_PX) {
+      onBoardNearEnd();
+    }
+  }, [onBoardNearEnd]);
+
+  // Runs after every column change so a board that is still narrower than the
+  // viewport (or whose new columns are all compact) keeps loading.
+  useEffect(() => {
+    checkBoardNearEnd();
+  }, [columns, checkBoardNearEnd]);
+
+  useEffect(() => {
+    boardScrollRef.current?.scrollTo({ left: 0 });
+  }, [boardScrollResetToken]);
 
   function resetLabelMenuState() {
     setAssignedLabelIds([]);
@@ -840,9 +882,41 @@ export function ListKanbanPanel({
       </header>
       )}
 
-      <div className={KANBAN_BOARD_SCROLL_CLASS}>
+      <div
+        ref={boardScrollRef}
+        className={KANBAN_BOARD_SCROLL_CLASS}
+        onScroll={onBoardNearEnd ? checkBoardNearEnd : undefined}
+      >
         <div className="flex h-full w-max shrink-0 items-start gap-3 px-4 py-4">
           {columns.map((column) => {
+            if (column.gap) {
+              const { dayCount, onExpand } = column.gap;
+
+              return (
+                <section
+                  key={column.id}
+                  aria-label={`${column.name}: no tasks`}
+                  className="flex h-full w-[168px] shrink-0 flex-col items-center rounded-[20px] border border-dashed border-zinc-200 bg-zinc-50/60 px-3 pt-4 text-center dark:border-zinc-700/80 dark:bg-zinc-900/40"
+                >
+                  <p className="text-sm font-semibold text-zinc-600 dark:text-zinc-300">
+                    {column.name}
+                  </p>
+                  <p className="mt-1 text-[11px] text-zinc-400 dark:text-zinc-500">
+                    {dayCount} day{dayCount === 1 ? "" : "s"} · No tasks
+                  </p>
+                  {onExpand ? (
+                    <button
+                      type="button"
+                      onClick={onExpand}
+                      className="mt-3 cursor-pointer rounded-md px-2 py-1 text-xs text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+                    >
+                      Show days
+                    </button>
+                  ) : null}
+                </section>
+              );
+            }
+
             const columnTasks = tasksByColumnId.get(column.id) ?? [];
             const isAddingTaskHere = addingTask?.columnId === column.id;
             const canRemoveColumn =

@@ -99,6 +99,15 @@ export function normalizeDueDurationMinutes(value: number | null | undefined) {
   return minutes;
 }
 
+export const MAX_REMINDER_OFFSET_MINUTES = 60 * 24 * 365;
+
+/** Minutes before the due time to notify (0 = on time); null = no reminder. */
+export function normalizeReminderOffsetMinutes(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isInteger(value)) return null;
+  if (value < 0 || value > MAX_REMINDER_OFFSET_MINUTES) return null;
+  return value;
+}
+
 export function minutesToTimeInputValue(minutes: number | null) {
   const normalized = normalizeDueTimeMinutes(minutes ?? 0) ?? 22 * 60 + 30;
   const hours = Math.floor(normalized / 60);

@@ -66,8 +66,11 @@ const FORMAT_TOOLBAR_DROPDOWN_MENU_SURFACE_CLASS = `format-toolbar-dropdown-menu
 
 export const FORMAT_TOOLBAR_DROPDOWN_MENU_CLASS = `overflow-hidden rounded-[12px] py-1 min-w-[168px] cursor-pointer ${FORMAT_TOOLBAR_DROPDOWN_MENU_SURFACE_CLASS}`;
 
-/** List, heading, and font-family menus: 8px inset on all sides. */
+/** List and heading menus: 8px inset on all sides. */
 export const FORMAT_TOOLBAR_LIST_BLOCK_MENU_CLASS = `overflow-hidden rounded-[12px] p-2 min-w-[168px] cursor-pointer ${FORMAT_TOOLBAR_DROPDOWN_MENU_SURFACE_CLASS}`;
+
+/** Font-family submenu: 14px corners + frosted blur (see globals.css). */
+export const FORMAT_TOOLBAR_FONT_FAMILY_MENU_CLASS = `format-toolbar-font-family-submenu overflow-hidden rounded-[14px] p-2 min-w-[168px] cursor-pointer ${FORMAT_TOOLBAR_DROPDOWN_MENU_SURFACE_CLASS}`;
 
 export const FORMAT_TOOLBAR_DROPDOWN_ITEM_CLASS =
   "menu-item-hover-focus flex w-full cursor-pointer items-center gap-2 px-2 py-1.5 text-left text-sm text-zinc-900 hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800";
@@ -1133,7 +1136,7 @@ export function DetailFormatFontFamilyDropdown({
       tooltipId="format-toolbar-font-family-tooltip"
       tooltipLabel="Font family"
       triggerClassName={FORMAT_TOOLBAR_FONT_FAMILY_TRIGGER_CLASS}
-      menuClassName={`${FORMAT_TOOLBAR_LIST_BLOCK_MENU_CLASS} max-h-72 overflow-y-auto`}
+      menuClassName={`${FORMAT_TOOLBAR_FONT_FAMILY_MENU_CLASS} max-h-72 overflow-y-auto`}
       menuStyle={{ minWidth: "128px" }}
       trigger={
         <>

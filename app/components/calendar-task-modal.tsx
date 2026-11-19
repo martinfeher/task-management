@@ -23,11 +23,14 @@ import {
 import type { TaskRecurrenceRule } from "@/lib/task-recurrence";
 import {
   CALENDAR_TASK_MODAL_CONTENT_SWITCH_MS,
+  CALENDAR_TASK_MODAL_CLOSE_TRANSITION_EASING,
+  CALENDAR_TASK_MODAL_CLOSE_TRANSITION_MS,
   CALENDAR_TASK_MODAL_MIN_HEIGHT_PX,
   CALENDAR_TASK_MODAL_OPEN_TRANSITION_EASING,
   CALENDAR_TASK_MODAL_OPEN_TRANSITION_MS,
   CALENDAR_TASK_MODAL_VIEWPORT_PADDING_PX,
   CALENDAR_TASK_MODAL_WIDTH_PX,
+  findCalendarTaskCloseTarget,
   peekCalendarTaskOpenOrigin,
   type CalendarTaskModalAnchorRect,
 } from "@/lib/calendar-task-modal-position";
@@ -141,6 +144,8 @@ export function CalendarTaskModal({
   );
   const detailsSaveControllerRef = useRef<TaskDetailsSaveController | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
+  const backdropRef = useRef<HTMLButtonElement>(null);
+  const [isClosing, setIsClosing] = useState(false);
   const skipTaskContentSwitchAnimationRef = useRef(true);
   const modalActions = useCalendarTaskModalActions();
   const shouldAnimateTaskContentSwitch = !isHoverPreview && !isNewTaskDraft;
@@ -195,6 +200,116 @@ export function CalendarTaskModal({
     await detailsSaveControllerRef.current?.flushSave();
     onClose();
   }, [deleteEmptyNewTaskDraft, onClose]);
+
+  // Modal -> calendar item: a ghost in the modal's color shrinks into the
+  // related calendar item while the modal and backdrop fade out. Falls back to
+  // a plain close when there is no visible item to shrink into.
+  const handleCloseAnimated = useCallback(async () => {
+    if (isClosing) return;
+
+    const dialog = dialogRef.current;
+    const container = dialog?.parentElement;
+    const canAnimate =
+      !isHoverPreview &&
+      !isNewTaskDraft &&
+      showBackdrop &&
+      !isImagePreviewOpen &&
+      dialog &&
+      container &&
+      typeof dialog.animate === "function" &&
+      !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const target = canAnimate
+      ? findCalendarTaskCloseTarget(displayedTaskId)
+      : null;
+
+    if (!canAnimate || !dialog || !container || !target) {
+      await handleClose();
+      return;
+    }
+
+    const source = dialog.getBoundingClientRect();
+    if (source.width <= 0 || source.height <= 0) {
+      await handleClose();
+      return;
+    }
+
+    setIsClosing(true);
+
+    const surface =
+      dialog.querySelector<HTMLElement>(".task-details-panel-background") ??
+      dialog;
+    const sourceBackground = window.getComputedStyle(surface).backgroundColor;
+    const sourceRadius = window.getComputedStyle(dialog).borderTopLeftRadius;
+
+    const ghost = document.createElement("div");
+    ghost.setAttribute("aria-hidden", "true");
+    Object.assign(ghost.style, {
+      position: "fixed",
+      zIndex: "5",
+      pointerEvents: "none",
+      left: `${source.left}px`,
+      top: `${source.top}px`,
+      width: `${source.width}px`,
+      height: `${source.height}px`,
+      backgroundColor: sourceBackground,
+      borderRadius: sourceRadius,
+    });
+    container.insertBefore(ghost, dialog);
+
+    const timing = {
+      duration: CALENDAR_TASK_MODAL_CLOSE_TRANSITION_MS,
+      easing: CALENDAR_TASK_MODAL_CLOSE_TRANSITION_EASING,
+      fill: "forwards" as const,
+    };
+
+    const ghostAnimation = ghost.animate(
+      [
+        {
+          left: `${source.left}px`,
+          top: `${source.top}px`,
+          width: `${source.width}px`,
+          height: `${source.height}px`,
+          backgroundColor: sourceBackground,
+          borderRadius: sourceRadius,
+          boxShadow: "0 10px 23px rgba(0, 0, 0, 0.09)",
+        },
+        {
+          left: `${target.rect.left}px`,
+          top: `${target.rect.top}px`,
+          width: `${target.rect.width}px`,
+          height: `${target.rect.height}px`,
+          backgroundColor: target.backgroundColor,
+          borderRadius: target.borderRadius,
+          boxShadow: "0 0 0 rgba(0, 0, 0, 0)",
+        },
+      ],
+      timing,
+    );
+
+    // Real modal content fades out early so the ghost reads as the shrinking shape.
+    dialog.animate(
+      [{ opacity: 1 }, { opacity: 0, offset: 0.6 }, { opacity: 0 }],
+      { ...timing, easing: "linear" },
+    );
+    backdropRef.current?.animate([{ opacity: 1 }, { opacity: 0 }], {
+      ...timing,
+      easing: "ease-out",
+    });
+
+    const animationFinished = ghostAnimation.finished.catch(() => undefined);
+    const saved = detailsSaveControllerRef.current?.flushSave();
+    await Promise.all([animationFinished, saved]);
+    onClose();
+  }, [
+    displayedTaskId,
+    handleClose,
+    isClosing,
+    isHoverPreview,
+    isImagePreviewOpen,
+    isNewTaskDraft,
+    onClose,
+    showBackdrop,
+  ]);
 
   const handleMarkTaskComplete = useCallback(
     async (toggleTaskId: string) => {
@@ -434,7 +549,7 @@ export function CalendarTaskModal({
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key !== "Escape" || event.defaultPrevented) return;
-      void handleClose();
+      void handleCloseAnimated();
     }
 
     document.addEventListener("keydown", handleKeyDown);
@@ -443,7 +558,7 @@ export function CalendarTaskModal({
       document.body.style.overflow = previousOverflow;
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [handleClose, isHoverPreview, showBackdrop]);
+  }, [handleCloseAnimated, isHoverPreview, showBackdrop]);
 
   const clipSidebarBackdrop =
     showBackdrop &&
@@ -637,7 +752,8 @@ export function CalendarTaskModal({
       } ${
         allowBackgroundInteraction ||
         leaveSidebarInteractive ||
-        isMinimizedForImagePreview
+        isMinimizedForImagePreview ||
+        isClosing
           ? "pointer-events-none"
           : ""
       }`}
@@ -651,6 +767,7 @@ export function CalendarTaskModal({
           />
         ) : (
           <button
+            ref={backdropRef}
             type="button"
             aria-label="Close task editor"
             className={`calendar-task-modal-backdrop-fade-in fixed ${CALENDAR_TASK_MODAL_PINNED_BACKDROP_CLASS} ${
@@ -662,7 +779,7 @@ export function CalendarTaskModal({
             } ${backdropClipStyle ? "" : "inset-0"}`}
             tabIndex={isMinimizedForImagePreview ? -1 : undefined}
             style={backdropClipStyle ?? undefined}
-            onClick={() => void handleClose()}
+            onClick={() => void handleCloseAnimated()}
           />
         )
       ) : null}
@@ -737,7 +854,7 @@ export function CalendarTaskModal({
             onMarkTaskComplete={
               onToggleTask ? handleMarkTaskComplete : undefined
             }
-            onClose={() => void handleClose()}
+            onClose={() => void handleCloseAnimated()}
             onExpandFromModal={
               onExpandToTaskPanel && !isNewTaskDraft && !isHoverPreview
                 ? handleExpandToTaskPanel

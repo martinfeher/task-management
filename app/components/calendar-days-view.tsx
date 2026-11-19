@@ -104,7 +104,7 @@ import {
   useCalendarTaskDragPreview,
 } from "./calendar-task-hover-preview";
 import { useCalendarTaskColorMenuCaptureHandler } from "./calendar-task-color-menu";
-import { MdKeyboardArrowLeft } from "react-icons/md";
+import { MdKeyboardArrowLeft, MdKeyboardArrowRight } from "react-icons/md";
 import {
   buildCalendarNowLineDimmedColumns,
   getCalendarTimedBlockBounds,
@@ -773,26 +773,32 @@ export function CalendarMultiDayView({
                       </>
                     );
 
-                    if (dayIndex === 0) {
+                    const isFirstDayColumn = dayIndex === 0;
+                    const isLastDayColumn =
+                      dayIndex === visibleDays.length - 1;
+
+                    if (isFirstDayColumn || isLastDayColumn) {
                       return (
                         <div
                           key={`head-${toDateKey(day)}`}
                           className={`flex items-center ${headerCellClassName}`}
                         >
-                          <button
-                            type="button"
-                            aria-label="Previous day"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              goToPreviousRange();
-                            }}
-                            className="flex shrink-0 cursor-pointer items-center justify-center self-center pl-0.5"
-                          >
-                            <MdKeyboardArrowLeft
-                              className="size-[22px] text-[#abb1be] hover:text-[#90949e]"
-                              aria-hidden="true"
-                            />
-                          </button>
+                          {isFirstDayColumn ? (
+                            <button
+                              type="button"
+                              aria-label="Previous day"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                goToPreviousRange();
+                              }}
+                              className="flex shrink-0 cursor-pointer items-center justify-center self-center pl-0.5"
+                            >
+                              <MdKeyboardArrowLeft
+                                className="size-[22px] text-[#abb1be] hover:text-[#90949e]"
+                                aria-hidden="true"
+                              />
+                            </button>
+                          ) : null}
                           <button
                             type="button"
                             onClick={() => handleDaySelect(day)}
@@ -800,6 +806,22 @@ export function CalendarMultiDayView({
                           >
                             {dayHeaderLabel}
                           </button>
+                          {isLastDayColumn ? (
+                            <button
+                              type="button"
+                              aria-label="Next day"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                goToNextRange();
+                              }}
+                              className="flex shrink-0 cursor-pointer items-center justify-center self-center pr-0.5"
+                            >
+                              <MdKeyboardArrowRight
+                                className="size-[22px] text-[#abb1be] hover:text-[#90949e]"
+                                aria-hidden="true"
+                              />
+                            </button>
+                          ) : null}
                         </div>
                       );
                     }

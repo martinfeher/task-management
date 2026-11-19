@@ -1305,32 +1305,39 @@ body {
 }
 
 .group:hover > .app-hover-tooltip,
-[class*="group/"]:hover > .app-hover-tooltip {
+[class*="group/"]:not(.group\/tasklist):hover > .app-hover-tooltip,
+[class*="group/"]:not(.group\/tasklist):hover .app-hover-tooltip {
   opacity: 1;
 }
 
 .group:hover > .app-hover-tooltip-above-center,
-[class*="group/"]:hover > .app-hover-tooltip-above-center {
+[class*="group/"]:not(.group\/tasklist):hover
+  > .app-hover-tooltip-above-center,
+[class*="group/"]:not(.group\/tasklist):hover
+  .app-hover-tooltip-above-center {
   transform: translate(-50%, 0) scale(1);
 }
 
 .group:hover > .app-hover-tooltip-above-start,
-[class*="group/"]:hover > .app-hover-tooltip-above-start {
+[class*="group/"]:not(.group\/tasklist):hover
+  > .app-hover-tooltip-above-start {
   transform: translateY(0) scale(1);
 }
 
 .group:hover > .app-hover-tooltip-above-end,
-[class*="group/"]:hover > .app-hover-tooltip-above-end {
+[class*="group/"]:not(.group\/tasklist):hover > .app-hover-tooltip-above-end {
   transform: translateY(0) scale(1);
 }
 
 .group:hover > .app-hover-tooltip-below-center,
-[class*="group/"]:hover > .app-hover-tooltip-below-center {
+[class*="group/"]:not(.group\/tasklist):hover
+  > .app-hover-tooltip-below-center {
   transform: translate(-50%, 0) scale(1);
 }
 
 .group:hover > .app-hover-tooltip-below-start,
-[class*="group/"]:hover > .app-hover-tooltip-below-start {
+[class*="group/"]:not(.group\/tasklist):hover
+  > .app-hover-tooltip-below-start {
   transform: translateY(0) scale(1);
 }
 
@@ -1471,24 +1478,29 @@ body {
   }
 
   .group:hover > .app-hover-tooltip-above-center,
-  [class*="group/"]:hover > .app-hover-tooltip-above-center,
+  [class*="group/"]:not(.group\/tasklist):hover
+    > .app-hover-tooltip-above-center,
   .group:hover > .app-hover-tooltip-below-center,
-  [class*="group/"]:hover > .app-hover-tooltip-below-center,
+  [class*="group/"]:not(.group\/tasklist):hover
+    > .app-hover-tooltip-below-center,
   .app-hover-tooltip--shown.app-hover-tooltip-above-center,
   .app-hover-tooltip--shown.app-hover-tooltip-below-center {
     transform: translateX(-50%);
   }
 
   .group:hover > .app-hover-tooltip-below-start,
-  [class*="group/"]:hover > .app-hover-tooltip-below-start,
+  [class*="group/"]:not(.group\/tasklist):hover
+    > .app-hover-tooltip-below-start,
   .app-hover-tooltip--shown.app-hover-tooltip-below-start {
     transform: none;
   }
 
   .group:hover > .app-hover-tooltip-above-start,
-  [class*="group/"]:hover > .app-hover-tooltip-above-start,
+  [class*="group/"]:not(.group\/tasklist):hover
+    > .app-hover-tooltip-above-start,
   .group:hover > .app-hover-tooltip-above-end,
-  [class*="group/"]:hover > .app-hover-tooltip-above-end,
+  [class*="group/"]:not(.group\/tasklist):hover
+    > .app-hover-tooltip-above-end,
   .app-hover-tooltip--shown.app-hover-tooltip-above-start,
   .app-hover-tooltip--shown.app-hover-tooltip-above-end {
     transform: none;
@@ -1548,8 +1560,8 @@ body {
   top: 0.5rem;
   right: 0.5rem;
   display: flex;
-  width: 1.75rem;
-  height: 1.75rem;
+  width: calc(1.75rem - 1.5px);
+  height: calc(1.75rem - 1.5px);
   align-items: center;
   justify-content: center;
   border-radius: 9999px;
@@ -2548,13 +2560,15 @@ body {
 
 /* Selection formatting bar (task details + calendar task modal). */
 .format-toolbar-popover-surface.frosted-popover-surface {
-  @apply backdrop-blur-[3px];
-  background-color: rgb(255 255 255 / 0.8);
+  @apply backdrop-blur-[5px];
+  background-color: rgb(255 255 255 / 0.87);
+  border: 1px solid #dedeca;
 }
 
 .dark .format-toolbar-popover-surface.frosted-popover-surface {
-  @apply backdrop-blur-[3px];
-  background-color: rgb(9 9 11 / 0.85);
+  @apply backdrop-blur-[5px];
+  background-color: rgb(9 9 11 / 0.87);
+  border-color: #dedeca;
 }
 
 /* Text color + highlight swatch submenus (format toolbar). */
@@ -2564,6 +2578,17 @@ body {
 }
 
 .dark .format-toolbar-color-submenu.frosted-popover-surface {
+  @apply backdrop-blur-[4px];
+  background-color: rgb(9 9 11 / 0.85);
+}
+
+/* Font-family submenu (format toolbar + task detail format controls). */
+.format-toolbar-font-family-submenu.frosted-popover-surface {
+  @apply backdrop-blur-[4px];
+  background-color: rgb(255 255 255 / 0.8);
+}
+
+.dark .format-toolbar-font-family-submenu.frosted-popover-surface {
   @apply backdrop-blur-[4px];
   background-color: rgb(9 9 11 / 0.85);
 }
@@ -2649,6 +2674,7 @@ body {
 .task-item-date-picker-popover {
   border-radius: 16px;
   background-color: rgb(255 255 255 / 0.89);
+  @apply backdrop-blur-[5px];
   box-shadow:
     0 10px 23px rgba(0, 0, 0, 0.09),
     0 0 0 1px rgb(228 228 231 / 0.8);
@@ -2854,6 +2880,7 @@ body {
 .task-list-image-thumbs {
   --task-list-image-thumb-size: 20px;
   --task-list-image-thumb-hover-size: 22px;
+  --task-list-image-thumb-active-size: 24px;
 }
 
 .task-list-image-thumb {
@@ -2867,6 +2894,20 @@ body {
 .task-list-image-thumb[data-active="true"] {
   width: var(--task-list-image-thumb-hover-size);
   height: var(--task-list-image-thumb-hover-size);
+}
+
+/* Highlighted (active) row: +2px over the hover size. Same transition as hover. */
+.task-list-image-thumbs .task-list-image-thumb[data-active="true"],
+.group:hover .task-list-image-thumbs .task-list-image-thumb[data-active="true"] {
+  width: var(--task-list-image-thumb-active-size);
+  height: var(--task-list-image-thumb-active-size);
+}
+
+/* Selected task row: hide quick actions while the pointer is elsewhere on the list,
+   but keep them visible (same as hover) when the pointer is on that row. */
+.group\/tasklist:hover .group:not(:hover) .task-row-selected-quick-actions {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .task-list-checkbox {

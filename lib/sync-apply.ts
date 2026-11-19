@@ -15,6 +15,7 @@ import {
   updateTaskDueDate,
   updateTaskDueTime,
   updateTaskPriority,
+  updateTaskReminder,
 } from "@/app/actions/todo";
 import { Prisma } from "@/app/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -24,7 +25,10 @@ import {
   type TaskClockField,
 } from "@/lib/task-field-clock";
 import { extractTaskDetailImageSrcs } from "@/lib/task-details-content";
-import { normalizeDueTimeZone } from "@/lib/task-due-time";
+import {
+  MAX_REMINDER_OFFSET_MINUTES,
+  normalizeDueTimeZone,
+} from "@/lib/task-due-time";
 import { getPriorityFromTaskTags, LABEL_CATEGORY } from "@/lib/task-tags";
 import {
   persistTaskDetailsUpdate,
@@ -55,6 +59,7 @@ export type SyncTaskPayload = {
   dueTimeMinutes: number | null;
   dueDurationMinutes: number | null;
   dueTimeZone: string;
+  reminderOffsetMinutes: number | null;
   calendarColor: string | null;
   pinned: boolean;
   important: boolean;
@@ -94,6 +99,7 @@ const syncTaskSelect = {
   dueTimeMinutes: true,
   dueDurationMinutes: true,
   dueTimeZone: true,
+  reminderOffsetMinutes: true,
   calendarColor: true,
   pinned: true,
   important: true,
@@ -125,6 +131,7 @@ function toSyncTask(task: SyncTaskRecord): SyncTaskPayload {
     dueTimeMinutes: task.dueTimeMinutes,
     dueDurationMinutes: task.dueDurationMinutes,
     dueTimeZone: normalizeDueTimeZone(task.dueTimeZone),
+    reminderOffsetMinutes: task.reminderOffsetMinutes,
     calendarColor: task.calendarColor,
     pinned: task.pinned,
     important: task.important,
@@ -187,6 +194,7 @@ const FIELD_ORDER: TaskClockField[] = [
   "dueDate",
   "dueTimeMinutes",
   "dueDurationMinutes",
+  "reminderOffsetMinutes",
   "labelIds",
 ];
 
@@ -303,6 +311,12 @@ async function applyTaskFields(
       case "dueDurationMinutes":
         // Applied together below.
         break;
+      case "reminderOffsetMinutes": {
+        if (!isMinutesValue(value, 0, MAX_REMINDER_OFFSET_MINUTES)) break;
+        await updateTaskReminder(taskId, value as number | null);
+        markApplied(field, at);
+        break;
+      }
       case "labelIds": {
         if (!Array.isArray(value)) break;
         const requested = value.filter((id): id is string => typeof id === "string");

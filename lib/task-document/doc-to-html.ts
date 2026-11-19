@@ -116,13 +116,13 @@ function renderBlock(block: BlockNode): string {
       return renderLine(escaped || "<br>", "code");
     }
     case "image": {
-      const { src, alt, width, height } = block.attrs;
+      const { src, alt, width, height, originalSrc } = block.attrs;
       const styleParts = ["display: block;", "clear: both;", "margin-bottom: 0.35rem;"];
       const imgStyleParts: string[] = [];
       if (width) imgStyleParts.push(`width: ${width}px;`);
       if (height) imgStyleParts.push(`height: ${height}px;`);
       imgStyleParts.push("max-width: 100%;");
-      const img = `<img src="${escapeAttr(src)}" alt="${escapeAttr(alt ?? "Embedded image")}" class="detail-image" draggable="false" style="${imgStyleParts.join(" ")}">`;
+      const img = `<img src="${escapeAttr(src)}" alt="${escapeAttr(alt ?? "Embedded image")}" class="detail-image" draggable="false"${originalSrc ? ` data-original-src="${escapeAttr(originalSrc)}"` : ""} style="${imgStyleParts.join(" ")}">`;
       const wrapper = `<div class="detail-image-wrapper" contenteditable="false" style="${styleParts.join(" ")}">${img}</div>`;
       return renderLine(wrapper, undefined, " data-empty=\"true\"");
     }

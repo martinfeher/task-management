@@ -2132,16 +2132,56 @@ function escapeHtml(text: string) {
     .replace(/>/g, "&gt;");
 }
 
+const DETAIL_IMAGE_CONTROL_TOOLTIP_CLASS =
+  "add-task-date-tooltip app-hover-tooltip app-hover-tooltip-above-center pointer-events-none absolute bottom-[calc(100%+8px)] z-[60] whitespace-nowrap px-3 py-1.5 text-[11px] font-medium";
+
+let detailImageControlTooltipId = 0;
+
+function nextDetailImageControlTooltipId(kind: string) {
+  detailImageControlTooltipId += 1;
+  return `detail-image-${kind}-tooltip-${detailImageControlTooltipId}`;
+}
+
+function appendDetailImageControlTooltip(
+  button: HTMLButtonElement,
+  kind: string,
+  label: string,
+) {
+  button.classList.add("group", "detail-image-control");
+  button.removeAttribute("title");
+
+  const tooltipId = nextDetailImageControlTooltipId(kind);
+  button.setAttribute("aria-describedby", tooltipId);
+
+  const tooltip = document.createElement("span");
+  tooltip.id = tooltipId;
+  tooltip.setAttribute("role", "tooltip");
+  tooltip.className = DETAIL_IMAGE_CONTROL_TOOLTIP_CLASS;
+  tooltip.textContent = label;
+  button.appendChild(tooltip);
+}
+
+function ensureDetailImageControlTooltip(
+  button: HTMLButtonElement,
+  kind: string,
+  label: string,
+) {
+  if (button.querySelector('[role="tooltip"]')) {
+    return;
+  }
+  appendDetailImageControlTooltip(button, kind, label);
+}
+
 function createImageDeleteButton() {
   const button = document.createElement("button");
   button.type = "button";
   button.className =
     "detail-image-delete task-detail-image-control-surface";
   button.setAttribute("aria-label", "Delete image");
-  button.setAttribute("title", "Delete image");
   button.contentEditable = "false";
   button.innerHTML =
     '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M4 4l8 8M12 4 4 12" stroke-linecap="round" /></svg>';
+  appendDetailImageControlTooltip(button, "delete", "Delete");
   return button;
 }
 
@@ -2150,10 +2190,10 @@ function createImageCropButton() {
   button.type = "button";
   button.className = "detail-image-crop task-detail-image-control-surface";
   button.setAttribute("aria-label", "Crop image");
-  button.setAttribute("title", "Crop image");
   button.contentEditable = "false";
   button.innerHTML =
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2v14a2 2 0 0 0 2 2h14" /><path d="M18 22V8a2 2 0 0 0-2-2H2" /></svg>';
+  appendDetailImageControlTooltip(button, "crop", "Crop");
   return button;
 }
 
@@ -2162,10 +2202,10 @@ function createImageAnnotateButton() {
   button.type = "button";
   button.className = "detail-image-annotate task-detail-image-control-surface";
   button.setAttribute("aria-label", "Add text to image");
-  button.setAttribute("title", "Add text to image");
   button.contentEditable = "false";
   button.innerHTML =
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 7 4 4 20 4 20 7" /><line x1="9" x2="15" y1="20" y2="20" /><line x1="12" x2="12" y1="4" y2="20" /></svg>';
+  appendDetailImageControlTooltip(button, "annotate", "Annotate");
   return button;
 }
 
@@ -2199,6 +2239,16 @@ function wrapImageWithControls(image: HTMLImageElement) {
     )
     .forEach((control) => {
       control.classList.add("task-detail-image-control-surface");
+      if (!(control instanceof HTMLButtonElement)) {
+        return;
+      }
+      if (control.classList.contains("detail-image-delete")) {
+        ensureDetailImageControlTooltip(control, "delete", "Delete");
+      } else if (control.classList.contains("detail-image-crop")) {
+        ensureDetailImageControlTooltip(control, "crop", "Crop");
+      } else if (control.classList.contains("detail-image-annotate")) {
+        ensureDetailImageControlTooltip(control, "annotate", "Annotate");
+      }
     });
 
   ensureImageResizeHandles(wrapper);

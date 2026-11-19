@@ -174,8 +174,17 @@ function validateBlockNode(value: unknown): BlockNode {
       const attrs = node.attrs as Record<string, unknown> | undefined;
       const src = typeof attrs?.src === "string" ? attrs.src : "";
       if (!src || !isSafeHref(src)) fail(`Unsafe image src: ${src}`);
-      const out: { src: string; alt?: string; width?: number; height?: number } = { src };
+      const out: {
+        src: string;
+        alt?: string;
+        width?: number;
+        height?: number;
+        originalSrc?: string;
+      } = { src };
       if (typeof attrs?.alt === "string") out.alt = attrs.alt;
+      if (typeof attrs?.originalSrc === "string" && isSafeHref(attrs.originalSrc)) {
+        out.originalSrc = attrs.originalSrc;
+      }
       if (typeof attrs?.width === "number") out.width = attrs.width;
       if (typeof attrs?.height === "number") out.height = attrs.height;
       return { type: "image", attrs: out };

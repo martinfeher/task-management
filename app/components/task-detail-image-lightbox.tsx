@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ComponentProps,
+  type ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
 import {
   LuChevronLeft,
@@ -28,8 +34,49 @@ type TaskDetailImageLightboxProps = {
 /** Above calendar task modal (`z-[10050]`) and detail date menus (`z-[10060]`). */
 const TASK_DETAIL_IMAGE_LIGHTBOX_Z_CLASS = "z-[10070]";
 
+/** Delay after the preview image loads before the top-right controls fade in. */
+const CONTROLS_REVEAL_DELAY_MS = 250;
+
+/** Max rendered height for the preview image (94% of the viewport). */
+const LIGHTBOX_IMAGE_MAX_HEIGHT_CLASS = "max-h-[94vh]";
+
 const LIGHTBOX_CONTROL_BUTTON_CLASS =
-  "task-detail-image-control-surface flex size-7 cursor-pointer items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:cursor-not-allowed disabled:opacity-35";
+  "task-detail-image-control-surface flex size-[calc(1.75rem-1.5px)] cursor-pointer items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:cursor-not-allowed disabled:opacity-35";
+
+const LIGHTBOX_IMAGE_CONTROL_TOOLTIP_CLASS =
+  "add-task-date-tooltip app-hover-tooltip app-hover-tooltip-above-center pointer-events-none absolute bottom-[calc(100%+8px)] z-[10080] whitespace-nowrap px-3 py-1.5 text-[11px] font-medium";
+
+type LightboxImageControlButtonProps = {
+  label: string;
+  tooltipId: string;
+  children: ReactNode;
+} & Omit<ComponentProps<"button">, "children">;
+
+function LightboxImageControlButton({
+  label,
+  tooltipId,
+  children,
+  className,
+  ...buttonProps
+}: LightboxImageControlButtonProps) {
+  return (
+    <div className="group/lightbox-control relative">
+      <button
+        type="button"
+        aria-describedby={tooltipId}
+        className={[LIGHTBOX_CONTROL_BUTTON_CLASS, className]
+          .filter(Boolean)
+          .join(" ")}
+        {...buttonProps}
+      >
+        {children}
+      </button>
+      <span id={tooltipId} role="tooltip" className={LIGHTBOX_IMAGE_CONTROL_TOOLTIP_CLASS}>
+        {label}
+      </span>
+    </div>
+  );
+}
 
 const LIGHTBOX_GALLERY_NAV_BUTTON_CLASS =
   "flex size-11 cursor-pointer items-center justify-center rounded-full border-0 bg-zinc-900/65 text-white shadow-[0_8px_24px_rgba(0,0,0,0.1)] transition-colors hover:bg-zinc-900/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:cursor-not-allowed disabled:opacity-30";
@@ -48,6 +95,30 @@ export function TaskDetailImageLightbox({
   onNext,
   taskTitle,
 }: TaskDetailImageLightboxProps) {
+  const imageRef = useRef<HTMLImageElement>(null);
+  const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
+  const [revealedSrc, setRevealedSrc] = useState<string | null>(null);
+  const controlsVisible = revealedSrc === src;
+
+  // Image may already be cached/complete before React attaches onLoad.
+  useEffect(() => {
+    const image = imageRef.current;
+    if (image?.complete && image.naturalWidth > 0) {
+      setLoadedSrc(src);
+    }
+  }, [src]);
+
+  // Reveal the controls a beat after the image has loaded.
+  useEffect(() => {
+    if (loadedSrc !== src) return;
+
+    const timer = window.setTimeout(() => {
+      setRevealedSrc(src);
+    }, CONTROLS_REVEAL_DELAY_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [loadedSrc, src]);
+
   const showGalleryNav = imageCount > 1;
   const galleryTitleTrimmed = taskTitle?.trim() ?? "";
   const galleryTitle =
@@ -131,7 +202,7 @@ export function TaskDetailImageLightbox({
         }}
       >
         <div
-          className="task-detail-image-lightbox-frame relative flex w-fit max-h-[92vh] max-w-[92vw] -translate-y-[20px] items-center justify-center overflow-visible"
+          className={`task-detail-image-lightbox-frame relative flex w-fit max-w-[92vw] items-center justify-center overflow-visible ${LIGHTBOX_IMAGE_MAX_HEIGHT_CLASS}`}
           onMouseDown={(event) => event.stopPropagation()}
         >
         {showGalleryNav ? (
@@ -149,53 +220,57 @@ export function TaskDetailImageLightbox({
             <LuChevronLeft className="size-6" />
           </button>
         ) : null}
-        <div className="absolute inset-x-3 top-3 z-10 flex items-center justify-end gap-2">
+        <div
+          className={`absolute top-[6px] right-[6px] z-10 flex items-center justify-end gap-2 transition-opacity duration-300 ease-out ${
+            controlsVisible ? "opacity-100" : "pointer-events-none opacity-0"
+          }`}
+          aria-hidden={controlsVisible ? undefined : true}
+        >
           {onAnnotate ? (
-            <button
-              type="button"
+            <LightboxImageControlButton
+              tooltipId="task-detail-image-lightbox-annotate-tooltip"
+              label="Annotate"
               aria-label="Add text to image"
-              title="Add text to image"
               onClick={(event) => {
                 event.stopPropagation();
                 onAnnotate();
               }}
-              className={LIGHTBOX_CONTROL_BUTTON_CLASS}
             >
               <LuType className="size-[12px]" aria-hidden="true" />
-            </button>
+            </LightboxImageControlButton>
           ) : null}
           {onCrop ? (
-            <button
-              type="button"
+            <LightboxImageControlButton
+              tooltipId="task-detail-image-lightbox-crop-tooltip"
+              label="Crop"
               aria-label="Crop image"
-              title="Crop image"
               onClick={(event) => {
                 event.stopPropagation();
                 onCrop();
               }}
-              className={LIGHTBOX_CONTROL_BUTTON_CLASS}
             >
               <LuCrop className="size-[12px]" aria-hidden="true" />
-            </button>
+            </LightboxImageControlButton>
           ) : null}
-          <button
-            type="button"
+          <LightboxImageControlButton
+            tooltipId="task-detail-image-lightbox-close-tooltip"
+            label="Close"
             aria-label="Close preview"
-            title="Close preview"
             onClick={(event) => {
               event.stopPropagation();
               onClose();
             }}
-            className={LIGHTBOX_CONTROL_BUTTON_CLASS}
           >
             <LuX className="size-[12px]" aria-hidden="true" />
-          </button>
+          </LightboxImageControlButton>
         </div>
         {/* eslint-disable-next-line @next/next/no-img-element -- user-uploaded task detail URLs */}
         <img
+          ref={imageRef}
           src={src}
           alt={alt}
-          className="task-detail-image-lightbox-image h-auto max-h-[92vh] w-auto max-w-[92vw] select-none rounded-[8px] object-contain shadow-[0_18px_50px_rgba(15,23,42,0.18)] dark:shadow-[0_18px_50px_rgba(0,0,0,0.45)]"
+          onLoad={() => setLoadedSrc(src)}
+          className={`task-detail-image-lightbox-image h-auto w-auto max-w-[92vw] select-none rounded-[8px] object-contain shadow-[0_18px_50px_rgba(15,23,42,0.18)] dark:shadow-[0_18px_50px_rgba(0,0,0,0.45)] ${LIGHTBOX_IMAGE_MAX_HEIGHT_CLASS}`}
           draggable={false}
         />
         {showGalleryNav ? (

@@ -8,6 +8,7 @@ import {
   normalizeDueDurationMinutes,
   normalizeDueTimeMinutes,
   normalizeDueTimeZone,
+  normalizeReminderOffsetMinutes,
   type TaskDueTime,
 } from "@/lib/task-due-time";
 import {
@@ -286,6 +287,24 @@ export async function updateTaskDueTime(taskId: string, dueTime: TaskDueTime) {
     dueDurationMinutes: task.dueDurationMinutes,
     dueTimeZone: normalizeDueTimeZone(task.dueTimeZone),
   };
+}
+
+export async function updateTaskReminder(
+  taskId: string,
+  reminderOffsetMinutes: number | null,
+) {
+  const { id: userId } = await requireUser();
+  await requireOwnedTask(taskId, userId);
+
+  const task = await prisma.task.update({
+    where: { id: taskId },
+    data: { reminderOffsetMinutes: normalizeReminderOffsetMinutes(reminderOffsetMinutes) },
+    select: { id: true, reminderOffsetMinutes: true },
+  });
+
+  await stampTaskFields(taskId, ["reminderOffsetMinutes"]);
+  revalidatePath("/");
+  return task;
 }
 
 export async function updateTaskPriority(taskId: string, priority: number | null) {

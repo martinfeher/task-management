@@ -4815,16 +4815,6 @@ export function TodoApp({
                     onClick={handleExitTaskDetailsFullscreen}
                   />
                 ) : null}
-                {taskDetailsFullscreenLayout ? (
-                  <div
-                    aria-hidden="true"
-                    className="pointer-events-none absolute inset-y-0 right-3 z-[1000] w-[13px]"
-                    style={{
-                      background:
-                        "linear-gradient(to left, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0))",
-                    }}
-                  />
-                ) : null}
               </div>
             ) : null}
             {!isCompactLayout || compactDetailView ? (
@@ -4844,6 +4834,10 @@ export function TodoApp({
                 marginLeft: taskDetailsFullscreenLayout
                   ? -TASK_DETAILS_FULLSCREEN_DETAILS_OVERLAP_PX
                   : 0,
+                // Edge shadow follows the 12px rounded left corners.
+                boxShadow: taskDetailsFullscreenLayout
+                  ? "-6px 0 13px -4px rgba(0, 0, 0, 0.22)"
+                  : undefined,
               }}
             >
               {showListCalendarPanel ? (

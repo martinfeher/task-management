@@ -2040,10 +2040,10 @@ function captureLiveEditorFormatSelection(editor: HTMLElement) {
   return selection.getRangeAt(0).cloneRange();
 }
 
-const FORMAT_MENU_ABOVE_SELECTION_GAP = 10;
-const FORMAT_MENU_BELOW_SELECTION_GAP = 3;
+const FORMAT_MENU_ABOVE_SELECTION_GAP = 13;
+const FORMAT_MENU_BELOW_SELECTION_GAP = 6;
 const FORMAT_MENU_LARGE_SELECTION_LINE_THRESHOLD = 7;
-const FORMAT_MENU_BELOW_FIRST_SELECTED_LINE_GAP = 27;
+const FORMAT_MENU_BELOW_FIRST_SELECTED_LINE_GAP = 30;
 const FORMAT_MENU_BELOW_TRANSFORM_OFFSET_PX = 8;
 const FORMAT_MENU_ESTIMATED_HEIGHT = 44;
 
@@ -2354,17 +2354,17 @@ function clampFormatMenuPosition(
 }
 
 const TASK_DETAILS_SKELETON_BAR_CLASS =
-  "task-details-skeleton-bar animate-pulse";
+  "task-details-skeleton-bar animate-pulse rounded-[12px]";
 
 function TaskDetailsSkeleton() {
   return (
     <div className="flex flex-col px-2 pb-4" aria-hidden="true">
       <div className="min-h-[850px] rounded-xl bg-white py-3 pl-[60px] pr-3 dark:bg-zinc-950">
-        <div className={`h-7 w-1/2 rounded ${TASK_DETAILS_SKELETON_BAR_CLASS}`} />
-        <div className={`mt-5 h-3.5 w-[92%] rounded ${TASK_DETAILS_SKELETON_BAR_CLASS}`} />
-        <div className={`mt-2.5 h-3.5 w-[85%] rounded ${TASK_DETAILS_SKELETON_BAR_CLASS}`} />
-        <div className={`mt-2.5 h-3.5 w-[78%] rounded ${TASK_DETAILS_SKELETON_BAR_CLASS}`} />
-        <div className={`mt-2.5 h-3.5 w-[64%] rounded ${TASK_DETAILS_SKELETON_BAR_CLASS}`} />
+        <div className={`h-7 w-1/2 ${TASK_DETAILS_SKELETON_BAR_CLASS}`} />
+        <div className={`mt-5 h-3.5 w-[92%] ${TASK_DETAILS_SKELETON_BAR_CLASS}`} />
+        <div className={`mt-2.5 h-3.5 w-[85%] ${TASK_DETAILS_SKELETON_BAR_CLASS}`} />
+        <div className={`mt-2.5 h-3.5 w-[78%] ${TASK_DETAILS_SKELETON_BAR_CLASS}`} />
+        <div className={`mt-2.5 h-3.5 w-[64%] ${TASK_DETAILS_SKELETON_BAR_CLASS}`} />
       </div>
     </div>
   );
@@ -7627,6 +7627,8 @@ export function TaskDetailsPanel({
 
     image.removeAttribute("srcset");
     image.setAttribute("src", url);
+    // Cropped output no longer matches the pre-annotation original.
+    image.removeAttribute("data-original-src");
     image.style.width = `${Math.round(nextWidth)}px`;
     image.style.height = `${Math.round(nextHeight)}px`;
     image.style.maxWidth = "100%";
@@ -7677,12 +7679,41 @@ export function TaskDetailsPanel({
     }
 
     // Same pixel dimensions as before, so the displayed size is left untouched.
+    // Keep the very first un-annotated image so the text can be removed later.
+    if (!image.getAttribute("data-original-src")) {
+      const previousSrc = image.getAttribute("src");
+      if (previousSrc) image.setAttribute("data-original-src", previousSrc);
+    }
     image.removeAttribute("srcset");
     image.setAttribute("src", url);
 
     setImageAnnotate(null);
     syncEditorContent();
     recordHistorySnapshot("Add text to image");
+    requestSave("flush");
+    scheduleEditorHeightSync();
+    updateLineControls();
+  }
+
+  function handleImageAnnotateRemoveApplied() {
+    const annotateTarget = imageAnnotate;
+    const editor = editorRef.current;
+    setImageAnnotate(null);
+    if (!annotateTarget || !editor?.contains(annotateTarget.wrapper)) return;
+
+    const image = annotateTarget.wrapper.querySelector("img.detail-image");
+    if (!(image instanceof HTMLImageElement)) return;
+
+    const originalSrc = image.getAttribute("data-original-src");
+    if (!originalSrc) return;
+
+    // The original has identical pixel dimensions, so the displayed size stays.
+    image.removeAttribute("srcset");
+    image.setAttribute("src", originalSrc);
+    image.removeAttribute("data-original-src");
+
+    syncEditorContent();
+    recordHistorySnapshot("Remove text from image");
     requestSave("flush");
     scheduleEditorHeightSync();
     updateLineControls();
@@ -8666,7 +8697,7 @@ export function TaskDetailsPanel({
           {taskId && saveStatus === "loading" && !task ? (
             <div className="flex items-center gap-3" aria-hidden="true">
               <div
-                className={`h-[30px] w-[68px] rounded-full ${TASK_DETAILS_SKELETON_BAR_CLASS}`}
+                className={`h-[30px] w-[68px] ${TASK_DETAILS_SKELETON_BAR_CLASS}`}
               />
               <span className="ml-2 text-[#cacaca]">|</span>
               <div className={`h-5 w-7 ${TASK_DETAILS_SKELETON_BAR_CLASS}`} />
@@ -9045,10 +9076,10 @@ export function TaskDetailsPanel({
                 className="pointer-events-none absolute top-[60px] right-3 left-[25px] z-10"
                 aria-hidden="true"
               >
-                <div className={`h-3.5 w-[92%] rounded ${TASK_DETAILS_SKELETON_BAR_CLASS}`} />
-                <div className={`mt-2.5 h-3.5 w-[85%] rounded ${TASK_DETAILS_SKELETON_BAR_CLASS}`} />
-                <div className={`mt-2.5 h-3.5 w-[78%] rounded ${TASK_DETAILS_SKELETON_BAR_CLASS}`} />
-                <div className={`mt-2.5 h-3.5 w-[64%] rounded ${TASK_DETAILS_SKELETON_BAR_CLASS}`} />
+                <div className={`h-3.5 w-[92%] ${TASK_DETAILS_SKELETON_BAR_CLASS}`} />
+                <div className={`mt-2.5 h-3.5 w-[85%] ${TASK_DETAILS_SKELETON_BAR_CLASS}`} />
+                <div className={`mt-2.5 h-3.5 w-[78%] ${TASK_DETAILS_SKELETON_BAR_CLASS}`} />
+                <div className={`mt-2.5 h-3.5 w-[64%] ${TASK_DETAILS_SKELETON_BAR_CLASS}`} />
               </div>
             ) : null}
             {isDetailsBodyLoading ? (
@@ -9749,8 +9780,14 @@ export function TaskDetailsPanel({
       {imageAnnotate ? (
         <TaskDetailImageAnnotateModal
           src={imageAnnotate.src}
+          canRemoveAppliedText={Boolean(
+            imageAnnotate.wrapper
+              .querySelector("img.detail-image")
+              ?.getAttribute("data-original-src"),
+          )}
           onCancel={() => setImageAnnotate(null)}
           onApply={handleImageAnnotateApply}
+          onRemoveAppliedText={handleImageAnnotateRemoveApplied}
         />
       ) : null}
       <ConfirmModal

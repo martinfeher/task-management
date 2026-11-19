@@ -97,6 +97,12 @@ type TaskListTaskRowProps = {
   ) => void;
   onToggleDatePicker: (taskId: string) => void;
   onOpenDatePicker: (taskId: string) => void;
+  onHoverOpenDatePicker?: (taskId: string) => void;
+  onScheduleCloseDatePicker?: () => void;
+  onHoverOpenLabelMenu?: (taskId: string) => void;
+  onScheduleCloseLabelMenu?: () => void;
+  onHoverOpenPriorityMenu?: (taskId: string) => void;
+  onScheduleClosePriorityMenu?: () => void;
   onSelectTaskDueDate: (taskId: string, dateValue: string | null) => void;
   onSaveTaskDueTime: (
     taskId: string,
@@ -149,7 +155,7 @@ const TASK_LABEL_SELECTOR_MAX_HEIGHT = 360;
 
 function computeTaskLabelSelectorPosition(rect: DOMRect) {
   const viewportPadding = 8;
-  let left = rect.left;
+  let left = rect.left + rect.width / 2 - TASK_LABEL_SELECTOR_WIDTH / 2;
   let top = rect.bottom + TASK_LABEL_SELECTOR_GAP;
 
   left = Math.max(
@@ -314,12 +320,10 @@ function getRowMenuView(
   return null;
 }
 
-function computeTaskDatePickerPosition(
-  anchor: HTMLElement,
-  preferScheduleAlignment: boolean,
-) {
+function computeTaskDatePickerPosition(anchor: HTMLElement) {
   return computeTaskDatePickerMenuPosition(anchor, {
-    align: preferScheduleAlignment ? "left" : "right",
+    align: "center",
+    placementBounds: getTaskListPanelScrollBounds(anchor),
   });
 }
 
@@ -381,6 +385,12 @@ export function TaskListTaskRow({
   onTaskDragStart,
   onToggleDatePicker,
   onOpenDatePicker,
+  onHoverOpenDatePicker,
+  onScheduleCloseDatePicker,
+  onHoverOpenLabelMenu,
+  onScheduleCloseLabelMenu,
+  onHoverOpenPriorityMenu,
+  onScheduleClosePriorityMenu,
   onSelectTaskDueDate,
   onSaveTaskDueTime,
   onSaveTaskRecurrence,
@@ -470,10 +480,16 @@ export function TaskListTaskRow({
   const rowActionsPointerClass = suppressPointerHoverActions
     ? "pointer-events-none"
     : hideSelectedActionsOnPanelHover
-      ? "pointer-events-auto group-hover/tasklist:pointer-events-none group-hover:pointer-events-auto"
+      ? "pointer-events-auto task-row-selected-quick-actions"
       : showRowHoverActions
         ? "pointer-events-auto"
         : "pointer-events-none group-hover:pointer-events-auto";
+  /** Set priority pill stays visible on selected rows; it must not use quick-action hide rules. */
+  const priorityPillPointerClass = suppressPointerHoverActions
+    ? "pointer-events-none"
+    : hasPriorityActions
+      ? "pointer-events-auto"
+      : "pointer-events-none";
 
   const basePaddingLeft = useWiderRowPadding ? 1 : 0;
   const rowOuterPaddingLeft = depth * SUBTASK_INDENT_PX;
@@ -506,6 +522,7 @@ export function TaskListTaskRow({
   } as React.CSSProperties;
   const datePickerAnchorRef = useRef<HTMLButtonElement>(null);
   const scheduleAnchorRef = useRef<HTMLButtonElement>(null);
+  const scheduleTimeIconRef = useRef<HTMLSpanElement>(null);
   const rowMenuButtonRef = useRef<HTMLButtonElement>(null);
   const priorityMenuButtonRef = useRef<HTMLButtonElement>(null);
   const labelPillsAnchorRef = useRef<HTMLSpanElement>(null);
@@ -548,7 +565,10 @@ export function TaskListTaskRow({
     1;
   const taskRowMetaMarginRightPx =
     task.labels.length > 0
-      ? Math.max(20, taskRowHoverActionCount * taskRowHoverActionSlotPx)
+      ? Math.max(
+          showPriorityPillInActionColumn ? 54 : 20,
+          taskRowHoverActionCount * taskRowHoverActionSlotPx,
+        )
       : 0;
   /** Real widths of the hover action slots (icon + side margins), so previews clear them. */
   const taskRowImageMarginRightPx =
@@ -557,8 +577,14 @@ export function TaskListTaskRow({
     (showPriorityActionSlot ? 31 : 0) +
     23 +
     4;
+  const taskRowTrailingReservePx =
+    showPriorityPillInActionColumn &&
+    task.labels.length === 0 &&
+    (!task.imageSrcs || task.imageSrcs.length === 0)
+      ? taskRowImageMarginRightPx
+      : 0;
   const rowActionHoverVisibilityClass = hideSelectedActionsOnPanelHover
-    ? "opacity-100 transition-opacity group-hover/tasklist:opacity-0 group-hover:opacity-100"
+    ? "opacity-100 transition-opacity task-row-selected-quick-actions"
     : showRowHoverActions
       ? "opacity-100"
       : "opacity-0 transition-opacity group-hover:opacity-100";
@@ -591,17 +617,34 @@ export function TaskListTaskRow({
           ? "h-[44px]"
           : "min-h-[37px]";
 
+  function resolveTaskRowDatePickerAnchor(): HTMLElement | null {
+    const dateIconAnchor = datePickerAnchorRef.current;
+    const scheduleAnchor = scheduleAnchorRef.current;
+    const menuAnchor = rowMenuButtonRef.current;
+    const anchor = dateIconAnchor ?? scheduleAnchor ?? menuAnchor;
+
+    if (
+      anchor === scheduleAnchor &&
+      scheduleTimeIconRef.current
+    ) {
+      return scheduleTimeIconRef.current;
+    }
+
+    return anchor;
+  }
+
   function handleDatePickerTrigger(
     event: React.SyntheticEvent<HTMLButtonElement>,
-    preferScheduleAlignment: boolean,
+    fromScheduleRow: boolean,
   ) {
     event.stopPropagation();
 
-    const anchor = event.currentTarget;
+    const anchor =
+      fromScheduleRow && scheduleTimeIconRef.current
+        ? scheduleTimeIconRef.current
+        : event.currentTarget;
 
-    setDatePickerPosition(
-      computeTaskDatePickerPosition(anchor, preferScheduleAlignment),
-    );
+    setDatePickerPosition(computeTaskDatePickerPosition(anchor));
 
     if (openDatePickerTaskId === task.id) {
       onToggleDatePicker(task.id);
@@ -611,19 +654,26 @@ export function TaskListTaskRow({
     onOpenDatePicker(task.id);
   }
 
+  function keepDatePickerPreviewOpen() {
+    onHoverOpenDatePicker?.(task.id);
+  }
+
+  function keepLabelMenuPreviewOpen() {
+    onHoverOpenLabelMenu?.(task.id);
+  }
+
+  function keepPriorityMenuPreviewOpen() {
+    onHoverOpenPriorityMenu?.(task.id);
+  }
+
   useLayoutEffect(() => {
     if (!isDatePickerOpen) return;
 
     function updateDatePickerPosition() {
-      const dateIconAnchor = datePickerAnchorRef.current;
-      const scheduleAnchor = scheduleAnchorRef.current;
-      const menuAnchor = rowMenuButtonRef.current;
-      const anchor = dateIconAnchor ?? scheduleAnchor ?? menuAnchor;
+      const anchor = resolveTaskRowDatePickerAnchor();
       if (!anchor) return;
 
-      setDatePickerPosition(
-        computeTaskDatePickerPosition(anchor, anchor === scheduleAnchor),
-      );
+      setDatePickerPosition(computeTaskDatePickerPosition(anchor));
     }
 
     updateDatePickerPosition();
@@ -946,6 +996,8 @@ export function TaskListTaskRow({
                   title="Change date"
                   className={`group/schedule inline-flex w-fit max-w-full cursor-pointer appearance-none items-center gap-1 border-0 bg-transparent p-0 text-left text-[11px] leading-none outline-none focus:outline-none focus-visible:outline-none ${TASK_ROW_SCHEDULE_COLOR_CLASS} ${TASK_ROW_SCHEDULE_TRANSITION_CLASS}`}
                   style={{ transition: dimTransition }}
+                  onMouseEnter={keepDatePickerPreviewOpen}
+                  onMouseLeave={() => onScheduleCloseDatePicker?.()}
                   onPointerDown={(event) => {
                     if (event.button !== 0) return;
                     event.stopPropagation();
@@ -954,10 +1006,15 @@ export function TaskListTaskRow({
                   onClick={(event) => event.stopPropagation()}
                   data-task-date-picker-trigger
                 >
-                  <IoMdTime
-                    className="size-3 shrink-0"
-                    aria-hidden="true"
-                  />
+                  <span
+                    ref={scheduleTimeIconRef}
+                    className="inline-flex shrink-0"
+                  >
+                    <IoMdTime
+                      className="size-3 shrink-0"
+                      aria-hidden="true"
+                    />
+                  </span>
                   <span className="truncate">{dueScheduleSubline}</span>
                 </button>
               ) : (
@@ -989,6 +1046,11 @@ export function TaskListTaskRow({
       {!hideDueDate ? (
       <div
         className="relative ml-auto flex min-h-[22px] shrink-0 self-center items-center justify-end gap-1.5 pl-2"
+        style={
+          taskRowTrailingReservePx > 0
+            ? { minWidth: taskRowTrailingReservePx }
+            : undefined
+        }
       >
         {task.imageSrcs && task.imageSrcs.length > 0 ? (
           <TaskListImageThumbs
@@ -1008,11 +1070,19 @@ export function TaskListTaskRow({
         {task.labels.length > 0 ? (
           <span
             ref={labelPillsAnchorRef}
-            className={`relative z-10 flex min-w-0 max-w-[180px] mr-[54px]! items-center gap-1 ${checkedContentDim}`}
+            className={`relative z-10 flex min-w-0 max-w-[180px] items-center gap-1 ${checkedContentDim}`}
             style={{
               transition: dimTransition,
               marginRight: taskRowMetaMarginRightPx,
             }}
+            onMouseEnter={
+              hasLabelActions ? keepLabelMenuPreviewOpen : undefined
+            }
+            onMouseLeave={
+              hasLabelActions
+                ? () => onScheduleCloseLabelMenu?.()
+                : undefined
+            }
           >
             <TaskLabelPills
               labels={task.labels}
@@ -1035,6 +1105,8 @@ export function TaskListTaskRow({
           {showSetDateOnHover ? (
             <div
               className={`group/set-date relative ${rowActionsPointerClass} ${rowActionHoverVisibilityClass}`}
+              onMouseEnter={keepDatePickerPreviewOpen}
+              onMouseLeave={() => onScheduleCloseDatePicker?.()}
             >
               <button
                 ref={datePickerAnchorRef}
@@ -1048,7 +1120,7 @@ export function TaskListTaskRow({
                 aria-haspopup="dialog"
                 aria-expanded={openDatePickerTaskId === task.id}
                 aria-describedby={`set-date-tooltip-${task.id}`}
-                className="flex h-[19px] w-[19px] shrink-0 mr-1 items-center justify-center rounded-md ptxt-task-datetime transition-colors cursor-pointer hover:opacity-80 dark:hover:bg-zinc-800"
+                className="relative flex h-[19px] w-[19px] shrink-0 mr-1 items-center justify-center rounded-md ptxt-task-datetime transition-colors cursor-pointer hover:opacity-80 dark:hover:bg-zinc-800"
                 onPointerDown={(event) => {
                   if (event.button !== 0) return;
                   event.stopPropagation();
@@ -1056,14 +1128,16 @@ export function TaskListTaskRow({
                 }}
               >
                 <TaskSetDateIcon className="size-[22px]" />
+                <span
+                  id={`set-date-tooltip-${task.id}`}
+                  role="tooltip"
+                  className={`add-task-date-tooltip app-hover-tooltip app-hover-tooltip-above-center pointer-events-none absolute bottom-[calc(100%+10px)] z-40 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium ${
+                    isDatePickerOpen ? "opacity-0" : ""
+                  }`}
+                >
+                  Set date
+                </span>
               </button>
-              <span
-                id={`set-date-tooltip-${task.id}`}
-                role="tooltip"
-                className="add-task-date-tooltip app-hover-tooltip app-hover-tooltip-above-center pointer-events-none absolute bottom-[calc(100%+10px)] z-40 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium"
-              >
-                Set date
-              </span>
             </div>
           ) : null}
 
@@ -1072,12 +1146,14 @@ export function TaskListTaskRow({
                 <div
                   ref={taskDateMenuRef}
                   data-task-date-picker-menu
-                  className="fixed ml-[2px] z-[100]"
+                  className="fixed z-[100]"
                   style={{
                     top: datePickerPosition?.top ?? 0,
                     left: datePickerPosition?.left ?? 0,
                     visibility: datePickerPosition ? "visible" : "hidden",
                   }}
+                  onMouseEnter={keepDatePickerPreviewOpen}
+                  onMouseLeave={() => onScheduleCloseDatePicker?.()}
                   onPointerDown={(event) => event.stopPropagation()}
                   onKeyDown={(event) => {
                     if (event.key !== "Escape") return;
@@ -1114,6 +1190,8 @@ export function TaskListTaskRow({
           {showHoverLabelIcon ? (
             <div
               className={`group/add-label relative z-[1] ml-[2px] mr-1 flex w-[25px] shrink-0 items-center justify-center ${rowActionsPointerClass} ${rowActionHoverVisibilityClass}`}
+              onMouseEnter={keepLabelMenuPreviewOpen}
+              onMouseLeave={() => onScheduleCloseLabelMenu?.()}
             >
               <button
                 ref={labelHoverTriggerRef}
@@ -1123,7 +1201,7 @@ export function TaskListTaskRow({
                 aria-haspopup="dialog"
                 aria-expanded={isLabelMenuOpen}
                 aria-describedby={`set-label-tooltip-${task.id}`}
-                className="flex h-[19px] w-[19px] shrink-0 items-center justify-center rounded-md cursor-pointer transition-colors hover:opacity-80 dark:hover:bg-zinc-800"
+                className="relative flex h-[19px] w-[19px] shrink-0 items-center justify-center rounded-md cursor-pointer transition-colors hover:opacity-80 dark:hover:bg-zinc-800"
                 onPointerDown={(event) => {
                   if (event.button !== 0) return;
                   event.stopPropagation();
@@ -1135,20 +1213,24 @@ export function TaskListTaskRow({
                 }}
               >
                 <LiaTagSolid className="size-[17px]! text-[#c1c1d8]! group-hover/add-label:text-zinc-450 dark:text-zinc-400" />
+                <span
+                  id={`set-label-tooltip-${task.id}`}
+                  role="tooltip"
+                  className={`add-task-date-tooltip app-hover-tooltip app-hover-tooltip-above-center pointer-events-none absolute bottom-[calc(100%+10px)] z-40 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium ${
+                    isLabelMenuOpen ? "opacity-0" : ""
+                  }`}
+                >
+                  Add label
+                </span>
               </button>
-              <span
-                id={`set-label-tooltip-${task.id}`}
-                role="tooltip"
-                className="add-task-date-tooltip app-hover-tooltip app-hover-tooltip-above-center pointer-events-none absolute bottom-[calc(100%+10px)] z-40 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium"
-              >
-                Add label
-              </span>
             </div>
           ) : null}
 
           {showHoverPriorityIcon ? (
             <div
               className={`group/add-priority relative z-0 ml-[2px] mr-1 flex w-[25px] shrink-0 items-center justify-center ${rowActionsPointerClass} ${rowActionHoverVisibilityClass}`}
+              onMouseEnter={keepPriorityMenuPreviewOpen}
+              onMouseLeave={() => onScheduleClosePriorityMenu?.()}
             >
               <button
                 ref={priorityMenuButtonRef}
@@ -1158,7 +1240,7 @@ export function TaskListTaskRow({
                 aria-haspopup="menu"
                 aria-expanded={isPriorityMenuOpen}
                 aria-describedby={`set-priority-tooltip-${task.id}`}
-                className="flex h-[19px] w-[19px] shrink-0 items-center justify-center rounded-md cursor-pointer transition-colors hover:opacity-80 dark:hover:bg-zinc-800"
+                className="relative flex h-[19px] w-[19px] shrink-0 items-center justify-center rounded-md cursor-pointer transition-colors hover:opacity-80 dark:hover:bg-zinc-800"
                 onPointerDown={(event) => {
                   if (event.button !== 0) return;
                   event.stopPropagation();
@@ -1169,20 +1251,30 @@ export function TaskListTaskRow({
                 }}
               >
                 <TaskPriorityFlagIcon outline className="size-[14px] text-[#b4b4c8]!" />
+                <span
+                  id={`set-priority-tooltip-${task.id}`}
+                  role="tooltip"
+                  className={`add-task-date-tooltip app-hover-tooltip app-hover-tooltip-above-center pointer-events-none absolute bottom-[calc(100%+10px)] z-40 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium ${
+                    isPriorityMenuOpen ? "opacity-0" : ""
+                  }`}
+                >
+                  Priority
+                </span>
               </button>
-              <span
-                id={`set-priority-tooltip-${task.id}`}
-                role="tooltip"
-                className="add-task-date-tooltip app-hover-tooltip app-hover-tooltip-above-center pointer-events-none absolute bottom-[calc(100%+10px)] z-40 whitespace-nowrap px-3 py-1.5 text-[11px] font-medium"
-              >
-                Priority
-              </span>
             </div>
           ) : null}
 
           {showPriorityPillInActionColumn ? (
             <div
-              className={`relative z-0 ml-[2px] mr-1 flex w-[25px] shrink-0 items-center justify-center ${rowActionsPointerClass}`}
+              className={`relative z-[2] ml-[2px] mr-1 flex w-[25px] shrink-0 items-center justify-center ${priorityPillPointerClass}`}
+              onMouseEnter={
+                hasPriorityActions ? keepPriorityMenuPreviewOpen : undefined
+              }
+              onMouseLeave={
+                hasPriorityActions
+                  ? () => onScheduleClosePriorityMenu?.()
+                  : undefined
+              }
             >
               <TaskPriorityPill
                 priority={task.priority}
@@ -1293,6 +1385,8 @@ export function TaskListTaskRow({
                   top: labelMenuPosition.top,
                   left: labelMenuPosition.left,
                 }}
+                onMouseEnter={keepLabelMenuPreviewOpen}
+                onMouseLeave={() => onScheduleCloseLabelMenu?.()}
               >
                 <TaskLabelSelector
                   labels={availableLabels}
@@ -1319,6 +1413,8 @@ export function TaskListTaskRow({
                   top: priorityMenuPosition.top,
                   left: priorityMenuPosition.left,
                 }}
+                onMouseEnter={keepPriorityMenuPreviewOpen}
+                onMouseLeave={() => onScheduleClosePriorityMenu?.()}
                 onPointerDown={(event) => event.stopPropagation()}
               >
                 <TaskPriorityMenu

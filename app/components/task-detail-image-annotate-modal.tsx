@@ -8,6 +8,7 @@ import {
   LuPlus,
   LuTrash2,
   LuType,
+  LuUndo2,
   LuX,
 } from "react-icons/lu";
 import { getCropOutputMimeType } from "@/lib/image-crop";
@@ -49,6 +50,10 @@ type TaskDetailImageAnnotateModalProps = {
   onCancel: () => void;
   /** Resolve once the annotated image has been stored; the parent then closes the modal. */
   onApply: (result: RenderedAnnotation) => Promise<void>;
+  /** True when this image has text previously applied that can be reverted. */
+  canRemoveAppliedText?: boolean;
+  /** Reverts the image to its original (before any applied text) and closes the modal. */
+  onRemoveAppliedText?: () => void;
 };
 
 function clamp(value: number, min: number, max: number) {
@@ -67,6 +72,8 @@ export function TaskDetailImageAnnotateModal({
   src,
   onCancel,
   onApply,
+  canRemoveAppliedText = false,
+  onRemoveAppliedText,
 }: TaskDetailImageAnnotateModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -87,6 +94,7 @@ export function TaskDetailImageAnnotateModal({
   const [drag, setDrag] = useState<DragState | null>(null);
   const [isApplying, setIsApplying] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
 
   const [zoom, setZoom] = useState(1);
 
@@ -106,7 +114,12 @@ export function TaskDetailImageAnnotateModal({
 
   const filledItems = items.filter((item) => item.text.trim() !== "");
   const canApply = Boolean(natural) && filledItems.length > 0;
-  const selectedItem = items.find((item) => item.id === selectedId) ?? null;
+  const hasUnappliedChanges = filledItems.length > 0;
+  const activeAnnotationId = editingId ?? selectedId;
+  const activeAnnotation = activeAnnotationId
+    ? (items.find((item) => item.id === activeAnnotationId) ?? null)
+    : null;
+  const canDeleteActiveAnnotation = activeAnnotation !== null;
 
   useEffect(() => {
     const stage = stageRef.current;
@@ -177,13 +190,50 @@ export function TaskDetailImageAnnotateModal({
     [editingId, selectedId],
   );
 
-  const deleteSelected = useCallback(() => {
-    if (selectedId === null) return;
-    const id = selectedId;
+  const deleteActiveAnnotation = useCallback(() => {
+    const id = editingId ?? selectedId;
+    if (id === null) return;
+
     setEditingId((current) => (current === id ? null : current));
-    setSelectedId(null);
+    setSelectedId((current) => (current === id ? null : current));
     setItems((prev) => prev.filter((item) => item.id !== id));
-  }, [selectedId]);
+  }, [editingId, selectedId]);
+
+  const effectiveItemsAfterEditing = useCallback(() => {
+    if (editingId === null) return items;
+
+    const editingItem = items.find((item) => item.id === editingId);
+    if (editingItem && editingItem.text.trim() === "") {
+      return items.filter((item) => item.id !== editingId);
+    }
+
+    return items;
+  }, [editingId, items]);
+
+  const attemptClose = useCallback(() => {
+    if (isApplying) return;
+
+    if (editingId !== null) {
+      stopEditing();
+    }
+
+    const remaining = effectiveItemsAfterEditing();
+    const hasChanges = remaining.some((item) => item.text.trim() !== "");
+
+    if (hasChanges) {
+      setShowDiscardConfirm(true);
+      return;
+    }
+
+    setShowDiscardConfirm(false);
+    onCancel();
+  }, [
+    effectiveItemsAfterEditing,
+    editingId,
+    isApplying,
+    onCancel,
+    stopEditing,
+  ]);
 
   const handleApply = useCallback(async () => {
     const image = imageRef.current;
@@ -218,10 +268,10 @@ export function TaskDetailImageAnnotateModal({
       if (event.key === "Escape") {
         event.preventDefault();
         event.stopPropagation();
-        if (editingId !== null) {
-          stopEditing();
+        if (showDiscardConfirm) {
+          setShowDiscardConfirm(false);
         } else if (!isApplying) {
-          onCancel();
+          attemptClose();
         }
         return;
       }
@@ -257,7 +307,7 @@ export function TaskDetailImageAnnotateModal({
       if (event.key === "Delete" || event.key === "Backspace") {
         event.preventDefault();
         event.stopPropagation();
-        deleteSelected();
+        deleteActiveAnnotation();
         return;
       }
 
@@ -297,14 +347,15 @@ export function TaskDetailImageAnnotateModal({
     document.addEventListener("keydown", handleKeyDown, true);
     return () => document.removeEventListener("keydown", handleKeyDown, true);
   }, [
-    deleteSelected,
+    attemptClose,
+    deleteActiveAnnotation,
     editingId,
     handleApply,
     isApplying,
     natural,
-    onCancel,
     scale,
     selectedId,
+    showDiscardConfirm,
     startEditing,
     stopEditing,
   ]);
@@ -417,12 +468,30 @@ export function TaskDetailImageAnnotateModal({
   const stopReactPropagation = (event: React.SyntheticEvent) =>
     event.stopPropagation();
 
+  function handleBackdropPointerDown(
+    event: React.PointerEvent<HTMLDivElement>,
+  ) {
+    event.stopPropagation();
+    if (event.target !== event.currentTarget || isApplying) return;
+    attemptClose();
+  }
+
+  function handleDialogSurfacePointerDown(
+    event: React.PointerEvent<HTMLDivElement>,
+  ) {
+    event.stopPropagation();
+    if (showDiscardConfirm) {
+      event.preventDefault();
+    }
+  }
+
   return createPortal(
     <div
       className={`task-detail-image-annotate-overlay fixed inset-0 ${TASK_DETAIL_IMAGE_ANNOTATE_Z_CLASS} flex items-center justify-center bg-zinc-950/55 px-4 py-[1.5vh] backdrop-blur-[3px]`}
       role="dialog"
       aria-modal="true"
       aria-label="Add text to image"
+      onPointerDown={handleBackdropPointerDown}
       onMouseDown={stopReactPropagation}
       onClick={stopReactPropagation}
       onDoubleClick={stopReactPropagation}
@@ -435,11 +504,12 @@ export function TaskDetailImageAnnotateModal({
       <div
         ref={dialogRef}
         tabIndex={-1}
-        className="flex h-[97vh] max-h-[97vh] w-full max-w-[920px] flex-col overflow-hidden rounded-[22px] border border-zinc-200 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.28)] outline-none dark:border-zinc-700 dark:bg-zinc-900"
+        onPointerDown={handleDialogSurfacePointerDown}
+        className="relative flex h-[95vh] max-h-[95vh] w-full max-w-[920px] flex-col overflow-hidden rounded-[22px] border border-zinc-200 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.28)] outline-none dark:border-zinc-700 dark:bg-zinc-900"
       >
-        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-zinc-200 px-5 py-2 dark:border-zinc-800">
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-zinc-200 px-5 py-1.5 dark:border-zinc-800">
           <div className="flex min-w-0 items-center gap-2.5">
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+            <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
               <LuType className="size-4" aria-hidden="true" />
             </span>
             <div className="min-w-0">
@@ -454,9 +524,9 @@ export function TaskDetailImageAnnotateModal({
           <button
             type="button"
             aria-label="Close annotate dialog"
-            onClick={onCancel}
+            onClick={attemptClose}
             disabled={isApplying}
-            className={`flex size-[29px] shrink-0 cursor-pointer items-center justify-center rounded-full bg-zinc-200/30 text-zinc-500 transition-colors hover:text-zinc-600 disabled:cursor-not-allowed disabled:opacity-50 dark:text-zinc-400 dark:hover:text-zinc-100 ${TASK_DETAILS_HEADER_ICON_HOVER_CLASS}`}
+            className={`flex size-[29px] shrink-0 translate-x-[5px] cursor-pointer items-center justify-center rounded-full bg-zinc-200/30 text-zinc-500 transition-colors hover:text-zinc-600 disabled:cursor-not-allowed disabled:opacity-50 dark:text-zinc-400 dark:hover:text-zinc-100 ${TASK_DETAILS_HEADER_ICON_HOVER_CLASS}`}
           >
             <LuX className="size-[15px]" aria-hidden="true" />
           </button>
@@ -464,7 +534,7 @@ export function TaskDetailImageAnnotateModal({
 
         <div
           ref={stageRef}
-          className="relative min-h-0 flex-1 select-none overflow-hidden bg-[#1c1c20]"
+          className="relative min-h-0 flex-1 select-none overflow-hidden bg-[#8f8f8a]"
         >
           <div className="absolute inset-0 overflow-auto">
             <div
@@ -540,6 +610,17 @@ export function TaskDetailImageAnnotateModal({
                                     : candidate,
                                 ),
                               );
+                            }}
+                            onKeyDown={(event) => {
+                              if (
+                                (event.metaKey || event.ctrlKey) &&
+                                (event.key === "Backspace" ||
+                                  event.key === "Delete")
+                              ) {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                deleteActiveAnnotation();
+                              }
                             }}
                             className="col-start-1 row-start-1 m-0 w-full resize-none overflow-hidden border-0 bg-transparent p-0 outline-none placeholder:text-white/50"
                             style={{
@@ -707,11 +788,31 @@ export function TaskDetailImageAnnotateModal({
           </span>
 
           <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+            {canRemoveAppliedText && onRemoveAppliedText ? (
+              <button
+                type="button"
+                title="Revert the image to how it was before text was applied"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  if (isApplying) return;
+                  onRemoveAppliedText();
+                }}
+                disabled={isApplying}
+                className="inline-flex cursor-pointer items-center gap-1 rounded-full px-2.5 py-[5px] text-[10.5px] font-medium text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40 dark:text-red-400 dark:hover:bg-red-950/40"
+              >
+                <LuUndo2 className="size-3" aria-hidden="true" />
+                Remove applied text
+              </button>
+            ) : null}
             <button
               type="button"
+              // Keep focus/selection where it is until the click handler runs.
               onMouseDown={(event) => event.preventDefault()}
-              onClick={deleteSelected}
-              disabled={!selectedItem || isApplying}
+              onClick={() => {
+                if (isApplying || !canDeleteActiveAnnotation) return;
+                deleteActiveAnnotation();
+              }}
+              disabled={!canDeleteActiveAnnotation || isApplying}
               className="inline-flex cursor-pointer items-center gap-1 rounded-full px-2.5 py-[5px] text-[10.5px] font-medium text-zinc-600 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40 dark:text-zinc-300 dark:hover:bg-zinc-800"
             >
               <LuTrash2 className="size-3" aria-hidden="true" />
@@ -719,7 +820,7 @@ export function TaskDetailImageAnnotateModal({
             </button>
             <button
               type="button"
-              onClick={onCancel}
+              onClick={attemptClose}
               disabled={isApplying}
               className="cursor-pointer rounded-full border border-zinc-200 bg-white px-3.5 py-[6px] text-[11.5px] font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
             >
@@ -744,6 +845,56 @@ export function TaskDetailImageAnnotateModal({
           >
             {errorMessage}
           </p>
+        ) : null}
+
+        {showDiscardConfirm ? (
+          <div
+            className="absolute inset-0 z-20 flex items-center justify-center bg-zinc-950/40 px-6 backdrop-blur-[2px]"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="task-detail-image-annotate-discard-title"
+            aria-describedby="task-detail-image-annotate-discard-desc"
+            onPointerDown={(event) => event.stopPropagation()}
+          >
+            <div className="w-full max-w-[360px] rounded-[18px] border border-zinc-200 bg-white p-5 shadow-[0_16px_40px_rgba(15,23,42,0.22)] dark:border-zinc-700 dark:bg-zinc-900">
+              <h3
+                id="task-detail-image-annotate-discard-title"
+                className="text-[14px] font-semibold text-zinc-900 dark:text-zinc-50"
+              >
+                Discard text labels?
+              </h3>
+              <p
+                id="task-detail-image-annotate-discard-desc"
+                className="mt-1.5 text-[12px] leading-snug text-zinc-500 dark:text-zinc-400"
+              >
+                {hasUnappliedChanges
+                  ? `You have ${filledItems.length} text ${
+                      filledItems.length === 1 ? "label" : "labels"
+                    } that have not been applied to the image.`
+                  : "Close without applying your changes?"}
+              </p>
+              <div className="mt-4 flex flex-wrap justify-end gap-2">
+                <button
+                  type="button"
+                  autoFocus
+                  onClick={() => setShowDiscardConfirm(false)}
+                  className="cursor-pointer rounded-full border border-zinc-200 bg-white px-3.5 py-[6px] text-[11.5px] font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                >
+                  Keep editing
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDiscardConfirm(false);
+                    onCancel();
+                  }}
+                  className="cursor-pointer rounded-full bg-red-600 px-3.5 py-[6px] text-[11.5px] font-medium text-white transition-colors hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-500"
+                >
+                  Discard
+                </button>
+              </div>
+            </div>
+          </div>
         ) : null}
       </div>
     </div>,

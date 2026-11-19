@@ -82,6 +82,68 @@ export function peekCalendarTaskOpenOrigin(): CalendarTaskOpenOrigin | null {
   return lastCalendarTaskOpenOrigin;
 }
 
+/** Modal -> calendar task item "shrink" transition (mirror of the open transition). */
+export const CALENDAR_TASK_MODAL_CLOSE_TRANSITION_MS = 160;
+export const CALENDAR_TASK_MODAL_CLOSE_TRANSITION_EASING =
+  "cubic-bezier(0.22, 1, 0.36, 1)";
+
+/** Matches `CALENDAR_TASK_ID_DATA_ATTR` in `calendar-task-color-menu.tsx`. */
+const CALENDAR_TASK_ID_ATTR = "data-calendar-task-id";
+
+export type CalendarTaskCloseTarget = {
+  rect: CalendarTaskModalAnchorRect;
+  backgroundColor: string;
+  borderRadius: string;
+};
+
+/**
+ * Finds the on-screen calendar item for a task so the closing modal can shrink
+ * back into it. Returns null when the item isn't rendered or is out of view.
+ */
+export function findCalendarTaskCloseTarget(
+  taskId: string,
+): CalendarTaskCloseTarget | null {
+  if (typeof document === "undefined") return null;
+
+  const candidates = Array.from(
+    document.querySelectorAll<HTMLElement>(
+      `[${CALENDAR_TASK_ID_ATTR}="${CSS.escape(taskId)}"]`,
+    ),
+  );
+
+  for (const candidate of candidates) {
+    const item = candidate.matches(".calendar-task-item")
+      ? candidate
+      : candidate.closest<HTMLElement>(".calendar-task-item");
+    if (!item) continue;
+
+    const rect = item.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) continue;
+    const isInViewport =
+      rect.bottom > 0 &&
+      rect.right > 0 &&
+      rect.top < window.innerHeight &&
+      rect.left < window.innerWidth;
+    if (!isInViewport) continue;
+
+    const style = window.getComputedStyle(item);
+    return {
+      rect: {
+        top: rect.top,
+        left: rect.left,
+        right: rect.right,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+      },
+      backgroundColor: style.backgroundColor,
+      borderRadius: style.borderTopLeftRadius,
+    };
+  }
+
+  return null;
+}
+
 export function getCalendarTaskClickAnchorRect(
   element: HTMLElement,
 ): CalendarTaskModalAnchorRect {

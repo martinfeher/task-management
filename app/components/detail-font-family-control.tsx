@@ -8,7 +8,10 @@ import {
   getFormatToolbarFontFamilyOptions,
   type DetailFontFamilyId,
 } from "./detail-fonts";
-import { FORMAT_TOOLBAR_FONT_FAMILY_ITEM_CLASS } from "./detail-format-toolbar-menus";
+import {
+  FORMAT_TOOLBAR_FONT_FAMILY_ITEM_CLASS,
+  FORMAT_TOOLBAR_FONT_FAMILY_MENU_CLASS,
+} from "./detail-format-toolbar-menus";
 import { FROSTED_POPOVER_SURFACE_CLASS } from "@/lib/frosted-popover-surface";
 import { TASK_DETAILS_HEADER_ICON_HOVER_CLASS } from "@/lib/task-details-header-icon-hover";
 
@@ -25,7 +28,7 @@ type DetailFontFamilyControlProps = {
 
 const menuPanelClassName = `overflow-hidden rounded-lg py-1 ${FROSTED_POPOVER_SURFACE_CLASS}`;
 
-const formatToolbarMenuPanelClassName = `format-toolbar-dropdown-menu overflow-hidden rounded-[11px] py-1 cursor-pointer ${FROSTED_POPOVER_SURFACE_CLASS}`;
+const formatToolbarMenuPanelClassName = `format-toolbar-dropdown-menu ${FORMAT_TOOLBAR_FONT_FAMILY_MENU_CLASS}`;
 
 const FORMAT_TOOLBAR_HEADER_TRIGGER_ACTIVE_CLASS =
   "bg-[var(--panel-text-task-detail-header-icon-hover-background)] dark:bg-zinc-800";

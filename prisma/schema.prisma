@@ -154,6 +154,8 @@ model Task {
   dueTimeMinutes     Int?
   dueDurationMinutes Int?
   dueTimeZone        String        @default("floating")
+  /// Minutes before the due time to notify (0 = on time). Null = no reminder.
+  reminderOffsetMinutes Int?
   calendarColor      String?
   recurrenceRule     String?
   recurrenceAnchor   DateTime?

@@ -3,7 +3,10 @@ import { prisma } from "@/lib/prisma";
 import { jsonWithCors, optionsWithCors } from "@/lib/api-cors";
 import { repairBrokenTaskImageReferences } from "@/lib/task-image-storage";
 import { LABEL_CATEGORY } from "@/lib/task-tags";
-import { normalizeDueTimeZone } from "@/lib/task-due-time";
+import {
+  MAX_REMINDER_OFFSET_MINUTES,
+  normalizeDueTimeZone,
+} from "@/lib/task-due-time";
 import { getPriorityFromTaskTags } from "@/lib/task-tags";
 import type { TaskRecurrenceRule } from "@/lib/task-recurrence";
 import {
@@ -15,6 +18,7 @@ import {
   updateTaskDueTime,
   updateTaskPriority,
   updateTaskRecurrence,
+  updateTaskReminder,
 } from "@/app/actions/todo";
 import { requireUser, UnauthorizedError } from "@/lib/require-user";
 import { stampTaskFields } from "@/lib/task-field-clock";
@@ -46,6 +50,7 @@ export async function GET(_request: Request, context: RouteContext) {
       dueTimeMinutes: true,
       dueDurationMinutes: true,
       dueTimeZone: true,
+      reminderOffsetMinutes: true,
       calendarColor: true,
       recurrenceRule: true,
       recurrenceAnchor: true,
@@ -102,6 +107,7 @@ export async function GET(_request: Request, context: RouteContext) {
     dueTimeMinutes: task.dueTimeMinutes,
     dueDurationMinutes: task.dueDurationMinutes,
     dueTimeZone: normalizeDueTimeZone(task.dueTimeZone),
+    reminderOffsetMinutes: task.reminderOffsetMinutes,
     calendarColor: task.calendarColor,
     recurrenceRule: task.recurrenceRule,
     recurrenceAnchor: task.recurrenceAnchor
@@ -131,6 +137,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     dueDate?: string | null;
     dueTimeMinutes?: number | null;
     dueDurationMinutes?: number | null;
+    reminderOffsetMinutes?: number | null;
     calendarColor?: string | null;
     recurrenceRule?: TaskRecurrenceRule | null;
   };
@@ -145,6 +152,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       dueDate?: string | null;
       dueTimeMinutes?: number | null;
       dueDurationMinutes?: number | null;
+      reminderOffsetMinutes?: number | null;
       calendarColor?: string | null;
       recurrenceRule?: TaskRecurrenceRule | null;
     };
@@ -162,13 +170,14 @@ export async function PATCH(request: Request, context: RouteContext) {
     body.dueDate === undefined &&
     body.dueTimeMinutes === undefined &&
     body.dueDurationMinutes === undefined &&
+    body.reminderOffsetMinutes === undefined &&
     body.calendarColor === undefined &&
     body.recurrenceRule === undefined
   ) {
     return jsonWithCors(
       {
         error:
-          "Provide completed, important, pinned, priority, name, listId, dueDate, dueTimeMinutes, dueDurationMinutes, calendarColor, and/or recurrenceRule",
+          "Provide completed, important, pinned, priority, name, listId, dueDate, dueTimeMinutes, dueDurationMinutes, reminderOffsetMinutes, calendarColor, and/or recurrenceRule",
       },
       { status: 400 },
     );
@@ -249,6 +258,20 @@ export async function PATCH(request: Request, context: RouteContext) {
   ) {
     return jsonWithCors(
       { error: "dueDurationMinutes must be null or a positive integer" },
+      { status: 400 },
+    );
+  }
+
+  if (
+    body.reminderOffsetMinutes !== undefined &&
+    body.reminderOffsetMinutes !== null &&
+    (typeof body.reminderOffsetMinutes !== "number" ||
+      !Number.isInteger(body.reminderOffsetMinutes) ||
+      body.reminderOffsetMinutes < 0 ||
+      body.reminderOffsetMinutes > MAX_REMINDER_OFFSET_MINUTES)
+  ) {
+    return jsonWithCors(
+      { error: "reminderOffsetMinutes must be null or a non-negative integer" },
       { status: 400 },
     );
   }
@@ -364,6 +387,10 @@ export async function PATCH(request: Request, context: RouteContext) {
       });
     }
 
+    if (body.reminderOffsetMinutes !== undefined) {
+      await updateTaskReminder(taskId, body.reminderOffsetMinutes);
+    }
+
     const updateData = {
       ...(body.important !== undefined ? { important: body.important } : {}),
       ...(body.pinned !== undefined ? { pinned: body.pinned } : {}),
@@ -380,6 +407,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       dueTimeMinutes: true,
       dueDurationMinutes: true,
       dueTimeZone: true,
+      reminderOffsetMinutes: true,
       calendarColor: true,
       recurrenceRule: true,
       recurrenceAnchor: true,
@@ -425,6 +453,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       dueTimeMinutes: task.dueTimeMinutes,
       dueDurationMinutes: task.dueDurationMinutes,
       dueTimeZone: normalizeDueTimeZone(task.dueTimeZone),
+      reminderOffsetMinutes: task.reminderOffsetMinutes,
       calendarColor: task.calendarColor,
       recurrenceRule: task.recurrenceRule,
       recurrenceAnchor: task.recurrenceAnchor

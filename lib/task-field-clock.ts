@@ -13,6 +13,7 @@ export type TaskClockField =
   | "dueDate"
   | "dueTimeMinutes"
   | "dueDurationMinutes"
+  | "reminderOffsetMinutes"
   | "listId"
   | "labelIds"
   | "parentId"

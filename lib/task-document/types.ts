@@ -69,6 +69,8 @@ export type ImageNode = {
     alt?: string;
     width?: number;
     height?: number;
+    /** Image as it was before text was added via annotate; lets the text be removed later. */
+    originalSrc?: string;
   };
 };
 

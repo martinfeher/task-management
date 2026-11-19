@@ -127,6 +127,7 @@ export function TaskDetailImageCropModal({
   const isDragging = drag !== null;
   const [isApplying, setIsApplying] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
 
   const scale =
     natural && stageSize.w > 0 && stageSize.h > 0
@@ -171,6 +172,18 @@ export function TaskDetailImageCropModal({
     dialogRef.current?.focus();
   }, []);
 
+  const attemptClose = useCallback(() => {
+    if (isApplying) return;
+
+    if (canApply) {
+      setShowDiscardConfirm(true);
+      return;
+    }
+
+    setShowDiscardConfirm(false);
+    onCancel();
+  }, [canApply, isApplying, onCancel]);
+
   const handleApply = useCallback(async () => {
     const image = imageRef.current;
     if (!image || !crop || !natural || isApplying || !canApply) return;
@@ -198,11 +211,15 @@ export function TaskDetailImageCropModal({
       if (event.key === "Escape") {
         event.preventDefault();
         event.stopPropagation();
-        if (!isApplying) onCancel();
+        if (showDiscardConfirm) {
+          setShowDiscardConfirm(false);
+        } else if (!isApplying) {
+          attemptClose();
+        }
         return;
       }
 
-      if (isApplying) return;
+      if (isApplying || showDiscardConfirm) return;
 
       if (event.key === "Enter") {
         if (event.target instanceof HTMLButtonElement) return;
@@ -234,7 +251,15 @@ export function TaskDetailImageCropModal({
 
     document.addEventListener("keydown", handleKeyDown, true);
     return () => document.removeEventListener("keydown", handleKeyDown, true);
-  }, [crop, handleApply, isApplying, natural, onCancel, scale]);
+  }, [
+    attemptClose,
+    crop,
+    handleApply,
+    isApplying,
+    natural,
+    scale,
+    showDiscardConfirm,
+  ]);
 
   function handleImageLoad(event: React.SyntheticEvent<HTMLImageElement>) {
     const { naturalWidth, naturalHeight } = event.currentTarget;
@@ -312,29 +337,59 @@ export function TaskDetailImageCropModal({
       }
     : null;
 
+  // Dialog events must not reach the editor (React bubbles through portals).
+  const stopReactPropagation = (event: React.SyntheticEvent) =>
+    event.stopPropagation();
+
+  function handleBackdropPointerDown(
+    event: React.PointerEvent<HTMLDivElement>,
+  ) {
+    event.stopPropagation();
+    if (event.target !== event.currentTarget || isApplying) return;
+    attemptClose();
+  }
+
+  function handleDialogSurfacePointerDown(
+    event: React.PointerEvent<HTMLDivElement>,
+  ) {
+    event.stopPropagation();
+    if (showDiscardConfirm) {
+      event.preventDefault();
+    }
+  }
+
   return createPortal(
     <div
-      className={`task-detail-image-crop-overlay fixed inset-0 ${TASK_DETAIL_IMAGE_CROP_Z_CLASS} flex items-center justify-center bg-zinc-950/55 p-4 backdrop-blur-[3px]`}
+      className={`task-detail-image-crop-overlay fixed inset-0 ${TASK_DETAIL_IMAGE_CROP_Z_CLASS} flex items-center justify-center bg-zinc-950/55 px-4 py-[1.5vh] backdrop-blur-[3px]`}
       role="dialog"
       aria-modal="true"
       aria-label="Crop image"
-      onMouseDown={(event) => event.stopPropagation()}
+      onPointerDown={handleBackdropPointerDown}
+      onMouseDown={stopReactPropagation}
+      onClick={stopReactPropagation}
+      onDoubleClick={stopReactPropagation}
+      onKeyDown={stopReactPropagation}
+      onKeyUp={stopReactPropagation}
+      onPaste={stopReactPropagation}
+      onCopy={stopReactPropagation}
+      onCut={stopReactPropagation}
     >
       <div
         ref={dialogRef}
         tabIndex={-1}
-        className="flex max-h-full w-full max-w-[920px] flex-col overflow-hidden rounded-[22px] border border-zinc-200 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.28)] outline-none dark:border-zinc-700 dark:bg-zinc-900"
+        onPointerDown={handleDialogSurfacePointerDown}
+        className="relative flex h-[95vh] max-h-[95vh] w-full max-w-[920px] flex-col overflow-hidden rounded-[22px] border border-zinc-200 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.28)] outline-none dark:border-zinc-700 dark:bg-zinc-900"
       >
-        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-zinc-200 px-5 py-3.5 dark:border-zinc-800">
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-zinc-200 px-5 py-1.5 dark:border-zinc-800">
           <div className="flex min-w-0 items-center gap-2.5">
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+            <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
               <LuCrop className="size-4" aria-hidden="true" />
             </span>
             <div className="min-w-0">
-              <h2 className="text-[15px] font-semibold leading-tight text-zinc-900 dark:text-zinc-50">
+              <h2 className="text-[14px] font-semibold leading-tight text-zinc-900 dark:text-zinc-50">
                 Crop image
               </h2>
-              <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
+              <p className="truncate text-[11px] text-zinc-400 dark:text-zinc-400">
                 Drag the handles to choose what to keep. Arrow keys nudge the
                 selection.
               </p>
@@ -343,9 +398,9 @@ export function TaskDetailImageCropModal({
           <button
             type="button"
             aria-label="Close crop dialog"
-            onClick={onCancel}
+            onClick={attemptClose}
             disabled={isApplying}
-            className={`flex size-[29px] shrink-0 cursor-pointer items-center justify-center rounded-full bg-zinc-200/30 text-zinc-500 transition-colors hover:text-zinc-600 disabled:cursor-not-allowed disabled:opacity-50 dark:text-zinc-400 dark:hover:text-zinc-100 ${TASK_DETAILS_HEADER_ICON_HOVER_CLASS}`}
+            className={`flex size-[29px] shrink-0 translate-x-[5px] cursor-pointer items-center justify-center rounded-full bg-zinc-200/30 text-zinc-500 transition-colors hover:text-zinc-600 disabled:cursor-not-allowed disabled:opacity-50 dark:text-zinc-400 dark:hover:text-zinc-100 ${TASK_DETAILS_HEADER_ICON_HOVER_CLASS}`}
           >
             <LuX className="size-[15px]" aria-hidden="true" />
           </button>
@@ -353,7 +408,7 @@ export function TaskDetailImageCropModal({
 
         <div
           ref={stageRef}
-          className="relative flex h-[min(58vh,520px)] min-h-[240px] shrink-0 select-none items-center justify-center overflow-hidden bg-[#1c1c20]"
+          className="relative flex min-h-0 flex-1 select-none items-center justify-center overflow-hidden bg-[#8f8f8a]"
           style={{ padding: STAGE_PADDING_PX }}
         >
           <div
@@ -461,39 +516,30 @@ export function TaskDetailImageCropModal({
           ) : null}
         </div>
 
-        <div className="flex shrink-0 flex-wrap items-center gap-2 border-t border-zinc-200 px-5 py-3 dark:border-zinc-800">
-          <span className="mr-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
-            Aspect
-          </span>
-          {ASPECT_OPTIONS.map((option) => (
-            <button
-              key={option.id}
-              type="button"
-              aria-pressed={aspect === option.id}
-              disabled={!natural || isApplying}
-              onClick={() => handleAspectChange(option.id)}
-              className={`cursor-pointer rounded-full px-[13px] py-[5px] text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                aspect === option.id
-                  ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                  : "bg-zinc-200 text-zinc-600 hover:bg-zinc-300 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-zinc-200 px-5 py-[10.5px] dark:border-zinc-800">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="mr-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+              Aspect
+            </span>
+            {ASPECT_OPTIONS.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                aria-pressed={aspect === option.id}
+                disabled={!natural || isApplying}
+                onClick={() => handleAspectChange(option.id)}
+                className={`cursor-pointer rounded-full px-2.5 py-[4px] text-[10.5px] font-medium leading-none transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                  aspect === option.id
+                    ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                    : "bg-zinc-200 text-zinc-600 hover:bg-zinc-300 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
 
-        {errorMessage ? (
-          <p
-            role="alert"
-            className="shrink-0 px-5 pb-1 text-xs text-red-600 dark:text-red-400"
-          >
-            {errorMessage}
-          </p>
-        ) : null}
-
-        <div className="flex shrink-0 items-center justify-between gap-3 border-t border-zinc-200 px-5 py-3.5 dark:border-zinc-800">
-          <span className="min-w-0 truncate text-xs tabular-nums text-zinc-500 dark:text-zinc-400">
+          <span className="min-w-0 flex-1 truncate text-[10.5px] tabular-nums text-zinc-500 dark:text-zinc-400">
             {crop && natural ? (
               <>
                 <span className="font-medium text-zinc-700 dark:text-zinc-200">
@@ -506,21 +552,22 @@ export function TaskDetailImageCropModal({
               </>
             ) : null}
           </span>
-          <div className="flex shrink-0 items-center gap-2">
+
+          <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-1.5">
             <button
               type="button"
               onClick={handleReset}
               disabled={!natural || isApplying || !canApply}
-              className="inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-[7px] text-[13px] font-medium text-zinc-600 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              className="inline-flex cursor-pointer items-center gap-1 rounded-full px-2.5 py-[5px] text-[10.5px] font-medium text-zinc-600 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40 dark:text-zinc-300 dark:hover:bg-zinc-800"
             >
-              <LuRotateCcw className="size-3.5" aria-hidden="true" />
+              <LuRotateCcw className="size-3" aria-hidden="true" />
               Reset
             </button>
             <button
               type="button"
-              onClick={onCancel}
+              onClick={attemptClose}
               disabled={isApplying}
-              className="cursor-pointer rounded-full border border-zinc-200 bg-white px-4 py-[7px] text-[13px] font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+              className="cursor-pointer rounded-full border border-zinc-200 bg-white px-3.5 py-[6px] text-[11.5px] font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
             >
               Cancel
             </button>
@@ -528,13 +575,68 @@ export function TaskDetailImageCropModal({
               type="button"
               onClick={() => void handleApply()}
               disabled={!canApply || isApplying}
-              className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-zinc-900 px-4 py-[7px] text-[13px] font-medium text-white transition-colors hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+              className="inline-flex cursor-pointer items-center gap-1 rounded-full bg-zinc-900 px-3.5 py-[6px] text-[11.5px] font-medium text-white transition-colors hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
             >
-              <LuCheck className="size-3.5" aria-hidden="true" />
+              <LuCheck className="size-3" aria-hidden="true" />
               {isApplying ? "Applying…" : "Apply crop"}
             </button>
           </div>
         </div>
+
+        {errorMessage ? (
+          <p
+            role="alert"
+            className="shrink-0 px-5 pb-1 text-xs text-red-600 dark:text-red-400"
+          >
+            {errorMessage}
+          </p>
+        ) : null}
+
+        {showDiscardConfirm ? (
+          <div
+            className="absolute inset-0 z-20 flex items-center justify-center bg-zinc-950/40 px-6 backdrop-blur-[2px]"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="task-detail-image-crop-discard-title"
+            aria-describedby="task-detail-image-crop-discard-desc"
+            onPointerDown={(event) => event.stopPropagation()}
+          >
+            <div className="w-full max-w-[360px] rounded-[18px] border border-zinc-200 bg-white p-5 shadow-[0_16px_40px_rgba(15,23,42,0.22)] dark:border-zinc-700 dark:bg-zinc-900">
+              <h3
+                id="task-detail-image-crop-discard-title"
+                className="text-[14px] font-semibold text-zinc-900 dark:text-zinc-50"
+              >
+                Discard crop?
+              </h3>
+              <p
+                id="task-detail-image-crop-discard-desc"
+                className="mt-1.5 text-[12px] leading-snug text-zinc-500 dark:text-zinc-400"
+              >
+                Your crop selection has not been applied to the image.
+              </p>
+              <div className="mt-4 flex flex-wrap justify-end gap-2">
+                <button
+                  type="button"
+                  autoFocus
+                  onClick={() => setShowDiscardConfirm(false)}
+                  className="cursor-pointer rounded-full border border-zinc-200 bg-white px-3.5 py-[6px] text-[11.5px] font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                >
+                  Keep editing
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDiscardConfirm(false);
+                    onCancel();
+                  }}
+                  className="cursor-pointer rounded-full bg-red-600 px-3.5 py-[6px] text-[11.5px] font-medium text-white transition-colors hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-500"
+                >
+                  Discard
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>,
     document.body,

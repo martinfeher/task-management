@@ -117,7 +117,6 @@ type SettingsModalSection =
   | "account"
   | "general"
   | "tasks"
-  | "labels"
   | "calendar";
 
 function getTotalActiveTaskCount(taskCountByListId: Record<string, number>) {

@@ -55,6 +55,7 @@ export type MobileTaskItem = {
   dueTimeMinutes: number | null;
   dueDurationMinutes: number | null;
   dueTimeZone: string;
+  reminderOffsetMinutes: number | null;
   calendarColor: string | null;
   recurrenceRule: string | null;
   pinned: boolean;
@@ -84,6 +85,7 @@ type TaskSource = {
   dueTimeMinutes?: number | null;
   dueDurationMinutes?: number | null;
   dueTimeZone?: string;
+  reminderOffsetMinutes?: number | null;
   calendarColor?: string | null;
   recurrenceRule?: string | null;
   pinned: boolean;
@@ -108,6 +110,7 @@ function mapToMobileTask(
     dueTimeMinutes: task.dueTimeMinutes ?? null,
     dueDurationMinutes: task.dueDurationMinutes ?? null,
     dueTimeZone: task.dueTimeZone ?? "floating",
+    reminderOffsetMinutes: task.reminderOffsetMinutes ?? null,
     calendarColor: task.calendarColor ?? null,
     recurrenceRule: task.recurrenceRule ?? null,
     pinned: task.pinned,

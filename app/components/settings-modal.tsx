@@ -31,7 +31,7 @@ import {
   type CalendarDefaultViewPreference,
 } from "@/lib/calendar-default-view-settings";
 
-export type SettingsSection = "account" | "general" | "tasks" | "labels" | "calendar";
+export type SettingsSection = "account" | "general" | "tasks" | "calendar";
 
 type SettingsModalProps = {
   open: boolean;
@@ -45,7 +45,6 @@ const SETTINGS_SECTIONS: { id: SettingsSection; label: string }[] = [
   { id: "account", label: "Account" },
   { id: "general", label: "General" },
   { id: "tasks", label: "Tasks" },
-  { id: "labels", label: "Labels" },
   { id: "calendar", label: "Calendar" },
 ];
 
@@ -563,17 +562,6 @@ function SettingsSectionContent({ section }: { section: SettingsSection }) {
       return <GeneralSettingsContent />;
     case "tasks":
       return <TasksSettingsContent />;
-    case "labels":
-      return (
-        <div className="space-y-1">
-          <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
-            Labels
-          </h3>
-          <p className={SETTINGS_SECTION_DESCRIPTION_CLASS}>
-            Label settings will appear here.
-          </p>
-        </div>
-      );
     case "calendar":
       return <CalendarSettingsContent />;
   }

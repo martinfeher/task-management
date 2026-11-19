@@ -280,9 +280,17 @@ function parseImage(img: ParsedElement): BlockNode | null {
   const src = img.getAttribute("src");
   if (!src || !isSafeHref(src)) return null;
 
-  const attrs: { src: string; alt?: string; width?: number; height?: number } = { src };
+  const attrs: {
+    src: string;
+    alt?: string;
+    width?: number;
+    height?: number;
+    originalSrc?: string;
+  } = { src };
   const alt = img.getAttribute("alt");
   if (alt) attrs.alt = alt;
+  const originalSrc = img.getAttribute("data-original-src");
+  if (originalSrc && isSafeHref(originalSrc)) attrs.originalSrc = originalSrc;
 
   const style = parseStyleAttr(img.getAttribute("style"));
   const width = Number.parseFloat(style.width ?? "");

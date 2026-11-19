@@ -173,7 +173,7 @@ export function LoginForm({ googleConfigured }: LoginFormProps) {
           </p>
         ) : null}
 
-        <form className="mt-6 space-y-4" onSubmit={handleEmailAuth}>
+        <form className="mt-6 space-y-3" onSubmit={handleEmailAuth}>
           <div className="flex rounded-[10px] border border-zinc-200 p-0.5 dark:border-zinc-700">
             <button
               type="button"

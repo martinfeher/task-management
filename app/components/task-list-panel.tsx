@@ -9,11 +9,23 @@ import {
   useMemo,
   useRef,
   useState,
+  type ReactNode,
   type RefObject,
 } from "react";
 import { createPortal } from "react-dom";
 import { BiChevronDown, BiSortAlt2 } from "react-icons/bi";
-import { LuCalendarCheck2, LuCheck, LuMenu, LuPlus, LuX } from "react-icons/lu";
+import {
+  LuArrowDownWideNarrow,
+  LuArrowUpDown,
+  LuCalendarCheck2,
+  LuCheck,
+  LuChevronLeft,
+  LuChevronRight,
+  LuLayoutList,
+  LuMenu,
+  LuPlus,
+  LuX,
+} from "react-icons/lu";
 import { MdOutlineKeyboardDoubleArrowRight } from "react-icons/md";
 import { createLabel, getLabels } from "@/app/actions/todo";
 import {
@@ -140,19 +152,24 @@ function measureTaskListTruncationOverflow(root: HTMLElement | null) {
   return maxOverflow;
 }
 
-type SortField = "date" | "title" | "kind" | "list" | "groupDate" | "priority";
+type SortField = "date" | "title";
 type SortDirection = "asc" | "desc";
+type GroupField =
+  | "none"
+  | "kindNotes"
+  | "kindTasks"
+  | "list"
+  | "groupDate"
+  | "priority";
 
+/** Combined list ordering: group first, then sort within each group. */
 type SortOption = {
+  group: GroupField;
   field: SortField;
   direction: SortDirection;
-  label: string;
-  /** Short row title shown in the menu. */
-  menuLabel: string;
-  /** Right-aligned secondary text (order). */
-  hint?: string;
-  section: "sort" | "group";
 };
+
+type SortMenuView = "main" | "group" | "sort" | "order";
 
 type SortOrderHistoryEntry = {
   activeSort: SortOption | null;
@@ -165,7 +182,40 @@ const MAX_SORT_ORDER_HISTORY = 50;
 function sortOptionsEqual(a: SortOption | null, b: SortOption | null) {
   if (a === null && b === null) return true;
   if (a === null || b === null) return false;
-  return a.field === b.field && a.direction === b.direction;
+  return (
+    a.group === b.group && a.field === b.field && a.direction === b.direction
+  );
+}
+
+const DEFAULT_SORT_OPTION: SortOption = {
+  group: "none",
+  field: "date",
+  direction: "asc",
+};
+
+const GROUP_BY_OPTIONS: { value: GroupField; label: string }[] = [
+  { value: "none", label: "None" },
+  { value: "kindNotes", label: "Type: Notes first" },
+  { value: "kindTasks", label: "Type: Tasks first" },
+  { value: "list", label: "List" },
+  { value: "groupDate", label: "Due date" },
+  { value: "priority", label: "Priority" },
+];
+
+const SORT_BY_OPTIONS: { value: SortField; label: string }[] = [
+  { value: "date", label: "Date" },
+  { value: "title", label: "Title" },
+];
+
+const ORDER_LABELS: Record<SortField, Record<SortDirection, string>> = {
+  date: { asc: "Oldest First", desc: "Newest First" },
+  title: { asc: "A to Z", desc: "Z to A" },
+};
+
+function describeSortOption(option: SortOption) {
+  const group = GROUP_BY_OPTIONS.find((item) => item.value === option.group);
+  const sort = SORT_BY_OPTIONS.find((item) => item.value === option.field);
+  return `${group?.value === "none" ? "No grouping" : `grouped by ${group?.label}`}, sorted by ${sort?.label} (${ORDER_LABELS[option.field][option.direction]})`;
 }
 
 type DropIndicatorState = {
@@ -300,18 +350,6 @@ function ensureListDragVisuals(
   dragState.sourceRow.style.scale = "";
 }
 
-const SORT_OPTIONS: SortOption[] = [
-  { field: "date", direction: "asc", label: "Date (ascending)", menuLabel: "Date", hint: "Earliest first", section: "sort" },
-  { field: "date", direction: "desc", label: "Date (descending)", menuLabel: "Date", hint: "Latest first", section: "sort" },
-  { field: "title", direction: "asc", label: "Title (A-Z)", menuLabel: "Title", hint: "A to Z", section: "sort" },
-  { field: "title", direction: "desc", label: "Title (Z-A)", menuLabel: "Title", hint: "Z to A", section: "sort" },
-  { field: "kind", direction: "asc", label: "Group: Notes first", menuLabel: "Type", hint: "Notes first", section: "group" },
-  { field: "kind", direction: "desc", label: "Group: Tasks first", menuLabel: "Type", hint: "Tasks first", section: "group" },
-  { field: "list", direction: "asc", label: "Group: List", menuLabel: "List", section: "group" },
-  { field: "groupDate", direction: "asc", label: "Group: Date", menuLabel: "Due date", section: "group" },
-  { field: "priority", direction: "asc", label: "Group: Priority", menuLabel: "Priority", section: "group" },
-];
-
 function shouldIgnoreAddTaskShortcut(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) return false;
 
@@ -338,15 +376,6 @@ function shouldIgnoreListSortShortcut(target: EventTarget | null) {
     target.tagName === "TEXTAREA" ||
     target.isContentEditable
   );
-}
-
-function formatActiveSortLabel(label: string) {
-  return label
-    .replace("ascending", "asc")
-    .replace("descending", "desc")
-    .replace(/[()]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
 }
 
 const ROW_DRAG_THRESHOLD_PX = 5;
@@ -391,77 +420,88 @@ function getDueDateTimestamp(dueDate: string | null) {
   return Number.isNaN(date.getTime()) ? null : date.getTime();
 }
 
-function sortTasks(
-  tasks: TaskListItem[],
+function compareTaskNames(a: TaskListItem, b: TaskListItem) {
+  return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+}
+
+function getDueDayTimestamp(dueDate: string | null) {
+  const timestamp = getDueDateTimestamp(dueDate);
+  if (timestamp === null) return null;
+
+  const day = new Date(timestamp);
+  day.setHours(0, 0, 0, 0);
+  return day.getTime();
+}
+
+/** Compares two tasks by their group bucket (0 when in the same group). */
+function compareTaskGroups(
+  a: TaskListItem,
+  b: TaskListItem,
+  group: GroupField,
+) {
+  switch (group) {
+    case "kindNotes":
+    case "kindTasks": {
+      const aRank = a.isNote ? 0 : 1;
+      const bRank = b.isNote ? 0 : 1;
+      return group === "kindNotes" ? aRank - bRank : bRank - aRank;
+    }
+    case "list":
+      return (a.listName ?? "").localeCompare(b.listName ?? "", undefined, {
+        sensitivity: "base",
+      });
+    case "priority": {
+      const priorityRank = (priority: number | null | undefined) =>
+        priority === null || priority === undefined ? 99 : priority;
+      return priorityRank(a.priority) - priorityRank(b.priority);
+    }
+    case "groupDate": {
+      const aDay = getDueDayTimestamp(a.dueDate);
+      const bDay = getDueDayTimestamp(b.dueDate);
+      if (aDay === null && bDay === null) return 0;
+      if (aDay === null) return 1;
+      if (bDay === null) return -1;
+      return aDay - bDay;
+    }
+    default:
+      return 0;
+  }
+}
+
+function compareTaskSortField(
+  a: TaskListItem,
+  b: TaskListItem,
   field: SortField,
   direction: SortDirection,
 ) {
+  if (field === "title") {
+    const comparison = compareTaskNames(a, b);
+    return direction === "asc" ? comparison : -comparison;
+  }
+
+  const aDate = getDueDateTimestamp(a.dueDate);
+  const bDate = getDueDateTimestamp(b.dueDate);
+
+  if (aDate === null && bDate === null) return compareTaskNames(a, b);
+  if (aDate === null) return direction === "asc" ? 1 : -1;
+  if (bDate === null) return direction === "asc" ? -1 : 1;
+
+  const comparison = aDate - bDate;
+  if (comparison !== 0) {
+    return direction === "asc" ? comparison : -comparison;
+  }
+
+  return compareTaskNames(a, b);
+}
+
+function sortTasks(tasks: TaskListItem[], option: SortOption) {
   const sorted = [...tasks];
 
   sorted.sort((a, b) => {
-    if (field === "title") {
-      const comparison = a.name.localeCompare(b.name, undefined, {
-        sensitivity: "base",
-      });
-      return direction === "asc" ? comparison : -comparison;
-    }
+    const groupComparison = compareTaskGroups(a, b, option.group);
+    if (groupComparison !== 0) return groupComparison;
 
-    if (field === "kind") {
-      const aRank = a.isNote ? 0 : 1;
-      const bRank = b.isNote ? 0 : 1;
-      if (aRank !== bRank) {
-        return direction === "asc" ? aRank - bRank : bRank - aRank;
-      }
-
-      return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
-    }
-
-    if (field === "list") {
-      const aList = a.listName ?? "";
-      const bList = b.listName ?? "";
-      const comparison = aList.localeCompare(bList, undefined, {
-        sensitivity: "base",
-      });
-      if (comparison !== 0) {
-        return direction === "asc" ? comparison : -comparison;
-      }
-
-      return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
-    }
-
-    if (field === "priority") {
-      const priorityRank = (priority: number | null) =>
-        priority === null || priority === undefined ? 99 : priority;
-      const aRank = priorityRank(a.priority);
-      const bRank = priorityRank(b.priority);
-      if (aRank !== bRank) {
-        return direction === "asc" ? aRank - bRank : bRank - aRank;
-      }
-
-      return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
-    }
-
-    const sortByDueDate = field === "date" || field === "groupDate";
-    if (!sortByDueDate) {
-      return 0;
-    }
-
-    const aDate = getDueDateTimestamp(a.dueDate);
-    const bDate = getDueDateTimestamp(b.dueDate);
-
-    if (aDate === null && bDate === null) {
-      return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
-    }
-
-    if (aDate === null) return direction === "asc" ? 1 : -1;
-    if (bDate === null) return direction === "asc" ? -1 : 1;
-
-    const comparison = aDate - bDate;
-    if (comparison !== 0) {
-      return direction === "asc" ? comparison : -comparison;
-    }
-
-    return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+    return compareTaskSortField(a, b, option.field, option.direction);
   });
 
   return sorted;
@@ -692,6 +732,7 @@ export function TaskListPanel({
   titleDraftRef.current = titleDraft;
   const [orderedTasks, setOrderedTasks] = useState(tasks);
   const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
+  const [sortMenuView, setSortMenuView] = useState<SortMenuView>("main");
   const [activeSort, setActiveSort] = useState<SortOption | null>(null);
   const sortUndoStackRef = useRef<SortOrderHistoryEntry[]>([]);
   const sortRedoStackRef = useRef<SortOrderHistoryEntry[]>([]);
@@ -767,6 +808,9 @@ export function TaskListPanel({
   const addTaskDateMenuCloseTimerRef = useRef<number | null>(null);
   const addTaskLabelMenuCloseTimerRef = useRef<number | null>(null);
   const addTaskPriorityMenuCloseTimerRef = useRef<number | null>(null);
+  const taskRowDateMenuCloseTimerRef = useRef<number | null>(null);
+  const taskRowLabelMenuCloseTimerRef = useRef<number | null>(null);
+  const taskRowPriorityMenuCloseTimerRef = useRef<number | null>(null);
   const isAddTaskDatePickerOpenRef = useRef(false);
   const keepAddTaskOpenRef = useRef(false);
   const titleEditReadyRef = useRef(false);
@@ -1446,8 +1490,133 @@ export function TaskListPanel({
   useEffect(() => {
     return () => {
       clearAllAddTaskMetadataMenuCloseTimers();
+      clearAllTaskRowMetadataMenuCloseTimers();
     };
   }, []);
+
+  function clearTaskRowDateMenuCloseTimer() {
+    if (taskRowDateMenuCloseTimerRef.current !== null) {
+      window.clearTimeout(taskRowDateMenuCloseTimerRef.current);
+      taskRowDateMenuCloseTimerRef.current = null;
+    }
+  }
+
+  function clearTaskRowLabelMenuCloseTimer() {
+    if (taskRowLabelMenuCloseTimerRef.current !== null) {
+      window.clearTimeout(taskRowLabelMenuCloseTimerRef.current);
+      taskRowLabelMenuCloseTimerRef.current = null;
+    }
+  }
+
+  function clearTaskRowPriorityMenuCloseTimer() {
+    if (taskRowPriorityMenuCloseTimerRef.current !== null) {
+      window.clearTimeout(taskRowPriorityMenuCloseTimerRef.current);
+      taskRowPriorityMenuCloseTimerRef.current = null;
+    }
+  }
+
+  function clearAllTaskRowMetadataMenuCloseTimers() {
+    clearTaskRowDateMenuCloseTimer();
+    clearTaskRowLabelMenuCloseTimer();
+    clearTaskRowPriorityMenuCloseTimer();
+  }
+
+  function closeOtherTaskRowMetadataMenus(
+    except: "date" | "label" | "priority",
+  ) {
+    if (except !== "date") {
+      clearTaskRowDateMenuCloseTimer();
+      setOpenDatePickerTaskId(null);
+    }
+    if (except !== "label") {
+      clearTaskRowLabelMenuCloseTimer();
+      setOpenLabelMenuTaskId(null);
+      resetLabelMenuState();
+    }
+    if (except !== "priority") {
+      clearTaskRowPriorityMenuCloseTimer();
+      setOpenPriorityMenuTaskId(null);
+    }
+  }
+
+  function ensureTaskLabelMenuOpen(taskId: string) {
+    const labelMenuAlreadyOpen =
+      openLabelMenuTaskId === taskId ||
+      (pointerContextMenu?.taskId === taskId &&
+        pointerContextMenu.view === "label");
+    if (labelMenuAlreadyOpen) {
+      return;
+    }
+
+    setOpenDatePickerTaskId(null);
+    setOpenMenuTaskId(null);
+    setOpenMoveMenuTaskId(null);
+    setOpenPriorityMenuTaskId(null);
+    resetMoveMenuState();
+    initLabelMenuForTask(taskId);
+    closeTaskListPointerMenu();
+    setOpenLabelMenuTaskId(taskId);
+  }
+
+  function hoverOpenTaskDatePicker(taskId: string) {
+    if (!onSetTaskDueDate) return;
+
+    closeOtherTaskRowMetadataMenus("date");
+    clearTaskRowDateMenuCloseTimer();
+    if (openDatePickerTaskId === taskId) return;
+
+    openDatePicker(taskId);
+  }
+
+  function scheduleCloseTaskDatePicker() {
+    clearTaskRowDateMenuCloseTimer();
+    taskRowDateMenuCloseTimerRef.current = window.setTimeout(() => {
+      taskRowDateMenuCloseTimerRef.current = null;
+      setOpenDatePickerTaskId(null);
+    }, ADD_TASK_METADATA_MENU_HOVER_CLOSE_MS);
+  }
+
+  function hoverOpenTaskLabelMenu(taskId: string) {
+    if (!onToggleTaskLabel) return;
+
+    closeOtherTaskRowMetadataMenus("label");
+    clearTaskRowLabelMenuCloseTimer();
+    ensureTaskLabelMenuOpen(taskId);
+  }
+
+  function scheduleCloseTaskLabelMenu() {
+    clearTaskRowLabelMenuCloseTimer();
+    taskRowLabelMenuCloseTimerRef.current = window.setTimeout(() => {
+      taskRowLabelMenuCloseTimerRef.current = null;
+      setOpenLabelMenuTaskId(null);
+      resetLabelMenuState();
+    }, ADD_TASK_METADATA_MENU_HOVER_CLOSE_MS);
+  }
+
+  function hoverOpenTaskPriorityMenu(taskId: string) {
+    if (!onSetTaskPriority) return;
+
+    closeOtherTaskRowMetadataMenus("priority");
+    clearTaskRowPriorityMenuCloseTimer();
+    if (openPriorityMenuTaskId === taskId) return;
+
+    setOpenDatePickerTaskId(null);
+    setOpenMenuTaskId(null);
+    setOpenLabelMenuTaskId(null);
+    setOpenMoveMenuTaskId(null);
+    resetLabelMenuState();
+    resetMoveMenuState();
+    closeTaskListPointerMenu();
+    setOpenPriorityMenuTaskId(taskId);
+  }
+
+  function scheduleCloseTaskPriorityMenu() {
+    clearTaskRowPriorityMenuCloseTimer();
+    taskRowPriorityMenuCloseTimerRef.current = window.setTimeout(() => {
+      taskRowPriorityMenuCloseTimerRef.current = null;
+      setOpenPriorityMenuTaskId(null);
+    }, ADD_TASK_METADATA_MENU_HOVER_CLOSE_MS);
+  }
 
   function focusAddTaskInput() {
     requestAnimationFrame(() => {
@@ -1849,14 +2018,10 @@ export function TaskListPanel({
   }, [captureSortOrderSnapshot]);
 
   const applySort = useCallback(
-    (field: SortField, direction: SortDirection) => {
-      const sortOption =
-        SORT_OPTIONS.find(
-          (option) => option.field === field && option.direction === direction,
-        ) ?? null;
+    (sortOption: SortOption) => {
+      setSortMenuView("main");
 
       if (sortOptionsEqual(activeSortRef.current, sortOption)) {
-        setIsSortMenuOpen(false);
         return;
       }
 
@@ -1864,7 +2029,7 @@ export function TaskListPanel({
 
       const pinned = orderedTasksRef.current.filter((task) => task.pinned);
       const unpinned = orderedTasksRef.current.filter((task) => !task.pinned);
-      const sorted = sortTasks(unpinned, field, direction);
+      const sorted = sortTasks(unpinned, sortOption);
       setOrderedTasks([...pinned, ...sorted]);
 
       if (listId && onReorderTasks) {
@@ -1876,7 +2041,6 @@ export function TaskListPanel({
       }
 
       setActiveSort(sortOption);
-      setIsSortMenuOpen(false);
     },
     [listId, onReorderTasks, pushSortOrderUndoSnapshot],
   );
@@ -1953,6 +2117,7 @@ export function TaskListPanel({
   }
 
   function closeTaskMenus() {
+    clearAllTaskRowMetadataMenuCloseTimers();
     setOpenMenuTaskId(null);
     setOpenLabelMenuTaskId(null);
     setOpenMoveMenuTaskId(null);
@@ -2887,6 +3052,12 @@ export function TaskListPanel({
           }
           onToggleDatePicker={toggleDatePicker}
           onOpenDatePicker={openDatePicker}
+          onHoverOpenDatePicker={hoverOpenTaskDatePicker}
+          onScheduleCloseDatePicker={scheduleCloseTaskDatePicker}
+          onHoverOpenLabelMenu={hoverOpenTaskLabelMenu}
+          onScheduleCloseLabelMenu={scheduleCloseTaskLabelMenu}
+          onHoverOpenPriorityMenu={hoverOpenTaskPriorityMenu}
+          onScheduleClosePriorityMenu={scheduleCloseTaskPriorityMenu}
           onSelectTaskDueDate={handleSelectTaskDueDate}
           onSaveTaskDueTime={handleSaveTaskDueTime}
           onSaveTaskRecurrence={handleSaveTaskRecurrence}
@@ -3147,14 +3318,17 @@ export function TaskListPanel({
                 <div
                   className="relative flex size-[29px] shrink-0 items-center justify-center rounded-[6px] bg-[#fbfbfc] border border-[#e7e7eb] shadow-[0_7px_17px_rgba(0,0,0,0.06)]"
                   ref={sortMenuRef}
-                  onMouseEnter={() => setIsSortMenuOpen(true)}
+                  onMouseEnter={() => {
+                    setSortMenuView("main");
+                    setIsSortMenuOpen(true);
+                  }}
                   onMouseLeave={() => setIsSortMenuOpen(false)}
                 >
                   <button
                     type="button"
                     aria-label={
                       activeSort
-                        ? `Sort tasks. Currently sorted by ${activeSort.label}`
+                        ? `Sort tasks. Currently ${describeSortOption(activeSort)}`
                         : "Sort tasks"
                     }
                     aria-haspopup="menu"
@@ -3165,88 +3339,169 @@ export function TaskListPanel({
                       className="size-[15px] shrink-0"
                       aria-hidden="true"
                     />
-                    {/* {activeSort ? (
-                      <div className="ml-[1px] flex">
-                        Sort:{" "}
-                        <div className="ml-[1px] mt-[3.5px] cursor-pointer text-[11px] font-medium">
-                          {formatActiveSortLabel(activeSort.label)}
-                        </div>
-                      </div>
-                    ) : (
-                      "Sort"
-                    )} */}
                   </button>
 
                   {isSortMenuOpen && (
-                    <div className="absolute right-0 top-full z-50 min-w-[248px] pt-1">
+                    <div className="absolute right-0 top-full z-50 min-w-[300px] pt-1">
                       <div
                         role="menu"
                         className="task-list-sort-menu p-1.5"
                       >
-                        {SORT_OPTIONS.map((option, index) => {
-                          const isActive =
-                            activeSort?.field === option.field &&
-                            activeSort.direction === option.direction;
-                          const startsSection =
-                            index === 0 ||
-                            SORT_OPTIONS[index - 1].section !== option.section;
+                        {(() => {
+                          const current = activeSort ?? DEFAULT_SORT_OPTION;
+                          const rowClass =
+                            "flex h-[40px] w-full cursor-pointer items-center gap-3 rounded-xl px-3 text-left text-[14px] ptxt-700 transition-colors hover:bg-zinc-100 hover:ptxt-900 dark:ptxt-200 dark:hover:bg-zinc-800/80";
+                          const valueClass =
+                            "shrink-0 text-[13px] font-normal ptxt-500 dark:ptxt-400";
+
+                          if (sortMenuView === "main") {
+                            const mainRows: {
+                              view: Exclude<SortMenuView, "main">;
+                              label: string;
+                              value: string;
+                              icon: ReactNode;
+                            }[] = [
+                              {
+                                view: "group",
+                                label: "Group by",
+                                value:
+                                  GROUP_BY_OPTIONS.find(
+                                    (item) => item.value === current.group,
+                                  )?.label ?? "None",
+                                icon: <LuLayoutList className="size-[17px]" />,
+                              },
+                              {
+                                view: "sort",
+                                label: "Sort by",
+                                value:
+                                  SORT_BY_OPTIONS.find(
+                                    (item) => item.value === current.field,
+                                  )?.label ?? "Date",
+                                icon: (
+                                  <LuArrowDownWideNarrow className="size-[17px]" />
+                                ),
+                              },
+                              {
+                                view: "order",
+                                label: "Order",
+                                value:
+                                  ORDER_LABELS[current.field][current.direction],
+                                icon: <LuArrowUpDown className="size-[17px]" />,
+                              },
+                            ];
+
+                            return mainRows.map((row) => (
+                              <button
+                                key={row.view}
+                                type="button"
+                                role="menuitem"
+                                aria-haspopup="menu"
+                                aria-label={`${row.label}: ${row.value}`}
+                                onClick={() => setSortMenuView(row.view)}
+                                onMouseEnter={() => setSortMenuView("main")}
+                                className={rowClass}
+                              >
+                                <span
+                                  className="flex size-[18px] shrink-0 items-center justify-center ptxt-600 dark:ptxt-300"
+                                  aria-hidden="true"
+                                >
+                                  {row.icon}
+                                </span>
+                                <span className="min-w-0 flex-1 truncate">
+                                  {row.label}
+                                </span>
+                                <span className={valueClass}>{row.value}</span>
+                                <LuChevronRight
+                                  className="size-[14px] shrink-0 ptxt-400 dark:ptxt-500"
+                                  aria-hidden="true"
+                                />
+                              </button>
+                            ));
+                          }
+
+                          const submenuTitle =
+                            sortMenuView === "group"
+                              ? "Group by"
+                              : sortMenuView === "sort"
+                                ? "Sort by"
+                                : "Order";
+                          const submenuItems: {
+                            key: string;
+                            label: string;
+                            isActive: boolean;
+                            next: SortOption;
+                          }[] =
+                            sortMenuView === "group"
+                              ? GROUP_BY_OPTIONS.map((item) => ({
+                                  key: item.value,
+                                  label: item.label,
+                                  isActive: current.group === item.value,
+                                  next: { ...current, group: item.value },
+                                }))
+                              : sortMenuView === "sort"
+                                ? SORT_BY_OPTIONS.map((item) => ({
+                                    key: item.value,
+                                    label: item.label,
+                                    isActive: current.field === item.value,
+                                    next: { ...current, field: item.value },
+                                  }))
+                                : (["asc", "desc"] as const).map(
+                                    (direction) => ({
+                                      key: direction,
+                                      label:
+                                        ORDER_LABELS[current.field][direction],
+                                      isActive: current.direction === direction,
+                                      next: { ...current, direction },
+                                    }),
+                                  );
 
                           return (
-                            <Fragment
-                              key={`${option.field}-${option.direction}`}
-                            >
-                              {startsSection ? (
-                                <>
-                                  {index > 0 ? (
-                                    <div
-                                      role="separator"
-                                      className="mx-2 my-1.5 border-t border-zinc-200 dark:border-zinc-700"
-                                    />
-                                  ) : null}
-                                  <div
-                                    role="presentation"
-                                    className="px-2.5 pb-1 pt-2 text-[11px] font-medium uppercase tracking-wide ptxt-400 dark:ptxt-500"
-                                  >
-                                    {option.section === "sort"
-                                      ? "Sort by"
-                                      : "Group by"}
-                                  </div>
-                                </>
-                              ) : null}
+                            <>
                               <button
                                 type="button"
-                                role="menuitemradio"
-                                aria-checked={isActive}
-                                aria-label={option.label}
-                                onClick={() =>
-                                  applySort(option.field, option.direction)
-                                }
-                                className={`flex h-[32px] w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 text-left text-[13px] ptxt-650 transition-colors hover:bg-zinc-50 hover:ptxt-800 dark:ptxt-200 dark:hover:bg-zinc-800/80 ${
-                                  isActive
-                                    ? "bg-zinc-100 font-medium ptxt-800 dark:bg-zinc-800 dark:ptxt-100"
-                                    : ""
-                                }`}
+                                aria-label="Back"
+                                onClick={() => setSortMenuView("main")}
+                                className="flex h-[36px] w-full cursor-pointer items-center gap-2 rounded-xl px-3 text-left text-[13px] font-medium ptxt-500 transition-colors hover:bg-zinc-100 hover:ptxt-800 dark:ptxt-400 dark:hover:bg-zinc-800/80"
                               >
-                                <span className="min-w-0 flex-1 truncate">
-                                  {option.menuLabel}
-                                </span>
-                                {option.hint ? (
-                                  <span className="shrink-0 text-[12px] font-normal ptxt-400 dark:ptxt-500">
-                                    {option.hint}
-                                  </span>
-                                ) : null}
-                                <span className="flex size-[14px] shrink-0 items-center justify-center">
-                                  {isActive ? (
-                                    <LuCheck
-                                      className="size-[14px]"
-                                      aria-hidden="true"
-                                    />
-                                  ) : null}
-                                </span>
+                                <LuChevronLeft
+                                  className="size-[14px] shrink-0"
+                                  aria-hidden="true"
+                                />
+                                <span>{submenuTitle}</span>
                               </button>
-                            </Fragment>
+                              <div
+                                role="separator"
+                                className="mx-2 my-1 border-t border-zinc-200 dark:border-zinc-700"
+                              />
+                              {submenuItems.map((item) => (
+                                <button
+                                  key={item.key}
+                                  type="button"
+                                  role="menuitemradio"
+                                  aria-checked={item.isActive}
+                                  onClick={() => applySort(item.next)}
+                                  className={`${rowClass} h-[36px] ${
+                                    item.isActive
+                                      ? "bg-zinc-100 font-medium ptxt-900 dark:bg-zinc-800 dark:ptxt-100"
+                                      : ""
+                                  }`}
+                                >
+                                  <span className="min-w-0 flex-1 truncate">
+                                    {item.label}
+                                  </span>
+                                  <span className="flex size-[14px] shrink-0 items-center justify-center">
+                                    {item.isActive ? (
+                                      <LuCheck
+                                        className="size-[14px]"
+                                        aria-hidden="true"
+                                      />
+                                    ) : null}
+                                  </span>
+                                </button>
+                              ))}
+                            </>
                           );
-                        })}
+                        })()}
                       </div>
                     </div>
                   )}
@@ -3442,11 +3697,17 @@ export function TaskListPanel({
                   </div>
 
                   <div
-                    className="group/add-priority relative shrink-0"
+                    className="relative shrink-0"
                     ref={addTaskPriorityMenuRef}
                     onMouseEnter={openAddTaskPriorityMenu}
                     onMouseLeave={scheduleAddTaskPriorityMenuClose}
                   >
+                    {/*
+                      Tooltip hover group wraps only the trigger. If the group
+                      wrapped the whole menu, hovering the flag would reveal
+                      every option tooltip inside the menu at once.
+                    */}
+                    <div className="group/add-priority-trigger relative">
                     <button
                       type="button"
                       aria-label="priority"
@@ -3476,6 +3737,7 @@ export function TaskListPanel({
                     >
                       priority
                     </span>
+                    </div>
                     {isAddTaskPriorityMenuOpen ? (
                       <div className="absolute left-1/2 top-full z-[1000] mt-1 w-max -translate-x-1/2">
                         <div className="w-fit shrink-0">

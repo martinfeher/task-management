@@ -83,6 +83,7 @@ Response:
 | `dueTimeMinutes` | number \| null | 0–1439 |
 | `dueDurationMinutes` | number \| null | |
 | `dueTimeZone` | string | `"floating"` or IANA zone |
+| `reminderOffsetMinutes` | number \| null | Minutes before the due time to notify (`0` = on time); `null` = no reminder. Requires `dueTimeMinutes` |
 | `calendarColor` | string \| null | Hex color for calendar blocks |
 | `recurrenceRule` | string \| null | JSON: `{"frequency":"daily\|weekly\|monthly","interval":1}` |
 | `pinned` | boolean | |
@@ -126,6 +127,7 @@ Partial update. Accepted fields:
 - `listId` (move task)
 - `dueDate` (`YYYY-MM-DD` or null)
 - `dueTimeMinutes`, `dueDurationMinutes`
+- `reminderOffsetMinutes` (non-negative integer minutes or null)
 - `calendarColor` (string or null)
 - `recurrenceRule` (`{ frequency, interval }` or null)
 

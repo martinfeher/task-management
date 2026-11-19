@@ -65,19 +65,35 @@ type TaskDatePickerProps = {
 
 const TASK_DATE_PICKER_WIDTH = 270;
 const TASK_DATE_PICKER_GAP = 4;
+/** Conservative max height for flip/clamp before the menu is measured. */
+const TASK_DATE_PICKER_HEIGHT = 400;
+const TASK_TIME_MENU_OFFSET = 6;
 
-export { TASK_DATE_PICKER_WIDTH, TASK_DATE_PICKER_GAP };
+export {
+  TASK_DATE_PICKER_WIDTH,
+  TASK_DATE_PICKER_GAP,
+  TASK_DATE_PICKER_HEIGHT,
+};
 
 export function computeTaskDatePickerMenuPosition(
   anchor: HTMLElement,
-  options?: { align?: "left" | "right" },
+  options?: {
+    align?: "left" | "right" | "center";
+    placementBounds?: { top: number; bottom: number };
+    menuHeight?: number;
+  },
 ) {
   const rect = anchor.getBoundingClientRect();
   const viewportPadding = 8;
-  let left =
-    options?.align === "right"
-      ? rect.right - TASK_DATE_PICKER_WIDTH
-      : rect.left;
+  const menuHeight = options?.menuHeight ?? TASK_DATE_PICKER_HEIGHT;
+  let left: number;
+  if (options?.align === "right") {
+    left = rect.right - TASK_DATE_PICKER_WIDTH;
+  } else if (options?.align === "center") {
+    left = rect.left + rect.width / 2 - TASK_DATE_PICKER_WIDTH / 2;
+  } else {
+    left = rect.left;
+  }
 
   left = Math.max(
     viewportPadding,
@@ -87,8 +103,31 @@ export function computeTaskDatePickerMenuPosition(
     ),
   );
 
+  const belowTop = rect.bottom + TASK_DATE_PICKER_GAP;
+  let top = belowTop;
+
+  if (options?.placementBounds) {
+    const bounds = options.placementBounds;
+    const fitsBelowInPanel = belowTop + menuHeight <= bounds.bottom;
+
+    if (!fitsBelowInPanel) {
+      top = rect.top - menuHeight - TASK_DATE_PICKER_GAP;
+      if (top < bounds.top) {
+        top = Math.max(
+          bounds.top,
+          Math.min(belowTop, bounds.bottom - menuHeight),
+        );
+      }
+    }
+  }
+
+  top = Math.max(
+    viewportPadding,
+    Math.min(top, window.innerHeight - menuHeight - viewportPadding),
+  );
+
   return {
-    top: rect.bottom + TASK_DATE_PICKER_GAP,
+    top,
     left,
   };
 }
@@ -1686,45 +1725,56 @@ export function TaskDatePicker({
         className="space-y-3 border-t p-3"
         style={{ borderColor: PICKER_BORDER }}
       >
-        <button
-          type="button"
-          onClick={() => {
-            setOpenFooterSubmenu(null);
-            setIsTimeMenuOpen((open) => !open);
-          }}
-          className="flex w-full items-center justify-center mb-2 h-[37px]! gap-2 rounded-full border bg-white py-1 text-[13px] border-[#dedede] text-[#808089] font-medium transition-colors cursor-pointer"
-          style={
-            isTimeMenuOpen || dueTimeMinutes !== null
-              ? {
-                  color: PICKER_ACCENT,
-                }
-              : {
-                  borderColor: PICKER_BORDER,
-                  color: PICKER_MUTED_FG,
-                }
-          }
-        >
-          <BiTimeFive className="size-4" />
-          {timeButtonLabel}
-          <BiChevronDown
-            className={`size-4 text-[#808089] transition-transform ${
-              isTimeMenuOpen ? "rotate-180" : ""
-            }`}
-            aria-hidden="true"
-          />
-        </button>
-        {isTimeMenuOpen && onSaveDueTime ? (
-          <TaskTimeMenu
-            initialDueTime={{
-              dueTimeMinutes: normalizeDueTimeMinutes(dueTimeMinutes),
-              dueDurationMinutes: dueDurationMinutes ?? null,
-              dueTimeZone: normalizeDueTimeZone(dueTimeZone),
+        <div className="relative mb-2 flex items-center">
+          <button
+            type="button"
+            onClick={() => {
+              setOpenFooterSubmenu(null);
+              setIsTimeMenuOpen((open) => !open);
             }}
-            onSave={(dueTime, options) => {
-              onSaveDueTime(dueTime, options);
-            }}
-          />
-        ) : null}
+            className="flex h-[37px]! w-full items-center justify-center gap-2 rounded-full border bg-white py-1 text-[13px] border-[#dedede] text-[#808089] font-medium transition-colors cursor-pointer"
+            style={
+              isTimeMenuOpen || dueTimeMinutes !== null
+                ? {
+                    color: PICKER_ACCENT,
+                  }
+                : {
+                    borderColor: PICKER_BORDER,
+                    color: PICKER_MUTED_FG,
+                  }
+            }
+          >
+            <BiTimeFive className="size-4" />
+            {timeButtonLabel}
+            <BiChevronDown
+              className={`size-4 text-[#808089] transition-transform ${
+                isTimeMenuOpen ? "-rotate-90" : ""
+              }`}
+              aria-hidden="true"
+            />
+          </button>
+          {isTimeMenuOpen && onSaveDueTime ? (
+            <div
+              className="absolute top-0 z-[70]"
+              style={{
+                left: `calc(100% + ${TASK_TIME_MENU_OFFSET}px)`,
+                width: TASK_DATE_PICKER_WIDTH,
+                boxShadow: PICKER_POPOVER_SHADOW,
+              }}
+            >
+              <TaskTimeMenu
+                initialDueTime={{
+                  dueTimeMinutes: normalizeDueTimeMinutes(dueTimeMinutes),
+                  dueDurationMinutes: dueDurationMinutes ?? null,
+                  dueTimeZone: normalizeDueTimeZone(dueTimeZone),
+                }}
+                onSave={(dueTime, options) => {
+                  onSaveDueTime(dueTime, options);
+                }}
+              />
+            </div>
+          ) : null}
+        </div>
         <TaskReminderMenu
           activeReminder={displayReminder}
           isOpen={openFooterSubmenu === "reminder"}
