@@ -62,7 +62,10 @@ import {
   getLineElementAtPoint,
   getLineById,
   getLineElements,
+  getImageGapCaretWrapper,
+  getLineImageWrappers,
   getLineIndex,
+  placeCaretBelowWrapper,
   getSelectedListBlockLines,
   getSelectedBlockLinesInRange,
   indentListLines,
@@ -2492,6 +2495,9 @@ export function TaskDetailsPanel({
   const noteMenuRef = useRef<HTMLDivElement>(null);
   const [openFormatDropdown, setOpenFormatDropdown] =
     useState<FormatToolbarDropdown | null>(null);
+  /** Hides native selection fill while hovering text-color swatches (live preview). */
+  const [textColorPreviewHoverActive, setTextColorPreviewHoverActive] =
+    useState(false);
   const [openHeaderFormatDropdown, setOpenHeaderFormatDropdown] =
     useState<HeaderFormatDropdown | null>(null);
   const [isModalFormatToolbarOpen, setIsModalFormatToolbarOpen] = useState(false);
@@ -3900,6 +3906,8 @@ export function TaskDetailsPanel({
 
   const clearTextColorLivePreview = useCallback(
     (options?: { keepContent?: boolean }) => {
+      setTextColorPreviewHoverActive(false);
+
       const editor = editorRef.current;
       if (!editor || !textColorPreviewMarkersPlacedRef.current) {
         textColorPreviewBaselineRef.current = null;
@@ -3980,6 +3988,8 @@ export function TaskDetailsPanel({
     (color: string) => {
       const editor = editorRef.current;
       if (!editor) return;
+
+      setTextColorPreviewHoverActive(true);
 
       const contentRange = ensureTextColorPreviewSetup();
       if (!contentRange || textColorPreviewBaselineRef.current === null) return;
@@ -6822,7 +6832,55 @@ export function TaskDetailsPanel({
       return;
     }
 
+    const gapWrapper =
+      !event.shiftKey && !isMultiClick
+        ? getImageGapCaretWrapper(editor, event.clientX, event.clientY)
+        : null;
+    if (gapWrapper) {
+      // Click between two images: put the caret between them.
+      event.preventDefault();
+      window.getSelection()?.removeAllRanges();
+      editor.focus();
+      placeCaretBelowWrapper(gapWrapper);
+      const gapLine = gapWrapper.closest(".detail-line");
+      if (gapLine instanceof HTMLElement) {
+        clickedLineRef.current = gapLine;
+      }
+      pendingClickLineRef.current = null;
+      updateLineControls();
+      requestAnimationFrame(() => {
+        updateLineControls();
+      });
+      return;
+    }
+
     const line = getLineElementAtPoint(editor, event.clientY);
+    if (line && !isTitleLine(editor, line) && !isCodeLine(line)) {
+      const imageWrappers = getLineImageWrappers(line);
+      const firstImageRect = imageWrappers[0]?.getBoundingClientRect();
+      if (
+        firstImageRect &&
+        !event.shiftKey &&
+        !isMultiClick &&
+        event.clientX < firstImageRect.left &&
+        event.clientY >= firstImageRect.top &&
+        event.clientY <= firstImageRect.bottom
+      ) {
+        // Click to the left of an image: put the caret under the image.
+        event.preventDefault();
+        window.getSelection()?.removeAllRanges();
+        editor.focus();
+        placeCaretBelowWrapper(imageWrappers[imageWrappers.length - 1]);
+        clickedLineRef.current = line;
+        pendingClickLineRef.current = null;
+        updateLineControls();
+        requestAnimationFrame(() => {
+          updateLineControls();
+        });
+        return;
+      }
+    }
+
     if (!line || line.querySelector(".detail-image-wrapper") || isCodeLine(line)) {
       return;
     }
@@ -8918,7 +8976,7 @@ export function TaskDetailsPanel({
                             captureFormatSelectionFromEditor();
                             clearFormatting();
                           }}
-                          className={`flex h-10 min-w-[2.25rem] cursor-pointer items-center justify-center rounded-full px-2.5 text-zinc-500 transition-colors hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-100 ${TASK_DETAILS_HEADER_ICON_HOVER_CLASS}`}
+                          className={`flex size-8 cursor-pointer items-center justify-center rounded-full px-2.5 text-zinc-500 transition-colors hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-100 ${TASK_DETAILS_HEADER_ICON_HOVER_CLASS}`}
                         >
                           <LuRemoveFormatting className="size-[18px]" />
                         </button>
@@ -8986,7 +9044,7 @@ export function TaskDetailsPanel({
                       aria-label="Open note full width"
                       aria-describedby="task-details-enter-fullscreen-tooltip"
                       onClick={onEnterDetailsFullscreen}
-                      className={`flex h-10 min-w-[2.25rem] cursor-pointer items-center justify-center rounded-full px-1 text-slate-400 transition-colors hover:text-zinc-600 dark:text-zinc-400 dark:hover:text-zinc-100 ${TASK_DETAILS_HEADER_ICON_HOVER_CLASS}`}
+                      className={`flex size-9 cursor-pointer items-center justify-center rounded-full px-1 text-slate-400 transition-colors hover:text-zinc-600 dark:text-zinc-400 dark:hover:text-zinc-100 ${TASK_DETAILS_HEADER_ICON_HOVER_CLASS}`}
                     >
                       <RxEnterFullScreen
                         className="size-[15px] text-[#b6b6b6]"
@@ -9092,6 +9150,9 @@ export function TaskDetailsPanel({
               data-format-highlight-menu-open={
                 openFormatDropdown === "highlight" ? "true" : undefined
               }
+              data-format-text-color-preview={
+                textColorPreviewHoverActive ? "true" : undefined
+              }
               contentEditable
               suppressContentEditableWarning
               onInput={handleEditorInput}
@@ -9157,7 +9218,7 @@ export function TaskDetailsPanel({
                       type="button"
                       aria-label="Drag line"
                       title="Drag to reorder line"
-                        className="pointer-events-auto flex w-[23px] h-[26px] cursor-grab items-center justify-center rounded-full px-[1px] py-[3px] mr-[2px] text-zinc-300 transition-colors hover:bg-zinc-100 hover:text-zinc-700 active:cursor-grabbing dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+                        className="pointer-events-auto flex w-[23px] h-[26px] cursor-grab items-center justify-center rounded-full px-[1px] py-[3px] mr-[2px] text-[#565678] transition-colors hover:bg-zinc-100 hover:text-zinc-700 active:cursor-grabbing dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
                       onPointerDown={(event) =>
                         handleLineDragStart(event, lineId)
                       }
@@ -9218,7 +9279,7 @@ export function TaskDetailsPanel({
           >
             {previewType ? (
               <div
-                className="absolute left-full ml-2"
+                className="absolute left-full ml-[3px]"
                 style={{ top: previewTopOffset }}
               >
                 <SlashCommandBlockPreview type={previewType} />
@@ -9293,7 +9354,7 @@ export function TaskDetailsPanel({
           >
             {previewType ? (
               <div
-                className="absolute left-full ml-2"
+                className="absolute left-full ml-[3px]"
                 style={{ top: previewTopOffset }}
               >
                 <SlashCommandBlockPreview type={previewType} />

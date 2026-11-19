@@ -9,17 +9,13 @@ import {
   useMemo,
   useRef,
   useState,
-  type ReactNode,
   type RefObject,
 } from "react";
 import { createPortal } from "react-dom";
 import { BiChevronDown, BiSortAlt2 } from "react-icons/bi";
 import {
-  LuArrowDownWideNarrow,
-  LuArrowUpDown,
   LuCalendarCheck2,
   LuCheck,
-  LuChevronLeft,
   LuChevronRight,
   LuLayoutList,
   LuMenu,
@@ -153,7 +149,7 @@ function measureTaskListTruncationOverflow(root: HTMLElement | null) {
   return maxOverflow;
 }
 
-type SortField = "date" | "title";
+type SortField = "date" | "title" | "manual";
 type SortDirection = "asc" | "desc";
 type GroupField =
   | "none"
@@ -170,7 +166,7 @@ type SortOption = {
   direction: SortDirection;
 };
 
-type SortMenuView = "main" | "group" | "sort" | "order";
+type SortMenuView = "main" | "group";
 
 type SortOrderHistoryEntry = {
   activeSort: SortOption | null;
@@ -194,6 +190,17 @@ const DEFAULT_SORT_OPTION: SortOption = {
   direction: "asc",
 };
 
+/** After drag-reorder, list order matches saved positions — not an automatic sort. */
+const MANUAL_SORT_OPTION: SortOption = {
+  group: "none",
+  field: "manual",
+  direction: "asc",
+};
+
+function isManualSortOption(option: SortOption | null | undefined) {
+  return option?.field === "manual";
+}
+
 const GROUP_BY_OPTIONS: { value: GroupField; label: string }[] = [
   { value: "none", label: "None" },
   { value: "kindNotes", label: "Type: Notes first" },
@@ -204,6 +211,7 @@ const GROUP_BY_OPTIONS: { value: GroupField; label: string }[] = [
 ];
 
 const SORT_BY_OPTIONS: { value: SortField; label: string }[] = [
+  { value: "manual", label: "Custom" },
   { value: "date", label: "Date" },
   { value: "title", label: "Title" },
 ];
@@ -211,9 +219,28 @@ const SORT_BY_OPTIONS: { value: SortField; label: string }[] = [
 const ORDER_LABELS: Record<SortField, Record<SortDirection, string>> = {
   date: { asc: "Oldest First", desc: "Newest First" },
   title: { asc: "A to Z", desc: "Z to A" },
+  manual: { asc: "Manual", desc: "Manual" },
 };
 
+function getSortByMenuLabel(field: SortField) {
+  return (
+    SORT_BY_OPTIONS.find((item) => item.value === field)?.label ??
+    (field === "manual" ? "Custom" : "Date")
+  );
+}
+
+function getOrderMenuLabel(option: SortOption) {
+  if (option.field === "manual") {
+    return "Manual";
+  }
+  return ORDER_LABELS[option.field][option.direction];
+}
+
 function describeSortOption(option: SortOption) {
+  if (isManualSortOption(option)) {
+    return "custom manual order";
+  }
+
   const group = GROUP_BY_OPTIONS.find((item) => item.value === option.group);
   const sort = SORT_BY_OPTIONS.find((item) => item.value === option.field);
   return `${group?.value === "none" ? "No grouping" : `grouped by ${group?.label}`}, sorted by ${sort?.label} (${ORDER_LABELS[option.field][option.direction]})`;
@@ -475,6 +502,10 @@ function compareTaskSortField(
   field: SortField,
   direction: SortDirection,
 ) {
+  if (field === "manual") {
+    return 0;
+  }
+
   if (field === "title") {
     const comparison = compareTaskNames(a, b);
     return direction === "asc" ? comparison : -comparison;
@@ -496,6 +527,10 @@ function compareTaskSortField(
 }
 
 function sortTasks(tasks: TaskListItem[], option: SortOption) {
+  if (isManualSortOption(option)) {
+    return [...tasks];
+  }
+
   const sorted = [...tasks];
 
   sorted.sort((a, b) => {
@@ -2048,6 +2083,11 @@ export function TaskListPanel({
 
       pushSortOrderUndoSnapshot();
 
+      if (isManualSortOption(sortOption)) {
+        setActiveSort(sortOption);
+        return;
+      }
+
       const pinned = orderedTasksRef.current.filter((task) => task.pinned);
       const unpinned = orderedTasksRef.current.filter((task) => !task.pinned);
       const sorted = sortTasks(unpinned, sortOption);
@@ -2475,7 +2515,8 @@ export function TaskListPanel({
   function handleDuplicateTask(taskId: string) {
     closeTaskMenus();
     void onDuplicateTask?.(taskId, {
-      insertAfterTaskId: activeSort === null ? taskId : null,
+      insertAfterTaskId:
+        activeSort === null || isManualSortOption(activeSort) ? taskId : null,
     });
   }
 
@@ -2953,7 +2994,8 @@ export function TaskListPanel({
       const parentChanged = parentUpdates.length > 0;
 
       if (orderChanged || parentChanged) {
-        setActiveSort(null);
+        pushSortOrderUndoSnapshot();
+        setActiveSort(MANUAL_SORT_OPTION);
 
         let nextOrderedTasks =
           dragState.section === "pinned"
@@ -3435,167 +3477,180 @@ export function TaskListPanel({
                   </button>
 
                   {isSortMenuOpen && (
-                    <div className="absolute right-0 top-full z-50 min-w-[282px] pt-1">
-                      <div
-                        role="menu"
-                        className="task-list-sort-menu p-1.5"
-                      >
-                        {(() => {
-                          const current = activeSort ?? DEFAULT_SORT_OPTION;
-                          const rowClass =
-                            "flex h-[40px] w-full cursor-pointer items-center gap-3 rounded-xl px-3 text-left text-[14px] ptxt-700 transition-colors hover:bg-zinc-100 hover:ptxt-900 dark:ptxt-200 dark:hover:bg-zinc-800/80";
-                          const valueClass =
-                            "shrink-0 text-[13px] font-normal ptxt-500 dark:ptxt-400";
+                    <div className="absolute right-0 top-full z-50 min-w-[267px] pt-1">
+                      {(() => {
+                        const current = activeSort ?? DEFAULT_SORT_OPTION;
+                        const isManual = isManualSortOption(current);
+                        const rowClass =
+                          "flex h-[36px] w-full cursor-pointer items-center gap-3 rounded-xl px-3 text-left text-[14px] ptxt-700 transition-colors hover:bg-zinc-100 hover:ptxt-900 dark:ptxt-200 dark:hover:bg-zinc-800/80";
+                        const activeRowClass =
+                          "bg-zinc-100 font-medium ptxt-900 dark:bg-zinc-800 dark:ptxt-100";
+                        const sectionLabelClass =
+                          "px-3 pb-0.5 pt-1.5 text-[11px] font-medium uppercase tracking-wide ptxt-400 dark:ptxt-500";
+                        const isGroupSubmenuOpen = sortMenuView === "group";
 
-                          if (sortMenuView === "main") {
-                            const mainRows: {
-                              view: Exclude<SortMenuView, "main">;
-                              label: string;
-                              value: string;
-                              icon: ReactNode;
-                            }[] = [
-                              {
-                                view: "group",
-                                label: "Group by",
-                                value:
-                                  GROUP_BY_OPTIONS.find(
-                                    (item) => item.value === current.group,
-                                  )?.label ?? "None",
-                                icon: <LuLayoutList className="size-[17px]" />,
-                              },
-                              {
-                                view: "sort",
-                                label: "Sort by",
-                                value:
-                                  SORT_BY_OPTIONS.find(
-                                    (item) => item.value === current.field,
-                                  )?.label ?? "Date",
-                                icon: (
-                                  <LuArrowDownWideNarrow className="size-[17px]" />
-                                ),
-                              },
-                              {
-                                view: "order",
-                                label: "Order",
-                                value:
-                                  ORDER_LABELS[current.field][current.direction],
-                                icon: <LuArrowUpDown className="size-[17px]" />,
-                              },
-                            ];
+                        const sortItems = SORT_BY_OPTIONS.map((item) => ({
+                          key: item.value,
+                          label: item.label,
+                          isActive: current.field === item.value,
+                          next:
+                            item.value === "manual"
+                              ? { ...MANUAL_SORT_OPTION }
+                              : {
+                                  ...current,
+                                  field: item.value as Exclude<
+                                    SortField,
+                                    "manual"
+                                  >,
+                                },
+                        }));
 
-                            return mainRows.map((row) => (
+                        const orderItems = isManual
+                          ? [
+                              {
+                                key: "manual",
+                                label: "Manual",
+                                isActive: true,
+                                next: { ...MANUAL_SORT_OPTION },
+                              },
+                            ]
+                          : (["asc", "desc"] as const).map((direction) => ({
+                              key: direction,
+                              label: ORDER_LABELS[current.field][direction],
+                              isActive: current.direction === direction,
+                              next: { ...current, direction },
+                            }));
+
+                        const renderOptionRow = (
+                          item: {
+                            key: string;
+                            label: string;
+                            isActive: boolean;
+                            next: SortOption;
+                          },
+                          inGroupSubmenu = false,
+                        ) => (
+                          <button
+                            key={item.key}
+                            type="button"
+                            role="menuitemradio"
+                            aria-checked={item.isActive}
+                            onMouseEnter={() => {
+                              if (!inGroupSubmenu) setSortMenuView("main");
+                            }}
+                            onClick={() => applySort(item.next)}
+                            className={`${rowClass} ${
+                              item.isActive ? activeRowClass : ""
+                            }`}
+                          >
+                            <span className="min-w-0 flex-1 truncate">
+                              {item.label}
+                            </span>
+                            <span className="flex size-[14px] shrink-0 items-center justify-center">
+                              {item.isActive ? (
+                                <LuCheck
+                                  className="size-[14px]"
+                                  aria-hidden="true"
+                                />
+                              ) : null}
+                            </span>
+                          </button>
+                        );
+
+                        const groupValue =
+                          GROUP_BY_OPTIONS.find(
+                            (item) => item.value === current.group,
+                          )?.label ?? "None";
+
+                        return (
+                          <div className="relative">
+                            <div
+                              role="menu"
+                              className="task-list-sort-menu p-1.5"
+                            >
                               <button
-                                key={row.view}
                                 type="button"
                                 role="menuitem"
                                 aria-haspopup="menu"
-                                aria-label={`${row.label}: ${row.value}`}
-                                onClick={() => setSortMenuView(row.view)}
-                                onMouseEnter={() => setSortMenuView("main")}
-                                className={rowClass}
+                                aria-expanded={isGroupSubmenuOpen}
+                                aria-label={`Group by: ${groupValue}`}
+                                onClick={() =>
+                                  setSortMenuView(
+                                    isGroupSubmenuOpen ? "main" : "group",
+                                  )
+                                }
+                                onMouseEnter={() => setSortMenuView("group")}
+                                className={`${rowClass} h-[40px] ${
+                                  isGroupSubmenuOpen
+                                    ? "bg-zinc-100 ptxt-900 dark:bg-zinc-800/80"
+                                    : ""
+                                }`}
                               >
                                 <span
                                   className="flex size-[18px] shrink-0 items-center justify-center ptxt-600 dark:ptxt-300"
                                   aria-hidden="true"
                                 >
-                                  {row.icon}
+                                  <LuLayoutList className="size-[17px]" />
                                 </span>
                                 <span className="min-w-0 flex-1 truncate">
-                                  {row.label}
+                                  Group by
                                 </span>
-                                <span className={valueClass}>{row.value}</span>
+                                <span className="shrink-0 text-[13px] font-normal ptxt-500 dark:ptxt-400">
+                                  {groupValue}
+                                </span>
                                 <LuChevronRight
                                   className="size-[14px] shrink-0 ptxt-400 dark:ptxt-500"
                                   aria-hidden="true"
                                 />
                               </button>
-                            ));
-                          }
-
-                          const submenuTitle =
-                            sortMenuView === "group"
-                              ? "Group by"
-                              : sortMenuView === "sort"
-                                ? "Sort by"
-                                : "Order";
-                          const submenuItems: {
-                            key: string;
-                            label: string;
-                            isActive: boolean;
-                            next: SortOption;
-                          }[] =
-                            sortMenuView === "group"
-                              ? GROUP_BY_OPTIONS.map((item) => ({
-                                  key: item.value,
-                                  label: item.label,
-                                  isActive: current.group === item.value,
-                                  next: { ...current, group: item.value },
-                                }))
-                              : sortMenuView === "sort"
-                                ? SORT_BY_OPTIONS.map((item) => ({
-                                    key: item.value,
-                                    label: item.label,
-                                    isActive: current.field === item.value,
-                                    next: { ...current, field: item.value },
-                                  }))
-                                : (["asc", "desc"] as const).map(
-                                    (direction) => ({
-                                      key: direction,
-                                      label:
-                                        ORDER_LABELS[current.field][direction],
-                                      isActive: current.direction === direction,
-                                      next: { ...current, direction },
-                                    }),
-                                  );
-
-                          return (
-                            <>
-                              <button
-                                type="button"
-                                aria-label="Back"
-                                onClick={() => setSortMenuView("main")}
-                                className="flex h-[36px] w-full cursor-pointer items-center gap-2 rounded-xl px-3 text-left text-[13px] font-medium ptxt-500 transition-colors hover:bg-zinc-100 hover:ptxt-800 dark:ptxt-400 dark:hover:bg-zinc-800/80"
-                              >
-                                <LuChevronLeft
-                                  className="size-[14px] shrink-0"
-                                  aria-hidden="true"
-                                />
-                                <span>{submenuTitle}</span>
-                              </button>
                               <div
                                 role="separator"
                                 className="mx-2 my-1 border-t border-zinc-200 dark:border-zinc-700"
                               />
-                              {submenuItems.map((item) => (
-                                <button
-                                  key={item.key}
-                                  type="button"
-                                  role="menuitemradio"
-                                  aria-checked={item.isActive}
-                                  onClick={() => applySort(item.next)}
-                                  className={`${rowClass} h-[36px] ${
-                                    item.isActive
-                                      ? "bg-zinc-100 font-medium ptxt-900 dark:bg-zinc-800 dark:ptxt-100"
-                                      : ""
-                                  }`}
+                              <div
+                                className={sectionLabelClass}
+                                onMouseEnter={() => setSortMenuView("main")}
+                              >
+                                Sort by
+                              </div>
+                              {sortItems.map((item) => renderOptionRow(item))}
+                              <div
+                                role="separator"
+                                className="mx-2 my-1 border-t border-zinc-200 dark:border-zinc-700"
+                              />
+                              <div
+                                className={sectionLabelClass}
+                                onMouseEnter={() => setSortMenuView("main")}
+                              >
+                                Order
+                              </div>
+                              {orderItems.map((item) => renderOptionRow(item))}
+                            </div>
+
+                            {isGroupSubmenuOpen ? (
+                              <div className="absolute right-full top-0 z-50 min-w-[200px] pr-1">
+                                <div
+                                  role="menu"
+                                  aria-label="Group by"
+                                  className="task-list-sort-menu p-1.5"
                                 >
-                                  <span className="min-w-0 flex-1 truncate">
-                                    {item.label}
-                                  </span>
-                                  <span className="flex size-[14px] shrink-0 items-center justify-center">
-                                    {item.isActive ? (
-                                      <LuCheck
-                                        className="size-[14px]"
-                                        aria-hidden="true"
-                                      />
-                                    ) : null}
-                                  </span>
-                                </button>
-                              ))}
-                            </>
-                          );
-                        })()}
-                      </div>
+                                  {GROUP_BY_OPTIONS.map((item) =>
+                                    renderOptionRow(
+                                      {
+                                        key: item.value,
+                                        label: item.label,
+                                        isActive: current.group === item.value,
+                                        next: { ...current, group: item.value },
+                                      },
+                                      true,
+                                    ),
+                                  )}
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
                 </div>

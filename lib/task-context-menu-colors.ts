@@ -47,6 +47,9 @@ export const TASK_CONTEXT_MENU_COLORS = Object.fromEntries(
   ]),
 ) as { [K in TaskContextMenuColorKey]: string };
 
+/** Text color of the main task-row context menu items (used as-is, not lightened). */
+export const TASK_CONTEXT_MENU_ITEM_TEXT_COLOR = "#787890";
+
 export function taskContextMenuTextColor(
   key: TaskContextMenuColorKey,
 ): CSSProperties {

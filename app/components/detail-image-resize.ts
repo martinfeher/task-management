@@ -44,22 +44,8 @@ function parseMarginTop(element: HTMLElement) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function isCornerHandle(handle: ImageResizeHandle) {
-  return (
-    handle === "ne" ||
-    handle === "nw" ||
-    handle === "se" ||
-    handle === "sw"
-  );
-}
-
 function isUpwardHeightHandle(handle: ImageResizeHandle) {
   return handle === "n" || handle === "ne" || handle === "nw";
-}
-
-/** Handles whose drag moves the right edge (left edge/opposite side stays fixed). */
-function isEastHandle(handle: ImageResizeHandle) {
-  return handle === "e" || handle === "ne" || handle === "se";
 }
 
 /** Handles whose drag moves the left edge (right edge/opposite side stays fixed). */
@@ -124,6 +110,8 @@ function clampResizeLayout(
   deltaY: number,
   state: ResizeStartState,
 ) {
+  // The aspect ratio is always preserved: every handle (edges and corners)
+  // derives the other dimension from the width/height ratio.
   let { width, height } = computeResizeSize(
     handle,
     state.startWidth,
@@ -133,47 +121,35 @@ function clampResizeLayout(
     deltaY,
   );
 
-  if (isUpwardHeightHandle(handle)) {
-    const maxUpward = Math.max(0, state.startWrapperTop - state.minAllowedTop);
-    const maxHeightFromTop = state.startHeight + 2 * maxUpward;
+  const maxUpward = Math.max(0, state.startWrapperTop - state.minAllowedTop);
+  const maxHeightFromTop = state.startHeight + 2 * maxUpward;
 
-    if (height > maxHeightFromTop) {
-      height = maxHeightFromTop;
-      if (isCornerHandle(handle)) {
-        width = height * aspectRatio;
-      }
-    }
+  if (isUpwardHeightHandle(handle) && height > maxHeightFromTop) {
+    height = maxHeightFromTop;
+    width = height * aspectRatio;
   }
 
   // The edge opposite the dragged handle stays fixed, so the available growth
   // room is bounded by the space between that fixed edge and the line's own
   // edge (not a symmetric/centered allowance).
-  let maxWidth = state.lineWidth;
-  if (isWestHandle(handle)) {
-    maxWidth = state.startWidth + state.startMarginLeft;
-  } else if (isEastHandle(handle)) {
-    maxWidth = state.lineWidth - state.startMarginLeft;
-  }
+  const minWidth = Math.max(MIN_IMAGE_WIDTH, MIN_IMAGE_HEIGHT * aspectRatio);
+  let maxWidth = isWestHandle(handle)
+    ? state.startWidth + state.startMarginLeft
+    : state.lineWidth - state.startMarginLeft;
   maxWidth = Math.min(state.lineWidth, maxWidth);
-  maxWidth = Math.max(MIN_IMAGE_WIDTH, maxWidth);
+  maxWidth = Math.max(minWidth, maxWidth);
 
   if (width > maxWidth) {
     width = maxWidth;
-    if (isCornerHandle(handle)) {
-      height = width / aspectRatio;
-      if (isUpwardHeightHandle(handle)) {
-        const maxUpward = Math.max(0, state.startWrapperTop - state.minAllowedTop);
-        const maxHeightFromTop = state.startHeight + 2 * maxUpward;
-        if (height > maxHeightFromTop) {
-          height = maxHeightFromTop;
-          width = height * aspectRatio;
-        }
-      }
+    height = width / aspectRatio;
+    if (isUpwardHeightHandle(handle) && height > maxHeightFromTop) {
+      height = maxHeightFromTop;
+      width = height * aspectRatio;
     }
   }
 
-  width = clampDimension(width, MIN_IMAGE_WIDTH);
-  height = clampDimension(height, MIN_IMAGE_HEIGHT);
+  width = Math.max(minWidth, Math.round(width));
+  height = Math.max(1, Math.round(width / aspectRatio));
 
   // Keep the edge opposite the dragged handle fixed: east handles grow the
   // image to the right (left edge/marginLeft unchanged); west handles grow
@@ -250,14 +226,21 @@ function enforceLayoutBounds(
   if (wrapperRect.right > lineRect.right + 0.5) {
     const overflow = wrapperRect.right - lineRect.right;
     let marginLeft = parseMarginLeft(wrapper) - overflow;
-    const imageWidth = getImageDimensions(image).width;
+    const { width: imageWidth, height: imageHeight } =
+      getImageDimensions(image);
 
     if (marginLeft < 0) {
       const nextWidth = Math.max(
         MIN_IMAGE_WIDTH,
+        (MIN_IMAGE_HEIGHT * imageWidth) / imageHeight,
         Math.round(imageWidth - (overflow + Math.abs(marginLeft))),
       );
-      applyImageSize(image, nextWidth, getImageDimensions(image).height);
+      // Scale the height with the width so the aspect ratio stays fixed.
+      applyImageSize(
+        image,
+        nextWidth,
+        Math.round((nextWidth * imageHeight) / imageWidth),
+      );
       marginLeft = 0;
     }
 
@@ -280,15 +263,19 @@ function computeResizeSize(
   switch (handle) {
     case "e":
       nextWidth = startWidth + deltaX;
+      nextHeight = nextWidth / aspectRatio;
       break;
     case "w":
       nextWidth = startWidth - deltaX;
+      nextHeight = nextWidth / aspectRatio;
       break;
     case "s":
       nextHeight = startHeight + deltaY;
+      nextWidth = nextHeight * aspectRatio;
       break;
     case "n":
       nextHeight = startHeight - deltaY;
+      nextWidth = nextHeight * aspectRatio;
       break;
     case "se":
       nextHeight = startHeight + deltaY;
@@ -310,9 +297,10 @@ function computeResizeSize(
       break;
   }
 
+  // Minimum sizes are applied by the caller so the aspect ratio is kept.
   return {
-    width: clampDimension(nextWidth, MIN_IMAGE_WIDTH),
-    height: clampDimension(nextHeight, MIN_IMAGE_HEIGHT),
+    width: Math.round(nextWidth),
+    height: Math.round(nextHeight),
   };
 }
 

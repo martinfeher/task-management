@@ -78,6 +78,10 @@ export const FORMAT_TOOLBAR_DROPDOWN_ITEM_CLASS =
 export const FORMAT_TOOLBAR_LIST_BLOCK_MENU_ITEM_CLASS =
   "menu-item-hover-focus flex w-full cursor-pointer items-center gap-2 px-2 py-1.5 text-left text-sm text-zinc-600 hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800";
 
+/** List type dropdown (bullet / numbered / checklist) option text. */
+const FORMAT_TOOLBAR_LIST_TYPE_MENU_ITEM_CLASS =
+  "menu-item-hover-focus flex w-full cursor-pointer items-center gap-2 px-2 py-1.5 text-left text-sm text-[#696970] hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800";
+
 export const FORMAT_TOOLBAR_FONT_FAMILY_TRIGGER_CLASS =
   `flex h-8 cursor-pointer items-center gap-0.5 rounded-lg px-1 text-[13px] ${FORMAT_TOOLBAR_ICON_COLOR} transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800`;
 
@@ -1026,7 +1030,7 @@ export function DetailFormatListDropdown({
           key={type}
           type="button"
           role="menuitem"
-          className={FORMAT_TOOLBAR_LIST_BLOCK_MENU_ITEM_CLASS}
+          className={FORMAT_TOOLBAR_LIST_TYPE_MENU_ITEM_CLASS}
           onClick={() => {
             onSelect(type);
             onOpenChange(false);

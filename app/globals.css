@@ -374,6 +374,7 @@
   --calendar-task-title-brightness: 0.3;
   --calendar-task-modal-content-switch-ms: 125ms;
   --task-detail-image-shadow: 0 3px 6px rgba(0, 0, 0, 0.04);
+  --task-detail-image-border: #E5E5EE;
 }
 
 html[data-app-font="sf-pro"] {
@@ -521,11 +522,13 @@ body {
   background-color: #c2f1ff;
 }
 
-.task-details-editor[data-format-highlight-menu-open="true"] ::selection {
+.task-details-editor[data-format-highlight-menu-open="true"] ::selection,
+.task-details-editor[data-format-text-color-preview="true"] ::selection {
   background-color: transparent;
 }
 
-.task-details-editor[data-format-highlight-menu-open="true"] ::-moz-selection {
+.task-details-editor[data-format-highlight-menu-open="true"] ::-moz-selection,
+.task-details-editor[data-format-text-color-preview="true"] ::-moz-selection {
   background-color: transparent;
 }
 
@@ -730,14 +733,14 @@ body {
 
 .task-details-editor .detail-line[data-line-type="checklist"][data-checked="true"] .detail-checklist-text {
   text-decoration: line-through;
-  color: rgb(87 87 87 / 0.6);
+  color: #C4C2CF;
 }
 
 .dark
   .task-details-editor
   .detail-line[data-line-type="checklist"][data-checked="true"]
   .detail-checklist-text {
-  color: rgb(87 87 87 / 0.6);
+  color: #C4C2CF;
 }
 
 .task-details-editor
@@ -745,7 +748,7 @@ body {
   .detail-checklist-text
   *:not(.detail-image-wrapper):not(.detail-image-wrapper *) {
   text-decoration: line-through;
-  opacity: 0.6;
+  color: inherit;
 }
 
 .detail-line[data-line-type="h1"] {
@@ -778,7 +781,7 @@ body {
   )::before {
   content: "press / to access commands, start writing";
   position: absolute;
-  left: 5px;
+  left: 3px;
   /* Center on the line box so it lines up with the "+" line control. */
   top: 50%;
   transform: translateY(-50%);
@@ -964,7 +967,7 @@ body {
   display: block;
   max-width: 100%;
   height: auto;
-  border: none;
+  border: 1px solid var(--task-detail-image-border);
   border-radius: 0.5rem;
   box-shadow: var(--task-detail-image-shadow);
   cursor: pointer;
@@ -2300,7 +2303,7 @@ body {
 }
 
 .calendar-task-modal .task-details-editor .detail-image {
-  border: none;
+  border: 1px solid var(--task-detail-image-border);
   border-radius: 0.5rem;
   box-shadow: var(--task-detail-image-shadow);
 }
@@ -2761,10 +2764,20 @@ body {
   border-radius: 24px;
 }
 
+.task-list-sort-menu {
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  background-color: rgb(255 255 255 / 0.88);
+}
+
 @media (prefers-color-scheme: dark) {
   .task-list-sort-menu,
   .sidebar-context-menu {
     background-color: rgb(9 9 11 / 0.95);
+  }
+
+  .task-list-sort-menu {
+    background-color: rgb(9 9 11 / 0.88);
   }
 
   .task-details-block-menu {

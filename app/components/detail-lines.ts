@@ -2209,6 +2209,22 @@ function createImageAnnotateButton() {
   return button;
 }
 
+function imageControlsPaintAboveResizeHandles(wrapper: HTMLElement) {
+  const handles = wrapper.querySelector(".detail-image-resize-handles");
+  if (!handles) return true;
+
+  return Array.from(
+    wrapper.querySelectorAll(
+      ".detail-image-delete, .detail-image-crop, .detail-image-annotate",
+    ),
+  ).every(
+    (control) =>
+      (handles.compareDocumentPosition(control) &
+        Node.DOCUMENT_POSITION_FOLLOWING) !==
+      0,
+  );
+}
+
 function wrapImageWithControls(image: HTMLImageElement) {
   let wrapper = image.parentElement;
 
@@ -2235,25 +2251,28 @@ function wrapImageWithControls(image: HTMLImageElement) {
     wrapper.appendChild(createImageAnnotateButton());
   }
 
-  wrapper
-    .querySelectorAll(
-      ".detail-image-delete, .detail-image-crop, .detail-image-annotate",
-    )
-    .forEach((control) => {
-      control.classList.add("task-detail-image-control-surface");
-      if (!(control instanceof HTMLButtonElement)) {
-        return;
-      }
-      if (control.classList.contains("detail-image-delete")) {
-        ensureDetailImageControlTooltip(control, "delete", "Delete");
-      } else if (control.classList.contains("detail-image-crop")) {
-        ensureDetailImageControlTooltip(control, "crop", "Crop");
-      } else if (control.classList.contains("detail-image-annotate")) {
-        ensureDetailImageControlTooltip(control, "annotate", "Annotate");
-      }
-      // Paint above the resize overlay (resize handles use z-index 2).
-      wrapper.appendChild(control);
-    });
+  const imageControls = wrapper.querySelectorAll(
+    ".detail-image-delete, .detail-image-crop, .detail-image-annotate",
+  );
+  imageControls.forEach((control) => {
+    control.classList.add("task-detail-image-control-surface");
+    if (!(control instanceof HTMLButtonElement)) {
+      return;
+    }
+    if (control.classList.contains("detail-image-delete")) {
+      ensureDetailImageControlTooltip(control, "delete", "Delete");
+    } else if (control.classList.contains("detail-image-crop")) {
+      ensureDetailImageControlTooltip(control, "crop", "Crop");
+    } else if (control.classList.contains("detail-image-annotate")) {
+      ensureDetailImageControlTooltip(control, "annotate", "Annotate");
+    }
+  });
+
+  // Paint above the resize overlay (resize handles use z-index 2). Re-parenting
+  // on every editor sync (e.g. mousemove) drops hover and blinks tooltips.
+  if (!imageControlsPaintAboveResizeHandles(wrapper)) {
+    imageControls.forEach((control) => wrapper.appendChild(control));
+  }
 
   return wrapper;
 }
@@ -2476,6 +2495,80 @@ export function getLineImageWrappers(line: HTMLElement) {
   return Array.from(line.querySelectorAll(".detail-image-wrapper")).filter(
     (element): element is HTMLElement => element instanceof HTMLElement,
   );
+}
+
+function hasTextContentAfterWrapper(wrapper: HTMLElement) {
+  let node = wrapper.nextSibling;
+
+  while (node) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      if ((node.textContent ?? "").replace(/\u200B/g, "").trim()) return true;
+    } else if (
+      node instanceof HTMLElement &&
+      node.tagName !== "BR" &&
+      !node.classList.contains("detail-image-wrapper")
+    ) {
+      return true;
+    }
+    node = node.nextSibling;
+  }
+
+  return false;
+}
+
+/**
+ * When the pointer is in the empty space between two neighbouring images
+ * (stacked above each other, or side by side in a row), returns the image
+ * the caret should be placed after so it sits between them.
+ */
+export function getImageGapCaretWrapper(
+  editor: HTMLElement,
+  clientX: number,
+  clientY: number,
+): HTMLElement | null {
+  const wrappers = Array.from(
+    editor.querySelectorAll(".detail-image-wrapper"),
+  ).filter((element): element is HTMLElement => element instanceof HTMLElement);
+  if (wrappers.length < 2) return null;
+
+  const lines = getLineElements(editor);
+
+  for (let index = 0; index < wrappers.length - 1; index += 1) {
+    const first = wrappers[index];
+    const second = wrappers[index + 1];
+    const lineA = first.closest(".detail-line");
+    const lineB = second.closest(".detail-line");
+    if (!(lineA instanceof HTMLElement) || !(lineB instanceof HTMLElement)) {
+      continue;
+    }
+
+    const firstRect = first.getBoundingClientRect();
+    const secondRect = second.getBoundingClientRect();
+
+    const isSideBySide =
+      secondRect.top < firstRect.bottom && firstRect.top < secondRect.bottom;
+
+    if (isSideBySide) {
+      if (
+        lineA === lineB &&
+        clientX > firstRect.right &&
+        clientX < secondRect.left &&
+        clientY >= Math.min(firstRect.top, secondRect.top) &&
+        clientY <= Math.max(firstRect.bottom, secondRect.bottom)
+      ) {
+        return first;
+      }
+      continue;
+    }
+
+    if (clientY <= firstRect.bottom || clientY >= secondRect.top) continue;
+    if (hasTextContentAfterWrapper(first)) continue;
+    if (lines.indexOf(lineB) - lines.indexOf(lineA) > 1) continue;
+
+    return first;
+  }
+
+  return null;
 }
 
 /**

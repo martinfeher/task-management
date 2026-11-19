@@ -37,11 +37,11 @@ const TASK_DETAIL_IMAGE_LIGHTBOX_Z_CLASS = "z-[10070]";
 /** Delay after the preview image loads before the top-right controls fade in. */
 const CONTROLS_REVEAL_DELAY_MS = 250;
 
-/** Min rendered height for the preview image (50% of the viewport). */
-const LIGHTBOX_IMAGE_MIN_HEIGHT_CLASS = "min-h-[50vh]";
+/** Min rendered height for the preview image. */
+const LIGHTBOX_IMAGE_MIN_HEIGHT_CLASS = "min-h-[170px]";
 
-/** Preview frame and image height (93% of the viewport). */
-const LIGHTBOX_IMAGE_HEIGHT_CLASS = "h-[92vh] max-h-[92vh]";
+/** Max preview height (92% of the viewport); the frame hugs the image so controls stay on it. */
+const LIGHTBOX_IMAGE_MAX_HEIGHT_CLASS = "max-h-[92vh]";
 
 const LIGHTBOX_CONTROL_BUTTON_CLASS =
   "task-detail-image-control-surface flex size-[calc(1.75rem-1.5px)] cursor-pointer items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:cursor-not-allowed disabled:opacity-35";
@@ -82,7 +82,7 @@ function LightboxImageControlButton({
 }
 
 const LIGHTBOX_GALLERY_NAV_BUTTON_CLASS =
-  "flex size-11 cursor-pointer items-center justify-center rounded-full border-0 bg-zinc-900/65 text-white shadow-[0_8px_24px_rgba(0,0,0,0.1)] transition-colors hover:bg-zinc-900/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:cursor-not-allowed disabled:opacity-30";
+  "flex size-10 cursor-pointer items-center justify-center rounded-full border-0 bg-zinc-900/65 text-white shadow-[0_8px_24px_rgba(0,0,0,0.1)] transition-colors hover:bg-zinc-900/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:cursor-not-allowed disabled:opacity-30";
 
 export function TaskDetailImageLightbox({
   src,
@@ -205,7 +205,7 @@ export function TaskDetailImageLightbox({
         }}
       >
         <div
-          className={`task-detail-image-lightbox-frame relative flex w-fit max-w-[92vw] items-center justify-center overflow-visible ${LIGHTBOX_IMAGE_HEIGHT_CLASS}`}
+          className={`task-detail-image-lightbox-frame relative flex w-fit max-w-[92vw] items-center justify-center overflow-visible ${LIGHTBOX_IMAGE_MIN_HEIGHT_CLASS} ${LIGHTBOX_IMAGE_MAX_HEIGHT_CLASS}`}
           onMouseDown={(event) => event.stopPropagation()}
         >
         {showGalleryNav ? (
@@ -239,7 +239,7 @@ export function TaskDetailImageLightbox({
                 onAnnotate();
               }}
             >
-              <LuType className="size-[12px]" aria-hidden="true" />
+              <LuType className="size-[13px]" aria-hidden="true" />
             </LightboxImageControlButton>
           ) : null}
           {onCrop ? (
@@ -252,7 +252,7 @@ export function TaskDetailImageLightbox({
                 onCrop();
               }}
             >
-              <LuCrop className="size-[12px]" aria-hidden="true" />
+              <LuCrop className="size-[14px]" aria-hidden="true" />
             </LightboxImageControlButton>
           ) : null}
           <LightboxImageControlButton
@@ -264,7 +264,7 @@ export function TaskDetailImageLightbox({
               onClose();
             }}
           >
-            <LuX className="size-[12px]" aria-hidden="true" />
+            <LuX className="size-[14.5px]" aria-hidden="true" />
           </LightboxImageControlButton>
         </div>
         {/* eslint-disable-next-line @next/next/no-img-element -- user-uploaded task detail URLs */}
@@ -273,7 +273,7 @@ export function TaskDetailImageLightbox({
           src={src}
           alt={alt}
           onLoad={() => setLoadedSrc(src)}
-          className={`task-detail-image-lightbox-image h-auto max-h-full w-auto max-w-full select-none rounded-[8px] object-contain shadow-[0_18px_50px_rgba(15,23,42,0.18)] dark:shadow-[0_18px_50px_rgba(0,0,0,0.45)] ${LIGHTBOX_IMAGE_MIN_HEIGHT_CLASS}`}
+          className={`task-detail-image-lightbox-image h-auto w-auto max-w-full select-none rounded-[8px] object-contain shadow-[0_18px_50px_rgba(15,23,42,0.18)] dark:shadow-[0_18px_50px_rgba(0,0,0,0.45)] ${LIGHTBOX_IMAGE_MIN_HEIGHT_CLASS} ${LIGHTBOX_IMAGE_MAX_HEIGHT_CLASS}`}
           draggable={false}
         />
         {showGalleryNav ? (

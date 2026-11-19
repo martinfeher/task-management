@@ -22,6 +22,7 @@ import type { TaskListItem, TodoList } from "./todo-app";
 import { FROSTED_POPOVER_SURFACE_CLASS } from "@/lib/frosted-popover-surface";
 import {
   TASK_CONTEXT_MENU_COLORS,
+  TASK_CONTEXT_MENU_ITEM_TEXT_COLOR,
   taskContextMenuTextColor,
 } from "@/lib/task-context-menu-colors";
 
@@ -93,7 +94,7 @@ const deleteMenuItemClassName =
   "tcm-menu-item tcm-menu-item--delete flex h-[35px] w-full items-center px-3 text-left text-sm dark:hover:bg-red-950/40";
 
 const taskContextMenuSurfaceStyle = {
-  color: TASK_CONTEXT_MENU_COLORS.textPrimary,
+  color: TASK_CONTEXT_MENU_ITEM_TEXT_COLOR,
   ["--tcm-text-primary" as string]: TASK_CONTEXT_MENU_COLORS.textPrimary,
   ["--tcm-text-secondary" as string]: TASK_CONTEXT_MENU_COLORS.textSecondary,
   ["--tcm-icon-350" as string]: TASK_CONTEXT_MENU_COLORS.icon350,
@@ -251,7 +252,7 @@ function MainMenuItems({
             </span>
             <span
               className="text-[15px]"
-              style={taskContextMenuTextColor("textSecondary")}
+              style={{ color: TASK_CONTEXT_MENU_ITEM_TEXT_COLOR }}
             >
               Move to
             </span>
@@ -302,7 +303,7 @@ function MainMenuItems({
             </span>
             <span
               className="text-[15px]"
-              style={taskContextMenuTextColor("textSecondary")}
+              style={{ color: TASK_CONTEXT_MENU_ITEM_TEXT_COLOR }}
             >
               {task.labels.length > 0 ? "Labels" : "Add label"}
             </span>
