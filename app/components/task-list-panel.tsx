@@ -112,6 +112,7 @@ import {
 } from "@/lib/task-list-interaction-store";
 import { useTaskListBackground } from "@/lib/task-list-background";
 import { LiaTagSolid } from "react-icons/lia";
+import { computeAnchoredMenuPosition } from "@/lib/anchored-menu-position";
 
 export const TASK_LIST_PANEL_DEFAULT_WIDTH = 520;
 export const TASK_LIST_PANEL_NARROW_DEFAULT_WIDTH = 346;
@@ -509,6 +510,8 @@ function sortTasks(tasks: TaskListItem[], option: SortOption) {
 
 const TASK_ROW_CONTEXT_MENU_WIDTH = 220;
 const TASK_ROW_CONTEXT_MENU_HEIGHT = 350;
+/** Tallest the row menu gets; decides whether it opens below or above its icon. */
+const TASK_ROW_MENU_ANCHOR_HEIGHT = 420;
 const ADD_TASK_METADATA_MENU_HOVER_CLOSE_MS = 120;
 /** Horizontal nudge (px, to the right) of the three-dots menu from its anchor. */
 const TASK_ROW_MENU_OFFSET_X = 18;
@@ -530,12 +533,17 @@ function clampPointerContextMenuPosition(x: number, y: number) {
   };
 }
 
+/** Directly under the three-dots icon, or directly over it when there is no room below. */
 function computeTaskRowMenuAnchorPosition(anchor: HTMLElement) {
-  const rect = anchor.getBoundingClientRect();
-  return clampPointerContextMenuPosition(
-    rect.right - TASK_ROW_CONTEXT_MENU_WIDTH + TASK_ROW_MENU_OFFSET_X,
-    rect.bottom + 4,
-  );
+  const position = computeAnchoredMenuPosition(anchor.getBoundingClientRect(), {
+    menuWidth: TASK_ROW_CONTEXT_MENU_WIDTH,
+    menuHeight: TASK_ROW_MENU_ANCHOR_HEIGHT,
+    gap: 4,
+    align: "right",
+    offsetX: TASK_ROW_MENU_OFFSET_X,
+  });
+
+  return { x: position.left, y: position.top, bottom: position.bottom };
 }
 
 type TaskListPanelProps = {
@@ -2198,6 +2206,7 @@ export function TaskListPanel({
       task,
       x: position.x,
       y: position.y,
+      bottom: position.bottom,
       view: "main",
     };
 
@@ -2246,6 +2255,7 @@ export function TaskListPanel({
       task,
       x: position.x,
       y: position.y,
+      bottom: position.bottom,
       view: "main",
     });
   }
@@ -3221,6 +3231,7 @@ export function TaskListPanel({
               fixedPosition={{
                 x: pointerContextMenu.x,
                 y: pointerContextMenu.y,
+                bottom: pointerContextMenu.bottom,
               }}
               onMoveQueryChange={setMoveQuery}
               onLabelQueryChange={setLabelQuery}

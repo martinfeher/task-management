@@ -14,8 +14,14 @@ import {
 } from "./task-completion-checkbox";
 import {
   TaskDatePicker,
-  computeTaskDatePickerMenuPosition,
+  TASK_DATE_PICKER_GAP,
+  TASK_DATE_PICKER_HEIGHT,
+  TASK_DATE_PICKER_WIDTH,
 } from "./task-date-picker";
+import {
+  computeAnchoredMenuPosition,
+  type AnchoredMenuPosition,
+} from "@/lib/anchored-menu-position";
 import type { TaskReminderOptionId } from "@/lib/task-reminder";
 import {
   TaskRowContextMenu,
@@ -157,40 +163,12 @@ const TASK_LABEL_SELECTOR_GAP = 4;
 const TASK_LABEL_SELECTOR_MAX_HEIGHT = 360;
 
 function computeTaskLabelSelectorPosition(rect: DOMRect) {
-  const viewportPadding = 8;
-  let left = rect.left + rect.width / 2 - TASK_LABEL_SELECTOR_WIDTH / 2;
-  let top = rect.bottom + TASK_LABEL_SELECTOR_GAP;
-
-  left = Math.max(
-    viewportPadding,
-    Math.min(
-      left,
-      window.innerWidth - TASK_LABEL_SELECTOR_WIDTH - viewportPadding,
-    ),
-  );
-
-  if (
-    top + TASK_LABEL_SELECTOR_MAX_HEIGHT >
-    window.innerHeight - viewportPadding
-  ) {
-    const aboveTop =
-      rect.top - TASK_LABEL_SELECTOR_GAP - TASK_LABEL_SELECTOR_MAX_HEIGHT;
-    if (aboveTop >= viewportPadding) {
-      top = aboveTop;
-    } else {
-      top = Math.max(
-        viewportPadding,
-        Math.min(
-          top,
-          window.innerHeight -
-            TASK_LABEL_SELECTOR_MAX_HEIGHT -
-            viewportPadding,
-        ),
-      );
-    }
-  }
-
-  return { top, left };
+  return computeAnchoredMenuPosition(rect, {
+    menuWidth: TASK_LABEL_SELECTOR_WIDTH,
+    menuHeight: TASK_LABEL_SELECTOR_MAX_HEIGHT,
+    gap: TASK_LABEL_SELECTOR_GAP,
+    align: "center",
+  });
 }
 
 function resolveClickedLabelPillAnchor(
@@ -234,43 +212,13 @@ function computeTaskPriorityMenuPosition(
   rect: DOMRect,
   anchor: HTMLElement | null,
 ) {
-  const viewportPadding = 8;
-  let left = rect.left + rect.width / 2 - TASK_PRIORITY_MENU_WIDTH / 2;
-  left = Math.max(
-    viewportPadding,
-    Math.min(
-      left,
-      window.innerWidth - TASK_PRIORITY_MENU_WIDTH - viewportPadding,
-    ),
-  );
-
-  const panelBounds = getTaskListPanelScrollBounds(anchor);
-  const belowTop = rect.bottom + TASK_PRIORITY_MENU_GAP;
-  const fitsBelowInPanel =
-    belowTop + TASK_PRIORITY_MENU_HEIGHT <= panelBounds.bottom;
-
-  let top: number;
-  if (fitsBelowInPanel) {
-    top = belowTop;
-  } else {
-    top = rect.top - TASK_PRIORITY_MENU_HEIGHT - TASK_PRIORITY_MENU_GAP;
-    if (top < panelBounds.top) {
-      top = Math.max(
-        panelBounds.top,
-        Math.min(
-          belowTop,
-          panelBounds.bottom - TASK_PRIORITY_MENU_HEIGHT,
-        ),
-      );
-    }
-  }
-
-  top = Math.max(
-    viewportPadding,
-    Math.min(top, window.innerHeight - TASK_PRIORITY_MENU_HEIGHT - viewportPadding),
-  );
-
-  return { top, left };
+  return computeAnchoredMenuPosition(rect, {
+    menuWidth: TASK_PRIORITY_MENU_WIDTH,
+    menuHeight: TASK_PRIORITY_MENU_HEIGHT,
+    gap: TASK_PRIORITY_MENU_GAP,
+    align: "center",
+    bounds: getTaskListPanelScrollBounds(anchor),
+  });
 }
 
 const TASK_ROW_LEFT_BORDER_WIDTH_CLASS = "border-l-[2px]";
@@ -324,9 +272,12 @@ function getRowMenuView(
 }
 
 function computeTaskDatePickerPosition(anchor: HTMLElement) {
-  return computeTaskDatePickerMenuPosition(anchor, {
+  return computeAnchoredMenuPosition(anchor.getBoundingClientRect(), {
+    menuWidth: TASK_DATE_PICKER_WIDTH,
+    menuHeight: TASK_DATE_PICKER_HEIGHT,
+    gap: TASK_DATE_PICKER_GAP,
     align: "center",
-    placementBounds: getTaskListPanelScrollBounds(anchor),
+    bounds: getTaskListPanelScrollBounds(anchor),
   });
 }
 
@@ -533,18 +484,12 @@ export function TaskListTaskRow({
   const labelPillsAnchorRef = useRef<HTMLSpanElement>(null);
   const labelHoverTriggerRef = useRef<HTMLButtonElement>(null);
   const labelMenuAnchorRef = useRef<HTMLElement | null>(null);
-  const [datePickerPosition, setDatePickerPosition] = useState<{
-    top: number;
-    left: number;
-  } | null>(null);
-  const [labelMenuPosition, setLabelMenuPosition] = useState<{
-    top: number;
-    left: number;
-  } | null>(null);
-  const [priorityMenuPosition, setPriorityMenuPosition] = useState<{
-    top: number;
-    left: number;
-  } | null>(null);
+  const [datePickerPosition, setDatePickerPosition] =
+    useState<AnchoredMenuPosition | null>(null);
+  const [labelMenuPosition, setLabelMenuPosition] =
+    useState<AnchoredMenuPosition | null>(null);
+  const [priorityMenuPosition, setPriorityMenuPosition] =
+    useState<AnchoredMenuPosition | null>(null);
   const isDatePickerOpen = openDatePickerTaskId === task.id;
   const dueTimeLabel = formatDueTimeLabel(task.dueTimeMinutes);
   const hasDueTime = normalizeDueTimeMinutes(task.dueTimeMinutes) !== null;
@@ -1158,7 +1103,8 @@ export function TaskListTaskRow({
                   data-task-date-picker-menu
                   className="fixed z-[100]"
                   style={{
-                    top: datePickerPosition?.top ?? 0,
+                    top: datePickerPosition?.top,
+                    bottom: datePickerPosition?.bottom,
                     left: datePickerPosition?.left ?? 0,
                     visibility: datePickerPosition ? "visible" : "hidden",
                   }}
@@ -1397,6 +1343,7 @@ export function TaskListTaskRow({
                 className="fixed z-50"
                 style={{
                   top: labelMenuPosition.top,
+                  bottom: labelMenuPosition.bottom,
                   left: labelMenuPosition.left,
                 }}
                 onMouseEnter={keepLabelMenuPreviewOpen}
@@ -1425,6 +1372,7 @@ export function TaskListTaskRow({
                 className="fixed z-50"
                 style={{
                   top: priorityMenuPosition.top,
+                  bottom: priorityMenuPosition.bottom,
                   left: priorityMenuPosition.left,
                 }}
                 onMouseEnter={keepPriorityMenuPreviewOpen}

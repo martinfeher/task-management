@@ -2634,6 +2634,11 @@ body {
   border-color: #dedeca;
 }
 
+/* Format toolbar dropdown submenus (list, block, font size, overflow, etc.). */
+.format-toolbar-dropdown-menu.frosted-popover-surface {
+  @apply backdrop-blur-[4px];
+}
+
 /* Text color + highlight swatch submenus (format toolbar). */
 .format-toolbar-color-submenu.frosted-popover-surface {
   @apply backdrop-blur-[4px];

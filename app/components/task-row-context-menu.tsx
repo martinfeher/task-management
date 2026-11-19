@@ -37,7 +37,7 @@ type TaskRowContextMenuProps = {
   assignedLabelIds: string[];
   labelQuery: string;
   isLabelSubmitting?: boolean;
-  fixedPosition?: { x: number; y: number };
+  fixedPosition?: { x: number; y?: number; bottom?: number };
   onMoveQueryChange: (value: string) => void;
   onLabelQueryChange: (value: string) => void;
   onToggleLabelSelection: (labelId: string) => void;
@@ -568,6 +568,7 @@ export function TaskRowContextMenu({
     estimateMainMenuWidth,
     fixedPosition?.x,
     fixedPosition?.y,
+    fixedPosition?.bottom,
     showMoveFlyout,
     view,
   ]);
@@ -680,6 +681,7 @@ export function TaskRowContextMenu({
         style={{
           left: fixedPosition.x + fixedLeftOffset,
           top: fixedPosition.y,
+          bottom: fixedPosition.bottom,
         }}
       >
         {menu}

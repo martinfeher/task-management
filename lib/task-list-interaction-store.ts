@@ -7,7 +7,10 @@ export type TaskListPointerContextMenuState = {
   taskId: string;
   task: TaskListItem;
   x: number;
-  y: number;
+  /** Top edge of the menu; omitted when the menu is pinned above its anchor via `bottom`. */
+  y?: number;
+  /** CSS `bottom` for a menu opened above its anchor icon. */
+  bottom?: number;
   view: TaskRowContextMenuView;
 };
 

@@ -295,7 +295,7 @@ export function LoginForm({ googleConfigured }: LoginFormProps) {
           <button
             type="submit"
             disabled={isBusy}
-            className="w-full rounded-[22px] bg-[#3d5077] hover:bg-[#424654] px-4 py-2.5 text-sm font-medium text-white transition-colors disabled:cursor-not-allowed disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 cursor-pointer"
+            className="w-full rounded-[22px] bg-[#3d5077] hover:bg-[#2d4067] px-4 py-2.5 text-sm font-medium text-white transition-colors duration-300 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 cursor-pointer"
           >
             {isBusy
               ? mode === "sign-up"
