@@ -23,6 +23,9 @@ import type { ComponentProps } from "react";
 
 type CalendarPanelProps = ComponentProps<typeof CalendarPanel>;
 
+/** Above standalone {@link CalendarPanel} (`z-[4000]`) on full-page `/calendar/*` routes. */
+const CALENDAR_SHORTCUT_MODAL_Z_CLASS = "z-[10050]";
+
 type CalendarShortcutModalProps = {
   open: boolean;
   onClose: () => void;
@@ -119,7 +122,7 @@ export function CalendarShortcutModal({
   if (!open) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[100]">
+    <div className={`fixed inset-0 ${CALENDAR_SHORTCUT_MODAL_Z_CLASS}`}>
       <button
         type="button"
         aria-label="Close calendar"
@@ -137,9 +140,9 @@ export function CalendarShortcutModal({
           type="button"
           aria-label="Close calendar"
           onClick={handleClose}
-          className="absolute top-[3px] right-[3px] z-[2100] flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-zinc-500 transition-colors hover:bg-[#e8e8e8] hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+          className="absolute right-1.5 top-1.5 z-[5000] flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#f2f2f8] text-zinc-500 shadow-sm transition-colors hover:bg-[#e2e2e6] hover:text-zinc-800 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 dark:hover:text-zinc-100"
         >
-          <LuX className="size-4" />
+          <LuX className="size-4" strokeWidth={2.25} />
         </button>
         <div className="flex min-h-0 px-2 pb-2 pt-1 flex-1 flex-col overflow-hidden">
           <CalendarPanel

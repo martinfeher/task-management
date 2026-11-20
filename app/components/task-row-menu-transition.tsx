@@ -27,7 +27,7 @@ function prefersReducedMotion() {
   );
 }
 
-function playMenuEnter(node: HTMLElement) {
+function playMenuEnter(node: HTMLElement, solid: boolean) {
   const previous = lastClosedMenu;
   lastClosedMenu = null;
 
@@ -45,10 +45,13 @@ function playMenuEnter(node: HTMLElement) {
       node.animate(
         [
           {
-            opacity: 0,
+            ...(solid ? {} : { opacity: 0 }),
             transform: `translate(${dx}px, ${dy}px) scale(0.97)`,
           },
-          { opacity: 1, transform: "translate(0, 0) scale(1)" },
+          {
+            ...(solid ? {} : { opacity: 1 }),
+            transform: "translate(0, 0) scale(1)",
+          },
         ],
         { duration: MENU_SWITCH_MS, easing: MENU_EASING },
       );
@@ -58,8 +61,11 @@ function playMenuEnter(node: HTMLElement) {
 
   node.animate(
     [
-      { opacity: 0, transform: "translateY(-4px) scale(0.98)" },
-      { opacity: 1, transform: "none" },
+      {
+        ...(solid ? {} : { opacity: 0 }),
+        transform: "translateY(-4px) scale(0.98)",
+      },
+      { ...(solid ? {} : { opacity: 1 }), transform: "none" },
     ],
     { duration: MENU_ENTER_MS, easing: MENU_EASING },
   );
@@ -69,7 +75,7 @@ function playMenuEnter(node: HTMLElement) {
  * Fades out a static copy of the menu in place so closing (or switching to a
  * different menu) cross-fades instead of vanishing.
  */
-function playMenuExit(node: HTMLElement) {
+function playMenuExit(node: HTMLElement, solid: boolean) {
   if (!node.isConnected) return;
 
   const rect = node.getBoundingClientRect();
@@ -77,6 +83,9 @@ function playMenuExit(node: HTMLElement) {
 
   lastClosedMenu = { left: rect.left, top: rect.top, at: performance.now() };
 
+  // Solid menus never cross-fade (that makes them look see-through); they
+  // simply disappear once closed.
+  if (solid) return;
   if (typeof node.animate !== "function" || prefersReducedMotion()) return;
 
   const ghost = node.cloneNode(true) as HTMLElement;
@@ -110,6 +119,8 @@ type TaskRowMenuTransitionProps = ComponentPropsWithoutRef<"div"> & {
   innerRef?: Ref<HTMLDivElement>;
   /** Set to false while the menu is mounted but not yet positioned. */
   active?: boolean;
+  /** Animate position/scale only, never opacity, so the menu always looks opaque. */
+  solid?: boolean;
 };
 
 /**
@@ -120,6 +131,7 @@ type TaskRowMenuTransitionProps = ComponentPropsWithoutRef<"div"> & {
 export function TaskRowMenuTransition({
   innerRef,
   active = true,
+  solid = false,
   style,
   children,
   ...rest
@@ -134,9 +146,9 @@ export function TaskRowMenuTransition({
     const node = localRef.current;
     if (!node) return;
 
-    playMenuEnter(node);
-    return () => playMenuExit(node);
-  }, [active]);
+    playMenuEnter(node, solid);
+    return () => playMenuExit(node, solid);
+  }, [active, solid]);
 
   return (
     <div

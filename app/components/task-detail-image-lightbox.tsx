@@ -170,12 +170,7 @@ export function TaskDetailImageLightbox({
 
   return createPortal(
     <div
-      className={`task-detail-image-lightbox fixed inset-0 ${TASK_DETAIL_IMAGE_LIGHTBOX_Z_CLASS} flex cursor-zoom-out flex-col`}
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) {
-          onClose();
-        }
-      }}
+      className={`task-detail-image-lightbox fixed inset-0 ${TASK_DETAIL_IMAGE_LIGHTBOX_Z_CLASS} flex cursor-auto flex-col`}
       role="dialog"
       aria-modal="true"
       aria-label={galleryTitle && showGalleryNav ? undefined : ariaLabel}
@@ -185,6 +180,12 @@ export function TaskDetailImageLightbox({
           : undefined
       }
     >
+      <div
+        className="absolute inset-0 z-0 cursor-auto"
+        aria-hidden="true"
+        onClick={onClose}
+      />
+      <div className="relative z-10 flex min-h-0 flex-1 cursor-auto flex-col pointer-events-none">
       {showGalleryNav && galleryTitle ? (
         <header className="shrink-0 px-6 pt-2 pb-2">
           <h2
@@ -196,17 +197,9 @@ export function TaskDetailImageLightbox({
           </h2>
         </header>
       ) : null}
-      <div
-        className="flex min-h-0 flex-1 items-center justify-center px-6 py-[2vh]"
-        onMouseDown={(event) => {
-          if (event.target === event.currentTarget) {
-            onClose();
-          }
-        }}
-      >
+      <div className="flex min-h-0 flex-1 items-center justify-center px-6 py-[2vh]">
         <div
-          className={`task-detail-image-lightbox-frame relative flex w-fit max-w-[92vw] items-center justify-center overflow-visible ${LIGHTBOX_IMAGE_MIN_HEIGHT_CLASS} ${LIGHTBOX_IMAGE_MAX_HEIGHT_CLASS}`}
-          onMouseDown={(event) => event.stopPropagation()}
+          className={`task-detail-image-lightbox-frame pointer-events-auto relative flex w-fit max-w-[92vw] cursor-auto items-center justify-center overflow-visible ${LIGHTBOX_IMAGE_MIN_HEIGHT_CLASS} ${LIGHTBOX_IMAGE_MAX_HEIGHT_CLASS}`}
         >
         {showGalleryNav ? (
           <button
@@ -273,7 +266,7 @@ export function TaskDetailImageLightbox({
           src={src}
           alt={alt}
           onLoad={() => setLoadedSrc(src)}
-          className={`task-detail-image-lightbox-image h-auto w-auto max-w-full select-none rounded-[8px] object-contain shadow-[0_18px_50px_rgba(15,23,42,0.18)] dark:shadow-[0_18px_50px_rgba(0,0,0,0.45)] ${LIGHTBOX_IMAGE_MIN_HEIGHT_CLASS} ${LIGHTBOX_IMAGE_MAX_HEIGHT_CLASS}`}
+          className={`task-detail-image-lightbox-image h-auto w-auto max-w-full cursor-auto select-none rounded-[8px] object-contain shadow-[0_18px_50px_rgba(15,23,42,0.18)] dark:shadow-[0_18px_50px_rgba(0,0,0,0.45)] ${LIGHTBOX_IMAGE_MIN_HEIGHT_CLASS} ${LIGHTBOX_IMAGE_MAX_HEIGHT_CLASS}`}
           draggable={false}
         />
         {showGalleryNav ? (
@@ -292,6 +285,7 @@ export function TaskDetailImageLightbox({
           </button>
         ) : null}
         </div>
+      </div>
       </div>
     </div>,
     document.body,

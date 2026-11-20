@@ -122,7 +122,7 @@ export function CompletedTasksModal({
           </button>
         </div>
 
-        <p className="shrink-0 border-b border-zinc-200 px-4 py-2 text-[13px] text-zinc-400 dark:border-zinc-800 dark:text-zinc-400">
+        <p className="shrink-0 border-b border-zinc-200 px-4 py-2 text-[13px] text-zinc-400 z-[10000] dark:border-zinc-800 dark:text-zinc-400">
           {tasks.length === 0
             ? "Tasks you mark complete appear here."
             : `${tasks.length} completed ${tasks.length === 1 ? "task" : "tasks"}. Undo reopens a task; archive moves it to Archive.`}

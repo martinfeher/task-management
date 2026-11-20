@@ -16,7 +16,13 @@ import { LuCheck, LuCode, LuHeading1, LuHeading2, LuHeading3, LuHistory, LuPilcr
 import { RxEnterFullScreen, RxExitFullScreen } from "react-icons/rx";
 import { HiItalic, HiOutlineNumberedList } from "react-icons/hi2";
 import { VscChecklist } from "react-icons/vsc";
-import { renameTask, updateTaskDueDate, updateTaskDueTime, updateTaskRecurrence } from "@/app/actions/todo";
+import {
+  renameTask,
+  updateTaskDueDate,
+  updateTaskDueDateAndTime,
+  updateTaskDueTime,
+  updateTaskRecurrence,
+} from "@/app/actions/todo";
 import type { TaskRecurrenceRule } from "@/lib/task-recurrence";
 import type { TaskListItem, TodoList } from "./todo-app";
 import type { Label } from "./task-label-selector";
@@ -25,7 +31,15 @@ import {
   type TaskRowContextMenuView,
 } from "./task-row-context-menu";
 import { PiDotsThreeBold, PiListBulletsThin } from "react-icons/pi";
-import { serializeRecurrenceRule } from "@/lib/task-recurrence";
+import {
+  parseRecurrenceRule,
+  serializeRecurrenceRule,
+} from "@/lib/task-recurrence";
+import {
+  TASK_SCHEDULE_UNDO_LABEL,
+  taskScheduleSnapshotsEqual,
+  type TaskScheduleSnapshot,
+} from "@/lib/task-schedule-undo";
 import type { TaskReminderOptionId } from "@/lib/task-reminder";
 import {
   fetchTaskById,
@@ -193,6 +207,7 @@ import {
   DetailFormatTextColorDropdown,
   DetailFormatFontFamilyDropdown,
   DetailFormatFontSizeDropdown,
+  DetailFormatLineHeightDropdown,
   DetailFormatListDropdown,
   DetailFormatOverflowMenu,
   FormatToolbarAnchorPlacementProvider,
@@ -582,7 +597,7 @@ function getFormatToolbarPopoverClass(formatMenu: FormatMenuState) {
 }
 
 const TASK_DETAILS_BLOCK_MENU_CLASS =
-  "task-details-block-menu min-w-[168px] pl-[7px] pr-0 py-0!";
+  "task-details-block-menu min-w-[168px] pr-0 py-0! backdrop-blur-[4px] bg-white/88 dark:bg-zinc-950/88";
 
 const TASK_DETAILS_BLOCK_MENU_ITEM_CLASS =
   "menu-item-hover-focus flex w-full items-center gap-2 py-2 pl-3 pr-2 cursor-pointer text-left text-sm text-zinc-900 hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800";
@@ -596,6 +611,7 @@ const FORMAT_TOOLBAR_ICON_BUTTON_CLASS =
   `flex h-8 w-8 items-center justify-center rounded-lg ${FORMAT_TOOLBAR_ICON_COLOR} transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer`;
 
 const TASK_DETAILS_DATE_MENU_HOVER_CLOSE_MS = 120;
+const MAX_TASK_SCHEDULE_UNDO_STACK = 20;
 /** Above `calendar-task-modal` overlay (`z-[10050]`). */
 const TASK_DETAILS_MODAL_DATE_MENU_Z_CLASS = "z-[10060]";
 /** Above task modal and date menus; matches `.format-toolbar-popover--task-modal` in globals.css. */
@@ -2576,12 +2592,36 @@ export function TaskDetailsPanel({
   const showLinkMenuRef = useRef(false);
   const addBlockMenuRef = useRef<HTMLDivElement>(null);
   const slashCommandMenuRef = useRef<HTMLDivElement>(null);
+  const slashCommandMenuStateRef = useRef<SlashCommandMenuState | null>(null);
+  slashCommandMenuStateRef.current = slashCommandMenu;
+  const cancelSlashCommandRef = useRef<() => void>(() => {});
   const dateMenuRef = useRef<HTMLDivElement>(null);
   const dateMenuCloseTimerRef = useRef<number | null>(null);
   const dateMenuHoverDismissedRef = useRef(false);
   const isRecurrenceMenuOpenRef = useRef(false);
   const isReminderMenuOpenRef = useRef(false);
   const dateButtonRef = useRef<HTMLButtonElement>(null);
+  const isDateMenuOpenRef = useRef(isDateMenuOpen);
+  isDateMenuOpenRef.current = isDateMenuOpen;
+  const dateScheduleUndoStackRef = useRef<TaskScheduleSnapshot[]>([]);
+  const isApplyingScheduleUndoRef = useRef(false);
+  const taskScheduleSnapshotSourceRef = useRef<TaskScheduleSnapshot | null>(null);
+
+  useEffect(() => {
+    if (!task) {
+      taskScheduleSnapshotSourceRef.current = null;
+      return;
+    }
+
+    taskScheduleSnapshotSourceRef.current = {
+      dueDate: task.dueDate,
+      dueTimeMinutes: task.dueTimeMinutes,
+      dueDurationMinutes: task.dueDurationMinutes,
+      dueTimeZone: normalizeDueTimeZone(task.dueTimeZone),
+      recurrenceRule: task.recurrenceRule,
+      reminderOptionId: taskReminderOptionId,
+    };
+  }, [task, taskReminderOptionId]);
 
   useEffect(() => {
     if (!isDateMenuOpen) {
@@ -2980,6 +3020,143 @@ export function TaskDetailsPanel({
         : null,
     );
   }, []);
+
+  const refreshUndoControls = useCallback(() => {
+    if (
+      isDateMenuOpenRef.current &&
+      dateScheduleUndoStackRef.current.length > 0
+    ) {
+      setCanUndo(true);
+      setUndoActionLabel(TASK_SCHEDULE_UNDO_LABEL);
+      setCanRedo(false);
+      setRedoActionLabel(null);
+      return;
+    }
+
+    updateHistoryAvailability();
+  }, [updateHistoryAvailability]);
+
+  const recordTaskScheduleUndoSnapshot = useCallback(() => {
+    if (isApplyingScheduleUndoRef.current) return;
+    if (!isDateMenuOpenRef.current) return;
+
+    const snapshot = taskScheduleSnapshotSourceRef.current;
+    if (!snapshot) return;
+
+    const stack = dateScheduleUndoStackRef.current;
+    const top = stack[stack.length - 1];
+    if (top && taskScheduleSnapshotsEqual(top, snapshot)) return;
+
+    stack.push({ ...snapshot });
+    if (stack.length > MAX_TASK_SCHEDULE_UNDO_STACK) {
+      stack.shift();
+    }
+    refreshUndoControls();
+  }, [refreshUndoControls]);
+
+  const applyTaskScheduleSnapshot = useCallback(
+    async (snapshot: TaskScheduleSnapshot) => {
+      const currentTaskId = taskIdRef.current;
+      if (!currentTaskId) return;
+
+      isApplyingScheduleUndoRef.current = true;
+      try {
+        const dateKey = snapshot.dueDate ? snapshot.dueDate.slice(0, 10) : null;
+
+        const updated = await updateTaskDueDateAndTime(currentTaskId, dateKey, {
+          dueTimeMinutes: snapshot.dueTimeMinutes,
+          dueDurationMinutes: snapshot.dueDurationMinutes,
+          dueTimeZone: normalizeDueTimeZone(snapshot.dueTimeZone),
+        });
+
+        const dueDate = updated.dueDate
+          ? new Date(updated.dueDate).toISOString()
+          : null;
+
+        let nextRecurrenceRule = snapshot.recurrenceRule;
+        const parsedRecurrence = parseRecurrenceRule(snapshot.recurrenceRule);
+        if (onSaveTaskRecurrence) {
+          await onSaveTaskRecurrence(currentTaskId, parsedRecurrence);
+        } else {
+          const recurrenceUpdated = await updateTaskRecurrence(
+            currentTaskId,
+            parsedRecurrence,
+          );
+          nextRecurrenceRule = recurrenceUpdated.recurrenceRule;
+          onRecurrenceUpdated?.(currentTaskId, nextRecurrenceRule);
+        }
+
+        if (snapshot.reminderOptionId) {
+          taskReminderByIdRef.current.set(
+            currentTaskId,
+            snapshot.reminderOptionId,
+          );
+        } else {
+          taskReminderByIdRef.current.delete(currentTaskId);
+        }
+        setTaskReminderOptionId(snapshot.reminderOptionId);
+
+        setTask((current) => {
+          if (!current) return current;
+
+          taskDetailsCache.set(currentTaskId, {
+            id: currentTaskId,
+            name: current.name,
+            completed: current.completed,
+            isNote: current.isNote,
+            details: savedDetailsRef.current,
+            dueDate,
+            dueTimeMinutes: updated.dueTimeMinutes,
+            dueDurationMinutes: updated.dueDurationMinutes,
+            dueTimeZone: updated.dueTimeZone,
+            recurrenceRule: nextRecurrenceRule,
+          });
+
+          return {
+            ...current,
+            dueDate,
+            dueTimeMinutes: updated.dueTimeMinutes,
+            dueDurationMinutes: updated.dueDurationMinutes,
+            dueTimeZone: updated.dueTimeZone,
+            recurrenceRule: nextRecurrenceRule,
+          };
+        });
+
+        onDueDateUpdated(currentTaskId, dueDate, {
+          dueTimeMinutes: updated.dueTimeMinutes,
+          dueDurationMinutes: updated.dueDurationMinutes,
+          dueTimeZone: updated.dueTimeZone,
+        });
+        setMetadataError(null);
+      } catch {
+        setMetadataError("Could not undo the date and time change.");
+      } finally {
+        isApplyingScheduleUndoRef.current = false;
+        refreshUndoControls();
+      }
+    },
+    [
+      onDueDateUpdated,
+      onRecurrenceUpdated,
+      onSaveTaskRecurrence,
+      refreshUndoControls,
+    ],
+  );
+
+  const undoTaskScheduleChange = useCallback(async () => {
+    const stack = dateScheduleUndoStackRef.current;
+    if (stack.length === 0) return false;
+
+    const snapshot = stack.pop()!;
+    await applyTaskScheduleSnapshot(snapshot);
+    refreshUndoControls();
+    return true;
+  }, [applyTaskScheduleSnapshot, refreshUndoControls]);
+
+  useEffect(() => {
+    dateScheduleUndoStackRef.current = [];
+    refreshUndoControls();
+  }, [isDateMenuOpen, task?.id, refreshUndoControls]);
 
   const resetHistory = useCallback(
     (html: string) => {
@@ -3416,9 +3593,17 @@ export function TaskDetailsPanel({
       setLineControls([]);
       return;
     }
-    if (editorHasLiveExtendedTextSelection(editor)) {
-      setLineControls([]);
-      return;
+
+    const hasExtendedSelection = editorHasLiveExtendedTextSelection(editor);
+    let selectionLine: HTMLElement | null = null;
+    if (hasExtendedSelection) {
+      const selection = window.getSelection();
+      if (selection?.rangeCount && selection.anchorNode) {
+        const range = selection.getRangeAt(0);
+        selectionLine =
+          getDetailLineFromNode(range.startContainer, editor) ??
+          getDetailLineFromNode(selection.focusNode, editor);
+      }
     }
 
     let line: HTMLElement | null = null;
@@ -3453,6 +3638,14 @@ export function TaskDetailsPanel({
         setLineControls([]);
         return;
       }
+    } else if (
+      hasExtendedSelection &&
+      selectionLine &&
+      !isTitleLine(editor, selectionLine) &&
+      !selectionLine.querySelector(".detail-image-wrapper") &&
+      !isCodeLine(selectionLine)
+    ) {
+      line = selectionLine;
     } else if (
       isMouseOverEditorRef.current &&
       hoveredLine &&
@@ -3505,7 +3698,8 @@ export function TaskDetailsPanel({
       keepAddBlockMenuOpen ||
       keepSlashCommandMenuOpen ||
       focusedEmptyBodyLine === line ||
-      (isMouseOverEditorRef.current && hoveredLine === line);
+      (isMouseOverEditorRef.current && hoveredLine === line) ||
+      (hasExtendedSelection && line === selectionLine);
 
     setLineControls([
       {
@@ -3770,7 +3964,8 @@ export function TaskDetailsPanel({
     if (
       openFormatDropdownRef.current === "textColor" ||
       openFormatDropdownRef.current === "highlight" ||
-      openFormatDropdownRef.current === "fontFamily"
+      openFormatDropdownRef.current === "fontFamily" ||
+      openFormatDropdownRef.current === "fontSize"
     ) {
       clearTextColorLivePreviewRef.current?.();
     }
@@ -4093,6 +4288,31 @@ export function TaskDetailsPanel({
     ],
   );
 
+  const previewFontSizeOnSelection = useCallback(
+    (size: DetailFontSizeOption) => {
+      const editor = editorRef.current;
+      if (!editor) return;
+
+      const contentRange = ensureTextColorPreviewSetup();
+      if (!contentRange || textColorPreviewBaselineRef.current === null) return;
+
+      const previewRange = restoreTextColorPreviewBaseline(editor);
+      if (!previewRange || previewRange.collapsed) return;
+
+      if (applyDetailFontSize(editor, size, previewRange.cloneRange())) {
+        const styledRange = getTextColorPreviewContentRange(editor);
+        if (styledRange) {
+          rememberFormatSelection(editor, styledRange);
+        }
+      }
+    },
+    [
+      ensureTextColorPreviewSetup,
+      rememberFormatSelection,
+      restoreTextColorPreviewBaseline,
+    ],
+  );
+
   const setFormatDropdownOpen = useCallback(
     (dropdown: FormatToolbarDropdown, open: boolean) => {
       if (open) {
@@ -4110,6 +4330,7 @@ export function TaskDetailsPanel({
 
         if (
           dropdown === "fontFamily" ||
+          dropdown === "fontSize" ||
           dropdown === "textColor" ||
           dropdown === "highlight"
         ) {
@@ -4122,6 +4343,7 @@ export function TaskDetailsPanel({
       if (
         dropdown === "textColor" ||
         dropdown === "fontFamily" ||
+        dropdown === "fontSize" ||
         dropdown === "highlight"
       ) {
         clearTextColorLivePreview();
@@ -4251,10 +4473,12 @@ export function TaskDetailsPanel({
         });
         captureFormatSelectionFromEditor();
         syncFormatMenuFontState();
-        if (dropdown === "family") {
-          ensureTextColorPreviewSetup();
-        }
-      } else if (dropdown === "family") {
+        ensureTextColorPreviewSetup();
+      } else {
+        const openDropdown = openHeaderFormatDropdownRef.current;
+        // A delayed hover-close from one control must not tear down the
+        // preview/menu of the sibling control the pointer already moved to.
+        if (openDropdown !== null && openDropdown !== dropdown) return;
         clearTextColorLivePreview();
       }
       setOpenHeaderFormatDropdown(open ? dropdown : null);
@@ -4274,10 +4498,10 @@ export function TaskDetailsPanel({
         captureFormatSelectionFromEditor();
         syncFormatMenuFontState();
         setOpenFormatDropdown(null);
-        if (dropdown === "family") {
-          ensureTextColorPreviewSetup();
-        }
-      } else if (dropdown === "family") {
+        ensureTextColorPreviewSetup();
+      } else {
+        const openDropdown = openModalFormatDropdownRef.current;
+        if (openDropdown !== null && openDropdown !== dropdown) return;
         clearTextColorLivePreview();
       }
       setOpenModalFormatDropdown(open ? dropdown : null);
@@ -4324,6 +4548,16 @@ export function TaskDetailsPanel({
       const editor = editorRef.current;
       if (!editor) return;
 
+      // Hovering a size previews it directly in the editor. Remember whether the
+      // preview already changed the content so the click doesn't re-wrap it.
+      const previewBaseline = textColorPreviewBaselineRef.current;
+      const previewChanged =
+        textColorPreviewMarkersPlacedRef.current &&
+        previewBaseline !== null &&
+        editor.innerHTML !== previewBaseline;
+
+      clearTextColorLivePreview({ keepContent: true });
+
       const savedRange =
         savedFormatSelectionRef.current?.cloneRange() ??
         captureLiveEditorFormatSelection(editor);
@@ -4350,6 +4584,20 @@ export function TaskDetailsPanel({
 
       editor.focus({ preventScroll: true });
 
+      if (
+        previewChanged &&
+        getDetailSelectionFontState(editor).size === size
+      ) {
+        const selection = window.getSelection();
+        if (selection?.rangeCount) {
+          rememberFormatSelection(editor, selection.getRangeAt(0));
+        }
+        setFormatMenuFontSize(size);
+        handleDetailFontApplied();
+        closeFormatDropdowns();
+        return;
+      }
+
       if (applyDetailFontSize(editor, size, rangeToApply)) {
         const selection = window.getSelection();
         if (selection?.rangeCount) {
@@ -4363,6 +4611,7 @@ export function TaskDetailsPanel({
     },
     [
       captureFormatSelectionFromEditor,
+      clearTextColorLivePreview,
       closeFormatDropdowns,
       handleDetailFontApplied,
       rememberFormatSelection,
@@ -5238,9 +5487,17 @@ export function TaskDetailsPanel({
   );
 
   const handleUndo = useCallback(() => {
+    if (
+      isDateMenuOpenRef.current &&
+      dateScheduleUndoStackRef.current.length > 0
+    ) {
+      void undoTaskScheduleChange();
+      return;
+    }
+
     if (historyIndexRef.current <= 0) return;
     restoreHistorySnapshot(historyIndexRef.current - 1);
-  }, [restoreHistorySnapshot]);
+  }, [restoreHistorySnapshot, undoTaskScheduleChange]);
 
   const handleRedo = useCallback(() => {
     if (historyIndexRef.current >= historyRef.current.length - 1) return;
@@ -5866,7 +6123,11 @@ export function TaskDetailsPanel({
       }
 
       setAddBlockMenu(null);
-      setSlashCommandMenu(null);
+      if (slashCommandMenuStateRef.current) {
+        cancelSlashCommandRef.current();
+      } else {
+        setSlashCommandMenu(null);
+      }
       if (dateMenuCloseTimerRef.current !== null) {
         window.clearTimeout(dateMenuCloseTimerRef.current);
         dateMenuCloseTimerRef.current = null;
@@ -5921,17 +6182,14 @@ export function TaskDetailsPanel({
           syncEditorLineEmptyState(editor);
         }
 
-        setSlashCommandMenu((current) => {
-          if (!current || !editor) return current;
-
+        const slashMenu = slashCommandMenuStateRef.current;
+        if (slashMenu && editor) {
           const activeLine = getActiveLineElement(editor);
           const activeLineId = activeLine?.dataset.lineId;
-          if (activeLineId && activeLineId !== current.lineId) {
-            return null;
+          if (activeLineId && activeLineId !== slashMenu.lineId) {
+            cancelSlashCommandRef.current();
           }
-
-          return current;
-        });
+        }
 
         if (editorSelectionIsWithinTitleLine(editor)) {
           closeFormatMenu({ clearSavedSelection: true });
@@ -6034,7 +6292,19 @@ export function TaskDetailsPanel({
       if (!taskIdRef.current || !panelRef.current) return;
 
       const target = event.target as Node | null;
-      if (!target || !panelRef.current.contains(target)) return;
+      const inTaskDatePicker =
+        target instanceof Element &&
+        Boolean(
+          target.closest(
+            "[data-task-date-picker-menu], [data-task-date-picker-root]",
+          ),
+        );
+      if (
+        !target ||
+        (!panelRef.current.contains(target) && !inTaskDatePicker)
+      ) {
+        return;
+      }
 
       if (
         target instanceof HTMLElement &&
@@ -6175,20 +6445,31 @@ export function TaskDetailsPanel({
     });
   }
 
-  function cancelSlashCommand() {
+  const cancelSlashCommand = useCallback(() => {
     const editor = editorRef.current;
-    if (editor && slashCommandMenu && !slashCommandMenu.fromContextMenu) {
-      const line = getLineById(editor, slashCommandMenu.lineId);
+    const menu = slashCommandMenuStateRef.current;
+
+    if (editor && menu && !menu.fromContextMenu) {
+      const line = getLineById(editor, menu.lineId);
       if (line && lineHasSlashCommand(line)) {
         clearSlashCommandText(line);
         placeCaretInLine(line);
         syncEditorContent();
         syncEditorLineEmptyState(editor);
+        scheduleAutoSave();
+        updateLineControls();
       }
     }
 
     setSlashCommandMenu(null);
-  }
+  }, [
+    scheduleAutoSave,
+    syncEditorContent,
+    syncEditorLineEmptyState,
+    updateLineControls,
+  ]);
+
+  cancelSlashCommandRef.current = cancelSlashCommand;
 
   function handleApplySlashCommand(type: LineBlockType) {
     const editor = editorRef.current;
@@ -6973,9 +7254,9 @@ export function TaskDetailsPanel({
 
     activeLineControlsRef.current = line;
 
-    if (isBodyPlaceholderLine(line)) {
+    if (isBodyPlaceholderLine(line) || isEmptyEditableBodyLine(editor, line)) {
       if (slashCommandMenu?.lineId === lineId) {
-    setSlashCommandMenu(null);
+        cancelSlashCommand();
       } else {
         openSlashCommandMenuForLine(line);
       }
@@ -6984,7 +7265,11 @@ export function TaskDetailsPanel({
     }
 
     const rect = event.currentTarget.getBoundingClientRect();
-    setSlashCommandMenu(null);
+    if (slashCommandMenuStateRef.current) {
+      cancelSlashCommandRef.current();
+    } else {
+      setSlashCommandMenu(null);
+    }
     setAddBlockMenu((current) => {
       if (current) {
         return null;
@@ -7997,6 +8282,7 @@ export function TaskDetailsPanel({
   async function handleClearDueDateAndTime() {
     if (!task) return;
 
+    recordTaskScheduleUndoSnapshot();
     try {
       const updated = await updateTaskDueDate(task.id, null);
       let dueTimeMinutes = updated.dueTimeMinutes;
@@ -8015,7 +8301,7 @@ export function TaskDetailsPanel({
       }
 
       if (task.recurrenceRule) {
-        await handleSaveRecurrence(null);
+        await handleSaveRecurrence(null, { skipUndoRecord: true });
       } else {
         onRecurrenceUpdated?.(task.id, null);
       }
@@ -8064,6 +8350,7 @@ export function TaskDetailsPanel({
   async function handleSelectDueDate(dateValue: string | null) {
     if (!task) return;
 
+    recordTaskScheduleUndoSnapshot();
     try {
       const updated = await updateTaskDueDate(task.id, dateValue);
       const dueDate = updated.dueDate
@@ -8096,9 +8383,15 @@ export function TaskDetailsPanel({
     }
   }
 
-  async function handleSaveRecurrence(rule: TaskRecurrenceRule | null) {
+  async function handleSaveRecurrence(
+    rule: TaskRecurrenceRule | null,
+    options?: { skipUndoRecord?: boolean },
+  ) {
     if (!task) return;
 
+    if (!options?.skipUndoRecord) {
+      recordTaskScheduleUndoSnapshot();
+    }
     try {
       if (onSaveTaskRecurrence) {
         await onSaveTaskRecurrence(task.id, rule);
@@ -8145,6 +8438,7 @@ export function TaskDetailsPanel({
   ) {
     if (!task) return;
 
+    recordTaskScheduleUndoSnapshot();
     try {
       const updated = await updateTaskDueTime(task.id, dueTime);
 
@@ -8612,6 +8906,8 @@ export function TaskDetailsPanel({
                     setModalFormatDropdownOpen("size", open)
                   }
                   onSelect={applyFormatFontSize}
+                  onPreviewSize={previewFontSizeOnSelection}
+                  onPreviewSizeClear={clearTextColorLivePreview}
                 />
               </div>
             ) : null}
@@ -8686,6 +8982,7 @@ export function TaskDetailsPanel({
           onSaveRecurrence={(rule) => void handleSaveRecurrence(rule)}
           onSaveReminder={(optionId) => {
             if (!task) return;
+            recordTaskScheduleUndoSnapshot();
             taskReminderByIdRef.current.set(task.id, optionId);
             setTaskReminderOptionId(optionId);
           }}
@@ -8960,6 +9257,8 @@ export function TaskDetailsPanel({
                       setHeaderFormatDropdownOpen("size", open)
                     }
                     onSelect={applyFormatFontSize}
+                    onPreviewSize={previewFontSizeOnSelection}
+                    onPreviewSizeClear={clearTextColorLivePreview}
                   />
                   {showHeaderClearFormatting ? (
                     <>
@@ -9206,7 +9505,7 @@ export function TaskDetailsPanel({
                           (slashCommandMenu?.lineId === lineId &&
                             slashCommandMenu.fromContextMenu)
                         }
-                        className="pointer-events-auto flex size-[19px] mb-px cursor-pointer items-center justify-center rounded rounded-lg px-[1px] py-[3px] text-[#d5d5d7] transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+                        className="pointer-events-auto flex size-[19px] mb-px cursor-pointer items-center justify-center rounded rounded-lg px-[1px] py-[3px] text-[#d5d5d7] transition-colors hover:bg-zinc-100 hover:text-[#787890] dark:hover:bg-zinc-800 dark:hover:text-[#787890]"
                       onMouseDown={(event) => event.preventDefault()}
                       onClick={(event) => handlePlusClick(event, lineId)}
                     >
@@ -9218,7 +9517,7 @@ export function TaskDetailsPanel({
                       type="button"
                       aria-label="Drag line"
                       title="Drag to reorder line"
-                        className="pointer-events-auto flex w-[23px] h-[26px] cursor-grab items-center justify-center rounded-full px-[1px] py-[3px] mr-[2px] text-[#565678] transition-colors hover:bg-zinc-100 hover:text-zinc-700 active:cursor-grabbing dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+                        className="pointer-events-auto flex w-[23px] h-[26px] cursor-grab items-center justify-center rounded-full px-[1px] py-[3px] mr-[2px] text-[#9f9fbd] transition-colors hover:bg-zinc-100 hover:text-zinc-700 active:cursor-grabbing dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
                       onPointerDown={(event) =>
                         handleLineDragStart(event, lineId)
                       }
@@ -9624,6 +9923,20 @@ export function TaskDetailsPanel({
                   }}
                   size={formatMenuFontSize}
                   onSelectSize={applyFormatFontSize}
+                  onPreviewSize={previewFontSizeOnSelection}
+                  onPreviewSizeClear={clearTextColorLivePreview}
+                />
+
+                <DetailFormatLineHeightDropdown
+                  open={openFormatDropdown === "lineHeight"}
+                  onOpenChange={(open) => {
+                    setFormatDropdownOpen("lineHeight", open);
+                    if (open) {
+                      syncFormatMenuFontState();
+                    }
+                  }}
+                  lineHeight={formatMenuLineHeight}
+                  onSelectLineHeight={applyFormatLineHeight}
                 />
 
                 <div aria-hidden="true" className={FORMAT_TOOLBAR_DIVIDER_CLASS} />
@@ -9673,8 +9986,6 @@ export function TaskDetailsPanel({
                     }
                   }}
                   menuRef={formatOverflowMenuRef}
-                  lineHeight={formatMenuLineHeight}
-                  onSelectLineHeight={applyFormatLineHeight}
                   onUnderline={() => applyFormat("underline")}
                   onStrikethrough={() => applyFormat("strikeThrough")}
                   onSuperscript={() => applyFormat("superscript")}

@@ -23,6 +23,8 @@ type DetailFontSizeControlProps = {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   onSelect: (size: DetailFontSizeOption) => void;
+  onPreviewSize?: (size: DetailFontSizeOption) => void;
+  onPreviewSizeClear?: () => void;
 };
 
 const FORMAT_TOOLBAR_FONT_SIZE_HOVER_CLOSE_MS = 120;
@@ -51,6 +53,8 @@ export function DetailFontSizeControl({
   open = false,
   onOpenChange,
   onSelect,
+  onPreviewSize,
+  onPreviewSizeClear,
 }: DetailFontSizeControlProps) {
   const closeTimerRef = useRef<number | null>(null);
 
@@ -129,12 +133,16 @@ export function DetailFontSizeControl({
               aria-label="Font size"
               className={`format-toolbar-dropdown-menu ${formatToolbarMenuPanelClassName} min-w-[168px] cursor-pointer ${FROSTED_POPOVER_SURFACE_CLASS}`}
             >
-              <div className="grid grid-cols-4 gap-0.5 px-1 py-1">
+              <div
+                className="grid grid-cols-4 gap-0.5 px-1 py-1"
+                onMouseLeave={() => onPreviewSizeClear?.()}
+              >
                 {DETAIL_FONT_SIZE_OPTIONS.map((option) => (
                   <button
                     key={option}
                     type="button"
                     role="option"
+                    onMouseEnter={() => onPreviewSize?.(option)}
                     aria-selected={option === value}
                     className={`menu-item-hover-focus cursor-pointer rounded-md px-1 py-1 text-center ${FORMAT_TOOLBAR_FONT_SIZE_TEXT_CLASS} hover:bg-zinc-100/50 dark:hover:bg-zinc-800 ${
                       option === value

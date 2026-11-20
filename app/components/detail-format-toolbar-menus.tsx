@@ -40,6 +40,7 @@ export type FormatToolbarDropdown =
   | "block"
   | "fontFamily"
   | "fontSize"
+  | "lineHeight"
   | "overflow";
 
 export const FORMAT_TOOLBAR_ICON_SIZE_CLASS = "size-[18px]";
@@ -103,9 +104,6 @@ const FORMAT_TOOLBAR_OVERFLOW_MENU_BASE_CLASS = `rounded-[12px] p-2 w-[151px] mi
 
 const FORMAT_TOOLBAR_OVERFLOW_MENU_CLASS =
   `${FORMAT_TOOLBAR_OVERFLOW_MENU_BASE_CLASS} overflow-hidden`;
-
-const FORMAT_TOOLBAR_OVERFLOW_MENU_SCROLLABLE_CLASS =
-  `${FORMAT_TOOLBAR_OVERFLOW_MENU_BASE_CLASS} max-h-[min(70vh,360px)] overflow-x-hidden overflow-y-auto`;
 
 const FORMAT_TOOLBAR_OVERFLOW_MENU_TRIGGER_CLASS =
   "flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800";
@@ -1190,6 +1188,8 @@ type DetailFormatFontSizeDropdownProps = {
   onOpenChange: (open: boolean) => void;
   size: DetailFontSizeOption;
   onSelectSize: (size: DetailFontSizeOption) => void;
+  onPreviewSize?: (size: DetailFontSizeOption) => void;
+  onPreviewSizeClear?: () => void;
 };
 
 export function DetailFormatFontSizeDropdown({
@@ -1197,6 +1197,8 @@ export function DetailFormatFontSizeDropdown({
   onOpenChange,
   size,
   onSelectSize,
+  onPreviewSize,
+  onPreviewSizeClear,
 }: DetailFormatFontSizeDropdownProps) {
   return (
     <FormatToolbarDropdownShell
@@ -1216,12 +1218,16 @@ export function DetailFormatFontSizeDropdown({
         </>
       }
     >
-      <div className="grid grid-cols-4 gap-0.5 px-1 py-1">
+      <div
+        className="grid grid-cols-4 gap-0.5 px-1 py-1"
+        onMouseLeave={() => onPreviewSizeClear?.()}
+      >
         {DETAIL_FONT_SIZE_OPTIONS.map((option) => (
           <button
             key={option}
             type="button"
             role="menuitem"
+            onMouseEnter={() => onPreviewSize?.(option)}
             className={`menu-item-hover-focus cursor-pointer rounded-md px-1 py-1 text-center ${FORMAT_TOOLBAR_FONT_SIZE_TEXT_CLASS} hover:bg-zinc-100/50 dark:hover:bg-zinc-800 ${
               option === size
                 ? `bg-zinc-100 font-medium ${FORMAT_TOOLBAR_FONT_SIZE_SELECTED_COLOR} dark:bg-zinc-800`
@@ -1241,12 +1247,58 @@ export function DetailFormatFontSizeDropdown({
   );
 }
 
+type DetailFormatLineHeightDropdownProps = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  lineHeight: DetailLineHeightOption;
+  onSelectLineHeight: (lineHeight: DetailLineHeightOption) => void;
+};
+
+export function DetailFormatLineHeightDropdown({
+  open,
+  onOpenChange,
+  lineHeight,
+  onSelectLineHeight,
+}: DetailFormatLineHeightDropdownProps) {
+  return (
+    <FormatToolbarDropdownShell
+      open={open}
+      onOpenChange={onOpenChange}
+      ariaLabel="Line height"
+      tooltipId="format-toolbar-line-height-tooltip"
+      tooltipLabel="Line height"
+      triggerClassName={FORMAT_TOOLBAR_FONT_SIZE_TRIGGER_CLASS}
+      menuClassName={`${FORMAT_TOOLBAR_DROPDOWN_MENU_CLASS} min-w-[168px] p-0`}
+      trigger={
+        <>
+          <AiOutlineLineHeight
+            className={`${FORMAT_TOOLBAR_ICON_SIZE_CLASS} ${FORMAT_TOOLBAR_ICON_COLOR_MUTED}`}
+            aria-hidden="true"
+          />
+          <LuChevronDown
+            className={`size-3.5 shrink-0 ${FORMAT_TOOLBAR_CHEVRON_COLOR}`}
+            aria-hidden="true"
+          />
+        </>
+      }
+    >
+      <DetailLineHeightControl
+        open={open}
+        value={lineHeight}
+        onSelect={(nextLineHeight) => {
+          onSelectLineHeight(nextLineHeight);
+          onOpenChange(false);
+        }}
+        className="max-h-[min(70vh,280px)] border-0 shadow-none"
+      />
+    </FormatToolbarDropdownShell>
+  );
+}
+
 type DetailFormatOverflowMenuProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   menuRef?: RefObject<HTMLDivElement | null>;
-  lineHeight: DetailLineHeightOption;
-  onSelectLineHeight: (lineHeight: DetailLineHeightOption) => void;
   onUnderline: () => void;
   onStrikethrough: () => void;
   onSuperscript: () => void;
@@ -1257,43 +1309,11 @@ export function DetailFormatOverflowMenu({
   open,
   onOpenChange,
   menuRef,
-  lineHeight,
-  onSelectLineHeight,
   onUnderline,
   onStrikethrough,
   onSuperscript,
   onSubscript,
 }: DetailFormatOverflowMenuProps) {
-  const [lineHeightPanelOpen, setLineHeightPanelOpen] = useState(false);
-  const lineHeightCloseTimerRef = useRef<number | null>(null);
-  const lineHeightOpen = open && lineHeightPanelOpen;
-
-  useEffect(() => {
-    if (!open) {
-      setLineHeightPanelOpen(false);
-    }
-  }, [open]);
-
-  function clearLineHeightCloseTimer() {
-    if (lineHeightCloseTimerRef.current !== null) {
-      window.clearTimeout(lineHeightCloseTimerRef.current);
-      lineHeightCloseTimerRef.current = null;
-    }
-  }
-
-  function handleLineHeightMouseEnter() {
-    clearLineHeightCloseTimer();
-    setLineHeightPanelOpen(true);
-  }
-
-  function handleLineHeightMouseLeave() {
-    clearLineHeightCloseTimer();
-    lineHeightCloseTimerRef.current = window.setTimeout(() => {
-      lineHeightCloseTimerRef.current = null;
-      setLineHeightPanelOpen(false);
-    }, FORMAT_TOOLBAR_DROPDOWN_HOVER_CLOSE_MS);
-  }
-
   return (
     <FormatToolbarDropdownShell
       open={open}
@@ -1303,11 +1323,7 @@ export function DetailFormatOverflowMenu({
       tooltipLabel="More options"
       align="center"
       triggerClassName={FORMAT_TOOLBAR_OVERFLOW_MENU_TRIGGER_CLASS}
-      menuClassName={
-        lineHeightOpen
-          ? FORMAT_TOOLBAR_OVERFLOW_MENU_SCROLLABLE_CLASS
-          : FORMAT_TOOLBAR_OVERFLOW_MENU_CLASS
-      }
+      menuClassName={FORMAT_TOOLBAR_OVERFLOW_MENU_CLASS}
       trigger={
         <span
           className={`flex ${FORMAT_TOOLBAR_ICON_SIZE_CLASS} items-center justify-center ${FORMAT_TOOLBAR_ICON_TEXT_CLASS} tracking-widest ${FORMAT_TOOLBAR_ICON_COLOR_MUTED}`}
@@ -1385,44 +1401,6 @@ export function DetailFormatOverflowMenu({
           </span>
           Subscript
         </button>
-        <div
-          onMouseEnter={handleLineHeightMouseEnter}
-          onMouseLeave={handleLineHeightMouseLeave}
-        >
-          <button
-            type="button"
-            role="menuitem"
-            aria-haspopup="listbox"
-            aria-expanded={lineHeightOpen}
-            className={`${FORMAT_TOOLBAR_OVERFLOW_MENU_ITEM_CLASS} ${
-              lineHeightOpen ? "bg-zinc-100 dark:bg-zinc-800" : ""
-            }`}
-            style={{ fontSize: "13px" }}
-            onMouseDown={(event) => event.preventDefault()}
-            onClick={() => setLineHeightPanelOpen(true)}
-          >
-            <span className={FORMAT_TOOLBAR_OVERFLOW_MENU_ICON_CLASS}>
-              <AiOutlineLineHeight
-                className={`${FORMAT_TOOLBAR_ICON_SIZE_CLASS} ${FORMAT_TOOLBAR_ICON_COLOR_MUTED}`}
-                aria-hidden="true"
-              />
-            </span>
-            Line height
-          </button>
-
-          {lineHeightOpen ? (
-            <DetailLineHeightControl
-              open={lineHeightOpen}
-              value={lineHeight}
-              onSelect={(nextLineHeight) => {
-                onSelectLineHeight(nextLineHeight);
-                setLineHeightPanelOpen(false);
-                onOpenChange(false);
-              }}
-              className="mx-1 mb-1 border-0 shadow-none"
-            />
-          ) : null}
-        </div>
       </div>
     </FormatToolbarDropdownShell>
   );

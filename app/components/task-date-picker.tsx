@@ -1805,7 +1805,7 @@ export function TaskDatePicker({
         className="flex items-center justify-between border-t px-4 py-2.5"
         style={{ borderColor: PICKER_BORDER }}
       >
-        <span className="text-[13px] text-zinc-400">
+        <span className="text-[13.5px] text-gray-400">
           {selectedDate
             ? formatPickerFooterDate(selectedDate)
             : dueTimeMinutes !== null
@@ -1816,7 +1816,7 @@ export function TaskDatePicker({
           <button
             type="button"
             onClick={handleClearDateAndTime}
-            className="text-[13px] text-[#70707c] transition-opacity hover:opacity-80 cursor-pointer mr-2"
+            className="rounded-full bg-[#bcbcdf] px-3 py-1.5 text-[13px] text-white transition-opacity hover:opacity-80 cursor-pointer mr-2"
           >
             Clear
           </button>

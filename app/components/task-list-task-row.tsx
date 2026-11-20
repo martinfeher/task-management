@@ -1074,7 +1074,7 @@ export function TaskListTaskRow({
                 aria-haspopup="dialog"
                 aria-expanded={openDatePickerTaskId === task.id}
                 aria-describedby={`set-date-tooltip-${task.id}`}
-                className="relative flex h-[19px] w-[19px] shrink-0 mr-1 items-center justify-center rounded-md ptxt-task-datetime transition-colors cursor-pointer hover:opacity-80 dark:hover:bg-zinc-800"
+                className="relative flex h-[19px] w-[19px] shrink-0 mr-1 items-center justify-center rounded-md text-[#bfbfcd] transition-colors cursor-pointer hover:opacity-80 dark:hover:bg-zinc-800"
                 onPointerDown={(event) => {
                   if (event.button !== 0) return;
                   event.stopPropagation();
@@ -1098,6 +1098,7 @@ export function TaskListTaskRow({
           {isDatePickerOpen
             ? createPortal(
                 <TaskRowMenuTransition
+                  solid
                   innerRef={taskDateMenuRef}
                   active={datePickerPosition !== null}
                   data-task-date-picker-menu
@@ -1168,7 +1169,7 @@ export function TaskListTaskRow({
                   onOpenLabelMenu(task.id);
                 }}
               >
-                <LiaTagSolid className="size-[17px]! text-[#c1c1d8]! group-hover/add-label:text-zinc-450 dark:text-zinc-400" />
+                <LiaTagSolid className="size-[17px]! text-[#bfbfcd]! group-hover/add-label:text-zinc-450 dark:text-zinc-400" />
                 <span
                   id={`set-label-tooltip-${task.id}`}
                   role="tooltip"
@@ -1206,7 +1207,7 @@ export function TaskListTaskRow({
                   onTogglePriorityMenu(task.id);
                 }}
               >
-                <TaskPriorityFlagIcon outline className="size-[14px] text-[#b4b4c8]!" />
+                <TaskPriorityFlagIcon outline className="size-[14px] text-[#bfbfcd]!" />
                 <span
                   id={`set-priority-tooltip-${task.id}`}
                   role="tooltip"
@@ -1339,6 +1340,7 @@ export function TaskListTaskRow({
         {isLabelMenuOpen && labelMenuPosition
           ? createPortal(
               <TaskRowMenuTransition
+                solid
                 innerRef={taskLabelMenuRef}
                 className="fixed z-50"
                 style={{
@@ -1350,6 +1352,7 @@ export function TaskListTaskRow({
                 onMouseLeave={() => onScheduleCloseLabelMenu?.()}
               >
                 <TaskLabelSelector
+                  surface="solid"
                   labels={availableLabels}
                   assignedLabelIds={assignedLabelIds}
                   query={labelQuery}
