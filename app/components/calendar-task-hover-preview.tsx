@@ -40,7 +40,8 @@ const PREVIEW_TITLE_CLASS =
   "line-clamp-2 text-[15px] font-semibold leading-5 text-[#3C3C3E]";
 const PREVIEW_SUBTITLE_CLASS =
   "text-[13.5px] leading-[16px] text-[#78789f] dark:text-[#78789f]";
-const TASK_GAP = 12;
+/** Horizontal space between task block edge and hover preview (was 12px; −7px). */
+const TASK_GAP = 5;
 const TASK_EDGE_PREVIEW_UPWARD_OFFSET_PX = 10;
 const CURSOR_OFFSET_PX = 50;
 const POST_DRAG_HOVER_SUPPRESS_MS = 300;

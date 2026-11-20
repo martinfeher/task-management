@@ -6,9 +6,12 @@
 @source inline("rounded-[5px]");
 @source inline("rounded-[6px]");
 @source inline("rounded-[8px]");
+@source inline("rounded-[10px]");
+@source inline("rounded-[12px]");
 @source inline("rounded-[14px]");
 @source inline("rounded-[15px]");
 @source inline("shadow-[0_10px_23px_rgba(0,0,0,0.09)]");
+@source inline("shadow-[0_7px_17px_rgba(0,0,0,0.06)]");
 @source inline("gap-[8px]");
 @source inline("text-[13.5px]");
 @source inline("text-[14px]");
@@ -338,10 +341,7 @@
     0 2px 4px rgba(0, 0, 0, 0.04),
     0 8px 24px rgba(0, 0, 0, 0.08),
     0 24px 48px rgba(0, 0, 0, 0.12);
-  --calendar-task-hover-preview-shadow:
-    0 1.5px 3px rgba(0, 0, 0, 0.04),
-    0 6px 18px rgba(0, 0, 0, 0.08),
-    0 18px 36px rgba(0, 0, 0, 0.12);
+  --calendar-task-hover-preview-shadow: 0 7px 17px rgba(0, 0, 0, 0.06);
   --calendar-task-item-shadow-area: 0.65;
   --calendar-task-item-shadow:
     0 calc(1.125px * var(--calendar-task-item-shadow-area))
@@ -365,18 +365,19 @@
   );
   --calendar-task-column-left-inset: 1px;
   --calendar-task-column-right-inset: calc(2% + 5px);
-  --calendar-task-all-day-radius: 6px;
-  --calendar-task-all-day-radius-drag: 8px;
-  --calendar-task-block-radius: 6px;
-  --calendar-task-block-radius-drag: 8px;
-  --calendar-task-block-inner-radius: 6px;
-  --calendar-task-block-inner-radius-drag: 6px;
+  --calendar-task-all-day-radius: 10px;
+  --calendar-task-all-day-radius-drag: 12px;
+  --calendar-task-block-radius: 10px;
+  --calendar-task-block-radius-drag: 12px;
+  --calendar-task-block-inner-radius: 10px;
+  --calendar-task-block-inner-radius-drag: 10px;
   --calendar-task-drag-source-background-opacity: 0.87;
   --app-tooltip-shadow:
     0 1px 2px rgba(0, 0, 0, 0.05),
     0 3px 8px rgba(0, 0, 0, 0.08),
     0 8px 16px rgba(0, 0, 0, 0.1);
   --calendar-task-time-color: #D3D3D3;
+  --calendar-task-item-border: #EAEAE3;
   --calendar-task-title-brightness: 0.3;
   --calendar-task-modal-content-switch-ms: 125ms;
   --task-detail-image-shadow: 0 3px 6px rgba(0, 0, 0, 0.04);
@@ -1958,7 +1959,7 @@ body {
   .calendar-task-item:not(.calendar-task-drop-preview):not(
     .calendar-task-drag-source-placeholder
   ) {
-  border: 1px solid #bebee6;
+  border: 1px solid var(--calendar-task-item-border, #efef67);
 }
 
 [data-calendar-grid-view] .calendar-task-item.cursor-move,
@@ -2242,10 +2243,7 @@ body {
       0 2px 4px rgba(0, 0, 0, 0.2),
       0 8px 24px rgba(0, 0, 0, 0.32),
       0 24px 48px rgba(0, 0, 0, 0.4);
-    --calendar-task-hover-preview-shadow:
-      0 1.5px 3px rgba(0, 0, 0, 0.2),
-      0 6px 18px rgba(0, 0, 0, 0.32),
-      0 18px 36px rgba(0, 0, 0, 0.4);
+    --calendar-task-hover-preview-shadow: 0 7px 17px rgba(0, 0, 0, 0.06);
     --calendar-task-item-shadow:
       0 calc(1.125px * var(--calendar-task-item-shadow-area))
         calc(1.5px * var(--calendar-task-item-shadow-area)) rgba(0, 0, 0, 0.128),
@@ -2444,6 +2442,24 @@ body {
   border: 1px solid rgb(235 235 235);
   box-shadow: var(--calendar-task-hover-preview-shadow);
   animation: calendar-task-preview-in 160ms ease-out;
+  background-color: rgb(255 255 255 / 0.8);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+
+.dark .calendar-task-hover-preview {
+  background-color: rgb(9 9 11 / 0.8);
+}
+
+.calendar-task-hover-preview.frosted-popover-surface {
+  box-shadow: var(--calendar-task-hover-preview-shadow);
+  background-color: rgb(255 255 255 / 0.86);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+
+.dark .calendar-task-hover-preview.frosted-popover-surface {
+  background-color: rgb(9 9 11 / 0.8);
 }
 
 .calendar-task-hover-preview .calendar-task-hover-preview-description {

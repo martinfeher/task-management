@@ -552,6 +552,8 @@ const TASK_ROW_CONTEXT_MENU_HEIGHT = 350;
 /** Tallest the row menu gets; decides whether it opens below or above its icon. */
 const TASK_ROW_MENU_ANCHOR_HEIGHT = 420;
 const ADD_TASK_METADATA_MENU_HOVER_CLOSE_MS = 120;
+/** Delay before hover-preview opens row metadata menus (date, label, priority, ⋮). */
+const TASK_ROW_METADATA_MENU_HOVER_OPEN_MS = 100;
 /** Horizontal nudge (px, to the right) of the three-dots menu from its anchor. */
 const TASK_ROW_MENU_OFFSET_X = 18;
 
@@ -861,6 +863,10 @@ export function TaskListPanel({
   const taskRowLabelMenuCloseTimerRef = useRef<number | null>(null);
   const taskRowPriorityMenuCloseTimerRef = useRef<number | null>(null);
   const taskRowMenuCloseTimerRef = useRef<number | null>(null);
+  const taskRowDateMenuOpenTimerRef = useRef<number | null>(null);
+  const taskRowLabelMenuOpenTimerRef = useRef<number | null>(null);
+  const taskRowPriorityMenuOpenTimerRef = useRef<number | null>(null);
+  const taskRowMenuOpenTimerRef = useRef<number | null>(null);
   /** Task whose three-dots menu was opened by hover and not yet pinned by a click. */
   const hoverOpenedTaskRowMenuTaskIdRef = useRef<string | null>(null);
   const isTaskListDateInputFocusedRef = useRef(false);
@@ -1564,7 +1570,7 @@ export function TaskListPanel({
   useEffect(() => {
     return () => {
       clearAllAddTaskMetadataMenuCloseTimers();
-      clearAllTaskRowMetadataMenuCloseTimers();
+      clearAllTaskRowMetadataMenuHoverTimers();
     };
   }, []);
 
@@ -1596,11 +1602,51 @@ export function TaskListPanel({
     }
   }
 
+  function clearTaskRowDateMenuOpenTimer() {
+    if (taskRowDateMenuOpenTimerRef.current !== null) {
+      window.clearTimeout(taskRowDateMenuOpenTimerRef.current);
+      taskRowDateMenuOpenTimerRef.current = null;
+    }
+  }
+
+  function clearTaskRowLabelMenuOpenTimer() {
+    if (taskRowLabelMenuOpenTimerRef.current !== null) {
+      window.clearTimeout(taskRowLabelMenuOpenTimerRef.current);
+      taskRowLabelMenuOpenTimerRef.current = null;
+    }
+  }
+
+  function clearTaskRowPriorityMenuOpenTimer() {
+    if (taskRowPriorityMenuOpenTimerRef.current !== null) {
+      window.clearTimeout(taskRowPriorityMenuOpenTimerRef.current);
+      taskRowPriorityMenuOpenTimerRef.current = null;
+    }
+  }
+
+  function clearTaskRowMenuOpenTimer() {
+    if (taskRowMenuOpenTimerRef.current !== null) {
+      window.clearTimeout(taskRowMenuOpenTimerRef.current);
+      taskRowMenuOpenTimerRef.current = null;
+    }
+  }
+
+  function clearAllTaskRowMetadataMenuOpenTimers() {
+    clearTaskRowDateMenuOpenTimer();
+    clearTaskRowLabelMenuOpenTimer();
+    clearTaskRowPriorityMenuOpenTimer();
+    clearTaskRowMenuOpenTimer();
+  }
+
   function clearAllTaskRowMetadataMenuCloseTimers() {
     clearTaskRowMenuCloseTimer();
     clearTaskRowDateMenuCloseTimer();
     clearTaskRowLabelMenuCloseTimer();
     clearTaskRowPriorityMenuCloseTimer();
+  }
+
+  function clearAllTaskRowMetadataMenuHoverTimers() {
+    clearAllTaskRowMetadataMenuCloseTimers();
+    clearAllTaskRowMetadataMenuOpenTimers();
   }
 
   function closeOtherTaskRowMetadataMenus(
@@ -1643,14 +1689,19 @@ export function TaskListPanel({
   function hoverOpenTaskDatePicker(taskId: string) {
     if (!onSetTaskDueDate) return;
 
-    closeOtherTaskRowMetadataMenus("date");
+    clearAllTaskRowMetadataMenuOpenTimers();
     clearTaskRowDateMenuCloseTimer();
     if (openDatePickerTaskId === taskId) return;
 
-    openDatePicker(taskId);
+    taskRowDateMenuOpenTimerRef.current = window.setTimeout(() => {
+      taskRowDateMenuOpenTimerRef.current = null;
+      closeOtherTaskRowMetadataMenus("date");
+      openDatePicker(taskId);
+    }, TASK_ROW_METADATA_MENU_HOVER_OPEN_MS);
   }
 
   function scheduleCloseTaskDatePicker() {
+    clearTaskRowDateMenuOpenTimer();
     if (
       isTaskListDateInputFocusedRef.current ||
       isTaskDatePickerDateInputFocused()
@@ -1674,12 +1725,24 @@ export function TaskListPanel({
   function hoverOpenTaskLabelMenu(taskId: string) {
     if (!onToggleTaskLabel) return;
 
-    closeOtherTaskRowMetadataMenus("label");
+    clearAllTaskRowMetadataMenuOpenTimers();
     clearTaskRowLabelMenuCloseTimer();
-    ensureTaskLabelMenuOpen(taskId);
+
+    const labelMenuAlreadyOpen =
+      openLabelMenuTaskId === taskId ||
+      (pointerContextMenu?.taskId === taskId &&
+        pointerContextMenu.view === "label");
+    if (labelMenuAlreadyOpen) return;
+
+    taskRowLabelMenuOpenTimerRef.current = window.setTimeout(() => {
+      taskRowLabelMenuOpenTimerRef.current = null;
+      closeOtherTaskRowMetadataMenus("label");
+      ensureTaskLabelMenuOpen(taskId);
+    }, TASK_ROW_METADATA_MENU_HOVER_OPEN_MS);
   }
 
   function scheduleCloseTaskLabelMenu() {
+    clearTaskRowLabelMenuOpenTimer();
     clearTaskRowLabelMenuCloseTimer();
     taskRowLabelMenuCloseTimerRef.current = window.setTimeout(() => {
       taskRowLabelMenuCloseTimerRef.current = null;
@@ -1691,21 +1754,26 @@ export function TaskListPanel({
   function hoverOpenTaskPriorityMenu(taskId: string) {
     if (!onSetTaskPriority) return;
 
-    closeOtherTaskRowMetadataMenus("priority");
+    clearAllTaskRowMetadataMenuOpenTimers();
     clearTaskRowPriorityMenuCloseTimer();
     if (openPriorityMenuTaskId === taskId) return;
 
-    setOpenDatePickerTaskId(null);
-    setOpenMenuTaskId(null);
-    setOpenLabelMenuTaskId(null);
-    setOpenMoveMenuTaskId(null);
-    resetLabelMenuState();
-    resetMoveMenuState();
-    closeTaskListPointerMenu();
-    setOpenPriorityMenuTaskId(taskId);
+    taskRowPriorityMenuOpenTimerRef.current = window.setTimeout(() => {
+      taskRowPriorityMenuOpenTimerRef.current = null;
+      closeOtherTaskRowMetadataMenus("priority");
+      setOpenDatePickerTaskId(null);
+      setOpenMenuTaskId(null);
+      setOpenLabelMenuTaskId(null);
+      setOpenMoveMenuTaskId(null);
+      resetLabelMenuState();
+      resetMoveMenuState();
+      closeTaskListPointerMenu();
+      setOpenPriorityMenuTaskId(taskId);
+    }, TASK_ROW_METADATA_MENU_HOVER_OPEN_MS);
   }
 
   function scheduleCloseTaskPriorityMenu() {
+    clearTaskRowPriorityMenuOpenTimer();
     clearTaskRowPriorityMenuCloseTimer();
     taskRowPriorityMenuCloseTimerRef.current = window.setTimeout(() => {
       taskRowPriorityMenuCloseTimerRef.current = null;
@@ -2217,7 +2285,7 @@ export function TaskListPanel({
   }
 
   function closeTaskMenus() {
-    clearAllTaskRowMetadataMenuCloseTimers();
+    clearAllTaskRowMetadataMenuHoverTimers();
     hoverOpenedTaskRowMenuTaskIdRef.current = null;
     setOpenMenuTaskId(null);
     setOpenLabelMenuTaskId(null);
@@ -2229,6 +2297,7 @@ export function TaskListPanel({
   }
 
   function togglePriorityMenu(taskId: string) {
+    clearAllTaskRowMetadataMenuOpenTimers();
     setOpenDatePickerTaskId(null);
     setOpenMenuTaskId(null);
     setOpenLabelMenuTaskId(null);
@@ -2247,6 +2316,7 @@ export function TaskListPanel({
   }
 
   function openDatePicker(taskId: string) {
+    clearAllTaskRowMetadataMenuOpenTimers();
     suppressRowClickRef.current = true;
     closeTaskMenus();
     setOpenDatePickerTaskId(taskId);
@@ -2256,6 +2326,7 @@ export function TaskListPanel({
     task: TaskListItem,
     anchor: HTMLElement,
   ) {
+    clearAllTaskRowMetadataMenuOpenTimers();
     suppressRowClickRef.current = true;
 
     const currentPointerMenu = getTaskListPointerMenuSnapshot();
@@ -2310,8 +2381,7 @@ export function TaskListPanel({
     });
   }
 
-  /** Hovering the three-dots icon previews the row menu without selecting the task. */
-  function hoverOpenTaskRowMenu(task: TaskListItem, anchor: HTMLElement) {
+  function openTaskRowMenuFromHover(task: TaskListItem, anchor: HTMLElement) {
     clearTaskRowMenuCloseTimer();
 
     const currentPointerMenu = getTaskListPointerMenuSnapshot();
@@ -2339,7 +2409,22 @@ export function TaskListPanel({
     });
   }
 
+  /** Hovering the three-dots icon previews the row menu without selecting the task. */
+  function hoverOpenTaskRowMenu(task: TaskListItem, anchor: HTMLElement) {
+    clearAllTaskRowMetadataMenuOpenTimers();
+    clearTaskRowMenuCloseTimer();
+
+    const currentPointerMenu = getTaskListPointerMenuSnapshot();
+    if (currentPointerMenu?.taskId === task.id) return;
+
+    taskRowMenuOpenTimerRef.current = window.setTimeout(() => {
+      taskRowMenuOpenTimerRef.current = null;
+      openTaskRowMenuFromHover(task, anchor);
+    }, TASK_ROW_METADATA_MENU_HOVER_OPEN_MS);
+  }
+
   function scheduleCloseTaskRowMenu() {
+    clearTaskRowMenuOpenTimer();
     clearTaskRowMenuCloseTimer();
     if (hoverOpenedTaskRowMenuTaskIdRef.current === null) return;
 
@@ -2359,6 +2444,7 @@ export function TaskListPanel({
   }
 
   function openLabelMenu(taskId: string) {
+    clearAllTaskRowMetadataMenuOpenTimers();
     if (
       openLabelMenuTaskId === taskId &&
       pointerContextMenu?.taskId !== taskId

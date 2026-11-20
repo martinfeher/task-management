@@ -44,8 +44,8 @@ export const CALENDAR_TASK_HORIZONTAL_PADDING_START_PX = 7;
 export const CALENDAR_TASK_HORIZONTAL_PADDING_END_PX = 6;
 export const CALENDAR_TASK_GRID_EXTRA_PADDING_START_PX = 4;
 export const CALENDAR_TASK_CONTENT_PADDING_LEFT = `var(--calendar-task-content-padding-start, ${CALENDAR_TASK_HORIZONTAL_PADDING_START_PX}px)`;
-export const CALENDAR_TASK_INNER_RADIUS_PX = 6;
-export const CALENDAR_TASK_OUTER_RADIUS_PX = 6;
+export const CALENDAR_TASK_INNER_RADIUS_PX = 10;
+export const CALENDAR_TASK_OUTER_RADIUS_PX = 10;
 export const CALENDAR_TASK_DRAG_RADIUS_INCREASE_PX = 2;
 export const CALENDAR_TASK_OUTER_RADIUS_DRAG_PX =
   CALENDAR_TASK_OUTER_RADIUS_PX + CALENDAR_TASK_DRAG_RADIUS_INCREASE_PX;
@@ -301,7 +301,7 @@ export function CalendarTaskDropPreview({
         ...taskItemStyle,
         ...(variant === "source" ? { backgroundColor: "transparent" } : null),
       }}
-      className={`${previewClassName} pointer-events-none absolute ${horizontalInsetClass} overflow-hidden rounded-[8px] select-none ${calendarTaskItemClassName()}`}
+      className={`${previewClassName} pointer-events-none absolute ${horizontalInsetClass} overflow-hidden rounded-[12px] select-none ${calendarTaskItemClassName()}`}
     >
       <div
         className={`flex h-full flex-col py-0.5 text-left leading-tight ${CALENDAR_TASK_FONT_CLASS}`}
@@ -871,7 +871,7 @@ export function CalendarTimedTaskBlock({
       {...hoverHandlers}
       data-calendar-timed-task-block="true"
       {...{ [CALENDAR_TASK_ID_DATA_ATTR]: task.id }}
-      className={`calendar-timed-task-block absolute ${CALENDAR_TASK_TIMED_COLUMN_INSET_CLASS} z-10 rounded-[6px] ${calendarTaskItemClassName(selected)}`}
+      className={`calendar-timed-task-block absolute ${CALENDAR_TASK_TIMED_COLUMN_INSET_CLASS} z-10 rounded-[10px] ${calendarTaskItemClassName(selected)}`}
       style={{
         top,
         height,

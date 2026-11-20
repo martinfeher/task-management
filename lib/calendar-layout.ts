@@ -83,7 +83,7 @@ export function calendarAllDayTaskClassName(
   selected = false,
   draggable = false,
 ) {
-  return `flex h-[24px] w-full shrink-0 items-center truncate rounded-[6px] px-[5px] text-left leading-none transition-colors ${
+  return `flex h-[24px] w-full shrink-0 items-center truncate rounded-[10px] px-[5px] text-left leading-none transition-colors ${
     draggable ? "cursor-move touch-none" : ""
   } ${calendarTaskItemClassName(selected)}`;
 }
@@ -93,7 +93,7 @@ export function calendarAllDayDraftClassName() {
 }
 
 export function calendarTaskItemClassName(selected = false) {
-  const base = `${CALENDAR_TASK_ITEM_CLASS} ${CALENDAR_TASK_BACKGROUND_CLASS} ${CALENDAR_TASK_TITLE_TEXT_CLASS} ${CALENDAR_TASK_FONT_CLASS} hover:brightness-95`;
+  const base = `${CALENDAR_TASK_ITEM_CLASS} ${CALENDAR_TASK_BACKGROUND_CLASS} ${CALENDAR_TASK_TITLE_TEXT_CLASS} ${CALENDAR_TASK_FONT_CLASS}`;
   return selected ? `${base} font-medium` : base;
 }
 
