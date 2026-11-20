@@ -223,6 +223,7 @@ type HeaderFormatDropdown = "family" | "size";
 import {
   TaskDatePicker,
   computeTaskDatePickerMenuPosition,
+  isTaskDatePickerDateInputFocused,
 } from "./task-date-picker";
 import { TaskVersionHistoryOffcanvas } from "./task-version-history-offcanvas";
 import {
@@ -409,6 +410,8 @@ type TaskDetailsPanelProps = {
 
 const TASK_DETAILS_NOTE_MENU_WIDTH = 220;
 const TASK_DETAILS_NOTE_MENU_HEIGHT = 350;
+const TASK_DETAILS_NOTE_MENU_OFFSET_X_PX = 12;
+const NOTE_ACTIONS_MENU_HOVER_CLOSE_MS = 120;
 
 const TASK_DETAILS_MODAL_EXPAND_TOOLTIP_ID =
   "task-details-modal-expand-tooltip";
@@ -539,7 +542,10 @@ function computeTaskDetailsNoteMenuPosition(anchor: HTMLElement) {
   const rect = anchor.getBoundingClientRect();
   return {
     x: Math.min(
-      Math.max(8, rect.right - TASK_DETAILS_NOTE_MENU_WIDTH),
+      Math.max(
+        8,
+        rect.right - TASK_DETAILS_NOTE_MENU_WIDTH + TASK_DETAILS_NOTE_MENU_OFFSET_X_PX,
+      ),
       window.innerWidth - TASK_DETAILS_NOTE_MENU_WIDTH - 8,
     ),
     y: Math.min(
@@ -1266,6 +1272,11 @@ function resolveTextColorOption(color: string) {
 
   for (const option of TEXT_COLOR_OPTIONS) {
     if (colorsEquivalent(option.value, color)) return option.value;
+  }
+
+  const trimmed = color.trim();
+  if (/^#[0-9a-f]{6}$/i.test(trimmed)) {
+    return trimmed.toLowerCase();
   }
 
   const inputRgb = colorToRgb(color);
@@ -2206,6 +2217,7 @@ const TASK_DETAILS_LINE_CONTROLS_GUTTER_PX = 30;
 const TASK_DETAILS_EDITOR_MIN_HEIGHT_PX = 500;
 const TASK_DETAILS_EDITOR_SHORT_CONTENT_MIN_HEIGHT_VH = 0.85;
 const TASK_DETAILS_EDITOR_MODAL_MIN_HEIGHT_PX = 88;
+const TASK_MODAL_EDITOR_SCROLL_FADE_THRESHOLD_PX = 8;
 const TASK_DETAILS_EDITOR_BOTTOM_INSET_PX = 30;
 /** Space between the modal editor and footer (8px tighter than the default editor inset). */
 const TASK_DETAILS_EDITOR_MODAL_BOTTOM_INSET_PX = 14;
@@ -2509,6 +2521,8 @@ export function TaskDetailsPanel({
     useState(false);
   const noteMenuButtonRef = useRef<HTMLButtonElement>(null);
   const noteMenuRef = useRef<HTMLDivElement>(null);
+  const noteMenuCloseTimerRef = useRef<number | null>(null);
+  const hoverOpenedNoteMenuRef = useRef(false);
   const [openFormatDropdown, setOpenFormatDropdown] =
     useState<FormatToolbarDropdown | null>(null);
   /** Hides native selection fill while hovering text-color swatches (live preview). */
@@ -2519,6 +2533,10 @@ export function TaskDetailsPanel({
   const [isModalFormatToolbarOpen, setIsModalFormatToolbarOpen] = useState(false);
   const [openModalFormatDropdown, setOpenModalFormatDropdown] =
     useState<HeaderFormatDropdown | null>(null);
+  const [modalEditorScrollFades, setModalEditorScrollFades] = useState({
+    top: false,
+    bottom: false,
+  });
   const { defaultFontSizePx, defaultLineHeight } = useTaskEditorDefaults();
   const [formatMenuFontSize, setFormatMenuFontSize] =
     useState<DetailFontSizeOption>(() => getDefaultDetailFontSizeOption());
@@ -2600,6 +2618,7 @@ export function TaskDetailsPanel({
   const dateMenuHoverDismissedRef = useRef(false);
   const isRecurrenceMenuOpenRef = useRef(false);
   const isReminderMenuOpenRef = useRef(false);
+  const isDatePickerDateInputFocusedRef = useRef(false);
   const dateButtonRef = useRef<HTMLButtonElement>(null);
   const isDateMenuOpenRef = useRef(isDateMenuOpen);
   isDateMenuOpenRef.current = isDateMenuOpen;
@@ -3745,6 +3764,23 @@ export function TaskDetailsPanel({
     }, LINE_CONTROLS_DEBOUNCE_MS);
   }, [updateLineControls]);
 
+  const syncModalEditorScrollFades = useCallback(() => {
+    if (!isModalLayout) return;
+
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    const { scrollTop, scrollHeight, clientHeight } = editor;
+    const threshold = TASK_MODAL_EDITOR_SCROLL_FADE_THRESHOLD_PX;
+    const canScroll = scrollHeight > clientHeight + threshold;
+
+    setModalEditorScrollFades({
+      top: canScroll && scrollTop > threshold,
+      bottom:
+        canScroll && scrollTop + clientHeight < scrollHeight - threshold,
+    });
+  }, [isModalLayout]);
+
   const syncEditorHeight = useCallback(
     (options?: { scrollActiveLineIntoView?: boolean }) => {
       const editor = editorRef.current;
@@ -3808,9 +3844,37 @@ export function TaskDetailsPanel({
       } else {
         editor.scrollTop = 0;
       }
+
+      syncModalEditorScrollFades();
     },
-    [isModalLayout, task],
+    [isModalLayout, syncModalEditorScrollFades, task],
   );
+
+  const handleEditorScroll = useCallback(() => {
+    updateLineControls();
+    syncModalEditorScrollFades();
+  }, [syncModalEditorScrollFades, updateLineControls]);
+
+  useEffect(() => {
+    if (!isModalLayout || !task) return;
+
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    syncModalEditorScrollFades();
+
+    const resizeObserver = new ResizeObserver(() => {
+      syncModalEditorScrollFades();
+    });
+    resizeObserver.observe(editor);
+
+    return () => resizeObserver.disconnect();
+  }, [
+    isDetailsBodyLoading,
+    isModalLayout,
+    syncModalEditorScrollFades,
+    task?.id,
+  ]);
 
   const scheduleEditorHeightSync = useCallback(
     (options?: { scrollActiveLineIntoView?: boolean }) => {
@@ -5234,7 +5298,7 @@ export function TaskDetailsPanel({
           label:
             TEXT_COLOR_OPTIONS.find((option) =>
               colorsEquivalent(option.value, resolvedColor),
-            )?.label ?? "Text color",
+            )?.label ?? "Custom color",
         }),
       );
 
@@ -8222,12 +8286,33 @@ export function TaskDetailsPanel({
     setIsDateMenuOpen(true);
   }
 
+  function handleDatePickerDateInputFocusChange(focused: boolean) {
+    isDatePickerDateInputFocusedRef.current = focused;
+    if (focused) {
+      clearDateMenuCloseTimer();
+    }
+  }
+
   function scheduleDateMenuClose() {
-    if (isRecurrenceMenuOpenRef.current || isReminderMenuOpenRef.current) return;
+    if (isRecurrenceMenuOpenRef.current || isReminderMenuOpenRef.current) {
+      return;
+    }
+    if (
+      isDatePickerDateInputFocusedRef.current ||
+      isTaskDatePickerDateInputFocused()
+    ) {
+      return;
+    }
 
     clearDateMenuCloseTimer();
     dateMenuCloseTimerRef.current = window.setTimeout(() => {
       dateMenuCloseTimerRef.current = null;
+      if (
+        isDatePickerDateInputFocusedRef.current ||
+        isTaskDatePickerDateInputFocused()
+      ) {
+        return;
+      }
       setIsDateMenuOpen(false);
     }, TASK_DETAILS_DATE_MENU_HOVER_CLOSE_MS);
   }
@@ -8252,6 +8337,12 @@ export function TaskDetailsPanel({
   function handleDatePickerMouseLeave(event: React.MouseEvent) {
     if (isModalLayout) return;
     if (isMovingWithinDateMenuSurface(event.relatedTarget)) return;
+    if (
+      isDatePickerDateInputFocusedRef.current ||
+      isTaskDatePickerDateInputFocused()
+    ) {
+      return;
+    }
 
     scheduleDateMenuClose();
   }
@@ -8489,29 +8580,83 @@ export function TaskDetailsPanel({
       noteMenu.task.id === task.id,
   );
 
+  const clearNoteMenuCloseTimer = useCallback(() => {
+    if (noteMenuCloseTimerRef.current !== null) {
+      window.clearTimeout(noteMenuCloseTimerRef.current);
+      noteMenuCloseTimerRef.current = null;
+    }
+  }, []);
+
   const closeNoteActionsMenu = useCallback(() => {
+    clearNoteMenuCloseTimer();
+    hoverOpenedNoteMenuRef.current = false;
     setNoteMenuView(null);
     setNoteMenuPosition(null);
     setNoteMenuMoveQuery("");
     setNoteMenuLabelQuery("");
     setIsNoteMenuLabelSubmitting(false);
-  }, []);
+  }, [clearNoteMenuCloseTimer]);
+
+  const openNoteActionsMenu = useCallback(
+    (options?: { fromHover?: boolean }) => {
+      const button = noteMenuButtonRef.current;
+      if (!button || !noteMenu) return;
+      if (noteMenuView !== null) return;
+
+      setNoteMenuAssignedLabelIds(
+        noteMenu.task.labels.map((label) => label.id),
+      );
+      setNoteMenuMoveQuery("");
+      setNoteMenuLabelQuery("");
+      setNoteMenuPosition(computeTaskDetailsNoteMenuPosition(button));
+      setNoteMenuView("main");
+      hoverOpenedNoteMenuRef.current = options?.fromHover === true;
+    },
+    [noteMenu, noteMenuView],
+  );
+
+  const hoverOpenNoteActionsMenu = useCallback(() => {
+    clearNoteMenuCloseTimer();
+    openNoteActionsMenu({ fromHover: true });
+  }, [clearNoteMenuCloseTimer, openNoteActionsMenu]);
+
+  const scheduleCloseNoteActionsMenu = useCallback(() => {
+    clearNoteMenuCloseTimer();
+    if (!hoverOpenedNoteMenuRef.current) return;
+
+    noteMenuCloseTimerRef.current = window.setTimeout(() => {
+      noteMenuCloseTimerRef.current = null;
+      if (!hoverOpenedNoteMenuRef.current) return;
+      closeNoteActionsMenu();
+    }, NOTE_ACTIONS_MENU_HOVER_CLOSE_MS);
+  }, [clearNoteMenuCloseTimer, closeNoteActionsMenu]);
+
+  const pinHoverOpenedNoteActionsMenu = useCallback(() => {
+    clearNoteMenuCloseTimer();
+    hoverOpenedNoteMenuRef.current = false;
+  }, [clearNoteMenuCloseTimer]);
 
   const toggleNoteActionsMenu = useCallback(() => {
     const button = noteMenuButtonRef.current;
     if (!button || !noteMenu) return;
 
     if (noteMenuView !== null) {
+      if (hoverOpenedNoteMenuRef.current) {
+        pinHoverOpenedNoteActionsMenu();
+        return;
+      }
       closeNoteActionsMenu();
       return;
     }
 
-    setNoteMenuAssignedLabelIds(noteMenu.task.labels.map((label) => label.id));
-    setNoteMenuMoveQuery("");
-    setNoteMenuLabelQuery("");
-    setNoteMenuPosition(computeTaskDetailsNoteMenuPosition(button));
-    setNoteMenuView("main");
-  }, [closeNoteActionsMenu, noteMenu, noteMenuView]);
+    openNoteActionsMenu({ fromHover: false });
+  }, [
+    closeNoteActionsMenu,
+    noteMenu,
+    noteMenuView,
+    openNoteActionsMenu,
+    pinHoverOpenedNoteActionsMenu,
+  ]);
 
   const handleNoteMenuToggleLabel = useCallback(
     async (labelId: string) => {
@@ -8974,6 +9119,7 @@ export function TaskDetailsPanel({
           dueTimeZone={task.dueTimeZone}
           recurrenceRule={task.recurrenceRule}
           reminderOptionId={taskReminderOptionId}
+          onDateInputFocusChange={handleDatePickerDateInputFocusChange}
           onSelectDate={(dateValue) => void handleSelectDueDate(dateValue)}
           onClearDateAndTime={() => void handleClearDueDateAndTime()}
           onSaveDueTime={(dueTime, options) =>
@@ -9378,18 +9524,24 @@ export function TaskDetailsPanel({
                   </span>
                 </div>
                 {showNoteActionsMenu && noteMenu ? (
-                  <button
-                    ref={noteMenuButtonRef}
-                    type="button"
-                    aria-label={`Open menu for ${noteMenu.task.name}`}
-                    aria-haspopup="menu"
-                    aria-expanded={noteMenuView !== null}
-                    title="More options"
-                    onClick={toggleNoteActionsMenu}
-                    className={`flex size-[34px] shrink-0 cursor-pointer items-center justify-center rounded-full text-[#8a8a8a] transition-colors hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-100 ${TASK_DETAILS_HEADER_ICON_HOVER_CLASS}`}
+                  <div
+                    className="relative shrink-0"
+                    onMouseEnter={hoverOpenNoteActionsMenu}
+                    onMouseLeave={scheduleCloseNoteActionsMenu}
                   >
-                    <PiDotsThreeBold className="size-[18px]" />
-                  </button>
+                    <button
+                      ref={noteMenuButtonRef}
+                      type="button"
+                      aria-label={`Open menu for ${noteMenu.task.name}`}
+                      aria-haspopup="menu"
+                      aria-expanded={noteMenuView !== null}
+                      title="More options"
+                      onClick={toggleNoteActionsMenu}
+                      className={`flex size-[34px] shrink-0 cursor-pointer items-center justify-center rounded-full text-[#8a8a8a] transition-colors hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-100 ${TASK_DETAILS_HEADER_ICON_HOVER_CLASS}`}
+                    >
+                      <PiDotsThreeBold className="size-[18px]" />
+                    </button>
+                  </div>
                 ) : null}
               </div>
             ) : null}
@@ -9412,9 +9564,7 @@ export function TaskDetailsPanel({
         >
           <div
             ref={editorWrapperRef}
-            className={`relative text-[#555555] ${
-              isModalLayout ? "flex min-h-0 h-0 flex-1 flex-col" : ""
-            }`}
+            className="relative text-[#555555]"
             onMouseEnter={handleEditorWrapperMouseEnter}
             onMouseLeave={handleEditorWrapperMouseLeave}
             onMouseMove={handleEditorWrapperMouseMove}
@@ -9444,6 +9594,34 @@ export function TaskDetailsPanel({
             ) : null}
 
             <div
+              className={
+                isModalLayout
+                  ? "relative flex min-h-0 h-0 flex-1 flex-col"
+                  : "contents"
+              }
+            >
+              {isModalLayout ? (
+                <>
+                  <div
+                    aria-hidden="true"
+                    className={`task-modal-editor-scroll-fade task-modal-editor-scroll-fade--top${
+                      modalEditorScrollFades.top
+                        ? " task-modal-editor-scroll-fade--visible"
+                        : ""
+                    }`}
+                  />
+                  <div
+                    aria-hidden="true"
+                    className={`task-modal-editor-scroll-fade task-modal-editor-scroll-fade--bottom${
+                      modalEditorScrollFades.bottom
+                        ? " task-modal-editor-scroll-fade--visible"
+                        : ""
+                    }`}
+                  />
+                </>
+              ) : null}
+
+            <div
               ref={editorRef}
               data-details-loading={isDetailsBodyLoading ? "true" : undefined}
               data-format-highlight-menu-open={
@@ -9469,13 +9647,14 @@ export function TaskDetailsPanel({
               onKeyDown={handleEditorKeyDown}
               onKeyUp={handleEditorKeyUp}
               onMouseMove={handleEditorWrapperMouseMove}
-              onScroll={updateLineControls}
+              onScroll={handleEditorScroll}
               className={`task-details-editor w-full resize-none rounded-xl pt-[8px] pl-[25px] pr-3 pb-4! text-[#555555] outline-none transition-colors focus:border-[#7f7f7f] dark:text-zinc-300 [&_.detail-line[data-line-type=bullet]]:pl-1 [&_.detail-line[data-line-type=checklist]]:cursor-pointer [&_.detail-line[data-line-type=checklist]]:pl-1 [&_.detail-line[data-line-type=h1]]:text-[26px] [&_.detail-line[data-line-type=h1]]:font-bold [&_.detail-line[data-line-type=h1]]:leading-[36px] [&_.detail-line[data-line-type=h1]]:text-[#4B4B4B] dark:[&_.detail-line[data-line-type=h1]]:text-[#F5F5F5] [&_.detail-line[data-line-type=h2]]:text-[23px] [&_.detail-line[data-line-type=h2]]:font-semibold [&_.detail-line[data-line-type=h2]]:leading-[30px] [&_.detail-line[data-line-type=h3]]:text-[19px] [&_.detail-line[data-line-type=h3]]:font-semibold [&_.detail-line[data-line-type=h3]]:leading-[26px] [&_.detail-line[data-line-type=numbered]]:pl-1 [&_mark]:bg-yellow-200 dark:[&_mark]:bg-yellow-300/30 [&_s]:line-through [&_strike]:line-through [&_u]:underline ${
                 isModalLayout
                   ? "h-[496px]! min-h-0 shrink-0 overflow-x-hidden overflow-y-auto"
                   : "min-h-[85vh] min-h-0 overflow-auto"
               }`}
             />
+            </div>
 
             {dropIndicator && (
               <div
@@ -9517,7 +9696,7 @@ export function TaskDetailsPanel({
                       type="button"
                       aria-label="Drag line"
                       title="Drag to reorder line"
-                        className="pointer-events-auto flex w-[23px] h-[26px] cursor-grab items-center justify-center rounded-full px-[1px] py-[3px] mr-[2px] text-[#9f9fbd] transition-colors hover:bg-zinc-100 hover:text-zinc-700 active:cursor-grabbing dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+                        className="pointer-events-auto flex w-[20px] pr-[2px] h-[26px] cursor-grab items-center justify-center rounded-[7px] px-[1px] py-[3px] mr-[2px] text-[#9f9fbd] transition-colors hover:bg-[#f5f5f7] hover:text-zinc-700 active:cursor-grabbing dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
                       onPointerDown={(event) =>
                         handleLineDragStart(event, lineId)
                       }
@@ -10176,7 +10355,13 @@ export function TaskDetailsPanel({
       noteMenuPosition &&
       typeof document !== "undefined"
         ? createPortal(
-            <div ref={noteMenuRef} className="z-[10080]">
+            <div
+              ref={noteMenuRef}
+              className="z-[10080]"
+              onMouseEnter={clearNoteMenuCloseTimer}
+              onMouseLeave={scheduleCloseNoteActionsMenu}
+              onMouseDownCapture={pinHoverOpenedNoteActionsMenu}
+            >
               <TaskRowContextMenu
                 task={noteMenu.task}
                 view={noteMenuView}

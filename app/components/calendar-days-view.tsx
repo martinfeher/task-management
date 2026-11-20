@@ -794,7 +794,7 @@ export function CalendarMultiDayView({
                               className="flex shrink-0 cursor-pointer items-center justify-center self-center pl-0.5"
                             >
                               <MdKeyboardArrowLeft
-                                className="size-[22px] text-[#abb1be] hover:text-[#90949e]"
+                                className="size-[22px] text-[#c0c4cd] hover:text-[#90949e]"
                                 aria-hidden="true"
                               />
                             </button>
@@ -817,7 +817,7 @@ export function CalendarMultiDayView({
                               className="flex shrink-0 cursor-pointer items-center mr-1 justify-center self-center pr-0.5"
                             >
                               <MdKeyboardArrowRight
-                                className="size-[22px] text-[#abb1be] hover:text-[#90949e]"
+                                className="size-[22px] text-[#c0c4cd] hover:text-[#90949e]"
                                 aria-hidden="true"
                               />
                             </button>

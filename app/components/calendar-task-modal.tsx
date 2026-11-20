@@ -51,8 +51,8 @@ export {
   type CalendarTaskModalAnchorRect,
 } from "@/lib/calendar-task-modal-position";
 
-/** Width of the modal when shrunk behind an image preview overlay. */
-const CALENDAR_TASK_MODAL_MINIMIZED_WIDTH_PX = 100;
+/** Target width of the modal chip while an image preview overlay is open (+15%). */
+const CALENDAR_TASK_MODAL_MINIMIZED_WIDTH_PX = Math.round(100 * 1.15);
 const CALENDAR_TASK_MODAL_MINIMIZED_MARGIN_PX = 20;
 
 export type CalendarTaskSnapshot = {

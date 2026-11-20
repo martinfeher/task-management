@@ -17,7 +17,7 @@ import { createPortal } from "react-dom";
 import { AiOutlineLineHeight } from "react-icons/ai";
 import { HiNumberedList } from "react-icons/hi2";
 import { IoTextOutline } from "react-icons/io5";
-import { LuChevronDown } from "react-icons/lu";
+import { LuChevronDown, LuPlus } from "react-icons/lu";
 import { VscChecklist } from "react-icons/vsc";
 import type { DetailTextBlockType, LineBlockType } from "./detail-lines";
 import {
@@ -32,6 +32,20 @@ import { BulletListIcon } from "./line-control-icons";
 import { DetailLineHeightControl } from "./detail-line-height-control";
 import type { DetailLineHeightOption } from "./detail-line-height";
 import { FROSTED_POPOVER_SURFACE_CLASS } from "@/lib/frosted-popover-surface";
+
+const FORMAT_TOOLBAR_MENU_SCROLL_CLASS_PATTERN =
+  /\b(?:overflow-(?:hidden|y-auto|x-hidden)|max-h-\[[^\]]+\]|max-h-\S+)\b/g;
+
+function splitFormatToolbarMenuSurfaceClasses(menuClassName: string) {
+  const scrollClassName = (
+    menuClassName.match(FORMAT_TOOLBAR_MENU_SCROLL_CLASS_PATTERN) ?? []
+  ).join(" ");
+  const surfaceClassName = menuClassName
+    .replace(FORMAT_TOOLBAR_MENU_SCROLL_CLASS_PATTERN, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return { surfaceClassName, scrollClassName };
+}
 
 export type FormatToolbarDropdown =
   | "textColor"
@@ -51,6 +65,10 @@ export const FORMAT_TOOLBAR_TEXT_COLOR_ICON_SIZE_CLASS = "size-[20px]";
 export const FORMAT_TOOLBAR_ICON_COLOR = "text-[#525259] dark:text-[#e7e7e9]";
 /** 10% brighter than Tailwind zinc-600 / zinc-300 */
 export const FORMAT_TOOLBAR_ICON_COLOR_MUTED = "text-[#63636b] dark:text-[#d8d8dc]";
+/** Line height trigger: 2px smaller than `FORMAT_TOOLBAR_ICON_SIZE_CLASS`, 15% brighter than muted. */
+const FORMAT_TOOLBAR_LINE_HEIGHT_ICON_SIZE_CLASS = "size-[16px]";
+const FORMAT_TOOLBAR_LINE_HEIGHT_ICON_COLOR =
+  "text-[#7a7a81] dark:text-[#dedee1]";
 /** 10% brighter than Tailwind zinc-500 */
 export const FORMAT_TOOLBAR_CHEVRON_COLOR = "text-[#7f7f87]";
 /** 10% brighter than Tailwind zinc-800 / zinc-100 */
@@ -417,6 +435,8 @@ function FormatToolbarDropdownShell({
   trigger,
   children,
 }: DropdownShellProps) {
+  const { surfaceClassName, scrollClassName } =
+    splitFormatToolbarMenuSurfaceClasses(menuClassName);
   const placement = useFormatToolbarAnchorPlacement();
   const closeTimerRef = useRef<number | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -581,11 +601,15 @@ function FormatToolbarDropdownShell({
                   ref={resolvedMenuRef}
                   role="menu"
                   aria-label={ariaLabel}
-                  className={menuClassName}
+                  className={`${surfaceClassName} overflow-visible`}
                   style={menuStyle}
                   onMouseDown={(event) => event.preventDefault()}
                 >
-                  {children}
+                  <div
+                    className={`overflow-hidden rounded-[inherit] ${scrollClassName}`}
+                  >
+                    {children}
+                  </div>
                 </div>
               </div>,
               document.body,
@@ -610,6 +634,22 @@ export type RecentFormatColor = {
 
 const FORMAT_COLOR_MENU_SECTION_TITLE_CLASS =
   "mb-2 text-[11px] font-medium text-gray-600 dark:text-zinc-300";
+
+const FORMAT_TEXT_COLOR_CUSTOM_RING_GRADIENT =
+  "conic-gradient(#a855f7, #ef4444, #facc15, #22c55e, #3b82f6, #a855f7)";
+
+const FORMAT_TEXT_COLOR_CUSTOM_CHIP_CLASS =
+  "menu-item-hover-focus flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent p-0 transition-transform hover:scale-110";
+
+function toNativeColorInputValue(color: string) {
+  const normalized = normalizeColorValue(color);
+  if (/^#[0-9a-f]{6}$/i.test(normalized)) {
+    return normalized;
+  }
+
+  const hex = rgbStringToHex(color);
+  return hex ?? "#000000";
+}
 
 export type TextColorPreviewTypography = {
   fontFamily?: string;
@@ -715,6 +755,7 @@ export function DetailFormatTextColorDropdown({
 }: DetailFormatTextColorDropdownProps) {
   const placement = useFormatToolbarAnchorPlacement();
   const menuRef = useRef<HTMLDivElement>(null);
+  const customColorInputRef = useRef<HTMLInputElement>(null);
   const [previewColor, setPreviewColor] = useState<string | null>(null);
   const [previewPosition, setPreviewPosition] = useState({ top: 0, left: 0 });
   const previewContent = previewText?.trim() ?? "";
@@ -785,7 +826,7 @@ export function DetailFormatTextColorDropdown({
         tooltipLabel="Text color"
         openClassName=""
         menuRef={menuRef}
-        menuClassName={`format-toolbar-color-submenu ${FORMAT_TOOLBAR_DROPDOWN_MENU_CLASS} min-w-[260px]`}
+        menuClassName={`format-toolbar-color-submenu ${FORMAT_TOOLBAR_DROPDOWN_MENU_CLASS} min-w-[260px] overflow-visible`}
         triggerClassName={`format-text-color-trigger flex h-8 cursor-pointer items-center gap-0.5 rounded-lg px-2 text-sm ${FORMAT_TOOLBAR_ICON_COLOR} transition-[background-color] duration-150`}
         trigger={
           <>
@@ -807,10 +848,10 @@ export function DetailFormatTextColorDropdown({
         }
       >
         <div className="space-y-3 px-3 py-2" onMouseLeave={clearPreview}>
-          {recentTextColors.length > 0 ? (
-            <section>
-              <p className={FORMAT_COLOR_MENU_SECTION_TITLE_CLASS}>Recently Used</p>
-              <div className="flex flex-wrap gap-1.5">
+          <section>
+            <p className={FORMAT_COLOR_MENU_SECTION_TITLE_CLASS}>Recently Used</p>
+            <div className="flex items-center justify-between gap-1.5">
+              <div className="flex min-w-0 flex-wrap items-center gap-1.5">
                 {recentTextColors.map((entry) => (
                   <TextColorSwatchButton
                     key={`recent-text-${entry.color}`}
@@ -826,8 +867,54 @@ export function DetailFormatTextColorDropdown({
                   />
                 ))}
               </div>
-            </section>
-          ) : null}
+              <div className="group/format-color-custom relative shrink-0 translate-x-[3px] -translate-y-[3px]">
+                <button
+                  type="button"
+                  role="menuitem"
+                  aria-label="Custom color"
+                  aria-describedby="format-toolbar-text-color-custom-tooltip"
+                  className={FORMAT_TEXT_COLOR_CUSTOM_CHIP_CLASS}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => {
+                    customColorInputRef.current?.click();
+                  }}
+                >
+                  <span
+                    aria-hidden="true"
+                    className="relative flex size-7 items-center justify-center rounded-full p-[2px]"
+                    style={{ background: FORMAT_TEXT_COLOR_CUSTOM_RING_GRADIENT }}
+                  >
+                    <span className="flex size-full items-center justify-center rounded-full bg-white dark:bg-zinc-900">
+                      <LuPlus className="size-3 text-zinc-800 dark:text-zinc-100" />
+                    </span>
+                  </span>
+                </button>
+                <input
+                  ref={customColorInputRef}
+                  type="color"
+                  tabIndex={-1}
+                  aria-hidden="true"
+                  className="pointer-events-none absolute size-0 opacity-0"
+                  value={toNativeColorInputValue(selectedTextColor)}
+                  onInput={(event) => {
+                    onPreviewTextColorChange?.(event.currentTarget.value);
+                  }}
+                  onChange={(event) => {
+                    const nextColor = event.target.value;
+                    onPreviewTextColorChange?.(nextColor);
+                    onSelectTextColor(nextColor);
+                  }}
+                />
+                <span
+                  id="format-toolbar-text-color-custom-tooltip"
+                  role="tooltip"
+                  className={`${FORMAT_TOOLBAR_TOOLTIP_CHROME} app-hover-tooltip app-hover-tooltip-above-center bottom-[calc(100%+6px)] z-[10100]`}
+                >
+                  Custom color
+                </span>
+              </div>
+            </div>
+          </section>
 
           <section>
             <p className={FORMAT_COLOR_MENU_SECTION_TITLE_CLASS}>Text Color</p>
@@ -1272,7 +1359,7 @@ export function DetailFormatLineHeightDropdown({
       trigger={
         <>
           <AiOutlineLineHeight
-            className={`${FORMAT_TOOLBAR_ICON_SIZE_CLASS} ${FORMAT_TOOLBAR_ICON_COLOR_MUTED}`}
+            className={`${FORMAT_TOOLBAR_LINE_HEIGHT_ICON_SIZE_CLASS} ${FORMAT_TOOLBAR_LINE_HEIGHT_ICON_COLOR}`}
             aria-hidden="true"
           />
           <LuChevronDown

@@ -106,6 +106,7 @@ type TaskListTaskRowProps = {
   onOpenDatePicker: (taskId: string) => void;
   onHoverOpenDatePicker?: (taskId: string) => void;
   onScheduleCloseDatePicker?: () => void;
+  onDateInputFocusChange?: (focused: boolean) => void;
   onHoverOpenLabelMenu?: (taskId: string) => void;
   onScheduleCloseLabelMenu?: () => void;
   onHoverOpenPriorityMenu?: (taskId: string) => void;
@@ -341,6 +342,7 @@ export function TaskListTaskRow({
   onOpenDatePicker,
   onHoverOpenDatePicker,
   onScheduleCloseDatePicker,
+  onDateInputFocusChange,
   onHoverOpenLabelMenu,
   onScheduleCloseLabelMenu,
   onHoverOpenPriorityMenu,
@@ -721,7 +723,7 @@ export function TaskListTaskRow({
         isCompleting
           ? ""
           : isListFocusRow
-            ? "bg-[#e9ebee]/50 hover:bg-[#e9ebee]/80"
+            ? "relative z-[1] bg-[#e9ebee]/50 shadow-[0_7px_17px_rgba(0,0,0,0.06)] hover:bg-[#e9ebee]/80"
             : suppressRowHoverChrome
               ? ""
               : "hover:bg-[#faf6ff]"
@@ -1120,6 +1122,7 @@ export function TaskListTaskRow({
                 >
                   <TaskDatePicker
                     className="task-item-date-picker-popover"
+                    onDateInputFocusChange={onDateInputFocusChange}
                     dueDate={task.dueDate}
                     dueTimeMinutes={task.dueTimeMinutes}
                     dueDurationMinutes={task.dueDurationMinutes}
@@ -1246,6 +1249,11 @@ export function TaskListTaskRow({
           <div
             className={`relative ${rowActionsPointerClass} ${rowActionHoverVisibilityClass}`}
             ref={rowMenuView ? taskContextMenuRef : null}
+            onMouseEnter={() => {
+              const anchor = rowMenuButtonRef.current;
+              if (anchor) onHoverOpenTaskRowMenu?.(task, anchor);
+            }}
+            onMouseLeave={() => onScheduleCloseTaskRowMenu?.()}
           >
             <button
               ref={rowMenuButtonRef}
@@ -1260,10 +1268,6 @@ export function TaskListTaskRow({
                 if (event.button !== 0) return;
                 event.stopPropagation();
               }}
-              onMouseEnter={(event) =>
-                onHoverOpenTaskRowMenu?.(task, event.currentTarget)
-              }
-              onMouseLeave={() => onScheduleCloseTaskRowMenu?.()}
               onClick={(event) => {
                 event.stopPropagation();
                 onOpenTaskRowMenu(task, event.currentTarget);

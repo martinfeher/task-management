@@ -564,7 +564,7 @@ export function CalendarMultiWeekView({
                           event.stopPropagation();
                           handleCalendarTaskPointerDown(event, task, day);
                         }}
-                        className={`block w-full truncate rounded py-0.5 pr-2 pl-3 text-left transition-colors touch-none ${
+                        className={`block w-full truncate rounded-[6px] py-0.5 pr-2 pl-3 text-left transition-colors touch-none ${
                           onSetTaskDueDate
                             ? "cursor-move"
                             : ""

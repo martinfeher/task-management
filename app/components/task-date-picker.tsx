@@ -38,6 +38,7 @@ import {
   REMINDER_MENU_OPTIONS,
   type TaskReminderOptionId,
 } from "@/lib/task-reminder";
+import { APP_HOVER_TOOLTIP_ABOVE_CENTER } from "@/lib/app-hover-tooltip-classes";
 
 type TaskDueTimeSaveOptions = {
   keepOpen?: boolean;
@@ -60,6 +61,7 @@ type TaskDatePickerProps = {
   onSaveReminder?: (optionId: TaskReminderOptionId) => void;
   /** Clears date, time, and related schedule fields (preferred over separate callbacks). */
   onClearDateAndTime?: () => void | Promise<void>;
+  onDateInputFocusChange?: (focused: boolean) => void;
   className?: string;
 };
 
@@ -74,6 +76,17 @@ export {
   TASK_DATE_PICKER_GAP,
   TASK_DATE_PICKER_HEIGHT,
 };
+
+export const TASK_DATE_PICKER_DATE_INPUT_SELECTOR =
+  "[data-task-date-picker-date-input]";
+
+export function isTaskDatePickerDateInputFocused(): boolean {
+  const active = document.activeElement;
+  return (
+    active instanceof HTMLElement &&
+    Boolean(active.closest(TASK_DATE_PICKER_DATE_INPUT_SELECTOR))
+  );
+}
 
 export function computeTaskDatePickerMenuPosition(
   anchor: HTMLElement,
@@ -1352,6 +1365,7 @@ export function TaskDatePicker({
   reminderOptionId = null,
   onSaveReminder,
   onClearDateAndTime,
+  onDateInputFocusChange,
   className,
 }: TaskDatePickerProps) {
   const today = useMemo(() => startOfDay(new Date()), []);
@@ -1608,8 +1622,14 @@ export function TaskDatePicker({
                 handleTypedDateSubmit();
               }
             }}
-            onFocus={() => setIsDateInputFocused(true)}
-            onBlur={() => setIsDateInputFocused(false)}
+            onFocus={() => {
+              setIsDateInputFocused(true);
+              onDateInputFocusChange?.(true);
+            }}
+            onBlur={() => {
+              setIsDateInputFocused(false);
+              onDateInputFocusChange?.(false);
+            }}
             placeholder={
               isDateInputFocused
                 ? activeFormat.placeholder
@@ -1813,13 +1833,24 @@ export function TaskDatePicker({
               : "No date"}
         </span>
         {hasDateOrTime ? (
-          <button
-            type="button"
-            onClick={handleClearDateAndTime}
-            className="rounded-full bg-[#bcbcdf] px-3 py-1.5 text-[13px] text-white transition-opacity hover:opacity-80 cursor-pointer mr-2"
-          >
-            Clear
-          </button>
+          <div className="group/date-clear relative shrink-0">
+            <button
+              type="button"
+              onClick={handleClearDateAndTime}
+              aria-label="Clear date and time"
+              aria-describedby="task-date-picker-clear-tooltip"
+              className="inline-flex h-[30px] w-[55px] shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#85a4c5] text-[13px] text-white transition-opacity hover:opacity-80"
+            >
+              Clear
+            </button>
+            <span
+              id="task-date-picker-clear-tooltip"
+              role="tooltip"
+              className={`add-task-date-tooltip ${APP_HOVER_TOOLTIP_ABOVE_CENTER} pointer-events-none absolute bottom-[calc(100%+8px)] z-[200] whitespace-nowrap px-3 py-1.5 text-[11px] font-medium`}
+            >
+              Clear date and Time
+            </span>
+          </div>
         ) : null}
       </div>
     </div>

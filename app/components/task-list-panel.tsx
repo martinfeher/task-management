@@ -28,7 +28,10 @@ import {
   TaskListTitleIcon,
   type TaskListTitleIconKind,
 } from "./list-panel-title-icon";
-import { TaskDatePicker } from "./task-date-picker";
+import {
+  isTaskDatePickerDateInputFocused,
+  TaskDatePicker,
+} from "./task-date-picker";
 import { TaskSetDateIcon } from "./task-set-date-icon";
 import { TaskCompletionCheckbox } from "./task-completion-checkbox";
 import {
@@ -41,6 +44,7 @@ import {
 import { TaskLabelSelector, type Label } from "./task-label-selector";
 import { TaskPriorityMenu } from "./task-priority-menu";
 import { FROSTED_POPOVER_SURFACE_CLASS } from "@/lib/frosted-popover-surface";
+import { TASK_LIST_METADATA_POPOVER_SHADOW_CLASS } from "@/lib/task-list-metadata-popover-shadow";
 import { TaskPriorityFlagIcon } from "./task-priority-icon";
 import {
   TaskListEntityFilter,
@@ -859,6 +863,7 @@ export function TaskListPanel({
   const taskRowMenuCloseTimerRef = useRef<number | null>(null);
   /** Task whose three-dots menu was opened by hover and not yet pinned by a click. */
   const hoverOpenedTaskRowMenuTaskIdRef = useRef<string | null>(null);
+  const isTaskListDateInputFocusedRef = useRef(false);
   const isAddTaskDatePickerOpenRef = useRef(false);
   const keepAddTaskOpenRef = useRef(false);
   const titleEditReadyRef = useRef(false);
@@ -1500,11 +1505,32 @@ export function TaskListPanel({
   }
 
   function scheduleAddTaskDateMenuClose() {
+    if (
+      isTaskListDateInputFocusedRef.current ||
+      isTaskDatePickerDateInputFocused()
+    ) {
+      return;
+    }
+
     clearAddTaskDateMenuCloseTimer();
     addTaskDateMenuCloseTimerRef.current = window.setTimeout(() => {
       addTaskDateMenuCloseTimerRef.current = null;
+      if (
+        isTaskListDateInputFocusedRef.current ||
+        isTaskDatePickerDateInputFocused()
+      ) {
+        return;
+      }
       setIsAddTaskDatePickerOpen(false);
     }, ADD_TASK_METADATA_MENU_HOVER_CLOSE_MS);
+  }
+
+  function handleTaskDateInputFocusChange(focused: boolean) {
+    isTaskListDateInputFocusedRef.current = focused;
+    if (focused) {
+      clearTaskRowDateMenuCloseTimer();
+      clearAddTaskDateMenuCloseTimer();
+    }
   }
 
   function openAddTaskLabelMenu() {
@@ -1625,9 +1651,22 @@ export function TaskListPanel({
   }
 
   function scheduleCloseTaskDatePicker() {
+    if (
+      isTaskListDateInputFocusedRef.current ||
+      isTaskDatePickerDateInputFocused()
+    ) {
+      return;
+    }
+
     clearTaskRowDateMenuCloseTimer();
     taskRowDateMenuCloseTimerRef.current = window.setTimeout(() => {
       taskRowDateMenuCloseTimerRef.current = null;
+      if (
+        isTaskListDateInputFocusedRef.current ||
+        isTaskDatePickerDateInputFocused()
+      ) {
+        return;
+      }
       setOpenDatePickerTaskId(null);
     }, ADD_TASK_METADATA_MENU_HOVER_CLOSE_MS);
   }
@@ -3180,6 +3219,7 @@ export function TaskListPanel({
           onOpenDatePicker={openDatePicker}
           onHoverOpenDatePicker={hoverOpenTaskDatePicker}
           onScheduleCloseDatePicker={scheduleCloseTaskDatePicker}
+          onDateInputFocusChange={handleTaskDateInputFocusChange}
           onHoverOpenLabelMenu={hoverOpenTaskLabelMenu}
           onScheduleCloseLabelMenu={scheduleCloseTaskLabelMenu}
           onHoverOpenPriorityMenu={hoverOpenTaskPriorityMenu}
@@ -3761,7 +3801,8 @@ export function TaskListPanel({
                           }}
                         >
                         <TaskDatePicker
-                          className={`relative z-50 overflow-visible rounded-2xl ${FROSTED_POPOVER_SURFACE_CLASS}`}
+                          className={`relative z-50 overflow-visible rounded-2xl ${FROSTED_POPOVER_SURFACE_CLASS} ${TASK_LIST_METADATA_POPOVER_SHADOW_CLASS}`}
+                          onDateInputFocusChange={handleTaskDateInputFocusChange}
                           dueDate={newTaskDueDate}
                           dueTimeMinutes={
                             newTaskDueTime?.dueTimeMinutes ?? null
@@ -3821,6 +3862,7 @@ export function TaskListPanel({
                         <div className="w-fit shrink-0">
                         <TaskLabelSelector
                           surface="frosted"
+                          className={TASK_LIST_METADATA_POPOVER_SHADOW_CLASS}
                           labels={addTaskAvailableLabels}
                           assignedLabelIds={addTaskLabelIds}
                           query={addTaskLabelQuery}
@@ -4033,7 +4075,7 @@ export function TaskListPanel({
                           selectedTaskId,
                         )} ${
                           task.id === selectedTaskId
-                            ? "bg-[#e9ebee]/50 hover:bg-[#e9ebee]/80"
+                            ? "relative z-[1] bg-[#e9ebee]/50 shadow-[0_7px_17px_rgba(0,0,0,0.06)] hover:bg-[#e9ebee]/80"
                             : "hover:bg-[#faf6ff]"
                         }`}
                       >

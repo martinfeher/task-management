@@ -83,13 +83,13 @@ export function calendarAllDayTaskClassName(
   selected = false,
   draggable = false,
 ) {
-  return `flex h-[24px] w-full shrink-0 items-center truncate rounded-[5px] px-[5px] text-left leading-none transition-colors ${
+  return `flex h-[24px] w-full shrink-0 items-center truncate rounded-[6px] px-[5px] text-left leading-none transition-colors ${
     draggable ? "cursor-move touch-none" : ""
   } ${calendarTaskItemClassName(selected)}`;
 }
 
 export function calendarAllDayDraftClassName() {
-  return "flex h-[24px] w-full shrink-0 items-center truncate rounded-[5px] bg-zinc-200/50 px-[5px] text-[11px] text-zinc-400 dark:bg-zinc-700";
+  return "flex h-[24px] w-full shrink-0 items-center truncate rounded-[6px] bg-zinc-200/50 px-[5px] text-[11px] text-zinc-400 dark:bg-zinc-700";
 }
 
 export function calendarTaskItemClassName(selected = false) {

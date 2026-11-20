@@ -34,6 +34,7 @@ import {
 import { TemplateHexColorPicker } from "./template-hex-color-picker";
 import { TemplateStylesSection } from "./template-styles-section";
 import { TemplateDataBackupSection } from "./template-data-backup-section";
+import { TemplateBrowserNotificationSection } from "./template-browser-notification-section";
 import {
   areTemplateSettingsSnapshotsEqual,
   cloneTemplateSettingsSnapshot,
@@ -774,6 +775,8 @@ export function TemplateOptionsDrawer() {
               </div>
             </div>
           </section>
+
+          <TemplateBrowserNotificationSection />
 
           <TemplateDataBackupSection />
         </div>

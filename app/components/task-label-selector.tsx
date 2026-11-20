@@ -12,6 +12,7 @@ import {
   normalizeLabelColorHex,
 } from "@/lib/label-colors";
 import { FROSTED_POPOVER_SURFACE_CLASS } from "@/lib/frosted-popover-surface";
+import { TASK_LIST_METADATA_POPOVER_SHADOW_CLASS } from "@/lib/task-list-metadata-popover-shadow";
 import { TASK_MODAL_CONTEXT_SURFACE_CLASS } from "@/lib/task-modal-context-surface";
 import { taskContextMenuTextColor } from "@/lib/task-context-menu-colors";
 
@@ -35,11 +36,11 @@ type TaskLabelSelectorProps = {
   /** Scrollable label list max height in px (default 260). */
   listMaxHeightPx?: number;
   surface?: "solid" | "frosted" | "modalContext";
+  className?: string;
 };
 
 const LABEL_SELECTOR_SURFACE_CLASS = {
-  solid:
-    "bg-white shadow-[0_12px_32px_rgba(0,0,0,0.12)] dark:bg-zinc-900 dark:shadow-[0_12px_32px_rgba(0,0,0,0.32)]",
+  solid: `bg-white dark:bg-zinc-900 ${TASK_LIST_METADATA_POPOVER_SHADOW_CLASS}`,
   frosted: FROSTED_POPOVER_SURFACE_CLASS,
   modalContext: TASK_MODAL_CONTEXT_SURFACE_CLASS,
 } as const;
@@ -133,6 +134,7 @@ export function TaskLabelSelector({
   tone = "default",
   listMaxHeightPx = 260,
   surface = "frosted",
+  className,
 }: TaskLabelSelectorProps) {
   const isContextMenuTone = tone === "contextMenu";
   const isFrostedSurface = surface === "frosted";
@@ -251,14 +253,15 @@ export function TaskLabelSelector({
       role="dialog"
       aria-label="Add label"
       data-task-label-menu
-      className={`w-[220px] shrink-0 overflow-hidden rounded-3xl ${
+      className={`w-[220px] shrink-0 overflow-visible rounded-3xl ${
         isModalContextSurface
           ? ""
           : "border border-[#eaeaea] dark:border-zinc-700"
-      } ${LABEL_SELECTOR_SURFACE_CLASS[surface]}`}
+      } ${LABEL_SELECTOR_SURFACE_CLASS[surface]} ${className ?? ""}`}
       onMouseDown={(event) => event.stopPropagation()}
       onClick={(event) => event.stopPropagation()}
     >
+      <div className="overflow-hidden rounded-[inherit]">
       <div className="border-b border-zinc-200 px-3 py-2.5 dark:border-zinc-700">
         {assignedLabels.length > 0 ? (
           <div className="mb-2 flex flex-wrap gap-1.5">
@@ -498,6 +501,7 @@ export function TaskLabelSelector({
             );
           })
         )}
+      </div>
       </div>
     </div>
   );

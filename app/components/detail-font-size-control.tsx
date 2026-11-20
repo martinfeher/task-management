@@ -35,9 +35,9 @@ const FORMAT_TOOLBAR_HEADER_TRIGGER_ACTIVE_CLASS =
 const FORMAT_TOOLBAR_HEADER_TRIGGER_GROUP_HOVER_CLASS =
   "group-hover/control:bg-[var(--panel-text-task-detail-header-icon-hover-background)] dark:group-hover/control:bg-zinc-800";
 
-const menuClassName = `absolute top-full z-50 mt-1 overflow-hidden rounded-lg py-1 ${FROSTED_POPOVER_SURFACE_CLASS}`;
+const menuClassName = `absolute top-full z-50 mt-1 overflow-visible rounded-lg py-1 ${FROSTED_POPOVER_SURFACE_CLASS}`;
 
-const formatToolbarMenuPanelClassName = `overflow-hidden rounded-[11px] py-1 ${FROSTED_POPOVER_SURFACE_CLASS}`;
+const formatToolbarMenuPanelClassName = `overflow-visible rounded-[11px] py-1 ${FROSTED_POPOVER_SURFACE_CLASS}`;
 
 const menuItemClassName =
   "flex w-full cursor-pointer items-center px-3 py-1.5 text-left text-sm text-zinc-900 hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800";
@@ -131,8 +131,11 @@ export function DetailFontSizeControl({
             <div
               role="listbox"
               aria-label="Font size"
-              className={`format-toolbar-dropdown-menu ${formatToolbarMenuPanelClassName} min-w-[168px] cursor-pointer ${FROSTED_POPOVER_SURFACE_CLASS}`}
+              className={`format-toolbar-dropdown-menu ${formatToolbarMenuPanelClassName} min-w-[168px] cursor-pointer overflow-visible ${FROSTED_POPOVER_SURFACE_CLASS}`}
             >
+              <div
+                className="overflow-hidden rounded-[inherit]"
+              >
               <div
                 className="grid grid-cols-4 gap-0.5 px-1 py-1"
                 onMouseLeave={() => onPreviewSizeClear?.()}
@@ -159,13 +162,15 @@ export function DetailFontSizeControl({
                   </button>
                 ))}
               </div>
+              </div>
             </div>
           ) : (
             <div
               role="listbox"
               aria-label="Font size"
-              className={`${menuClassName} min-w-[72px] max-h-64 overflow-y-auto`}
+              className={`${menuClassName} min-w-[72px] overflow-visible`}
             >
+              <div className="max-h-64 overflow-y-auto rounded-[inherit]">
               {DETAIL_FONT_SIZE_OPTIONS.map((option) => (
                 <button
                   key={option}
@@ -181,6 +186,7 @@ export function DetailFontSizeControl({
                   {option}
                 </button>
               ))}
+              </div>
             </div>
           )}
         </div>

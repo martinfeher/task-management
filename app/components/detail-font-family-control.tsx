@@ -26,7 +26,7 @@ type DetailFontFamilyControlProps = {
   onPreviewFamilyClear?: () => void;
 };
 
-const menuPanelClassName = `overflow-hidden rounded-lg py-1 ${FROSTED_POPOVER_SURFACE_CLASS}`;
+const menuPanelClassName = `overflow-visible rounded-lg py-1 ${FROSTED_POPOVER_SURFACE_CLASS}`;
 
 const formatToolbarMenuPanelClassName = `format-toolbar-dropdown-menu ${FORMAT_TOOLBAR_FONT_FAMILY_MENU_CLASS}`;
 
@@ -135,9 +135,10 @@ export function DetailFontFamilyControl({
             aria-label="Font family"
             className={`${
               formatToolbar ? formatToolbarMenuPanelClassName : menuPanelClassName
-            } min-w-[168px] max-h-64 overflow-y-auto`}
+            } min-w-[168px] overflow-visible`}
             onMouseLeave={() => onPreviewFamilyClear?.()}
           >
+            <div className="max-h-64 overflow-y-auto overflow-x-hidden rounded-[inherit]">
             {fontOptions.map((option) => (
               <button
                 key={option.id}
@@ -157,6 +158,7 @@ export function DetailFontFamilyControl({
                 {option.label}
               </button>
             ))}
+            </div>
           </div>
         </div>
       ) : null}

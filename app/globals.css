@@ -4,6 +4,7 @@
 @source not "../.history";
 
 @source inline("rounded-[5px]");
+@source inline("rounded-[6px]");
 @source inline("rounded-[8px]");
 @source inline("rounded-[14px]");
 @source inline("rounded-[15px]");
@@ -48,6 +49,11 @@
 
   [data-task-priority-menu] .frosted-popover-surface {
     @apply backdrop-blur-[5px];
+  }
+
+  .task-list-metadata-popover-shadow,
+  .frosted-popover-surface.task-list-metadata-popover-shadow {
+    box-shadow: 0 7px 17px rgba(0, 0, 0, 0.06);
   }
 
   .task-list-context-menu .frosted-popover-surface {
@@ -359,12 +365,12 @@
   );
   --calendar-task-column-left-inset: 1px;
   --calendar-task-column-right-inset: calc(2% + 5px);
-  --calendar-task-all-day-radius: 5px;
-  --calendar-task-all-day-radius-drag: 7px;
-  --calendar-task-block-radius: 10px;
-  --calendar-task-block-radius-drag: 12px;
-  --calendar-task-block-inner-radius: 5px;
-  --calendar-task-block-inner-radius-drag: 7px;
+  --calendar-task-all-day-radius: 6px;
+  --calendar-task-all-day-radius-drag: 8px;
+  --calendar-task-block-radius: 6px;
+  --calendar-task-block-radius-drag: 8px;
+  --calendar-task-block-inner-radius: 6px;
+  --calendar-task-block-inner-radius-drag: 6px;
   --calendar-task-drag-source-background-opacity: 0.87;
   --app-tooltip-shadow:
     0 1px 2px rgba(0, 0, 0, 0.05),
@@ -515,11 +521,11 @@ body {
 }
 
 .task-details-editor ::selection {
-  background-color: #c2f1ff;
+  background-color: #EAEAF4;
 }
 
 .task-details-editor ::-moz-selection {
-  background-color: #c2f1ff;
+  background-color: #E9E9F2;
 }
 
 .task-details-editor[data-format-highlight-menu-open="true"] ::selection,
@@ -627,7 +633,7 @@ body {
 .detail-line[data-line-type="bullet"]::before {
   content: "•";
   margin-right: 0.5rem;
-  color: #ABB1C5;
+  color: #bcbcde;
 }
 
 .task-details-editor .detail-line[data-line-type="bullet"][data-list-indent="1"],
@@ -841,6 +847,15 @@ body {
   margin-left: 0.25rem;
   font-family: var(--font-app), ui-sans-serif, system-ui, sans-serif !important;
   animation: body-placeholder-fade-in 50ms ease both;
+}
+
+/* Keep the marker, caret <br> and placeholder on one row; otherwise the <br>
+   pushes the ::after placeholder onto a second row. */
+.task-details-editor .detail-line[data-empty="true"][data-line-type="bullet"],
+.task-details-editor .detail-line[data-empty="true"][data-line-type="numbered"] {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: baseline;
 }
 
 /* Hide the idle trailing placeholder while editing, but never on the line the
@@ -1939,6 +1954,13 @@ body {
   cursor: pointer;
 }
 
+[data-calendar-grid-view]
+  .calendar-task-item:not(.calendar-task-drop-preview):not(
+    .calendar-task-drag-source-placeholder
+  ) {
+  border: 1px solid #bebee6;
+}
+
 [data-calendar-grid-view] .calendar-task-item.cursor-move,
 [data-calendar-grid-view] .calendar-task-dragging {
   cursor: move;
@@ -2308,6 +2330,70 @@ body {
   box-shadow: var(--task-detail-image-shadow);
 }
 
+/* Subtle scroll hints above/below the modal task editor when content overflows. */
+.calendar-task-modal .task-modal-editor-scroll-fade {
+  pointer-events: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  height: 32px;
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.calendar-task-modal .task-modal-editor-scroll-fade--visible {
+  opacity: 1;
+}
+
+.calendar-task-modal .task-modal-editor-scroll-fade--top {
+  top: 0;
+  border-top-left-radius: 0.75rem;
+  border-top-right-radius: 0.75rem;
+  background: linear-gradient(
+    to bottom,
+    rgb(246 246 246 / 0.96) 0%,
+    rgb(246 246 246 / 0.55) 52%,
+    rgb(246 246 246 / 0) 100%
+  );
+}
+
+.calendar-task-modal .task-modal-editor-scroll-fade--bottom {
+  bottom: 0;
+  border-bottom-left-radius: 0.75rem;
+  border-bottom-right-radius: 0.75rem;
+  background: linear-gradient(
+    to top,
+    rgb(246 246 246 / 0.96) 0%,
+    rgb(246 246 246 / 0.55) 52%,
+    rgb(246 246 246 / 0) 100%
+  );
+}
+
+.dark .calendar-task-modal .task-modal-editor-scroll-fade--top {
+  background: linear-gradient(
+    to bottom,
+    rgb(9 9 11 / 0.96) 0%,
+    rgb(9 9 11 / 0.55) 52%,
+    rgb(9 9 11 / 0) 100%
+  );
+}
+
+.dark .calendar-task-modal .task-modal-editor-scroll-fade--bottom {
+  background: linear-gradient(
+    to top,
+    rgb(9 9 11 / 0.96) 0%,
+    rgb(9 9 11 / 0.55) 52%,
+    rgb(9 9 11 / 0) 100%
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .calendar-task-modal .task-modal-editor-scroll-fade {
+    transition: none;
+  }
+}
+
 /* Task switch (header up/down arrows): very subtle fade-in only. */
 .calendar-task-modal-content-transition--in {
   animation: calendar-task-modal-content-reveal
@@ -2628,13 +2714,13 @@ body {
 .format-toolbar-popover-surface.frosted-popover-surface {
   @apply backdrop-blur-[5px];
   background-color: rgb(255 255 255 / 0.87);
-  border: 1px solid #dedeca;
+  border: 1px solid #f2f2f6;
 }
 
 .dark .format-toolbar-popover-surface.frosted-popover-surface {
   @apply backdrop-blur-[5px];
   background-color: rgb(9 9 11 / 0.87);
-  border-color: #dedeca;
+  border-color: #E5E5EB;
 }
 
 /* Format toolbar dropdown submenus (list, block, font size, overflow, etc.). */
@@ -2646,6 +2732,7 @@ body {
 .format-toolbar-color-submenu.frosted-popover-surface {
   @apply backdrop-blur-[4px];
   background-color: rgb(255 255 255 / 0.8);
+  overflow: visible;
 }
 
 .dark .format-toolbar-color-submenu.frosted-popover-surface {
@@ -2745,9 +2832,7 @@ body {
 .task-item-date-picker-popover {
   border-radius: 16px;
   background-color: rgb(255 255 255);
-  box-shadow:
-    0 10px 23px rgba(0, 0, 0, 0.09),
-    0 0 0 1px rgb(228 228 231 / 0.8);
+  box-shadow: 0 7px 17px rgba(0, 0, 0, 0.06);
 }
 
 .task-details-block-menu {
@@ -2795,9 +2880,7 @@ body {
 
   .task-item-date-picker-popover {
     background-color: rgb(9 9 11);
-    box-shadow:
-      0 10px 23px rgba(0, 0, 0, 0.09),
-      0 0 0 1px rgb(39 39 42);
+    box-shadow: 0 7px 17px rgba(0, 0, 0, 0.06);
   }
 }
 

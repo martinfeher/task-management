@@ -79,10 +79,11 @@ export function TaskMoveToSelector({
     <div
       role="dialog"
       aria-label="Move to list"
-      className={`w-[240px] overflow-hidden rounded-3xl ${MOVE_TO_SURFACE_CLASS[surface]}`}
+      className={`w-[240px] overflow-visible rounded-3xl ${MOVE_TO_SURFACE_CLASS[surface]}`}
       onMouseDown={(event) => event.stopPropagation()}
       onClick={(event) => event.stopPropagation()}
     >
+      <div className="overflow-hidden rounded-[inherit]">
       <div
         className={`border-b px-3 py-2.5 ${
           isFrostedSurface
@@ -191,6 +192,7 @@ export function TaskMoveToSelector({
             );
           })
         )}
+      </div>
       </div>
     </div>
   );
