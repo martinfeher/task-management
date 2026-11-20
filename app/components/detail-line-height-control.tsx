@@ -11,7 +11,7 @@ import {
 } from "./detail-format-toolbar-menus";
 import { FROSTED_POPOVER_SURFACE_CLASS } from "@/lib/frosted-popover-surface";
 
-const DETAIL_LINE_HEIGHT_LIST_CLASS = `format-toolbar-dropdown-menu min-w-[168px] overflow-y-auto overscroll-contain rounded-lg py-1 ${FROSTED_POPOVER_SURFACE_CLASS}`;
+const DETAIL_LINE_HEIGHT_LIST_CLASS = `format-toolbar-dropdown-menu min-w-[188px] overflow-y-auto overscroll-contain rounded-lg py-1 ${FROSTED_POPOVER_SURFACE_CLASS}`;
 
 type DetailLineHeightControlProps = {
   value: DetailLineHeightOption;
@@ -87,7 +87,7 @@ export function DetailLineHeightControl({
       ref={listRef}
       role="listbox"
       aria-label="Line height"
-      className={`${DETAIL_LINE_HEIGHT_LIST_CLASS} max-h-40 py-1 ${className}`}
+      className={`${DETAIL_LINE_HEIGHT_LIST_CLASS} max-h-[180px] py-1 ${className}`}
     >
       {DETAIL_LINE_HEIGHT_OPTIONS.map((option) => {
         const selected = lineHeightsMatch(option, value);

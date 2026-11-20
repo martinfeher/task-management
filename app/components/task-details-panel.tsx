@@ -205,11 +205,11 @@ import {
 import { DetailFontFamilyControl } from "./detail-font-family-control";
 import { DetailFontSizeControl } from "./detail-font-size-control";
 import {
-  DetailFormatBlockTypeDropdown,
   DetailFormatHighlightColorDropdown,
   DetailFormatTextColorDropdown,
   DetailFormatFontFamilyDropdown,
-  DetailFormatFontSizeDropdown,
+  DetailFormatTypographyDropdown,
+  type DetailTypographyPreset,
   DetailFormatLineHeightDropdown,
   DetailFormatListDropdown,
   DetailFormatOverflowMenu,
@@ -614,7 +614,7 @@ const TASK_DETAILS_BLOCK_MENU_ITEM_CLASS =
 const FORMAT_TOOLBAR_ROW_CLASS = "flex items-center gap-0.5 px-2 py-1";
 
 const FORMAT_TOOLBAR_TEXT_BUTTON_CLASS =
-  `flex h-8 min-w-8 items-center justify-center rounded-[9px] px-2 cursor-pointer text-[16px] ${FORMAT_TOOLBAR_ICON_COLOR} transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800`;
+  `flex h-8 min-w-8 items-center justify-center rounded-[7px] px-2 cursor-pointer text-[16px] ${FORMAT_TOOLBAR_ICON_COLOR} transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800`;
 
 const FORMAT_TOOLBAR_ICON_BUTTON_CLASS =
   `flex h-8 w-8 items-center justify-center rounded-lg ${FORMAT_TOOLBAR_ICON_COLOR} transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer`;
@@ -2080,6 +2080,88 @@ const FORMAT_MENU_BELOW_FIRST_SELECTED_LINE_GAP = 30;
 const FORMAT_MENU_BELOW_TRANSFORM_OFFSET_PX = 8;
 const FORMAT_MENU_ESTIMATED_HEIGHT = 44;
 
+const TASK_DETAILS_SELECTION_HORIZONTAL_PAD_PX = 3;
+
+type TaskDetailsSelectionSidePadRect = {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  edge: "start" | "end";
+};
+
+function groupSelectionClientRectsByLine(rects: DOMRect[]) {
+  const sorted = [...rects].sort((a, b) => a.top - b.top || a.left - b.left);
+  const groups: DOMRect[][] = [];
+
+  for (const rect of sorted) {
+    const previousGroup = groups[groups.length - 1];
+    if (previousGroup && Math.abs(rect.top - previousGroup[0].top) < 2) {
+      previousGroup.push(rect);
+    } else {
+      groups.push([rect]);
+    }
+  }
+
+  for (const group of groups) {
+    group.sort((a, b) => a.left - b.left);
+  }
+
+  return groups;
+}
+
+function getEditorSelectionSidePadRects(
+  editor: HTMLElement,
+): TaskDetailsSelectionSidePadRect[] {
+  if (
+    editor.getAttribute("data-format-highlight-menu-open") === "true" ||
+    editor.getAttribute("data-format-text-color-preview") === "true"
+  ) {
+    return [];
+  }
+
+  const selection = window.getSelection();
+  if (!selection?.rangeCount || selection.isCollapsed) {
+    return [];
+  }
+
+  const range = selection.getRangeAt(0);
+  if (!editor.contains(range.commonAncestorContainer)) {
+    return [];
+  }
+
+  const pad = TASK_DETAILS_SELECTION_HORIZONTAL_PAD_PX;
+  const clientRects = Array.from(range.getClientRects()).filter(
+    (rect) => rect.width > 0 && rect.height > 0,
+  );
+  if (clientRects.length === 0) {
+    return [];
+  }
+
+  const sidePads: TaskDetailsSelectionSidePadRect[] = [];
+
+  for (const lineRects of groupSelectionClientRectsByLine(clientRects)) {
+    const first = lineRects[0];
+    const last = lineRects[lineRects.length - 1];
+    sidePads.push({
+      left: first.left - pad,
+      top: first.top,
+      width: pad,
+      height: first.height,
+      edge: "start",
+    });
+    sidePads.push({
+      left: last.right,
+      top: last.top,
+      width: pad,
+      height: last.height,
+      edge: "end",
+    });
+  }
+
+  return sidePads;
+}
+
 function shouldPlaceFormatMenuBelowTitle(
   editor: HTMLElement,
   range: Range,
@@ -2450,6 +2532,9 @@ export function TaskDetailsPanel({
   const [formatMenu, setFormatMenu] = useState<FormatMenuState | null>(null);
   const [lineControls, setLineControls] = useState<LineControlItem[]>([]);
   const [dropIndicator, setDropIndicator] = useState<DropIndicatorState | null>(null);
+  const [editorSelectionSidePadRects, setEditorSelectionSidePadRects] = useState<
+    TaskDetailsSelectionSidePadRect[]
+  >([]);
   const [isImageDropActive, setIsImageDropActive] = useState(false);
   const [isDetailsBodyLoading, setIsDetailsBodyLoading] = useState(false);
   const [imageLightbox, setImageLightbox] = useState<{
@@ -3866,10 +3951,24 @@ export function TaskDetailsPanel({
     [isModalLayout, syncModalEditorScrollFades, task],
   );
 
+  const syncEditorSelectionSidePads = useCallback(() => {
+    const editor = editorRef.current;
+    if (!editor) {
+      setEditorSelectionSidePadRects([]);
+      return;
+    }
+    setEditorSelectionSidePadRects(getEditorSelectionSidePadRects(editor));
+  }, []);
+
+  useLayoutEffect(() => {
+    syncEditorSelectionSidePads();
+  }, [openFormatDropdown, syncEditorSelectionSidePads, textColorPreviewHoverActive]);
+
   const handleEditorScroll = useCallback(() => {
     updateLineControls();
     syncModalEditorScrollFades();
-  }, [syncModalEditorScrollFades, updateLineControls]);
+    syncEditorSelectionSidePads();
+  }, [syncEditorSelectionSidePads, syncModalEditorScrollFades, updateLineControls]);
 
   useEffect(() => {
     if (!isModalLayout || !task) return;
@@ -4045,7 +4144,7 @@ export function TaskDetailsPanel({
       openFormatDropdownRef.current === "textColor" ||
       openFormatDropdownRef.current === "highlight" ||
       openFormatDropdownRef.current === "fontFamily" ||
-      openFormatDropdownRef.current === "fontSize"
+      openFormatDropdownRef.current === "typography"
     ) {
       clearTextColorLivePreviewRef.current?.();
     }
@@ -4410,7 +4509,7 @@ export function TaskDetailsPanel({
 
         if (
           dropdown === "fontFamily" ||
-          dropdown === "fontSize" ||
+          dropdown === "typography" ||
           dropdown === "textColor" ||
           dropdown === "highlight"
         ) {
@@ -4423,7 +4522,7 @@ export function TaskDetailsPanel({
       if (
         dropdown === "textColor" ||
         dropdown === "fontFamily" ||
-        dropdown === "fontSize" ||
+        dropdown === "typography" ||
         dropdown === "highlight"
       ) {
         clearTextColorLivePreview();
@@ -4623,6 +4722,142 @@ export function TaskDetailsPanel({
     updateLineControls,
   ]);
 
+  const prepareFormatFontSizeStep = useCallback(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    const saved = savedFormatSelectionRef.current;
+    if (
+      saved &&
+      !saved.collapsed &&
+      saved.toString().trim() &&
+      editor.contains(saved.commonAncestorContainer)
+    ) {
+      try {
+        restoreEditorSelectionRange(saved);
+      } catch {
+        savedFormatSelectionRef.current = null;
+      }
+      return;
+    }
+
+    captureFormatSelectionFromEditor();
+  }, [captureFormatSelectionFromEditor]);
+
+  const finalizeFormatFontSizeApply = useCallback(() => {
+    const editor = editorRef.current;
+    if (editor && textColorPreviewMarkersPlacedRef.current) {
+      removeTextColorPreviewMarkers(editor);
+    }
+    textColorPreviewBaselineRef.current = null;
+    textColorPreviewMarkersPlacedRef.current = false;
+    setTextColorPreviewHoverActive(false);
+
+    if (openFormatDropdownRef.current !== "typography") {
+      closeFormatDropdowns();
+    }
+  }, [closeFormatDropdowns]);
+
+  const applyFormatTypographyPreset = useCallback(
+    (preset: DetailTypographyPreset) => {
+      const editor = editorRef.current;
+      if (!editor) return;
+
+      const previewBaseline = textColorPreviewBaselineRef.current;
+      const previewChanged =
+        textColorPreviewMarkersPlacedRef.current &&
+        previewBaseline !== null &&
+        editor.innerHTML !== previewBaseline;
+
+      clearTextColorLivePreview({ keepContent: true });
+
+      const rangeToApply = resolveFormatMenuRange(
+        editor,
+        savedFormatSelectionRef.current,
+      );
+
+      if (!rangeToApply) {
+        finalizeFormatFontSizeApply();
+        setOpenFormatDropdown(null);
+        return;
+      }
+
+      restoreEditorSelectionRange(rangeToApply);
+      editor.focus({ preventScroll: true });
+
+      const activeLine = getActiveLineElement(editor);
+      if (!activeLine || isCodeLine(activeLine)) {
+        finalizeFormatFontSizeApply();
+        setOpenFormatDropdown(null);
+        return;
+      }
+      if (isTitleLine(editor, activeLine) && preset.blockType !== "h1") {
+        finalizeFormatFontSizeApply();
+        setOpenFormatDropdown(null);
+        return;
+      }
+
+      const currentBlockType = getActiveTextBlockType(editor);
+      if (preset.blockType !== currentBlockType) {
+        applyBlockTypeToSelection(editor, preset.blockType, rangeToApply);
+        setFormatMenuBlockType(preset.blockType);
+        captureFormatSelectionFromEditor();
+      }
+
+      const rangeForSize = resolveFormatMenuRange(
+        editor,
+        savedFormatSelectionRef.current,
+      );
+      if (!rangeForSize) {
+        syncEditorLineEmptyState(editor);
+        syncEditorContent();
+        recordHistorySnapshot(`Text style: ${preset.label}`);
+        scheduleAutoSave();
+        updateLineControls();
+        finalizeFormatFontSizeApply();
+        setOpenFormatDropdown(null);
+        return;
+      }
+
+      restoreEditorSelectionRange(rangeForSize);
+
+      const selectionFontState = getDetailSelectionFontState(editor);
+      if (
+        preset.size !== selectionFontState.size &&
+        !(
+          previewChanged &&
+          selectionFontState.size === preset.size
+        )
+      ) {
+        applyDetailFontSize(editor, preset.size, rangeForSize);
+      }
+
+      const selection = window.getSelection();
+      if (selection?.rangeCount) {
+        rememberFormatSelection(editor, selection.getRangeAt(0));
+      }
+
+      setFormatMenuFontSize(preset.size);
+      syncEditorLineEmptyState(editor);
+      syncEditorContent();
+      recordHistorySnapshot(`Text style: ${preset.label}`);
+      scheduleAutoSave();
+      updateLineControls();
+      finalizeFormatFontSizeApply();
+      setOpenFormatDropdown(null);
+    },
+    [
+      captureFormatSelectionFromEditor,
+      clearTextColorLivePreview,
+      finalizeFormatFontSizeApply,
+      recordHistorySnapshot,
+      rememberFormatSelection,
+      scheduleAutoSave,
+      syncEditorContent,
+      updateLineControls,
+    ],
+  );
+
   const applyFormatFontSize = useCallback(
     (size: DetailFontSizeOption) => {
       const editor = editorRef.current;
@@ -4638,30 +4873,17 @@ export function TaskDetailsPanel({
 
       clearTextColorLivePreview({ keepContent: true });
 
-      const savedRange =
-        savedFormatSelectionRef.current?.cloneRange() ??
-        captureLiveEditorFormatSelection(editor);
-      if (
-        savedRange &&
-        editor.contains(savedRange.commonAncestorContainer)
-      ) {
-        restoreEditorSelectionRange(savedRange);
-      }
+      const rangeToApply = resolveFormatMenuRange(
+        editor,
+        savedFormatSelectionRef.current,
+      );
 
-      const rangeToApply =
-        savedFormatSelectionRef.current?.cloneRange() ??
-        savedRange ??
-        captureLiveEditorFormatSelection(editor);
-
-      if (
-        !rangeToApply ||
-        rangeToApply.collapsed ||
-        !rangeToApply.toString().trim()
-      ) {
-        closeFormatDropdowns();
+      if (!rangeToApply) {
+        finalizeFormatFontSizeApply();
         return;
       }
 
+      restoreEditorSelectionRange(rangeToApply);
       editor.focus({ preventScroll: true });
 
       if (
@@ -4674,7 +4896,7 @@ export function TaskDetailsPanel({
         }
         setFormatMenuFontSize(size);
         handleDetailFontApplied();
-        closeFormatDropdowns();
+        finalizeFormatFontSizeApply();
         return;
       }
 
@@ -4687,12 +4909,11 @@ export function TaskDetailsPanel({
         handleDetailFontApplied();
       }
 
-      closeFormatDropdowns();
+      finalizeFormatFontSizeApply();
     },
     [
-      captureFormatSelectionFromEditor,
       clearTextColorLivePreview,
-      closeFormatDropdowns,
+      finalizeFormatFontSizeApply,
       handleDetailFontApplied,
       rememberFormatSelection,
     ],
@@ -6223,6 +6444,7 @@ export function TaskDetailsPanel({
     function handleSelectionChange() {
       const editor = editorRef.current;
 
+      try {
       if (isEditorPointerDownRef.current) {
         const pendingLine = pendingClickLineRef.current;
         if (
@@ -6306,6 +6528,9 @@ export function TaskDetailsPanel({
       }
 
       scheduleLineControlsUpdate();
+      } finally {
+        syncEditorSelectionSidePads();
+      }
     }
 
     document.addEventListener("mousedown", handleClickOutside, true);
@@ -6321,6 +6546,7 @@ export function TaskDetailsPanel({
     requestSave,
     scheduleFormatMenuReveal,
     scheduleLineControlsUpdate,
+    syncEditorSelectionSidePads,
     syncFormatMenuSelectionState,
   ]);
 
@@ -9740,6 +9966,20 @@ export function TaskDetailsPanel({
             />
             </div>
 
+            {editorSelectionSidePadRects.map((rect, index) => (
+              <div
+                key={`${rect.top}-${rect.left}-${rect.edge}-${index}`}
+                aria-hidden="true"
+                className={`task-details-selection-side-pad task-details-selection-side-pad--${rect.edge} pointer-events-none fixed`}
+                style={{
+                  left: rect.left,
+                  top: rect.top,
+                  width: rect.width,
+                  height: rect.height,
+                }}
+              />
+            ))}
+
             {dropIndicator && (
               <div
                 className="pointer-events-none absolute right-3 left-10 z-20 h-0.5 bg-blue-500"
@@ -10146,12 +10386,23 @@ export function TaskDetailsPanel({
                   onSelect={applyLineBlockType}
                 />
 
-                <DetailFormatBlockTypeDropdown
-                  open={openFormatDropdown === "block"}
-                  onOpenChange={(open) => setFormatDropdownOpen("block", open)}
-                  activeType={formatMenuBlockType}
-                  onSelect={applyFormatBlockType}
-                  isTypeDisabled={(type) => {
+                <DetailFormatTypographyDropdown
+                  open={openFormatDropdown === "typography"}
+                  onOpenChange={(open) => {
+                    setFormatDropdownOpen("typography", open);
+                    if (open) {
+                      syncFormatMenuFontState();
+                    }
+                  }}
+                  blockType={formatMenuBlockType}
+                  size={formatMenuFontSize}
+                  onSelectBlockType={applyFormatBlockType}
+                  onSelectSize={applyFormatFontSize}
+                  onSelectPreset={applyFormatTypographyPreset}
+                  onBeforeFontSizeStep={prepareFormatFontSizeStep}
+                  onPreviewSize={previewFontSizeOnSelection}
+                  onPreviewSizeClear={clearTextColorLivePreview}
+                  isBlockTypeDisabled={(type) => {
                     const editor = editorRef.current;
                     if (!editor) return true;
 
@@ -10174,20 +10425,6 @@ export function TaskDetailsPanel({
                   onSelectFamily={applyFormatFontFamily}
                   onPreviewFamily={previewFontFamilyOnSelection}
                   onPreviewFamilyClear={clearTextColorLivePreview}
-                />
-
-                <DetailFormatFontSizeDropdown
-                  open={openFormatDropdown === "fontSize"}
-                  onOpenChange={(open) => {
-                    setFormatDropdownOpen("fontSize", open);
-                    if (open) {
-                      syncFormatMenuFontState();
-                    }
-                  }}
-                  size={formatMenuFontSize}
-                  onSelectSize={applyFormatFontSize}
-                  onPreviewSize={previewFontSizeOnSelection}
-                  onPreviewSizeClear={clearTextColorLivePreview}
                 />
 
                 <DetailFormatLineHeightDropdown

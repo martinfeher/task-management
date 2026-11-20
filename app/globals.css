@@ -5,6 +5,7 @@
 
 @source inline("rounded-[5px]");
 @source inline("rounded-[6px]");
+@source inline("rounded-[7px]");
 @source inline("rounded-[8px]");
 @source inline("rounded-[10px]");
 @source inline("rounded-[12px]");
@@ -523,12 +524,28 @@ body {
 }
 
 .task-details-editor ::selection {
-  background-color: #EAEAF4;
+  background-color: #eaeaf4;
+  border-radius: 5px;
 }
 
 .task-details-editor ::-moz-selection {
-  background-color: #E9E9F2;
+  background-color: #e9e9f2;
+  border-radius: 5px;
 }
+
+.task-details-selection-side-pad {
+  z-index: 25;
+  background-color: #eaeaf4;
+}
+
+.task-details-selection-side-pad--start {
+  border-radius: 5px 0 0 5px;
+}
+
+.task-details-selection-side-pad--end {
+  border-radius: 0 5px 5px 0;
+}
+
 
 .task-details-editor[data-format-highlight-menu-open="true"] ::selection,
 .task-details-editor[data-format-text-color-preview="true"] ::selection {

@@ -128,6 +128,24 @@ export const DETAIL_FONT_SIZE_OPTIONS = [
 
 export type DetailFontSizeOption = (typeof DETAIL_FONT_SIZE_OPTIONS)[number];
 
+export function stepDetailFontSizeOption(
+  current: DetailFontSizeOption,
+  direction: -1 | 1,
+): DetailFontSizeOption {
+  const idx = DETAIL_FONT_SIZE_OPTIONS.indexOf(current);
+  const startIdx = idx >= 0 ? idx : DETAIL_FONT_SIZE_OPTIONS.indexOf(matchDetailFontSize(`${current}px`));
+  const nextIdx = Math.max(
+    0,
+    Math.min(DETAIL_FONT_SIZE_OPTIONS.length - 1, startIdx + direction),
+  );
+  return DETAIL_FONT_SIZE_OPTIONS[nextIdx];
+}
+
+export function detailFontSizeFromSliderValue(value: number): DetailFontSizeOption {
+  const rounded = Math.max(8, Math.min(72, Math.round(value)));
+  return matchDetailFontSize(`${rounded}px`);
+}
+
 export type DetailSelectionFontState = {
   familyId: DetailFontFamilyId;
   size: DetailFontSizeOption;

@@ -710,8 +710,7 @@ export function TaskListTaskRow({
           ? (event) => onTaskDragStart(event, task.id)
           : undefined
       }
-      className={`group ${dividerClass} flex ${rowMinHeightClass} items-center rounded-r-[3px] py-1.5 pr-2 pl-0 ${leftBorderClass} ${
-      // className={`group flex min-h-[35px] items-center rounded-r-[3px] border-b border-zinc-100 py-1 pr-2 pl-[1px] dark:border-zinc-900 ${
+      className={`group ${dividerClass} flex ${rowMinHeightClass} items-center rounded-r-[4px]! py-1.5 pr-2 pl-0 ${leftBorderClass} ${
         isCompleting
           ? showCompletionBackground
             ? "task-row-completing"
