@@ -47,19 +47,15 @@ function calendarLayoutStartOfDay(date: Date) {
   return normalized;
 }
 
-/** Monday–Sunday week immediately after the week that contains `referenceDay`. */
-export function isCalendarDateInNextWeek(day: Date, referenceDay: Date) {
+/** Monday–Sunday week that contains `referenceDay`. */
+export function isCalendarDateInSameWeek(day: Date, referenceDay: Date) {
   const dayStart = calendarLayoutStartOfDay(day);
-  const currentWeekStart = calendarLayoutStartOfDay(
-    getCalendarWeekStart(referenceDay),
-  );
-  const nextWeekStart = new Date(currentWeekStart);
-  nextWeekStart.setDate(nextWeekStart.getDate() + 7);
-  const nextWeekEnd = new Date(nextWeekStart);
-  nextWeekEnd.setDate(nextWeekEnd.getDate() + 6);
+  const weekStart = calendarLayoutStartOfDay(getCalendarWeekStart(referenceDay));
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekEnd.getDate() + 6);
 
-  const startMs = nextWeekStart.getTime();
-  const endMs = nextWeekEnd.getTime();
+  const startMs = weekStart.getTime();
+  const endMs = weekEnd.getTime();
   const dayMs = dayStart.getTime();
 
   return dayMs >= startMs && dayMs <= endMs;
@@ -176,8 +172,8 @@ export function isCalendarTaskPast(
   return isCalendarAllDayTaskPast(day, now);
 }
 
-/** Month grid: dim recurring occurrences that fall in the calendar week after “today”. */
-export const CALENDAR_MONTH_NEXT_WEEK_RECURRING_DESATURATE = 0.2;
+/** Month grid: recurring occurrences outside the week of “today”. */
+export const CALENDAR_MONTH_OUT_OF_WEEK_RECURRING_DESATURATE = 0.3;
 
 export function getCalendarMonthTaskItemStyleOptions(
   task: {
@@ -192,8 +188,8 @@ export function getCalendarMonthTaskItemStyleOptions(
   const past = now !== null && isCalendarTaskPast(day, now, task);
   const isRecurring = Boolean(parseRecurrenceRule(task.recurrenceRule));
   const desaturateBy =
-    isRecurring && isCalendarDateInNextWeek(day, today)
-      ? CALENDAR_MONTH_NEXT_WEEK_RECURRING_DESATURATE
+    isRecurring && !isCalendarDateInSameWeek(day, today)
+      ? CALENDAR_MONTH_OUT_OF_WEEK_RECURRING_DESATURATE
       : undefined;
 
   return {
