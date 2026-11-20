@@ -160,6 +160,18 @@ function hslToRgb(
   ];
 }
 
+/** Reduces HSL saturation by `fraction` (e.g. 0.2 → 20% less saturated). */
+export function desaturateHexColorByFraction(hex: string, fraction: number) {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return hex;
+
+  const [hue, saturation, lightness] = rgbToHsl(rgb[0], rgb[1], rgb[2]);
+  const amount = Math.max(0, Math.min(1, fraction));
+  const nextSaturation = saturation * (1 - amount);
+  const [red, green, blue] = hslToRgb(hue, nextSaturation, lightness);
+  return rgbToHex(red, green, blue);
+}
+
 export function getCalendarTaskTitleColorFromBackground(
   backgroundHex: string,
   brightness: number = DEFAULT_CALENDAR_TASK_TITLE_BRIGHTNESS,

@@ -9785,7 +9785,7 @@ export function TaskDetailsPanel({
                         handleLineDragStart(event, lineId)
                       }
                     >
-                      <InteractIcon className="size-4" />
+                      <InteractIcon className="size-4 -translate-y-[2px]" />
                     </button>
                     ) : null}
                   </div>

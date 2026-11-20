@@ -1,11 +1,13 @@
 import type { CSSProperties } from "react";
 import {
   appendCalendarTaskTitleColorVars,
+  desaturateHexColorByFraction,
   getCalendarTaskColorItemStyle,
 } from "@/lib/calendar-task-colors";
 import { getCalendarTaskDefaultColor } from "@/lib/calendar-task-default-color";
 import { mixHexWithWhite } from "@/lib/sidebar-background-types";
 import { normalizeDueTimeMinutes } from "@/lib/task-due-time";
+import { parseRecurrenceRule } from "@/lib/task-recurrence";
 
 export const CALENDAR_TASK_FONT_CLASS = "text-[12.5px]";
 export const CALENDAR_TASK_ITEM_CLASS = "calendar-task-item";
@@ -37,6 +39,30 @@ export function getCalendarWeekStart(date: Date) {
     normalized.getMonth(),
     normalized.getDate() - mondayOffset,
   );
+}
+
+function calendarLayoutStartOfDay(date: Date) {
+  const normalized = new Date(date);
+  normalized.setHours(0, 0, 0, 0);
+  return normalized;
+}
+
+/** Monday–Sunday week immediately after the week that contains `referenceDay`. */
+export function isCalendarDateInNextWeek(day: Date, referenceDay: Date) {
+  const dayStart = calendarLayoutStartOfDay(day);
+  const currentWeekStart = calendarLayoutStartOfDay(
+    getCalendarWeekStart(referenceDay),
+  );
+  const nextWeekStart = new Date(currentWeekStart);
+  nextWeekStart.setDate(nextWeekStart.getDate() + 7);
+  const nextWeekEnd = new Date(nextWeekStart);
+  nextWeekEnd.setDate(nextWeekEnd.getDate() + 6);
+
+  const startMs = nextWeekStart.getTime();
+  const endMs = nextWeekEnd.getTime();
+  const dayMs = dayStart.getTime();
+
+  return dayMs >= startMs && dayMs <= endMs;
 }
 
 /** Multi-week grids show weeks forward from the week that contains `today`. */
@@ -150,18 +176,46 @@ export function isCalendarTaskPast(
   return isCalendarAllDayTaskPast(day, now);
 }
 
+/** Month grid: dim recurring occurrences that fall in the calendar week after “today”. */
+export const CALENDAR_MONTH_NEXT_WEEK_RECURRING_DESATURATE = 0.2;
+
+export function getCalendarMonthTaskItemStyleOptions(
+  task: {
+    recurrenceRule?: string | null;
+    dueTimeMinutes?: number | null;
+    dueDurationMinutes?: number | null;
+  },
+  day: Date,
+  today: Date,
+  now: Date | null,
+): { past?: boolean; desaturateBy?: number } {
+  const past = now !== null && isCalendarTaskPast(day, now, task);
+  const isRecurring = Boolean(parseRecurrenceRule(task.recurrenceRule));
+  const desaturateBy =
+    isRecurring && isCalendarDateInNextWeek(day, today)
+      ? CALENDAR_MONTH_NEXT_WEEK_RECURRING_DESATURATE
+      : undefined;
+
+  return {
+    ...(past ? { past: true } : {}),
+    ...(desaturateBy ? { desaturateBy } : {}),
+  };
+}
+
 export function getCalendarTaskItemStyle(
   _priority: number | null | undefined,
   calendarColor?: string | null,
   defaultCalendarColor?: string | null,
-  options?: { past?: boolean },
+  options?: { past?: boolean; desaturateBy?: number },
 ): CSSProperties | undefined {
   const style =
     getCalendarTaskColorItemStyle(calendarColor) ??
     getCalendarTaskColorItemStyle(
       defaultCalendarColor ?? getCalendarTaskDefaultColor(),
     );
-  if (!style || !options?.past) return style;
+  if (!style) return style;
+
+  if (!options?.past && !options?.desaturateBy) return style;
 
   const background =
     typeof style.backgroundColor === "string"
@@ -169,15 +223,25 @@ export function getCalendarTaskItemStyle(
       : undefined;
   if (!background) return style;
 
-  const pastBackground = withPastCalendarTaskBackgroundBrightness(background);
+  let nextBackground = background;
+  if (options.past) {
+    nextBackground = withPastCalendarTaskBackgroundBrightness(nextBackground);
+  }
+  if (options.desaturateBy && options.desaturateBy > 0) {
+    nextBackground = desaturateHexColorByFraction(
+      nextBackground,
+      options.desaturateBy,
+    );
+  }
+
   return appendCalendarTaskTitleColorVars(
     {
       ...style,
-      backgroundColor: pastBackground,
-      ["--calendar-task-item-background" as string]: pastBackground,
-      ["--calendar-task-title-source-color" as string]: pastBackground,
+      backgroundColor: nextBackground,
+      ["--calendar-task-item-background" as string]: nextBackground,
+      ["--calendar-task-title-source-color" as string]: nextBackground,
     },
-    pastBackground,
+    nextBackground,
   );
 }
 

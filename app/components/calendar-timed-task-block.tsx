@@ -81,6 +81,13 @@ export function getCalendarTaskContentLayout(availableHeight: number) {
   };
 }
 
+export function isCalendarTimedTaskCompactSingleLine(
+  availableHeight: number,
+) {
+  const { showTime, titleMaxLines } = getCalendarTaskContentLayout(availableHeight);
+  return !showTime && titleMaxLines === 1;
+}
+
 export function getCalendarTaskDragPreviewTop({
   baseTop,
   isDraggingTask,
@@ -280,7 +287,7 @@ export function CalendarTaskDropPreview({
     startMinutes !== undefined &&
     durationMinutes !== undefined &&
     showTime;
-  const isSingleLineOnly = !showTimeRange && titleMaxLines === 1;
+  const isSingleLineOnly = isCalendarTimedTaskCompactSingleLine(availableHeight);
   const previewClassName =
     variant === "source"
       ? "calendar-task-drag-source-placeholder"
@@ -304,7 +311,9 @@ export function CalendarTaskDropPreview({
       className={`${previewClassName} pointer-events-none absolute ${horizontalInsetClass} overflow-hidden rounded-[12px] select-none ${calendarTaskItemClassName()}`}
     >
       <div
-        className={`flex h-full flex-col py-0.5 text-left leading-tight ${CALENDAR_TASK_FONT_CLASS}`}
+        className={`flex h-full flex-col ${
+          isSingleLineOnly ? "justify-center" : "justify-start"
+        } py-0.5 text-left leading-tight ${CALENDAR_TASK_FONT_CLASS}`}
         style={{
           paddingTop: CALENDAR_TASK_CONTENT_PADDING_PX,
           paddingBottom: CALENDAR_TASK_CONTENT_PADDING_PX,
@@ -452,13 +461,13 @@ export function CalendarTimedTaskContent({
   const availableHeight = height - contentPaddingTop - contentPaddingBottom;
   const { showTime, titleMaxLines } =
     getCalendarTaskContentLayout(availableHeight);
-  const isSingleLineOnly = !showTime && titleMaxLines === 1;
+  const isSingleLineOnly = isCalendarTimedTaskCompactSingleLine(availableHeight);
   const timeLabel = formatCalendarTaskTimeRange(startMinutes, durationMinutes);
   const timeClassName = calendarTaskTimeRangeClassName();
 
   return (
     <div
-      className={`flex min-h-0 w-full gap-1 boarder boarder-[#a5a5a5] ${
+      className={`flex min-h-0 w-full gap-1 ${
         isSingleLineOnly
           ? "calendar-task-row--single-line shrink-0 items-center"
           : "min-w-0 flex-1 items-start"
@@ -853,6 +862,9 @@ export function CalendarTimedTaskBlock({
   const canResize = canInteract && Boolean(onSetTaskDueTime);
   const contentPaddingTop = canResize ? RESIZE_HANDLE_PX : CALENDAR_TASK_CONTENT_PADDING_PX;
   const contentPaddingBottom = canResize ? RESIZE_HANDLE_PX : CALENDAR_TASK_CONTENT_PADDING_PX;
+  const availableContentHeight = height - contentPaddingTop - contentPaddingBottom;
+  const centerContentVertically =
+    isCalendarTimedTaskCompactSingleLine(availableContentHeight);
   const { defaultColor: calendarTaskDefaultColor } =
     useCalendarTaskDefaultColor();
   const hoverHandlers = useCalendarTaskHoverPreview(task);
@@ -959,7 +971,9 @@ export function CalendarTimedTaskBlock({
               },
             );
           }}
-          className={`flex h-full flex-col justify-start overflow-hidden py-0.5 pr-4 text-left leading-tight ${CALENDAR_TASK_FONT_CLASS} ${
+          className={`flex h-full flex-col ${
+            centerContentVertically ? "justify-center" : "justify-start"
+          } overflow-hidden py-0.5 pr-4 text-left leading-tight ${CALENDAR_TASK_FONT_CLASS} ${
             canInteract ? "cursor-pointer touch-none" : "cursor-pointer"
           }`}
           style={{

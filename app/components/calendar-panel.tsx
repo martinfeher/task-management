@@ -86,7 +86,7 @@ import {
   getCalendarTaskDragSurface,
   type CalendarTaskDragState,
 } from "@/lib/calendar-task-drag";
-import { getCalendarShellClassName, calendarAllDayTaskClassName, getCalendarTaskItemStyle, isCalendarTaskPast, CALENDAR_WEEKDAY_LABELS, getCalendarMonthDayColumnDividerClass, CALENDAR_MONTH_CELL_BORDER_CLASS, CALENDAR_MONTH_SELECTED_CELL_CLASS, CALENDAR_TODAY_DATE_CIRCLE_CLASS, CALENDAR_CURRENT_MONTH_DAY_NUMBER_CLASS, CALENDAR_FOLLOWING_MONTH_DAY_NUMBER_CLASS, getCalendarTimedGridScrollClassName, CALENDAR_MONTH_CELL_TASKS_SCROLL_CLASS } from "@/lib/calendar-layout";
+import { getCalendarShellClassName, calendarAllDayTaskClassName, getCalendarMonthTaskItemStyleOptions, getCalendarTaskItemStyle, CALENDAR_WEEKDAY_LABELS, getCalendarMonthDayColumnDividerClass, CALENDAR_MONTH_CELL_BORDER_CLASS, CALENDAR_MONTH_SELECTED_CELL_CLASS, CALENDAR_TODAY_DATE_CIRCLE_CLASS, CALENDAR_CURRENT_MONTH_DAY_NUMBER_CLASS, CALENDAR_FOLLOWING_MONTH_DAY_NUMBER_CLASS, getCalendarTimedGridScrollClassName, CALENDAR_MONTH_CELL_TASKS_SCROLL_CLASS } from "@/lib/calendar-layout";
 import { useCalendarTaskDefaultColor } from "@/lib/calendar-task-default-color-settings";
 import {
   patchCalendarViewSession,
@@ -1073,11 +1073,12 @@ export function CalendarMonthView({
                           task.priority,
                           task.calendarColor,
                           calendarTaskDefaultColor,
-                          {
-                            past:
-                              now !== null &&
-                              isCalendarTaskPast(day, now, task),
-                          },
+                          getCalendarMonthTaskItemStyleOptions(
+                            task,
+                            day,
+                            today,
+                            now,
+                          ),
                         )}
                       >
                         <CalendarTaskTitle

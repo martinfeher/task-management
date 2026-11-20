@@ -1752,7 +1752,7 @@ export function TaskDatePicker({
               setOpenFooterSubmenu(null);
               setIsTimeMenuOpen((open) => !open);
             }}
-            className="flex h-[37px]! w-full items-center justify-center gap-2 rounded-full border bg-white py-1 text-[13px] border-[#dedede] text-[#808089] font-medium transition-colors cursor-pointer"
+            className="flex h-[37px] w-full items-center justify-center gap-2 rounded-full border bg-white px-3 text-[13px] leading-none border-[#dedede] text-[#808089] font-medium transition-colors cursor-pointer"
             style={
               isTimeMenuOpen || dueTimeMinutes !== null
                 ? {
@@ -1764,10 +1764,10 @@ export function TaskDatePicker({
                   }
             }
           >
-            <BiTimeFive className="size-4" />
-            {timeButtonLabel}
+            <BiTimeFive className="size-4 shrink-0" aria-hidden="true" />
+            <span className="leading-none">{timeButtonLabel}</span>
             <BiChevronDown
-              className={`size-4 text-[#808089] transition-transform ${
+              className={`size-4 shrink-0 text-[#808089] transition-transform ${
                 isTimeMenuOpen ? "-rotate-90" : ""
               }`}
               aria-hidden="true"
@@ -1775,7 +1775,7 @@ export function TaskDatePicker({
           </button>
           {isTimeMenuOpen && onSaveDueTime ? (
             <div
-              className="absolute top-0 z-[70]"
+              className="absolute top-1/2 z-[70] -translate-y-1/2"
               style={{
                 left: `calc(100% + ${TASK_TIME_MENU_OFFSET}px)`,
                 width: TASK_DATE_PICKER_WIDTH,
