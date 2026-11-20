@@ -7,6 +7,7 @@ import {
   isCodeLine,
   isTitleLine,
   renumberNumberedLines,
+  syncListLineMarkerMetricsForRange,
 } from "./detail-lines";
 import {
   getDefaultDetailFontSizePx,
@@ -1165,17 +1166,25 @@ export function applyDetailFontSize(
 
   if (!canApplyDetailFont(editor, range)) return false;
 
+  let applied = false;
+
   if (size === getDefaultDetailFontSizePx()) {
     removeStylePropertyFromRange(range.cloneRange(), "fontSize");
     restoreSelectionRange(range);
-    return true;
+    applied = true;
+  } else {
+    applied = applyStyleToSelection(
+      editor,
+      { fontSize: `${size}px` },
+      range,
+    );
   }
 
-  return applyStyleToSelection(
-    editor,
-    { fontSize: `${size}px` },
-    range,
-  );
+  if (applied) {
+    syncListLineMarkerMetricsForRange(editor, range);
+  }
+
+  return applied;
 }
 
 function shouldSkipFontNormalization(element: Element) {

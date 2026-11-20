@@ -518,6 +518,44 @@ export function copyListIndent(fromLine: HTMLElement, toLine: HTMLElement) {
   setListIndentLevel(toLine, getListIndentLevel(fromLine));
 }
 
+/** Keep bullet/number markers aligned when inline font sizes differ on the line. */
+export function syncListLineMarkerMetrics(line: HTMLElement) {
+  if (!isListBlockLine(line)) return;
+
+  let maxFontSizePx = Number.parseFloat(getComputedStyle(line).fontSize);
+  if (!Number.isFinite(maxFontSizePx)) {
+    maxFontSizePx = 0;
+  }
+
+  line.querySelectorAll<HTMLElement>("span, font").forEach((element) => {
+    const inlineSize = element.style.fontSize.trim();
+    if (!inlineSize) return;
+
+    const size = Number.parseFloat(inlineSize);
+    if (Number.isFinite(size) && size > maxFontSizePx) {
+      maxFontSizePx = size;
+    }
+  });
+
+  if (maxFontSizePx > 0) {
+    line.style.setProperty(
+      "--detail-list-marker-font-size",
+      `${maxFontSizePx}px`,
+    );
+  } else {
+    line.style.removeProperty("--detail-list-marker-font-size");
+  }
+}
+
+export function syncListLineMarkerMetricsForRange(
+  editor: HTMLElement,
+  range: Range,
+) {
+  for (const line of getSelectedBlockLinesInRange(editor, range)) {
+    syncListLineMarkerMetrics(line);
+  }
+}
+
 function canIncreaseListIndent(editor: HTMLElement, line: HTMLElement) {
   if (!isListBlockLine(line) || isTitleLine(editor, line)) {
     return false;

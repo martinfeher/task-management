@@ -4798,7 +4798,14 @@ export function TaskDetailsPanel({
       }
 
       const currentBlockType = getActiveTextBlockType(editor);
-      if (preset.blockType !== currentBlockType) {
+      const linesInRange = getSelectedBlockLinesInRange(editor, rangeToApply);
+      const shouldPreserveListBlockType =
+        preset.blockType === "text" &&
+        linesInRange.some((line) => isListBlockLine(line));
+      if (
+        preset.blockType !== currentBlockType &&
+        !shouldPreserveListBlockType
+      ) {
         applyBlockTypeToSelection(editor, preset.blockType, rangeToApply);
         setFormatMenuBlockType(preset.blockType);
         captureFormatSelectionFromEditor();
