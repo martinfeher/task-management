@@ -342,6 +342,7 @@
     0 8px 24px rgba(0, 0, 0, 0.08),
     0 24px 48px rgba(0, 0, 0, 0.12);
   --calendar-task-hover-preview-shadow: 0 7px 17px rgba(0, 0, 0, 0.06);
+  --calendar-task-hover-preview-radius: 15px;
   --calendar-task-item-shadow-area: 0.65;
   --calendar-task-item-shadow:
     0 calc(1.125px * var(--calendar-task-item-shadow-area))
@@ -1960,6 +1961,7 @@ body {
     .calendar-task-drag-source-placeholder
   ) {
   border: 1px solid var(--calendar-task-item-border, #efef67);
+  border-radius: var(--calendar-task-block-radius, 10px);
 }
 
 [data-calendar-grid-view] .calendar-task-item.cursor-move,
@@ -2438,7 +2440,7 @@ body {
 }
 
 .calendar-task-hover-preview {
-  border-radius: 24px;
+  border-radius: var(--calendar-task-hover-preview-radius, 15px);
   border: 1px solid rgb(235 235 235);
   box-shadow: var(--calendar-task-hover-preview-shadow);
   animation: calendar-task-preview-in 160ms ease-out;

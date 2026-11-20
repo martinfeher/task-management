@@ -2345,6 +2345,97 @@ export function placeCaretBelowWrapper(wrapper: HTMLElement) {
   selection.addRange(range);
 }
 
+function isDetailImageWrapper(node: Node | null): node is HTMLElement {
+  return (
+    node instanceof HTMLElement && node.classList.contains("detail-image-wrapper")
+  );
+}
+
+export function getImageWrapperBeforeCollapsedCaret(
+  editor: HTMLElement,
+): HTMLElement | null {
+  const selection = window.getSelection();
+  if (!selection?.rangeCount || !selection.isCollapsed) return null;
+
+  const range = selection.getRangeAt(0);
+  if (!editor.contains(range.startContainer)) return null;
+
+  const { startContainer, startOffset } = range;
+
+  if (startContainer.nodeType === Node.ELEMENT_NODE && startOffset > 0) {
+    const before = startContainer.childNodes[startOffset - 1];
+    if (isDetailImageWrapper(before)) {
+      return before;
+    }
+  }
+
+  if (startContainer.nodeType === Node.TEXT_NODE && startOffset === 0) {
+    const before = startContainer.previousSibling;
+    if (isDetailImageWrapper(before)) {
+      return before;
+    }
+  }
+
+  return null;
+}
+
+export function getImageWrapperAfterCollapsedCaret(
+  editor: HTMLElement,
+): HTMLElement | null {
+  const selection = window.getSelection();
+  if (!selection?.rangeCount || !selection.isCollapsed) return null;
+
+  const range = selection.getRangeAt(0);
+  if (!editor.contains(range.startContainer)) return null;
+
+  const { startContainer, startOffset } = range;
+
+  if (startContainer.nodeType === Node.ELEMENT_NODE) {
+    const after = startContainer.childNodes[startOffset];
+    if (isDetailImageWrapper(after)) {
+      return after;
+    }
+  }
+
+  return null;
+}
+
+export function getImageOnlySelectionWrappers(
+  editor: HTMLElement,
+): HTMLElement[] {
+  const selection = window.getSelection();
+  if (!selection?.rangeCount || selection.isCollapsed) return [];
+
+  const range = selection.getRangeAt(0);
+  if (!editor.contains(range.commonAncestorContainer)) return [];
+
+  const wrappers = Array.from(
+    editor.querySelectorAll(".detail-image-wrapper"),
+  ).filter(
+    (node): node is HTMLElement =>
+      node instanceof HTMLElement && range.intersectsNode(node),
+  );
+
+  if (wrappers.length === 0) return [];
+
+  const fragment = range.cloneContents();
+  const text =
+    fragment.textContent
+      ?.replace(/\u00a0/g, " ")
+      .replace(/\u200B/g, "")
+      .trim() ?? "";
+  if (text !== "") return [];
+
+  for (const node of Array.from(fragment.querySelectorAll("*"))) {
+    if (!(node instanceof HTMLElement)) continue;
+    if (node.closest(".detail-image-wrapper")) continue;
+    if (node.tagName === "BR") continue;
+    return [];
+  }
+
+  return wrappers;
+}
+
 function insertImageWrapperIntoLine(
   editor: HTMLElement,
   line: HTMLElement,

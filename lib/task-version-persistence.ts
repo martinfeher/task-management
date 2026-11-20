@@ -123,6 +123,10 @@ export async function persistTaskRename(
     throw new Error("Task not found");
   }
 
+  if (!trimmedName) {
+    return existing;
+  }
+
   if (existing.name === trimmedName) {
     return existing;
   }

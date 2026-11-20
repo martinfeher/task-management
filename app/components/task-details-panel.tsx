@@ -123,6 +123,9 @@ import {
   enterFromTitleLine,
   removeEmptyLineAboveOnBackspace,
   removeLeadingEmptyBodyLineOnBackspace,
+  getImageWrapperBeforeCollapsedCaret,
+  getImageWrapperAfterCollapsedCaret,
+  getImageOnlySelectionWrappers,
   syncEditorBodyPlaceholderVisibility,
   flattenNestedDetailLines,
   stripTrailingBreakFromNonEmptyLine,
@@ -2483,8 +2486,7 @@ export function TaskDetailsPanel({
     src: string;
   } | null>(null);
   const [imageDeleteConfirm, setImageDeleteConfirm] = useState<{
-    wrapper: HTMLElement;
-    filename: string | null;
+    targets: Array<{ wrapper: HTMLElement; filename: string | null }>;
   } | null>(null);
   const [addBlockMenu, setAddBlockMenu] = useState<AddBlockMenuState | null>(null);
   const [slashCommandMenu, setSlashCommandMenu] =
@@ -3269,12 +3271,18 @@ export function TaskDetailsPanel({
         savedDetailsBaseline,
       );
 
+      const titleTrimmed = content.title.trim();
+      const savedNameTrimmed = savedNameBaseline.trim();
       const detailsChanged = resolvedDetails !== savedDetailsBaseline;
       const titleChanged = Boolean(
-        content.title && content.title !== savedNameBaseline,
+        titleTrimmed && titleTrimmed !== savedNameBaseline,
       );
 
       if (!detailsChanged && !titleChanged) {
+        return false;
+      }
+
+      if (!titleTrimmed && !savedNameTrimmed) {
         return false;
       }
 
@@ -3309,8 +3317,8 @@ export function TaskDetailsPanel({
         savedSomething = true;
       }
 
-      if (titleChanged && content.title) {
-        const updatedTask = await renameTask(taskId, content.title);
+      if (titleChanged && titleTrimmed) {
+        const updatedTask = await renameTask(taskId, titleTrimmed);
 
         clearPendingLocalSave(taskId);
         onTaskRenamed(taskId, updatedTask.name);
@@ -3372,12 +3380,16 @@ export function TaskDetailsPanel({
           details: resolvedDetails,
         };
 
+        const titleTrimmed = content.title.trim();
+        const savedNameTrimmed = savedNameBaseline.trim();
         const detailsChanged = resolvedDetails !== savedDetailsBaseline;
         const titleChanged = Boolean(
-          content.title && content.title !== savedNameBaseline,
+          titleTrimmed && titleTrimmed !== savedNameBaseline,
         );
 
         if (!detailsChanged && !titleChanged) break;
+
+        if (!titleTrimmed && !savedNameTrimmed) break;
 
         await persistTaskContent(currentTaskId, contentToPersist, {
           details: savedDetailsBaseline,
@@ -3537,6 +3549,10 @@ export function TaskDetailsPanel({
     const snapshot = captureTaskSnapshotForSwitch(currentTaskId);
     const savedDetailsBaseline = savedDetailsRef.current;
     const savedNameBaseline = taskNameRef.current;
+
+    if (!snapshot.title.trim() && !savedNameBaseline.trim()) {
+      return;
+    }
 
     if (saveTimerRef.current !== null) {
       window.clearTimeout(saveTimerRef.current);
@@ -7696,6 +7712,41 @@ export function TaskDetailsPanel({
         scheduleEditorHeightSync();
         return;
       }
+
+      if (!imageDeleteConfirm) {
+        const selectionWrappers = getImageOnlySelectionWrappers(editor);
+        const wrapper =
+          selectionWrappers.length > 0
+            ? null
+            : getImageWrapperBeforeCollapsedCaret(editor);
+
+        if (selectionWrappers.length > 0 || wrapper) {
+          event.preventDefault();
+          openImageDeleteConfirm(
+            selectionWrappers.length > 0 ? selectionWrappers : [wrapper!],
+          );
+          return;
+        }
+      }
+    }
+
+    if (event.key === "Delete" && !imageDeleteConfirm) {
+      const editor = editorRef.current;
+      if (editor) {
+        const selectionWrappers = getImageOnlySelectionWrappers(editor);
+        const wrapper =
+          selectionWrappers.length > 0
+            ? null
+            : getImageWrapperAfterCollapsedCaret(editor);
+
+        if (selectionWrappers.length > 0 || wrapper) {
+          event.preventDefault();
+          openImageDeleteConfirm(
+            selectionWrappers.length > 0 ? selectionWrappers : [wrapper!],
+          );
+          return;
+        }
+      }
     }
 
     if (event.key === "Enter" && !event.shiftKey) {
@@ -8126,31 +8177,73 @@ export function TaskDetailsPanel({
     updateLineControls();
   }
 
+  function buildImageDeleteConfirmTargets(wrappers: HTMLElement[]) {
+    const currentTaskId = taskIdRef.current;
+    return wrappers.map((wrapper) => {
+      const image = wrapper.querySelector("img.detail-image");
+      const imageSrc =
+        image instanceof HTMLImageElement ? image.getAttribute("src") ?? "" : "";
+      const filename =
+        currentTaskId && imageSrc
+          ? extractTaskImageFilename(currentTaskId, imageSrc)
+          : null;
+      return { wrapper, filename };
+    });
+  }
+
+  function openImageDeleteConfirm(wrappers: HTMLElement[]) {
+    if (wrappers.length === 0) return;
+    setImageDeleteConfirm({
+      targets: buildImageDeleteConfirmTargets(wrappers),
+    });
+  }
+
   function confirmPendingImageDelete() {
     const pending = imageDeleteConfirm;
     const editor = editorRef.current;
     setImageDeleteConfirm(null);
-    if (!pending || !editor || !editor.contains(pending.wrapper)) return;
+    if (!pending?.targets.length || !editor) return;
 
     const currentTaskId = taskIdRef.current;
-    const imageFilename = pending.filename;
+    const filenamesToDelete: string[] = [];
+    let removedAny = false;
 
-    const removed = removeImageWrapper(editor, pending.wrapper);
-    if (!removed) return;
+    for (const target of pending.targets) {
+      if (!editor.contains(target.wrapper)) continue;
+
+      const removed = removeImageWrapper(editor, target.wrapper);
+      if (!removed) continue;
+
+      removedAny = true;
+      if (target.filename) {
+        filenamesToDelete.push(target.filename);
+      }
+    }
+
+    if (!removedAny) return;
+
+    const selection = window.getSelection();
+    if (selection && !selection.isCollapsed) {
+      selection.removeAllRanges();
+    }
 
     syncEditorContent();
-    recordHistorySnapshot("Remove image");
+    recordHistorySnapshot(
+      pending.targets.length > 1 ? "Remove images" : "Remove image",
+    );
     requestSave("flush");
     updateLineControls();
 
-    if (currentTaskId && imageFilename) {
+    if (currentTaskId && filenamesToDelete.length > 0) {
       void (async () => {
         await waitForSaveIdle();
         if (taskIdRef.current !== currentTaskId) return;
-        try {
-          await deleteUploadedTaskImage(currentTaskId, imageFilename);
-        } catch {
-          // File cleanup is best-effort; content save is the source of truth.
+        for (const imageFilename of filenamesToDelete) {
+          try {
+            await deleteUploadedTaskImage(currentTaskId, imageFilename);
+          } catch {
+            // File cleanup is best-effort; content save is the source of truth.
+          }
         }
       })();
     }
@@ -8230,16 +8323,7 @@ export function TaskDetailsPanel({
       const imageWrapper = deleteButton.closest(".detail-image-wrapper");
       if (!(imageWrapper instanceof HTMLElement)) return;
 
-      const image = imageWrapper.querySelector("img.detail-image");
-      const imageSrc =
-        image instanceof HTMLImageElement ? image.getAttribute("src") ?? "" : "";
-      const currentTaskId = taskIdRef.current;
-      const imageFilename =
-        currentTaskId && imageSrc
-          ? extractTaskImageFilename(currentTaskId, imageSrc)
-          : null;
-
-      setImageDeleteConfirm({ wrapper: imageWrapper, filename: imageFilename });
+      openImageDeleteConfirm([imageWrapper]);
       return;
     }
 
@@ -8922,7 +9006,7 @@ export function TaskDetailsPanel({
     if (!isModalLayout || !task) return null;
 
     return (
-      <div className="absolute right-2 top-2 z-20 flex items-center gap-3.5">
+      <div className="absolute right-2 top-2 z-20 flex items-center gap-1">
         {showModalMarkComplete ? (
           <button
             type="button"
@@ -10343,8 +10427,16 @@ export function TaskDetailsPanel({
       ) : null}
       <ConfirmModal
         open={imageDeleteConfirm !== null}
-        title="Delete image"
-        message="Are you sure you want to delete this image? This cannot be undone."
+        title={
+          imageDeleteConfirm && imageDeleteConfirm.targets.length > 1
+            ? "Delete images"
+            : "Delete image"
+        }
+        message={
+          imageDeleteConfirm && imageDeleteConfirm.targets.length > 1
+            ? "Are you sure you want to delete these images? This cannot be undone."
+            : "Are you sure you want to delete this image? This cannot be undone."
+        }
         confirmLabel="Delete"
         onConfirm={confirmPendingImageDelete}
         onCancel={() => setImageDeleteConfirm(null)}

@@ -322,11 +322,19 @@ export function CalendarTaskModal({
 
   const handleMarkTaskComplete = useCallback(
     async (toggleTaskId: string) => {
+      if (
+        isNewTaskDraft &&
+        detailsSaveControllerRef.current?.hasCreateTitle?.() === false
+      ) {
+        await deleteEmptyNewTaskDraft();
+        onClose();
+        return;
+      }
       await detailsSaveControllerRef.current?.flushSave();
       onToggleTask?.(toggleTaskId);
       onClose();
     },
-    [onClose, onToggleTask],
+    [deleteEmptyNewTaskDraft, isNewTaskDraft, onClose, onToggleTask],
   );
 
   const handleCreateNewTask = useCallback(async () => {

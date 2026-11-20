@@ -765,7 +765,7 @@ export function CalendarMultiDayView({
                           className={`mt-px inline-flex size-7 items-center justify-center rounded-full text-sm ${
                             isToday
                               ? CALENDAR_TODAY_DATE_CIRCLE_CLASS
-                              : " text-[#abafb9] dark:text-zinc-400"
+                              : " text-[#b4bac7] dark:text-zinc-400"
                           }`}
                         >
                           {day.getDate()}
