@@ -185,7 +185,7 @@ export function CalendarTaskColorMenuProvider({
                       role="menuitemradio"
                       aria-checked={isSelected}
                       aria-label={`Set calendar color ${color}`}
-                      className={`size-6 rounded-full border border-black/10 transition-transform hover:scale-110 dark:border-white/15 ${
+                      className={`size-6 cursor-pointer rounded-full border border-black/10 transition-transform hover:scale-110 dark:border-white/15 ${
                         isSelected
                           ? "ring-2 ring-zinc-800 ring-offset-2 dark:ring-zinc-100 dark:ring-offset-zinc-900"
                           : ""
@@ -205,7 +205,7 @@ export function CalendarTaskColorMenuProvider({
               <button
                 type="button"
                 role="menuitem"
-                className="mt-2.5 w-full rounded-lg px-2 py-1.5 text-left text-[11px] text-zinc-600 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                className="mt-1 w-full cursor-pointer rounded-lg px-2 py-1.5 text-left text-[11px] text-zinc-600 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
                 onClick={() => {
                   onSetTaskCalendarColor(menu.task.id, null);
                   close();

@@ -677,7 +677,7 @@ export function TaskModalFooter({
     <>
     <div
       ref={footerRef}
-      className="flex h-full min-h-0 min-w-0 flex-1 items-center gap-2 self-stretch"
+      className="flex h-full min-h-0 min-w-0 flex-1 items-center gap-3 self-stretch"
     >
       {hasPriorityActions ? (
         <div

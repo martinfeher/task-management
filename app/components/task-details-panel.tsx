@@ -66,7 +66,10 @@ import {
 } from "@/lib/task-editor-defaults-settings";
 import {
   applyBlockTypeToSelection,
+  getBlockLinesContentsRange,
   buildEditorHtmlFromTask,
+  isHeadingBlockType,
+  isTextLinesRangeFullySelected,
   ensureBlockLines,
   ensureTitleLine,
   getActiveLineElement,
@@ -226,8 +229,8 @@ import {
 type HeaderFormatDropdown = "family" | "size";
 import {
   TaskDatePicker,
+  blurTaskDatePickerDateInput,
   computeTaskDatePickerMenuPosition,
-  isTaskDatePickerDateInputFocused,
 } from "./task-date-picker";
 import { TaskVersionHistoryOffcanvas } from "./task-version-history-offcanvas";
 import {
@@ -582,6 +585,7 @@ type SlashCommandMenuState = {
 type LineControlItem = {
   lineId: string;
   top: number;
+  left: number;
   showPlus: boolean;
   showDrag: boolean;
 };
@@ -893,6 +897,8 @@ const LARGE_CONTENT_HISTORY_LIMIT = 8;
 const LARGE_CONTENT_THRESHOLD = 200_000;
 const LINE_CONTROLS_DEBOUNCE_MS = 16;
 const FORMAT_MENU_DEBOUNCE_MS = 80;
+/** Ignore transient typography reads after line-height apply (selection/DOM sync). */
+const FORMAT_MENU_TYPO_SYNC_SKIP_AFTER_LINE_HEIGHT = 6;
 const SMALL_CONTENT_INPUT_DEBOUNCE_MS = 80;
 const INPUT_NORMALIZE_DEBOUNCE_MS = 400;
 const TITLE_SYNC_DEBOUNCE_MS = 300;
@@ -2800,6 +2806,7 @@ export function TaskDetailsPanel({
   const formatMenuVisibleRef = useRef(false);
   /** True while the pointer is over the floating toolbar (or its portaled submenus). */
   const formatMenuPointerInsideRef = useRef(false);
+  const skipFormatMenuTypographySyncCountRef = useRef(0);
   const lineControlsTimerRef = useRef<number | null>(null);
   const titleSyncTimerRef = useRef<number | null>(null);
   const clipboardNoticeTimerRef = useRef<number | null>(null);
@@ -3813,6 +3820,7 @@ export function TaskDetailsPanel({
       {
         lineId,
         top: position.top,
+        left: position.left,
         showPlus: isEmpty && showControls,
         showDrag: !isEmpty && showControls,
       },
@@ -4499,10 +4507,16 @@ export function TaskDetailsPanel({
     if (!selection?.rangeCount || !editor.contains(selection.anchorNode)) return;
 
     setFormatMenuInlineFormats(getDetailSelectionInlineFormatState(editor));
-    setFormatMenuFontSize(getDetailSelectionFontState(editor).size);
-    setFormatMenuFontFamily(getDetailSelectionFontState(editor).familyId);
     setFormatMenuLineHeight(getDetailSelectionLineHeight(editor));
-    setFormatMenuBlockType(getActiveTextBlockType(editor));
+
+    if (skipFormatMenuTypographySyncCountRef.current > 0) {
+      skipFormatMenuTypographySyncCountRef.current -= 1;
+    } else {
+      const fontState = getDetailSelectionFontState(editor);
+      setFormatMenuFontSize(fontState.size);
+      setFormatMenuFontFamily(fontState.familyId);
+      setFormatMenuBlockType(getActiveTextBlockType(editor));
+    }
     const activeLine = getActiveLineElement(editor);
     const activeListType = activeLine?.dataset.lineType;
     setFormatMenuListLineType(
@@ -4564,11 +4578,14 @@ export function TaskDetailsPanel({
     selectionObj?.removeAllRanges();
     selectionObj?.addRange(selectionForRead);
 
-    const fontState = getDetailSelectionFontState(editor);
-    setFormatMenuFontSize(fontState.size);
-    setFormatMenuFontFamily(fontState.familyId);
     setFormatMenuLineHeight(getDetailSelectionLineHeight(editor));
-    setFormatMenuBlockType(getActiveTextBlockType(editor));
+
+    if (skipFormatMenuTypographySyncCountRef.current === 0) {
+      const fontState = getDetailSelectionFontState(editor);
+      setFormatMenuFontSize(fontState.size);
+      setFormatMenuFontFamily(fontState.familyId);
+      setFormatMenuBlockType(getActiveTextBlockType(editor));
+    }
 
     if (
       !effectiveRange.collapsed &&
@@ -4715,15 +4732,9 @@ export function TaskDetailsPanel({
       const editor = editorRef.current;
       if (!editor) return;
 
-      const previewBaseline = textColorPreviewBaselineRef.current;
-      const previewChanged =
-        textColorPreviewMarkersPlacedRef.current &&
-        previewBaseline !== null &&
-        editor.innerHTML !== previewBaseline;
+      clearTextColorLivePreview({ keepContent: false });
 
-      clearTextColorLivePreview({ keepContent: true });
-
-      const rangeToApply = resolveFormatMenuRange(
+      let rangeToApply = resolveFormatMenuRange(
         editor,
         savedFormatSelectionRef.current,
       );
@@ -4732,6 +4743,29 @@ export function TaskDetailsPanel({
         finalizeFormatFontSizeApply();
         setOpenFormatDropdown(null);
         return;
+      }
+
+      const selectionCoversFullLines = isTextLinesRangeFullySelected(
+        editor,
+        rangeToApply,
+      );
+      const linesInRange = getSelectedBlockLinesInRange(editor, rangeToApply);
+      const hasHeadingLinesInRange = linesInRange.some((line) => {
+        const type = line.dataset.lineType;
+        return type === "h1" || type === "h2" || type === "h3";
+      });
+      const applyHeadingToWholeLines =
+        isHeadingBlockType(preset.blockType) && selectionCoversFullLines;
+      const applyBodyToWholeLines =
+        preset.blockType === "text" &&
+        hasHeadingLinesInRange &&
+        selectionCoversFullLines;
+
+      if (applyHeadingToWholeLines || applyBodyToWholeLines) {
+        const wholeLineRange = getBlockLinesContentsRange(editor, rangeToApply);
+        if (wholeLineRange) {
+          rangeToApply = wholeLineRange;
+        }
       }
 
       restoreEditorSelectionRange(rangeToApply);
@@ -4750,24 +4784,30 @@ export function TaskDetailsPanel({
       }
 
       const currentBlockType = getActiveTextBlockType(editor);
-      const linesInRange = getSelectedBlockLinesInRange(editor, rangeToApply);
       const hasListLinesInRange = linesInRange.some((line) =>
         isListBlockLine(line),
       );
-      if (
-        preset.blockType !== currentBlockType &&
-        !hasListLinesInRange
-      ) {
+      const needsBlockTypeApply =
+        selectionCoversFullLines &&
+        !hasListLinesInRange &&
+        (preset.blockType !== currentBlockType ||
+          (preset.blockType === "text" && hasHeadingLinesInRange));
+
+      if (needsBlockTypeApply) {
         applyBlockTypeToSelection(editor, preset.blockType, rangeToApply);
         setFormatMenuBlockType(preset.blockType);
         captureFormatSelectionFromEditor();
+        syncEditorContent();
       }
 
-      const rangeForSize = resolveFormatMenuRange(
-        editor,
-        savedFormatSelectionRef.current,
-      );
-      if (!rangeForSize) {
+      let rangeForSize =
+        applyHeadingToWholeLines || applyBodyToWholeLines
+          ? rangeToApply.cloneRange()
+          : (resolveFormatMenuRange(editor, savedFormatSelectionRef.current) ??
+              captureLiveEditorFormatSelection(editor) ??
+              rangeToApply.cloneRange());
+
+      if (!rangeForSize || rangeForSize.collapsed) {
         syncEditorLineEmptyState(editor);
         syncEditorContent();
         recordHistorySnapshot(`Text style: ${preset.label}`);
@@ -4779,24 +4819,14 @@ export function TaskDetailsPanel({
       }
 
       restoreEditorSelectionRange(rangeForSize);
-
-      const selectionFontState = getDetailSelectionFontState(editor);
-      if (
-        preset.size !== selectionFontState.size &&
-        !(
-          previewChanged &&
-          selectionFontState.size === preset.size
-        )
-      ) {
-        applyDetailFontSize(editor, preset.size, rangeForSize);
-      }
+      applyDetailFontSize(editor, preset.size, rangeForSize);
 
       const selection = window.getSelection();
       if (selection?.rangeCount) {
         rememberFormatSelection(editor, selection.getRangeAt(0));
       }
 
-      setFormatMenuFontSize(preset.size);
+      syncFormatMenuFontState();
       syncEditorLineEmptyState(editor);
       syncEditorContent();
       recordHistorySnapshot(`Text style: ${preset.label}`);
@@ -4813,6 +4843,7 @@ export function TaskDetailsPanel({
       rememberFormatSelection,
       scheduleAutoSave,
       syncEditorContent,
+      syncFormatMenuFontState,
       updateLineControls,
     ],
   );
@@ -4821,6 +4852,8 @@ export function TaskDetailsPanel({
     (size: DetailFontSizeOption) => {
       const editor = editorRef.current;
       if (!editor) return;
+
+      prepareFormatFontSizeStep();
 
       // Hovering a size previews it directly in the editor. Remember whether the
       // preview already changed the content so the click doesn't re-wrap it.
@@ -4832,12 +4865,22 @@ export function TaskDetailsPanel({
 
       clearTextColorLivePreview({ keepContent: true });
 
-      const rangeToApply = resolveFormatMenuRange(
+      let rangeToApply = resolveFormatMenuRange(
         editor,
         savedFormatSelectionRef.current,
       );
 
-      if (!rangeToApply) {
+      const savedRange = savedFormatSelectionRef.current;
+      if (
+        !rangeToApply &&
+        savedRange &&
+        !savedRange.collapsed &&
+        editor.contains(savedRange.commonAncestorContainer)
+      ) {
+        rangeToApply = savedRange.cloneRange();
+      }
+
+      if (!rangeToApply || rangeToApply.collapsed) {
         finalizeFormatFontSizeApply();
         return;
       }
@@ -4874,6 +4917,7 @@ export function TaskDetailsPanel({
       clearTextColorLivePreview,
       finalizeFormatFontSizeApply,
       handleDetailFontApplied,
+      prepareFormatFontSizeStep,
       rememberFormatSelection,
     ],
   );
@@ -4954,17 +4998,40 @@ export function TaskDetailsPanel({
       const rangeToApply =
         savedFormatSelectionRef.current?.cloneRange() ?? savedRange;
 
-      if (applyDetailLineHeight(editor, lineHeight, rangeToApply)) {
-        setFormatMenuLineHeight(lineHeight);
-        handleDetailFontApplied();
+      if (!applyDetailLineHeight(editor, lineHeight, rangeToApply)) {
+        closeFormatDropdowns();
+        return;
       }
 
+      skipFormatMenuTypographySyncCountRef.current =
+        FORMAT_MENU_TYPO_SYNC_SKIP_AFTER_LINE_HEIGHT;
+      setFormatMenuLineHeight(lineHeight);
+
+      const selection = window.getSelection();
+      if (selection?.rangeCount) {
+        rememberFormatSelection(editor, selection.getRangeAt(0));
+      } else if (
+        rangeToApply &&
+        editor.contains(rangeToApply.commonAncestorContainer)
+      ) {
+        rememberFormatSelection(editor, rangeToApply);
+      }
+
+      syncEditorLineEmptyState(editor);
+      syncEditorContent();
+      recordHistorySnapshot("Line height");
+      scheduleAutoSave();
+      updateLineControls();
       closeFormatDropdowns();
     },
     [
       captureFormatSelectionFromEditor,
       closeFormatDropdowns,
-      handleDetailFontApplied,
+      rememberFormatSelection,
+      recordHistorySnapshot,
+      scheduleAutoSave,
+      syncEditorContent,
+      updateLineControls,
     ],
   );
 
@@ -5180,11 +5247,17 @@ export function TaskDetailsPanel({
     }
     formatMenuVisibleRef.current = true;
 
-    const fontState = getDetailSelectionFontState(editor);
-    setFormatMenuFontSize(fontState.size);
-    setFormatMenuFontFamily(fontState.familyId);
     setFormatMenuLineHeight(getDetailSelectionLineHeight(editor));
-    setFormatMenuBlockType(getActiveTextBlockType(editor));
+
+    if (skipFormatMenuTypographySyncCountRef.current > 0) {
+      skipFormatMenuTypographySyncCountRef.current -= 1;
+    } else {
+      const fontState = getDetailSelectionFontState(editor);
+      setFormatMenuFontSize(fontState.size);
+      setFormatMenuFontFamily(fontState.familyId);
+      setFormatMenuBlockType(getActiveTextBlockType(editor));
+    }
+
     setFormatMenuInlineFormats(getDetailSelectionInlineFormatState(editor));
     syncHeaderClearFormattingState();
     closeFormatDropdowns();
@@ -5271,6 +5344,17 @@ export function TaskDetailsPanel({
       const activeLine = getActiveLineElement(editor);
       if (isCodeLine(activeLine)) return;
 
+      const savedRange =
+        savedFormatSelectionRef.current?.cloneRange() ??
+        captureLiveEditorFormatSelection(editor);
+      if (
+        savedRange &&
+        !savedRange.collapsed &&
+        editor.contains(savedRange.commonAncestorContainer)
+      ) {
+        restoreEditorSelectionRange(savedRange);
+      }
+
       editor.focus({ preventScroll: true });
 
       if (command === "highlight") {
@@ -5279,23 +5363,33 @@ export function TaskDetailsPanel({
         document.execCommand(command, false);
       }
 
+      const selection = window.getSelection();
+      if (selection?.rangeCount) {
+        rememberFormatSelection(editor, selection.getRangeAt(0));
+      }
+
       syncEditorContent();
       recordHistorySnapshot(inlineFormatHistoryLabel(command));
       scheduleAutoSave();
-      closeFormatMenu();
+      syncFormatMenuSelectionState();
+      syncHeaderClearFormattingState();
     },
-    [closeFormatMenu, recordHistorySnapshot, scheduleAutoSave, syncEditorContent],
+    [
+      rememberFormatSelection,
+      recordHistorySnapshot,
+      scheduleAutoSave,
+      syncEditorContent,
+      syncFormatMenuSelectionState,
+      syncHeaderClearFormattingState,
+    ],
   );
 
   const handleModalInlineFormatApply = useCallback(
     (command: "bold" | "italic" | "underline") => {
       captureFormatSelectionFromEditor();
       applyFormat(command);
-      requestAnimationFrame(() => {
-        syncFormatMenuSelectionState();
-      });
     },
-    [applyFormat, captureFormatSelectionFromEditor, syncFormatMenuSelectionState],
+    [applyFormat, captureFormatSelectionFromEditor],
   );
 
   const handleHeaderQuickFormatApply = handleModalInlineFormatApply;
@@ -5339,6 +5433,8 @@ export function TaskDetailsPanel({
     closeFormatDropdowns();
     setFormatMenuBlockType(getActiveTextBlockType(editor));
     setFormatMenuInlineFormats(DEFAULT_FORMAT_MENU_INLINE_FORMATS);
+    setFormatMenuFontSize(getDefaultDetailFontSizeOption());
+    setFormatMenuFontFamily(getAppFontFamilyId());
     setFormatMenuLineHeight(
       normalizeDetailLineHeight(getDefaultDetailLineHeight()) as DetailLineHeightOption,
     );
@@ -8566,22 +8662,12 @@ export function TaskDetailsPanel({
     if (isRecurrenceMenuOpenRef.current || isReminderMenuOpenRef.current) {
       return;
     }
-    if (
-      isDatePickerDateInputFocusedRef.current ||
-      isTaskDatePickerDateInputFocused()
-    ) {
-      return;
-    }
 
     clearDateMenuCloseTimer();
     dateMenuCloseTimerRef.current = window.setTimeout(() => {
       dateMenuCloseTimerRef.current = null;
-      if (
-        isDatePickerDateInputFocusedRef.current ||
-        isTaskDatePickerDateInputFocused()
-      ) {
-        return;
-      }
+      blurTaskDatePickerDateInput();
+      isDatePickerDateInputFocusedRef.current = false;
       setIsDateMenuOpen(false);
     }, TASK_DETAILS_DATE_MENU_HOVER_CLOSE_MS);
   }
@@ -8606,13 +8692,6 @@ export function TaskDetailsPanel({
   function handleDatePickerMouseLeave(event: React.MouseEvent) {
     if (isModalLayout) return;
     if (isMovingWithinDateMenuSurface(event.relatedTarget)) return;
-    if (
-      isDatePickerDateInputFocusedRef.current ||
-      isTaskDatePickerDateInputFocused()
-    ) {
-      return;
-    }
-
     scheduleDateMenuClose();
   }
 
@@ -9382,6 +9461,7 @@ export function TaskDetailsPanel({
         onPointerDown={(event) => event.stopPropagation()}
       >
         <TaskDatePicker
+          autoFocusDateInput={isModalLayout}
           dueDate={task.dueDate}
           dueTimeMinutes={task.dueTimeMinutes}
           dueDurationMinutes={task.dueDurationMinutes}
@@ -9432,13 +9512,13 @@ export function TaskDetailsPanel({
       data-details-fullscreen={detailsFullscreen ? "true" : undefined}
       className={`task-details-panel-background relative flex min-h-0 min-w-[300px] flex-1 flex-col${
         isModalLayout ? " h-full" : ""
-      }${detailsFullscreen ? " task-details-panel-fullscreen overflow-hidden rounded-l-[12px]" : ""}`}
+      }${detailsFullscreen ? " task-details-panel-fullscreen relative z-[1] overflow-hidden rounded-l-[12px]" : ""}`}
       aria-busy={saveStatus === "loading" ? true : undefined}
     >
       <div
         className={
           isModalLayout
-            ? "sticky top-0 z-30 shrink-0 overflow-visible  dark:bg-zinc-950"
+            ? "sticky top-0 z-30 shrink-0 overflow-visible bg-[var(--panel-text-task-modal-chrome-background)] dark:bg-zinc-950"
             : undefined
         }
       >
@@ -9833,10 +9913,10 @@ export function TaskDetailsPanel({
         >
           <div
             ref={editorWrapperRef}
-            className={`relative text-[#555555] rounded-xl border border-[var(--panel-text-task-detail-textarea-border)] ${
+            className={`relative text-[#555555] ${
               isModalLayout
-                ? "bg-[#ffffff] dark:bg-zinc-950"
-                : "bg-[var(--panel-text-task-detail-textarea-background)]"
+                ? "flex min-h-0 h-0 flex-1 flex-col"
+                : "rounded-xl border border-[var(--panel-text-task-detail-textarea-border)] bg-[var(--panel-text-task-detail-textarea-background)]"
             }`}
             onMouseEnter={handleEditorWrapperMouseEnter}
             onMouseLeave={handleEditorWrapperMouseLeave}
@@ -9866,13 +9946,7 @@ export function TaskDetailsPanel({
               <span className="sr-only">Loading task details</span>
             ) : null}
 
-            <div
-              className={
-                isModalLayout
-                  ? "relative flex min-h-0 h-0 flex-1 flex-col"
-                  : "contents"
-              }
-            >
+            <div className="contents">
             {editorSelectionHighlightRects.map((rect, index) => (
               <div
                 key={`${rect.top}-${rect.left}-${rect.width}-${index}`}
@@ -9914,10 +9988,10 @@ export function TaskDetailsPanel({
               onKeyUp={handleEditorKeyUp}
               onMouseMove={handleEditorWrapperMouseMove}
               onScroll={handleEditorScroll}
-              className={`task-details-editor task-details-editor--selection-layer relative z-[1] w-full resize-none rounded-xl border-0! bg-transparent! pt-[8px] pl-[25px] pr-3 pb-4! text-[#555555] shadow-none! outline-none transition-colors focus:border-[#7f7f7f] dark:text-zinc-300 [&_.detail-line[data-line-type=bullet]]:pl-1 [&_.detail-line[data-line-type=checklist]]:cursor-pointer [&_.detail-line[data-line-type=checklist]]:pl-1 [&_.detail-line[data-line-type=h1]]:text-[26px] [&_.detail-line[data-line-type=h1]]:font-bold [&_.detail-line[data-line-type=h1]]:leading-[36px] [&_.detail-line[data-line-type=h1]]:text-[#4B4B4B] dark:[&_.detail-line[data-line-type=h1]]:text-[#F5F5F5] [&_.detail-line[data-line-type=h2]]:text-[23px] [&_.detail-line[data-line-type=h2]]:font-semibold [&_.detail-line[data-line-type=h2]]:leading-[30px] [&_.detail-line[data-line-type=h3]]:text-[19px] [&_.detail-line[data-line-type=h3]]:font-semibold [&_.detail-line[data-line-type=h3]]:leading-[26px] [&_.detail-line[data-line-type=numbered]]:pl-1 [&_mark]:bg-yellow-200 dark:[&_mark]:bg-yellow-300/30 [&_s]:line-through [&_strike]:line-through [&_u]:underline ${
+              className={`task-details-editor relative w-full resize-none rounded-xl pt-[8px] pl-[25px] pr-3 pb-4! text-[#555555] outline-none transition-colors focus:border-[#7f7f7f] dark:text-zinc-300 [&_.detail-line[data-line-type=bullet]]:pl-1 [&_.detail-line[data-line-type=checklist]]:cursor-pointer [&_.detail-line[data-line-type=checklist]]:pl-1 [&_.detail-line[data-line-type=h1]]:text-[26px] [&_.detail-line:first-child[data-line-type=h1]]:font-bold [&_.detail-line[data-line-type=h1]]:leading-[36px] [&_.detail-line[data-line-type=h1]]:text-[#4B4B4B] dark:[&_.detail-line[data-line-type=h1]]:text-[#F5F5F5] [&_.detail-line[data-line-type=h2]]:text-[23px] [&_.detail-line[data-line-type=h2]]:font-semibold [&_.detail-line[data-line-type=h2]]:leading-[30px] [&_.detail-line[data-line-type=h3]]:text-[19px] [&_.detail-line[data-line-type=h3]]:font-semibold [&_.detail-line[data-line-type=h3]]:leading-[26px] [&_.detail-line[data-line-type=numbered]]:pl-1 [&_mark]:bg-yellow-200 dark:[&_mark]:bg-yellow-300/30 [&_s]:line-through [&_strike]:line-through [&_u]:underline ${
                 isModalLayout
-                  ? "h-[496px]! min-h-0 shrink-0 overflow-x-hidden overflow-y-auto"
-                  : "min-h-[85vh] min-h-0 overflow-auto"
+                  ? "z-[1] border-0! bg-[#ffffff]! shadow-none! dark:bg-zinc-950! h-[496px]! min-h-0 shrink-0 overflow-x-hidden overflow-y-auto"
+                  : "task-details-editor--selection-layer z-[1] border-0! bg-transparent! shadow-none! min-h-[85vh] min-h-0 overflow-auto"
               }`}
             />
             </div>
@@ -9933,11 +10007,11 @@ export function TaskDetailsPanel({
                 ref={lineControlsRef}
                 className="pointer-events-none absolute inset-0 z-10"
               >
-              {lineControls.map(({ lineId, top, showPlus, showDrag }) => (
+              {lineControls.map(({ lineId, top, left, showPlus, showDrag }) => (
                   <div
                     key={lineId}
-                    className="pointer-events-none absolute mt-[1px] left-1 flex h-[1.75em] -translate-y-1/2 items-center"
-                    style={{ top }}
+                    className="pointer-events-none absolute mt-[1px] flex h-[1.75em] -translate-y-1/2 items-center"
+                    style={{ top, left }}
                   >
                     {showPlus ? (
                     <button
@@ -10023,7 +10097,7 @@ export function TaskDetailsPanel({
           >
             {previewType ? (
               <div
-                className="absolute left-full ml-[3px]"
+                className="absolute left-full ml-[6px]"
                 style={{ top: previewTopOffset }}
               >
                 <SlashCommandBlockPreview type={previewType} />
@@ -10098,7 +10172,7 @@ export function TaskDetailsPanel({
           >
             {previewType ? (
               <div
-                className="absolute left-full ml-[3px]"
+                className="absolute left-full ml-[6px]"
                 style={{ top: previewTopOffset }}
               >
                 <SlashCommandBlockPreview type={previewType} />
@@ -10374,7 +10448,12 @@ export function TaskDetailsPanel({
                   onOpenChange={(open) => {
                     setFormatDropdownOpen("lineHeight", open);
                     if (open) {
-                      syncFormatMenuFontState();
+                      const editor = editorRef.current;
+                      if (editor) {
+                        setFormatMenuLineHeight(
+                          getDetailSelectionLineHeight(editor),
+                        );
+                      }
                     }
                   }}
                   lineHeight={formatMenuLineHeight}
@@ -10414,7 +10493,7 @@ export function TaskDetailsPanel({
                     }}
                   >
                     <LuRemoveFormatting
-                      className={`${FORMAT_TOOLBAR_ICON_SIZE_CLASS} text-[#5e5e66] dark:text-[#ffffff] cursor-pointer`}
+                      className={` text-[16px] text-[#5e5e66] dark:text-[#ffffff] cursor-pointer`}
                   />
                   </button>
                 </FormatToolbarTooltipWrap>
@@ -10451,7 +10530,7 @@ export function TaskDetailsPanel({
 
       {isModalLayout && task && modalFooterConfig ? (
         <footer
-          className="mt-auto flex shrink-0 items-center justify-between gap-2 px-[22px] py-0 dark:border-zinc-800"
+          className="mt-auto flex shrink-0 items-center justify-between gap-2 bg-[var(--panel-text-task-modal-chrome-background)] px-[22px] py-0 dark:border-zinc-800 dark:bg-zinc-950"
           style={{ minHeight: CALENDAR_TASK_MODAL_FOOTER_MIN_HEIGHT_PX }}
         >
           <TaskModalFooter taskId={task.id} {...modalFooterConfig} />

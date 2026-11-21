@@ -217,10 +217,10 @@ function CalendarSidebarDayTasks({
       <div className="min-h-0 flex-1 overflow-y-auto px-1.5 py-1">
         {taskGroups.length === 0 ? (
           <div className="px-1 py-[5px]">
-            <h4 className="pl-[3px] pr-1 pt-px pb-[1px] text-[11px] font-medium text-zinc-400 dark:text-zinc-500">
+            <h4 className="pl-[3px] pr-1 pt-px pb-[1px] text-[12px] font-medium text-zinc-400 dark:text-zinc-500">
               {formatSelectedDay(focusDate)}
             </h4>
-            <p className="mt-1 px-1 ml-[5px] text-[13.5px] text-zinc-350 dark:text-zinc-500">
+            <p className="mt-1 px-1 ml-[5px] text-[12.5px] text-zinc-350 dark:text-zinc-500">
               No tasks scheduled
             </p>
           </div>

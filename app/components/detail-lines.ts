@@ -998,6 +998,25 @@ function isListBlockType(type: LineBlockType) {
   return type === "bullet" || type === "numbered" || type === "checklist";
 }
 
+export function isHeadingBlockType(type: LineBlockType) {
+  return type === "h1" || type === "h2" || type === "h3";
+}
+
+export function getBlockLinesContentsRange(editor: HTMLElement, range: Range) {
+  const lines = getFullLinesInRange(editor, range);
+  if (lines.length === 0) return null;
+
+  const startRange = document.createRange();
+  startRange.selectNodeContents(lines[0]);
+  const endRange = document.createRange();
+  endRange.selectNodeContents(lines[lines.length - 1]);
+
+  const merged = document.createRange();
+  merged.setStart(startRange.startContainer, startRange.startOffset);
+  merged.setEnd(endRange.endContainer, endRange.endOffset);
+  return merged;
+}
+
 function rangeToInnerHtml(range: Range) {
   const fragment = range.cloneContents();
   const wrapper = document.createElement("div");
@@ -1014,6 +1033,25 @@ function isWholeLineSelected(line: HTMLElement, range: Range) {
     range.compareBoundaryPoints(Range.START_TO_START, lineRange) <= 0 &&
     range.compareBoundaryPoints(Range.END_TO_END, lineRange) >= 0
   );
+}
+
+/** True when the range covers every non-title line it intersects (per line, not only one word). */
+export function isTextLinesRangeFullySelected(
+  editor: HTMLElement,
+  range: Range,
+) {
+  if (range.collapsed) return false;
+
+  const lines = getFullLinesInRange(editor, range).filter(
+    (line) =>
+      !line.querySelector(".detail-image-wrapper") &&
+      !isCodeLine(line) &&
+      !isTitleLine(editor, line),
+  );
+
+  if (lines.length === 0) return false;
+
+  return lines.every((line) => isWholeLineSelected(line, range));
 }
 
 export function getLineSelectionRange(line: HTMLElement, range: Range) {

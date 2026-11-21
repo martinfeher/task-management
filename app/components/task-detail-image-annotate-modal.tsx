@@ -505,7 +505,7 @@ export function TaskDetailImageAnnotateModal({
         ref={dialogRef}
         tabIndex={-1}
         onPointerDown={handleDialogSurfacePointerDown}
-        className="relative flex h-[95vh] max-h-[95vh] w-full max-w-[920px] flex-col overflow-hidden rounded-[22px] border border-zinc-200 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.28)] outline-none dark:border-zinc-700 dark:bg-zinc-900"
+        className="relative flex h-[95vh] max-h-[95vh] w-full max-w-[920px] flex-col overflow-hidden rounded-[30px] border border-zinc-200 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.28)] outline-none dark:border-zinc-700 dark:bg-zinc-900"
       >
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-zinc-200 px-5 py-1.5 dark:border-zinc-800">
           <div className="flex min-w-0 items-center gap-2.5">

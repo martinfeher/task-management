@@ -20,6 +20,7 @@ import {
   createTodoList,
   deleteListFolder,
   deleteTask as deleteTaskInDb,
+  type ArchivedTaskItem,
   deleteLabel as deleteLabelInDb,
   deleteTodoList,
   getLabels,
@@ -51,6 +52,7 @@ import {
 import type { TaskParentUpdate } from "@/app/actions/todo";
 import { normalizeDueTimeZone, type TaskDueTime } from "@/lib/task-due-time";
 import type { ToggleTaskOptions } from "@/lib/toggle-task-options";
+import { dispatchArchivedTasksAdded } from "@/lib/archive-events";
 import { markTaskRestoredForFade } from "@/lib/task-restore-fade";
 import type { TaskRecurrenceRule } from "@/lib/task-recurrence";
 import {
@@ -3756,20 +3758,30 @@ export function TodoApp({
   }
 
   async function deleteTaskById(taskId: string) {
-    const listId = findTaskListId(taskId);
-    if (!listId) return;
+    const removedIds = new Set<string>([taskId]);
 
-    const listTasks = tasksByList[listId] ?? [];
-    const childIds = listTasks
-      .filter((item) => item.parentId === taskId)
-      .map((item) => item.id);
-    const removedIds = new Set([taskId, ...childIds]);
+    for (const listTasks of Object.values(tasksByList)) {
+      for (const item of listTasks) {
+        if (item.parentId === taskId) {
+          removedIds.add(item.id);
+        }
+      }
+    }
 
     if (selectedTaskId && removedIds.has(selectedTaskId)) {
       await detailsSaveControllerRef.current?.flushSave();
     }
 
-    await deleteTaskInDb(taskId);
+    let archivedItems: ArchivedTaskItem[] = [];
+    try {
+      archivedItems = await deleteTaskInDb(taskId);
+    } catch {
+      return;
+    }
+
+    if (archivedItems.length > 0) {
+      dispatchArchivedTasksAdded(archivedItems);
+    }
 
     setTasksByList((current) => {
       const next = { ...current };
@@ -4697,6 +4709,8 @@ export function TodoApp({
             {compactShowTaskList ? (
               <div
                 className={`relative flex min-h-0 shrink-0 overflow-hidden${
+                  taskDetailsFullscreenLayout ? " z-0" : ""
+                }${
                   !isCompactLayout
                     ? ` ${TASK_DETAILS_FULLSCREEN_WIDTH_TRANSITION_CLASS}`
                     : ""
@@ -4827,7 +4841,7 @@ export function TodoApp({
                   : "min-w-[344px]"
               }${
                 taskDetailsFullscreenLayout
-                  ? " relative z-10 overflow-hidden rounded-l-[12px]"
+                  ? " relative z-30 overflow-hidden rounded-l-[12px]"
                   : ""
               } ${TASK_DETAILS_FULLSCREEN_MARGIN_TRANSITION_CLASS}`}
               style={{
@@ -5190,10 +5204,14 @@ export function TodoApp({
       />
       <UndoButton
         visible={pendingUndo !== null}
-        message="Task completed"
+        message={
+          pendingUndo
+            ? `Completed: ${pendingUndo.taskName.trim() || "Untitled task"}`
+            : "Task completed"
+        }
         ariaLabel={
           pendingUndo
-            ? `Undo completing ${pendingUndo.taskName}`
+            ? `Undo completing ${pendingUndo.taskName.trim() || "Untitled task"}`
             : undefined
         }
         onUndo={handleUndoCompletion}

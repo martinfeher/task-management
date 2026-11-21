@@ -22,6 +22,8 @@ import { VscChecklist } from "react-icons/vsc";
 import type { DetailTextBlockType, LineBlockType } from "./detail-lines";
 import {
   DETAIL_FONT_SIZE_OPTIONS,
+  MAX_DETAIL_FONT_SIZE_PX,
+  MIN_DETAIL_FONT_SIZE_PX,
   detailFontSizeFromSliderValue,
   getDetailFontFamilyLabel,
   stepDetailFontSizeOption,
@@ -30,6 +32,7 @@ import {
   type DetailFontFamilyId,
   type DetailFontSizeOption,
 } from "./detail-fonts";
+import { DetailFontSizeNumberInput } from "./detail-font-size-number-input";
 import { BulletListIcon } from "./line-control-icons";
 import { DetailLineHeightControl } from "./detail-line-height-control";
 import type { DetailLineHeightOption } from "./detail-line-height";
@@ -88,7 +91,7 @@ export const FORMAT_TOOLBAR_DROPDOWN_TRIGGER_CLASS =
 
 const FORMAT_TOOLBAR_DROPDOWN_MENU_SURFACE_CLASS = `format-toolbar-dropdown-menu ${FROSTED_POPOVER_SURFACE_CLASS}`;
 
-export const FORMAT_TOOLBAR_DROPDOWN_MENU_CLASS = `overflow-hidden rounded-[12px] py-1 min-w-[168px] cursor-pointer ${FORMAT_TOOLBAR_DROPDOWN_MENU_SURFACE_CLASS}`;
+export const FORMAT_TOOLBAR_DROPDOWN_MENU_CLASS = `overflow-hidden rounded-[12px] pt-1.5 py-1 min-w-[140px] cursor-pointer ${FORMAT_TOOLBAR_DROPDOWN_MENU_SURFACE_CLASS}`;
 
 /** List and heading menus: 8px inset on all sides. */
 export const FORMAT_TOOLBAR_LIST_BLOCK_MENU_CLASS = `overflow-hidden rounded-[12px] p-2 min-w-[168px] cursor-pointer ${FORMAT_TOOLBAR_DROPDOWN_MENU_SURFACE_CLASS}`;
@@ -249,13 +252,13 @@ const DETAIL_TYPOGRAPHY_PRESETS: DetailTypographyPreset[] = [
   { id: "small", label: "Small", size: 12, blockType: "text" },
 ];
 
-const FORMAT_TOOLBAR_TYPOGRAPHY_MENU_CLASS = `${FORMAT_TOOLBAR_DROPDOWN_MENU_CLASS} w-[215px] min-w-[215px] p-1.5`;
+const FORMAT_TOOLBAR_TYPOGRAPHY_MENU_CLASS = `${FORMAT_TOOLBAR_DROPDOWN_MENU_CLASS} w-[215px] min-w-[215px] hover:bg-white! p-1.5`;
 
 const FORMAT_TOOLBAR_TYPOGRAPHY_TRIGGER_CLASS =
-  `flex h-[25px] min-w-0 cursor-pointer items-center gap-0.5 rounded-full px-1 ${FORMAT_TOOLBAR_ICON_COLOR} transition-colors hover:bg-zinc-200/60 dark:hover:bg-zinc-700/80`;
+  `flex h-27px min-w-0 cursor-pointer items-center gap-0.5 rounded-full px-[6px] ${FORMAT_TOOLBAR_ICON_COLOR} transition-none hover:bg-white! dark:hover:bg-zinc-700/80`;
 
 const FORMAT_TOOLBAR_TYPOGRAPHY_STEPPER_CLASS =
-  "menu-item-hover-focus flex size-[25px] shrink-0 cursor-pointer items-center justify-center rounded-full text-zinc-600 hover:bg-zinc-200/60 dark:text-zinc-300 dark:hover:bg-zinc-700/80";
+  "menu-item-hover-focus flex size-[25px] shrink-0 cursor-pointer items-center justify-center rounded-full text-zinc-600 transition-none! hover:bg-white! dark:text-zinc-300 dark:hover:bg-zinc-700/80";
 
 function isTypographyPresetActive(
   preset: DetailTypographyPreset,
@@ -274,10 +277,7 @@ function getTypographyStyleLabel(
   );
   if (preset) return preset.label;
 
-  if (blockType === "h1") return "Heading 1";
-  if (blockType === "h2") return "Heading 2";
-  if (blockType === "h3") return "Heading 3";
-  return "Body";
+  return "Custom";
 }
 
 const LIST_OPTIONS: {
@@ -659,7 +659,16 @@ function FormatToolbarDropdownShell({
                   aria-label={ariaLabel}
                   className={`${surfaceClassName} overflow-visible`}
                   style={menuStyle}
-                  onMouseDown={(event) => event.preventDefault()}
+                  onMouseDown={(event) => {
+                    const target = event.target;
+                    if (
+                      target instanceof HTMLInputElement &&
+                      (target.type === "range" || target.type === "number")
+                    ) {
+                      return;
+                    }
+                    event.preventDefault();
+                  }}
                 >
                   <div
                     className={`${
@@ -1220,8 +1229,8 @@ export function DetailFormatTypographyDropdown({
   onBeforeFontSizeStep,
 }: DetailFormatTypographyDropdownProps) {
   const styleLabel = getTypographyStyleLabel(blockType, size);
-  const sliderMin = DETAIL_FONT_SIZE_OPTIONS[0];
-  const sliderMax = DETAIL_FONT_SIZE_OPTIONS[DETAIL_FONT_SIZE_OPTIONS.length - 1];
+  const sliderMin = MIN_DETAIL_FONT_SIZE_PX;
+  const sliderMax = MAX_DETAIL_FONT_SIZE_PX;
   const [sliderValue, setSliderValue] = useState<number>(size);
 
   useLayoutEffect(() => {
@@ -1279,7 +1288,7 @@ export function DetailFormatTypographyDropdown({
 
   return (
     <div
-      className="flex h-[27px] items-center gap-px rounded-full bg-zinc-100/80 px-px dark:bg-zinc-800/70"
+      className="flex h-[31px] py-[5px]! items-center gap-px rounded-full bg-zinc-100/80 px-px dark:bg-zinc-800/70"
       onMouseLeave={() => onPreviewSizeClear?.()}
     >
       <button
@@ -1305,7 +1314,7 @@ export function DetailFormatTypographyDropdown({
         trigger={
           <>
             <span
-              className={`shrink-0 text-[11.5px] font-medium tabular-nums ${FORMAT_TOOLBAR_TRIGGER_LABEL_COLOR}`}
+              className={`shrink-0 text-[11.5px] mr-[2px] font-medium tabular-nums ${FORMAT_TOOLBAR_TRIGGER_LABEL_COLOR}`}
             >
               {size}
             </span>
@@ -1351,7 +1360,7 @@ export function DetailFormatTypographyDropdown({
                 <span className="ml-1.5 flex w-3.5 shrink-0 justify-end">
                   {active ? (
                     <LuCheck
-                      className="size-3.5 text-emerald-600"
+                      className="size-3 text-emerald-600"
                       aria-hidden="true"
                     />
                   ) : null}
@@ -1391,11 +1400,20 @@ export function DetailFormatTypographyDropdown({
                 commitSliderValue(Number(event.currentTarget.value));
               }}
             />
-            <span
-              className={`flex h-7 min-w-[1.75rem] items-center justify-center rounded-md bg-zinc-100 px-0.5 tabular-nums text-[12px] font-medium dark:bg-zinc-800 ${FORMAT_TOOLBAR_TRIGGER_LABEL_COLOR}`}
-            >
-              {detailFontSizeFromSliderValue(sliderValue)}
-            </span>
+            <DetailFontSizeNumberInput
+              value={size}
+              className={`flex h-7 min-w-[1.75rem] max-w-[2.75rem] items-center justify-center rounded-md bg-zinc-100 px-0.5 tabular-nums text-[12px] font-medium dark:bg-zinc-800 ${FORMAT_TOOLBAR_TRIGGER_LABEL_COLOR}`}
+              onCommit={(next) => {
+                onBeforeFontSizeStep?.();
+                setSliderValue(next);
+                onSelectSize(next);
+              }}
+              onPreview={(next) => {
+                onBeforeFontSizeStep?.();
+                onPreviewSize?.(next);
+              }}
+              onFocus={onBeforeFontSizeStep}
+            />
             <button
               type="button"
               className={FORMAT_TOOLBAR_TYPOGRAPHY_STEPPER_CLASS}

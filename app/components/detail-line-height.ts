@@ -13,6 +13,13 @@ import {
   stripTrailingBreakFromNonEmptyLine,
 } from "./detail-lines";
 
+function restoreSelectionRange(range: Range) {
+  const selection = window.getSelection();
+  if (!selection) return;
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
+
 export const DEFAULT_DETAIL_LINE_HEIGHT = INITIAL_TASK_EDITOR_LINE_HEIGHT;
 export const DETAIL_LINE_HEIGHT_MIN = 1;
 export const DETAIL_LINE_HEIGHT_MAX = 2.5;
@@ -170,10 +177,31 @@ export function applyDetailLineHeight(
   savedRange?: Range | null,
 ): boolean {
   const normalized = normalizeDetailLineHeight(lineHeight);
+  let rangeToRestore: Range | null = null;
+
+  if (
+    savedRange &&
+    !savedRange.collapsed &&
+    editor.contains(savedRange.commonAncestorContainer)
+  ) {
+    rangeToRestore = savedRange.cloneRange();
+    restoreSelectionRange(rangeToRestore);
+  } else {
+    const selection = window.getSelection();
+    if (
+      selection?.rangeCount &&
+      selection.anchorNode &&
+      editor.contains(selection.anchorNode) &&
+      !selection.getRangeAt(0).collapsed
+    ) {
+      rangeToRestore = selection.getRangeAt(0).cloneRange();
+    }
+  }
+
   const lines = getTargetLinesForLineHeight(editor, savedRange);
   if (lines.length === 0) return false;
 
-  editor.focus();
+  editor.focus({ preventScroll: true });
 
   for (const line of lines) {
     clearFixedLineDimensions(line);
@@ -187,6 +215,15 @@ export function applyDetailLineHeight(
     }
 
     stripTrailingBreakFromNonEmptyLine(line);
+  }
+
+  if (rangeToRestore && editor.contains(rangeToRestore.commonAncestorContainer)) {
+    try {
+      restoreSelectionRange(rangeToRestore);
+    } catch {
+      // The range can go stale after line normalization; the saved format selection
+      // in the panel is restored on the next toolbar action instead.
+    }
   }
 
   return true;

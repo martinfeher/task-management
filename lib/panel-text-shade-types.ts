@@ -39,7 +39,8 @@ export type PanelTextElementKey =
   | "taskDetailBackground"
   | "taskDetailTextareaBackground"
   | "taskDetailTextareaBorder"
-  | "taskDetailHeaderIconHoverBackground";
+  | "taskDetailHeaderIconHoverBackground"
+  | "taskModalChromeBackground";
 
 export type PanelTextColorValue = {
   shade: PanelTextShadeToken;
@@ -83,6 +84,7 @@ export const PANEL_TEXT_ELEMENT_KEYS: PanelTextElementKey[] = [
   "taskDetailTextareaBackground",
   "taskDetailTextareaBorder",
   "taskDetailHeaderIconHoverBackground",
+  "taskModalChromeBackground",
 ];
 
 export const PANEL_TEXT_ELEMENT_LABELS: Record<PanelTextElementKey, string> = {
@@ -118,6 +120,8 @@ export const PANEL_TEXT_ELEMENT_LABELS: Record<PanelTextElementKey, string> = {
   taskDetailTextareaBackground: "Textarea background",
   taskDetailTextareaBorder: "Textarea border",
   taskDetailHeaderIconHoverBackground: "Top bar icon hover background",
+  taskModalChromeBackground:
+    "Calendar task modal chrome (header, footer, margins)",
 };
 
 export const PANEL_TEXT_ELEMENT_GROUPS: Array<{
@@ -168,6 +172,7 @@ export const PANEL_TEXT_ELEMENT_GROUPS: Array<{
       "taskDetailTextareaBackground",
       "taskDetailTextareaBorder",
       "taskDetailHeaderIconHoverBackground",
+      "taskModalChromeBackground",
     ],
   },
 ];
@@ -206,6 +211,7 @@ export const PANEL_TEXT_ELEMENT_CSS_VARS: Record<PanelTextElementKey, string> =
     taskDetailTextareaBorder: "--panel-text-task-detail-textarea-border",
     taskDetailHeaderIconHoverBackground:
       "--panel-text-task-detail-header-icon-hover-background",
+    taskModalChromeBackground: "--panel-text-task-modal-chrome-background",
   };
 
 const DEFAULT_PANEL_TEXT_COLOR_OVERRIDES: Partial<
@@ -215,6 +221,7 @@ const DEFAULT_PANEL_TEXT_COLOR_OVERRIDES: Partial<
   taskDetailTextareaBackground: "#ffffff",
   taskDetailTextareaBorder: "#e4e4e7",
   taskDetailHeaderIconHoverBackground: "#f4f4f5",
+  taskModalChromeBackground: "#f8f8fa",
   listNavHoverBackground: "#efeff1",
   listItemsHoverBackground: "#f4f4f5",
   labelItemsHoverBackground: "#ededf0",
@@ -255,6 +262,7 @@ const DEFAULT_SHADES: Record<PanelTextElementKey, PanelTextShadeToken> = {
   taskDetailTextareaBackground: "zinc-50",
   taskDetailTextareaBorder: "zinc-200",
   taskDetailHeaderIconHoverBackground: "zinc-100",
+  taskModalChromeBackground: "zinc-100",
 };
 
 export function getDefaultPanelTextColorValue(

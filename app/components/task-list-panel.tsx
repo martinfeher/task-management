@@ -29,7 +29,7 @@ import {
   type TaskListTitleIconKind,
 } from "./list-panel-title-icon";
 import {
-  isTaskDatePickerDateInputFocused,
+  blurTaskDatePickerDateInput,
   TaskDatePicker,
 } from "./task-date-picker";
 import { TaskSetDateIcon } from "./task-set-date-icon";
@@ -1511,22 +1511,11 @@ export function TaskListPanel({
   }
 
   function scheduleAddTaskDateMenuClose() {
-    if (
-      isTaskListDateInputFocusedRef.current ||
-      isTaskDatePickerDateInputFocused()
-    ) {
-      return;
-    }
-
     clearAddTaskDateMenuCloseTimer();
     addTaskDateMenuCloseTimerRef.current = window.setTimeout(() => {
       addTaskDateMenuCloseTimerRef.current = null;
-      if (
-        isTaskListDateInputFocusedRef.current ||
-        isTaskDatePickerDateInputFocused()
-      ) {
-        return;
-      }
+      blurTaskDatePickerDateInput();
+      isTaskListDateInputFocusedRef.current = false;
       setIsAddTaskDatePickerOpen(false);
     }, ADD_TASK_METADATA_MENU_HOVER_CLOSE_MS);
   }
@@ -1702,22 +1691,11 @@ export function TaskListPanel({
 
   function scheduleCloseTaskDatePicker() {
     clearTaskRowDateMenuOpenTimer();
-    if (
-      isTaskListDateInputFocusedRef.current ||
-      isTaskDatePickerDateInputFocused()
-    ) {
-      return;
-    }
-
     clearTaskRowDateMenuCloseTimer();
     taskRowDateMenuCloseTimerRef.current = window.setTimeout(() => {
       taskRowDateMenuCloseTimerRef.current = null;
-      if (
-        isTaskListDateInputFocusedRef.current ||
-        isTaskDatePickerDateInputFocused()
-      ) {
-        return;
-      }
+      blurTaskDatePickerDateInput();
+      isTaskListDateInputFocusedRef.current = false;
       setOpenDatePickerTaskId(null);
     }, ADD_TASK_METADATA_MENU_HOVER_CLOSE_MS);
   }
@@ -3879,6 +3857,8 @@ export function TaskListPanel({
                         <div
                           ref={addTaskDatePickerRef}
                           className="w-fit"
+                          onMouseEnter={clearAddTaskDateMenuCloseTimer}
+                          onMouseLeave={scheduleAddTaskDateMenuClose}
                           onKeyDown={(event) => {
                             if (event.key !== "Escape") return;
                             event.stopPropagation();

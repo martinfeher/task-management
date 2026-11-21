@@ -12,8 +12,11 @@ import {
   FORMAT_TOOLBAR_ICON_COLOR,
   FORMAT_TOOLBAR_TRIGGER_LABEL_COLOR,
 } from "./detail-format-toolbar-menus";
+import { DetailFontSizeNumberInput } from "./detail-font-size-number-input";
 import { FROSTED_POPOVER_SURFACE_CLASS } from "@/lib/frosted-popover-surface";
 import { TASK_DETAILS_HEADER_ICON_HOVER_CLASS } from "@/lib/task-details-header-icon-hover";
+
+export { DetailFontSizeNumberInput } from "./detail-font-size-number-input";
 
 type DetailFontSizeControlProps = {
   value: DetailFontSizeOption;
@@ -131,7 +134,7 @@ export function DetailFontSizeControl({
             <div
               role="listbox"
               aria-label="Font size"
-              className={`format-toolbar-dropdown-menu ${formatToolbarMenuPanelClassName} min-w-[168px] cursor-pointer overflow-visible ${FROSTED_POPOVER_SURFACE_CLASS}`}
+              className={`format-toolbar-dropdown-menu ${formatToolbarMenuPanelClassName} min-w-[100px] cursor-pointer overflow-visible ${FROSTED_POPOVER_SURFACE_CLASS}`}
             >
               <div
                 className="overflow-hidden rounded-[inherit]"
@@ -161,6 +164,16 @@ export function DetailFontSizeControl({
                     {option}
                   </button>
                 ))}
+              </div>
+              <div className="border-t border-zinc-200/90 px-2 py-1.5 dark:border-zinc-700">
+                <DetailFontSizeNumberInput
+                  value={value}
+                  onCommit={(next) => {
+                    onSelect(next);
+                    onOpenChange?.(false);
+                  }}
+                  onPreview={onPreviewSize}
+                />
               </div>
               </div>
             </div>

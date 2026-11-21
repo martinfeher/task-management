@@ -92,7 +92,7 @@ const menuItemClassName =
   "tcm-menu-item flex h-[35px] w-full items-center px-3 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800";
 
 const deleteMenuItemClassName =
-  "tcm-menu-item tcm-menu-item--delete flex h-[35px] w-full items-center px-3 text-left text-sm dark:hover:bg-red-950/40";
+  "tcm-menu-item tcm-menu-item--delete flex h-[35px] w-full items-center px-3 text-left text-sm transition-colors hover:bg-red-50 dark:hover:bg-red-950/40";
 
 const taskContextMenuSurfaceStyle = {
   color: TASK_CONTEXT_MENU_ITEM_TEXT_COLOR,

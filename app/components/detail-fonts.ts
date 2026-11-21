@@ -123,6 +123,7 @@ export function getFormatToolbarFontFamilyOptions() {
   );
 }
 
+export const MIN_DETAIL_FONT_SIZE_PX = 4;
 export const MAX_DETAIL_FONT_SIZE_PX = 60;
 
 export const DETAIL_FONT_SIZE_OPTIONS = [
@@ -145,7 +146,19 @@ export function stepDetailFontSizeOption(
 }
 
 export function detailFontSizeFromSliderValue(value: number): DetailFontSizeOption {
-  const rounded = Math.max(8, Math.min(MAX_DETAIL_FONT_SIZE_PX, Math.round(value)));
+  return clampDetailFontSizeInput(value);
+}
+
+export function clampDetailFontSizeInput(value: number): DetailFontSizeOption {
+  const rounded = Math.max(
+    MIN_DETAIL_FONT_SIZE_PX,
+    Math.min(MAX_DETAIL_FONT_SIZE_PX, Math.round(value)),
+  );
+
+  if ((DETAIL_FONT_SIZE_OPTIONS as readonly number[]).includes(rounded)) {
+    return rounded as DetailFontSizeOption;
+  }
+
   return matchDetailFontSize(`${rounded}px`);
 }
 
@@ -649,10 +662,7 @@ function canApplyDetailFont(editor: HTMLElement, range?: Range | null) {
   );
 }
 
-function removeStylePropertyFromRange(
-  range: Range,
-  property: "fontFamily" | "fontSize" | "color",
-) {
+function collectElementsInRange(range: Range) {
   const elements = new Set<HTMLElement>();
   const walker = document.createTreeWalker(
     range.commonAncestorContainer,
@@ -679,7 +689,58 @@ function removeStylePropertyFromRange(
     }
   }
 
-  for (const element of elements) {
+  return elements;
+}
+
+function rangeHasRemovableInlineTypography(range: Range) {
+  for (const element of collectElementsInRange(range)) {
+    if (shouldSkipFontNormalization(element)) continue;
+
+    if (
+      element.tagName === "FONT" &&
+      (element.hasAttribute("size") || element.hasAttribute("face"))
+    ) {
+      return true;
+    }
+
+    if (
+      element.style.fontSize &&
+      !isDefaultDetailFontSize(element.style.fontSize)
+    ) {
+      return true;
+    }
+
+    if (
+      element.style.fontFamily &&
+      !isDefaultAppFont(element.style.fontFamily)
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function resetDetailInlineTypographyInRange(
+  editor: HTMLElement,
+  range: Range,
+): boolean {
+  if (!rangeHasRemovableInlineTypography(range)) {
+    return false;
+  }
+
+  removeStylePropertyFromRange(range.cloneRange(), "fontSize");
+  removeStylePropertyFromRange(range.cloneRange(), "fontFamily");
+  restoreSelectionRange(range);
+  syncListLineMarkerMetricsForRange(editor, range);
+  return true;
+}
+
+function removeStylePropertyFromRange(
+  range: Range,
+  property: "fontFamily" | "fontSize" | "color",
+) {
+  for (const element of collectElementsInRange(range)) {
     if (property === "fontFamily") {
       element.style.removeProperty("font-family");
       if (element.tagName === "FONT") {
@@ -808,15 +869,38 @@ export function stripFormattingInSelection(
 
   const resetLineHeight = resetDetailLineHeightOnLines(lineHeightTargets);
 
-  if (insertedNodes.length === 0) {
+  const nextRange =
+    insertedNodes.length > 0
+      ? (() => {
+          const range = document.createRange();
+          range.setStart(insertedNodes[0], 0);
+          const lastNode = insertedNodes[insertedNodes.length - 1];
+          range.setEnd(lastNode, lastNode.textContent?.length ?? 0);
+          return range;
+        })()
+      : (() => {
+          const current = window.getSelection();
+          if (
+            !current?.rangeCount ||
+            !current.anchorNode ||
+            !editor.contains(current.anchorNode)
+          ) {
+            return null;
+          }
+
+          return current.getRangeAt(0).cloneRange();
+        })();
+
+  if (!nextRange) {
     return clearedListTypes || resetLineHeight;
   }
 
-  const nextRange = document.createRange();
-  nextRange.setStart(insertedNodes[0], 0);
-  const lastNode = insertedNodes[insertedNodes.length - 1];
-  nextRange.setEnd(lastNode, lastNode.textContent?.length ?? 0);
   restoreSelectionRange(nextRange);
+  const resetTypography = resetDetailInlineTypographyInRange(editor, nextRange);
+
+  if (insertedNodes.length === 0) {
+    return clearedListTypes || resetLineHeight || resetTypography;
+  }
 
   return true;
 }

@@ -1187,7 +1187,7 @@ export function TaskListTaskRow({
 
           {showHoverPriorityIcon ? (
             <div
-              className={`group/add-priority relative z-0 ml-[2px] mr-1 flex w-[25px] shrink-0 items-center justify-center ${rowActionsPointerClass} ${rowActionHoverVisibilityClass}`}
+              className={`group/add-priority relative z-10 ml-[2px] mr-1 flex w-[25px] shrink-0 items-center justify-center ${rowActionsPointerClass} ${rowActionHoverVisibilityClass}`}
               onMouseEnter={keepPriorityMenuPreviewOpen}
               onMouseLeave={() => onScheduleClosePriorityMenu?.()}
             >
@@ -1225,7 +1225,7 @@ export function TaskListTaskRow({
 
           {showPriorityPillInActionColumn ? (
             <div
-              className={`relative z-[2] ml-[2px] mr-1 flex w-[25px] shrink-0 items-center justify-center ${priorityPillPointerClass}`}
+              className={`relative z-10 ml-[2px] mr-1 flex w-[25px] shrink-0 items-center justify-center ${priorityPillPointerClass}`}
               onMouseEnter={
                 hasPriorityActions ? keepPriorityMenuPreviewOpen : undefined
               }

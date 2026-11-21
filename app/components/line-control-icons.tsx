@@ -107,6 +107,29 @@ function getActiveLineRect(
   return markerRect.height > 0 ? markerRect : null;
 }
 
+const LINE_CONTROL_TEXT_GAP_PX = 10;
+const LINE_CONTROL_ICON_WIDTH_PX = 20;
+const LINE_CONTROL_MIN_LEFT_PX = 4;
+
+function getLineTextLeftEdge(line: HTMLElement, lineRect: DOMRect) {
+  const checklistText = line.querySelector<HTMLElement>(".detail-checklist-text");
+  if (checklistText) {
+    const checklistRect = checklistText.getBoundingClientRect();
+    return checklistRect.left;
+  }
+
+  const range = document.createRange();
+  range.selectNodeContents(line);
+  const textRects = Array.from(range.getClientRects()).filter(
+    (rect) => rect.width > 0 && rect.height > 0,
+  );
+  if (textRects.length > 0) {
+    return Math.min(...textRects.map((rect) => rect.left));
+  }
+
+  return lineRect.left;
+}
+
 export function getLineControlsPositionForLine(
   line: HTMLElement,
   wrapper: HTMLElement,
@@ -126,8 +149,18 @@ export function getLineControlsPositionForLine(
       ? textRects[0].top + textRects[0].height / 2
       : lineRect.top + lineRect.height / 2;
 
+  const textLeft = getLineTextLeftEdge(line, lineRect);
+  const left = Math.max(
+    LINE_CONTROL_MIN_LEFT_PX,
+    textLeft -
+      wrapperRect.left -
+      LINE_CONTROL_TEXT_GAP_PX -
+      LINE_CONTROL_ICON_WIDTH_PX,
+  );
+
   return {
     top: centerY - wrapperRect.top,
+    left,
   };
 }
 

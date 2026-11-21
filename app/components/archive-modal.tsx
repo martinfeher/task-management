@@ -9,6 +9,10 @@ import {
   type ArchivedTaskItem,
   type RestoredTaskItem,
 } from "@/app/actions/todo";
+import {
+  ARCHIVED_TASKS_ADDED_EVENT,
+  type ArchivedTasksAddedEventDetail,
+} from "@/lib/archive-events";
 import { ConfirmModal } from "./confirm-modal";
 
 type ArchiveScope = "all" | "tasks" | "notes";
@@ -49,6 +53,23 @@ function matchesScope(item: ArchivedTaskItem, scope: ArchiveScope) {
   if (scope === "all") return true;
   if (scope === "notes") return item.isNote;
   return !item.isNote;
+}
+
+function mergeArchivedTaskItems(
+  current: ArchivedTaskItem[],
+  additions: ArchivedTaskItem[],
+) {
+  if (additions.length === 0) return current;
+
+  const knownIds = new Set(current.map((item) => item.id));
+  const merged = [
+    ...additions.filter((item) => !knownIds.has(item.id)),
+    ...current,
+  ];
+
+  return merged.sort((left, right) =>
+    right.deletedAt.localeCompare(left.deletedAt),
+  );
 }
 
 export function ArchiveModal({
@@ -105,6 +126,25 @@ export function ArchiveModal({
       cancelled = true;
     };
   }, [open]);
+
+  useEffect(() => {
+    function handleArchivedTasksAdded(event: Event) {
+      const customEvent = event as CustomEvent<ArchivedTasksAddedEventDetail>;
+      if (!Array.isArray(customEvent.detail) || customEvent.detail.length === 0) {
+        return;
+      }
+
+      setItems((current) => mergeArchivedTaskItems(current, customEvent.detail));
+    }
+
+    window.addEventListener(ARCHIVED_TASKS_ADDED_EVENT, handleArchivedTasksAdded);
+    return () => {
+      window.removeEventListener(
+        ARCHIVED_TASKS_ADDED_EVENT,
+        handleArchivedTasksAdded,
+      );
+    };
+  }, []);
 
   useEffect(() => {
     if (!open) return;

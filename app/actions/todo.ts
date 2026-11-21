@@ -1466,7 +1466,64 @@ export async function toggleTask(taskId: string, completed: boolean) {
   };
 }
 
-export async function deleteTask(taskId: string) {
+export type ArchivedTaskItem = {
+  id: string;
+  name: string;
+  isNote: boolean;
+  listId: string;
+  listName: string;
+  deletedAt: string;
+};
+
+const archivedTaskSelect = {
+  id: true,
+  name: true,
+  isNote: true,
+  deletedAt: true,
+  parentId: true,
+  list: {
+    select: {
+      id: true,
+      name: true,
+    },
+  },
+} as const;
+
+function mapArchivedTaskRecord(
+  task: {
+    id: string;
+    name: string;
+    isNote: boolean;
+    deletedAt: Date | null;
+    parentId: string | null;
+    list: {
+      id: string;
+      name: string;
+    };
+  },
+  deletedBatchIds?: Set<string>,
+): ArchivedTaskItem | null {
+  if (!task.deletedAt) return null;
+  if (
+    task.parentId &&
+    deletedBatchIds?.has(task.parentId) === true
+  ) {
+    return null;
+  }
+
+  return {
+    id: task.id,
+    name: task.name,
+    isNote: task.isNote,
+    listId: task.list.id,
+    listName: task.list.name,
+    deletedAt: task.deletedAt.toISOString(),
+  };
+}
+
+export async function deleteTask(
+  taskId: string,
+): Promise<ArchivedTaskItem[]> {
   const { id: userId } = await requireUser();
   await requireOwnedTask(taskId, userId);
 
@@ -1478,23 +1535,27 @@ export async function deleteTask(taskId: string) {
   ).map((child) => child.id);
   const idsToDelete = [taskId, ...childIds];
   const deletedAt = new Date();
+  const deletedBatchIds = new Set(idsToDelete);
 
   await prisma.task.updateMany({
     where: { id: { in: idsToDelete }, deletedAt: null, userId },
     data: { deletedAt },
   });
 
-  revalidatePath("/");
-}
+  await stampTaskFields(idsToDelete, ["deletedAt"], deletedAt.getTime());
 
-export type ArchivedTaskItem = {
-  id: string;
-  name: string;
-  isNote: boolean;
-  listId: string;
-  listName: string;
-  deletedAt: string;
-};
+  const archivedTasks = await prisma.task.findMany({
+    where: { id: { in: idsToDelete }, userId },
+    select: archivedTaskSelect,
+  });
+
+  revalidatePath("/");
+
+  return archivedTasks
+    .map((task) => mapArchivedTaskRecord(task, deletedBatchIds))
+    .filter((item): item is ArchivedTaskItem => item !== null)
+    .sort((left, right) => right.deletedAt.localeCompare(left.deletedAt));
+}
 
 export type RestoredTaskItem = {
   id: string;
@@ -1733,30 +1794,18 @@ export async function getArchivedTasks(): Promise<ArchivedTaskItem[]> {
   const { id: userId } = await requireUser();
 
   const tasks = await prisma.task.findMany({
-    where: { deletedAt: { not: null }, userId },
-    orderBy: [{ deletedAt: "desc" }, { name: "asc" }],
-    select: {
-      id: true,
-      name: true,
-      isNote: true,
-      deletedAt: true,
-      list: {
-        select: {
-          id: true,
-          name: true,
-        },
-      },
+    where: {
+      deletedAt: { not: null },
+      userId,
+      OR: [{ parentId: null }, { parent: { deletedAt: null } }],
     },
+    orderBy: [{ deletedAt: "desc" }, { name: "asc" }],
+    select: archivedTaskSelect,
   });
 
-  return tasks.map((task) => ({
-    id: task.id,
-    name: task.name,
-    isNote: task.isNote,
-    listId: task.list.id,
-    listName: task.list.name,
-    deletedAt: task.deletedAt!.toISOString(),
-  }));
+  return tasks
+    .map((task) => mapArchivedTaskRecord(task))
+    .filter((item): item is ArchivedTaskItem => item !== null);
 }
 
 export async function restoreArchivedTask(

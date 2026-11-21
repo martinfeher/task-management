@@ -63,6 +63,8 @@ type TaskDatePickerProps = {
   onClearDateAndTime?: () => void | Promise<void>;
   onDateInputFocusChange?: (focused: boolean) => void;
   className?: string;
+  /** Default false — hover-opened pickers should not grab focus (allows dismiss on mouse leave). */
+  autoFocusDateInput?: boolean;
 };
 
 const TASK_DATE_PICKER_WIDTH = 270;
@@ -86,6 +88,16 @@ export function isTaskDatePickerDateInputFocused(): boolean {
     active instanceof HTMLElement &&
     Boolean(active.closest(TASK_DATE_PICKER_DATE_INPUT_SELECTOR))
   );
+}
+
+export function blurTaskDatePickerDateInput() {
+  const active = document.activeElement;
+  if (
+    active instanceof HTMLElement &&
+    active.matches(TASK_DATE_PICKER_DATE_INPUT_SELECTOR)
+  ) {
+    active.blur();
+  }
 }
 
 export function computeTaskDatePickerMenuPosition(
@@ -1367,6 +1379,7 @@ export function TaskDatePicker({
   onClearDateAndTime,
   onDateInputFocusChange,
   className,
+  autoFocusDateInput = false,
 }: TaskDatePickerProps) {
   const today = useMemo(() => startOfDay(new Date()), []);
   const selectedDate = fromDateValue(dueDate);
@@ -1396,7 +1409,7 @@ export function TaskDatePicker({
   const hasAutoFocusedDateInputRef = useRef(false);
 
   useEffect(() => {
-    if (hasAutoFocusedDateInputRef.current) return;
+    if (!autoFocusDateInput || hasAutoFocusedDateInputRef.current) return;
 
     const frame = requestAnimationFrame(() => {
       const pickerRoot = dateInputRef.current?.closest(
@@ -1420,7 +1433,7 @@ export function TaskDatePicker({
     return () => {
       cancelAnimationFrame(frame);
     };
-  }, []);
+  }, [autoFocusDateInput]);
 
   useEffect(() => {
     setDisplayRecurrence(activeRecurrence);
