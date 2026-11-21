@@ -521,31 +521,36 @@ body {
   scrollbar-gutter: stable;
   background-color: var(--panel-text-task-detail-textarea-background);
   border: 1px solid var(--panel-text-task-detail-textarea-border);
+  --task-details-selection-background: #eaeaf4;
+  --task-details-selection-radius: 6px;
 }
 
-.task-details-editor ::selection {
-  background-color: #eaeaf4;
-  border-radius: 5px;
+.task-details-editor--selection-layer {
+  background-color: transparent;
+  border-color: transparent;
 }
 
-.task-details-editor ::-moz-selection {
-  background-color: #e9e9f2;
-  border-radius: 5px;
+.task-details-editor--selection-layer:focus {
+  border-color: #7f7f7f;
 }
 
-.task-details-selection-side-pad {
-  z-index: 25;
-  background-color: #eaeaf4;
+.task-details-editor--selection-layer ::selection {
+  background-color: transparent;
 }
 
-.task-details-selection-side-pad--start {
-  border-radius: 5px 0 0 5px;
+.task-details-editor--selection-layer ::-moz-selection {
+  background-color: transparent;
 }
 
-.task-details-selection-side-pad--end {
-  border-radius: 0 5px 5px 0;
+.task-details-selection-highlight {
+  z-index: 0;
+  background-color: var(--task-details-selection-background, #eaeaf4);
+  border-radius: var(--task-details-selection-radius, 6px);
 }
 
+.dark .task-details-selection-highlight {
+  background-color: color-mix(in srgb, #3f3f46 72%, #6366f1 28%);
+}
 
 .task-details-editor[data-format-highlight-menu-open="true"] ::selection,
 .task-details-editor[data-format-text-color-preview="true"] ::selection {
@@ -649,18 +654,11 @@ body {
   }
 }
 
-.task-details-editor .detail-line[data-line-type="bullet"]:not([data-empty="true"]),
-.task-details-editor .detail-line[data-line-type="numbered"]:not([data-empty="true"]) {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-}
-
 .detail-line[data-line-type="bullet"]::before {
   content: "•";
-  flex: 0 0 auto;
   margin-right: 0.5rem;
   color: #bcbcde;
+  vertical-align: baseline;
   font-size: var(--detail-list-marker-font-size, 1em);
 }
 
@@ -714,8 +712,8 @@ body {
 
 .detail-line[data-line-type="numbered"]::before {
   content: attr(data-list-number) ".";
-  flex: 0 0 auto;
   margin-right: 0.5rem;
+  vertical-align: baseline;
   font-size: var(--detail-list-marker-font-size, 1em);
 }
 
@@ -1966,8 +1964,24 @@ body {
   pointer-events: none;
 }
 
+@property --calendar-task-base-font-size {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 12.5px;
+}
+
+.calendar-task-item {
+  --calendar-task-base-font-size: 12.5px;
+}
+
+.calendar-task-font-size {
+  font-size: var(--calendar-task-base-font-size);
+}
+
 .calendar-task-item:not(.calendar-timed-task-block) {
-  transition: width 10ms ease;
+  transition:
+    width 300ms ease,
+    --calendar-task-base-font-size 300ms ease;
 }
 
 .calendar-task-timed-column-inset {
@@ -2014,7 +2028,8 @@ body {
   transition:
     box-shadow 150ms ease,
     border-radius 80ms ease,
-    right 10ms ease;
+    right 300ms ease,
+    --calendar-task-base-font-size 300ms ease;
 }
 
 .calendar-task-dragging:not(.calendar-timed-task-block) {
@@ -2087,19 +2102,9 @@ body {
 }
 
 .calendar-task-time-text {
-  font-size: 11px;
+  font-size: 0.88em;
   color: var(--calendar-task-time-color, #D3D3D3);
-  transition:
-    color 150ms ease,
-    font-size 300ms ease;
-}
-
-.calendar-timed-task-block:hover:not(.calendar-task-dragging) .calendar-task-time-text,
-.calendar-task-item:not(.calendar-timed-task-block):hover:not(
-    .calendar-task-dragging
-  )
-  .calendar-task-time-text {
-  font-size: calc(11px + 0.25px);
+  transition: color 150ms ease;
 }
 
 .calendar-task-drag-source-placeholder,
@@ -2146,6 +2151,7 @@ body {
 .calendar-timed-task-block:hover:not(.calendar-task-dragging) {
   z-index: 12;
   box-shadow: var(--calendar-task-item-shadow);
+  --calendar-task-base-font-size: calc(12.5px + 0.25px);
   right: calc(
     var(--calendar-task-column-right-inset) -
       var(--calendar-task-hover-width-extra)
@@ -2157,6 +2163,7 @@ body {
   ) {
   z-index: 12;
   box-shadow: var(--calendar-task-item-shadow);
+  --calendar-task-base-font-size: calc(12.5px + 0.25px);
   width: calc(100% + var(--calendar-task-hover-width-extra));
 }
 
@@ -2172,9 +2179,7 @@ body {
       h s calc(l * var(--calendar-task-title-brightness, 0.3))
     )
   );
-  transition:
-    color 300ms ease,
-    font-size 300ms ease;
+  transition: color 300ms ease;
 }
 
 .calendar-timed-task-block:hover:not(.calendar-task-dragging) .calendar-task-title,
@@ -2182,7 +2187,6 @@ body {
     .calendar-task-dragging
   )
   .calendar-task-title {
-  font-size: calc(1em + 0.25px);
   color: var(
     --calendar-task-title-hover-color,
     color-mix(
@@ -2222,7 +2226,7 @@ body {
 }
 
 .calendar-panel .checkbox-wrapper-29 .checkbox__label::before {
-  background: #bfe0c227 !important;
+  background: #efefef !important;
   border-radius: 8px !important;
 }
 
@@ -2235,7 +2239,7 @@ body {
 }
 
 .calendar-task-checkbox .checkbox__label::before {
-  background: #bfe0c227 !important;
+  background: #A8B5AA !important;
   border-radius: 8px !important;
 }
 
@@ -2335,13 +2339,14 @@ body {
 }
 
 .calendar-task-modal {
+  --panel-text-task-detail-textarea-background: #ffffff;
   border-radius: 24px;
   border: 1px solid rgb(235 235 235);
   box-shadow: 0 10px 23px rgba(0, 0, 0, 0.09);
 }
 
 .calendar-task-modal .task-details-panel-background {
-  background-color: #F6F6F6;
+  background-color: #ffffff;
 }
 
 .dark .calendar-task-modal .task-details-panel-background {
@@ -2358,68 +2363,12 @@ body {
   box-shadow: var(--task-detail-image-shadow);
 }
 
-/* Subtle scroll hints above/below the modal task editor when content overflows. */
-.calendar-task-modal .task-modal-editor-scroll-fade {
-  pointer-events: none;
-  position: absolute;
-  left: 0;
-  right: 0;
-  z-index: 5;
-  height: 32px;
-  opacity: 0;
-  transition: opacity 180ms ease;
+.calendar-task-modal .task-details-editor.task-details-editor--selection-layer {
+  background-color: #ffffff !important;
 }
 
-.calendar-task-modal .task-modal-editor-scroll-fade--visible {
-  opacity: 1;
-}
-
-.calendar-task-modal .task-modal-editor-scroll-fade--top {
-  top: 0;
-  border-top-left-radius: 0.75rem;
-  border-top-right-radius: 0.75rem;
-  background: linear-gradient(
-    to bottom,
-    rgb(246 246 246 / 0.96) 0%,
-    rgb(246 246 246 / 0.55) 52%,
-    rgb(246 246 246 / 0) 100%
-  );
-}
-
-.calendar-task-modal .task-modal-editor-scroll-fade--bottom {
-  bottom: 0;
-  border-bottom-left-radius: 0.75rem;
-  border-bottom-right-radius: 0.75rem;
-  background: linear-gradient(
-    to top,
-    rgb(246 246 246 / 0.96) 0%,
-    rgb(246 246 246 / 0.55) 52%,
-    rgb(246 246 246 / 0) 100%
-  );
-}
-
-.dark .calendar-task-modal .task-modal-editor-scroll-fade--top {
-  background: linear-gradient(
-    to bottom,
-    rgb(9 9 11 / 0.96) 0%,
-    rgb(9 9 11 / 0.55) 52%,
-    rgb(9 9 11 / 0) 100%
-  );
-}
-
-.dark .calendar-task-modal .task-modal-editor-scroll-fade--bottom {
-  background: linear-gradient(
-    to top,
-    rgb(9 9 11 / 0.96) 0%,
-    rgb(9 9 11 / 0.55) 52%,
-    rgb(9 9 11 / 0) 100%
-  );
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .calendar-task-modal .task-modal-editor-scroll-fade {
-    transition: none;
-  }
+.dark .calendar-task-modal .task-details-editor.task-details-editor--selection-layer {
+  background-color: rgb(9 9 11) !important;
 }
 
 /* Task switch (header up/down arrows): very subtle fade-in only. */
@@ -2815,6 +2764,62 @@ body {
 
 .format-toolbar-dropdown-menu :is(button, [role="menuitem"], [role="option"]) {
   cursor: pointer;
+}
+
+/* Typography font-size slider — track 20% thinner than the 4px baseline */
+.format-toolbar-typography-slider {
+  --format-toolbar-typography-slider-track-height: 3.2px;
+  --format-toolbar-typography-slider-thumb-height: 11px;
+  --format-toolbar-typography-slider-thumb-width: 9px;
+  height: 18px;
+  margin: 0;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.format-toolbar-typography-slider::-webkit-slider-runnable-track {
+  height: var(--format-toolbar-typography-slider-track-height);
+  border-radius: 9999px;
+  background-color: #e4e4e7;
+}
+
+.format-toolbar-typography-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: var(--format-toolbar-typography-slider-thumb-width);
+  height: var(--format-toolbar-typography-slider-thumb-height);
+  margin-top: calc(
+    (
+        var(--format-toolbar-typography-slider-track-height) -
+          var(--format-toolbar-typography-slider-thumb-height)
+      ) / 2
+  );
+  border: none;
+  border-radius: 3px;
+  background-color: #047857;
+  box-shadow: none;
+}
+
+.format-toolbar-typography-slider::-moz-range-track {
+  height: var(--format-toolbar-typography-slider-track-height);
+  border: none;
+  border-radius: 9999px;
+  background-color: #e4e4e7;
+}
+
+.format-toolbar-typography-slider::-moz-range-thumb {
+  width: var(--format-toolbar-typography-slider-thumb-width);
+  height: var(--format-toolbar-typography-slider-thumb-height);
+  border: none;
+  border-radius: 3px;
+  background-color: #047857;
+  box-shadow: none;
+}
+
+.dark .format-toolbar-typography-slider::-webkit-slider-runnable-track,
+.dark .format-toolbar-typography-slider::-moz-range-track {
+  background-color: #52525b;
 }
 
 .menu-item-hover-focus {

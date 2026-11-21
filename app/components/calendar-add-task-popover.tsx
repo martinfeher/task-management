@@ -254,7 +254,7 @@ export function CalendarAddTaskPopover({
         role="dialog"
         aria-modal="true"
         aria-label={`Add task for ${dueDateLabel}${dueTimeLabel ? ` at ${dueTimeLabel}` : ""}`}
-        className="calendar-add-task-popover calendar-task-modal task-details-panel-background relative z-10 flex flex-col overflow-hidden bg-[#efefef] dark:bg-zinc-950"
+        className="calendar-add-task-popover calendar-task-modal task-details-panel-background relative z-10 flex flex-col overflow-hidden bg-white dark:bg-zinc-950"
         style={{
           width: CALENDAR_ADD_TASK_MODAL_WIDTH_PX,
           height: CALENDAR_ADD_TASK_MODAL_HEIGHT_PX,

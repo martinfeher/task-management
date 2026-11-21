@@ -49,6 +49,10 @@ function splitFormatToolbarMenuSurfaceClasses(menuClassName: string) {
   return { surfaceClassName, scrollClassName };
 }
 
+function formatToolbarMenuAllowsVisibleOverflow(menuClassName: string) {
+  return /\boverflow-visible\b/.test(menuClassName);
+}
+
 export type FormatToolbarDropdown =
   | "textColor"
   | "highlight"
@@ -238,20 +242,20 @@ export type DetailTypographyPreset = {
 };
 
 const DETAIL_TYPOGRAPHY_PRESETS: DetailTypographyPreset[] = [
-  { id: "small", label: "Small", size: 12, blockType: "text" },
   { id: "body", label: "Body", size: 15, blockType: "text" },
   { id: "h3", label: "Heading 3", size: 22, blockType: "h3" },
   { id: "h2", label: "Heading 2", size: 28, blockType: "h2" },
   { id: "h1", label: "Heading 1", size: 36, blockType: "h1" },
+  { id: "small", label: "Small", size: 12, blockType: "text" },
 ];
 
-const FORMAT_TOOLBAR_TYPOGRAPHY_MENU_CLASS = `${FORMAT_TOOLBAR_DROPDOWN_MENU_CLASS} w-[222px] min-w-[222px] p-2`;
+const FORMAT_TOOLBAR_TYPOGRAPHY_MENU_CLASS = `${FORMAT_TOOLBAR_DROPDOWN_MENU_CLASS} w-[215px] min-w-[215px] p-1.5`;
 
 const FORMAT_TOOLBAR_TYPOGRAPHY_TRIGGER_CLASS =
-  `flex h-7 min-w-0 cursor-pointer items-center gap-1 rounded-full px-1.5 ${FORMAT_TOOLBAR_ICON_COLOR} transition-colors hover:bg-zinc-200/60 dark:hover:bg-zinc-700/80`;
+  `flex h-[25px] min-w-0 cursor-pointer items-center gap-0.5 rounded-full px-1 ${FORMAT_TOOLBAR_ICON_COLOR} transition-colors hover:bg-zinc-200/60 dark:hover:bg-zinc-700/80`;
 
 const FORMAT_TOOLBAR_TYPOGRAPHY_STEPPER_CLASS =
-  "menu-item-hover-focus flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-zinc-600 hover:bg-zinc-200/60 dark:text-zinc-300 dark:hover:bg-zinc-700/80";
+  "menu-item-hover-focus flex size-[25px] shrink-0 cursor-pointer items-center justify-center rounded-full text-zinc-600 hover:bg-zinc-200/60 dark:text-zinc-300 dark:hover:bg-zinc-700/80";
 
 function isTypographyPresetActive(
   preset: DetailTypographyPreset,
@@ -484,6 +488,11 @@ function FormatToolbarDropdownShell({
 }: DropdownShellProps) {
   const { surfaceClassName, scrollClassName } =
     splitFormatToolbarMenuSurfaceClasses(menuClassName);
+  const menuAllowsVisibleOverflow =
+    formatToolbarMenuAllowsVisibleOverflow(menuClassName);
+  const menuScrollClassName = menuAllowsVisibleOverflow
+    ? scrollClassName.replace(/\boverflow-hidden\b/g, "").trim()
+    : scrollClassName;
   const placement = useFormatToolbarAnchorPlacement();
   const closeTimerRef = useRef<number | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -653,7 +662,11 @@ function FormatToolbarDropdownShell({
                   onMouseDown={(event) => event.preventDefault()}
                 >
                   <div
-                    className={`overflow-hidden rounded-[inherit] ${scrollClassName}`}
+                    className={`${
+                      menuAllowsVisibleOverflow
+                        ? "overflow-visible"
+                        : "overflow-hidden"
+                    } rounded-[inherit] ${menuScrollClassName}`}
                   >
                     {children}
                   </div>
@@ -1261,13 +1274,12 @@ export function DetailFormatTypographyDropdown({
     event: React.PointerEvent<HTMLInputElement>,
   ) {
     if (event.button !== 0) return;
-    event.preventDefault();
     onBeforeFontSizeStep?.();
   }
 
   return (
     <div
-      className="flex h-8 items-center gap-0.5 rounded-full bg-zinc-100/80 px-0.5 dark:bg-zinc-800/70"
+      className="flex h-[27px] items-center gap-px rounded-full bg-zinc-100/80 px-px dark:bg-zinc-800/70"
       onMouseLeave={() => onPreviewSizeClear?.()}
     >
       <button
@@ -1293,7 +1305,7 @@ export function DetailFormatTypographyDropdown({
         trigger={
           <>
             <span
-              className={`shrink-0 text-[11px] font-semibold tabular-nums ${FORMAT_TOOLBAR_TRIGGER_LABEL_COLOR}`}
+              className={`shrink-0 text-[11.5px] font-medium tabular-nums ${FORMAT_TOOLBAR_TRIGGER_LABEL_COLOR}`}
             >
               {size}
             </span>
@@ -1319,7 +1331,7 @@ export function DetailFormatTypographyDropdown({
                 type="button"
                 role="menuitem"
                 disabled={disabled}
-                className={`menu-item-hover-focus flex w-full cursor-pointer items-center gap-2 rounded-[16px] pl-2.5 pr-1 py-1.5 text-left text-[13px] ${
+                className={`menu-item-hover-focus flex w-full cursor-pointer items-center rounded-[12px] px-2 py-1.5 text-left text-[13px] ${
                   active
                     ? "bg-[#eef3fb] dark:bg-zinc-600"
                     : "hover:bg-zinc-100 dark:hover:bg-zinc-800"
@@ -1332,25 +1344,25 @@ export function DetailFormatTypographyDropdown({
                   {preset.label}
                 </span>
                 <span
-                  className={`shrink-0 tabular-nums ${FORMAT_TOOLBAR_FONT_SIZE_SELECTED_COLOR}`}
+                  className={`ml-auto min-w-[1.5rem] shrink-0 text-right tabular-nums ${FORMAT_TOOLBAR_FONT_SIZE_SELECTED_COLOR}`}
                 >
                   {preset.size}
                 </span>
-                {active ? (
-                  <LuCheck
-                    className="size-3.5 shrink-0 text-emerald-600"
-                    aria-hidden="true"
-                  />
-                ) : (
-                  <span className="size-3.5 shrink-0" aria-hidden="true" />
-                )}
+                <span className="ml-1.5 flex w-3.5 shrink-0 justify-end">
+                  {active ? (
+                    <LuCheck
+                      className="size-3.5 text-emerald-600"
+                      aria-hidden="true"
+                    />
+                  ) : null}
+                </span>
               </button>
             );
           })}
         </div>
 
-        <div className="border-t border-zinc-200/90 pt-2 dark:border-zinc-700">
-          <div className="flex items-center gap-2">
+        <div className="border-t border-zinc-200/90 pt-1.5 dark:border-zinc-700">
+          <div className="flex items-center gap-1">
             <button
               type="button"
               className={FORMAT_TOOLBAR_TYPOGRAPHY_STEPPER_CLASS}
@@ -1371,17 +1383,18 @@ export function DetailFormatTypographyDropdown({
               onPointerDown={handleSliderPointerDown}
               onInput={(event) => {
                 const nextValue = Number(event.currentTarget.value);
+                const nextSize = detailFontSizeFromSliderValue(nextValue);
                 setSliderValue(nextValue);
-                onPreviewSize?.(detailFontSizeFromSliderValue(nextValue));
+                onPreviewSize?.(nextSize);
               }}
               onChange={(event) => {
                 commitSliderValue(Number(event.currentTarget.value));
               }}
             />
             <span
-              className={`flex h-7 min-w-[2rem] items-center justify-center rounded-md bg-zinc-100 px-1 tabular-nums text-[12px] font-medium dark:bg-zinc-800 ${FORMAT_TOOLBAR_TRIGGER_LABEL_COLOR}`}
+              className={`flex h-7 min-w-[1.75rem] items-center justify-center rounded-md bg-zinc-100 px-0.5 tabular-nums text-[12px] font-medium dark:bg-zinc-800 ${FORMAT_TOOLBAR_TRIGGER_LABEL_COLOR}`}
             >
-              {sliderValue}
+              {detailFontSizeFromSliderValue(sliderValue)}
             </span>
             <button
               type="button"

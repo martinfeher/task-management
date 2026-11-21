@@ -527,17 +527,24 @@ export function syncListLineMarkerMetrics(line: HTMLElement) {
     maxFontSizePx = 0;
   }
 
-  line.querySelectorAll<HTMLElement>("span, font").forEach((element) => {
-    const inlineSize = element.style.fontSize.trim();
-    if (!inlineSize) return;
+  const walker = document.createTreeWalker(line, NodeFilter.SHOW_ELEMENT);
+  while (walker.nextNode()) {
+    const element = walker.currentNode;
+    if (!(element instanceof HTMLElement)) continue;
+    if (element.classList.contains("detail-image-wrapper")) continue;
+    if (element.hasAttribute("data-text-color-preview")) continue;
 
-    const size = Number.parseFloat(inlineSize);
+    const size = Number.parseFloat(getComputedStyle(element).fontSize);
     if (Number.isFinite(size) && size > maxFontSizePx) {
       maxFontSizePx = size;
     }
-  });
+  }
 
-  if (maxFontSizePx > 0) {
+  const lineDefault = Number.parseFloat(getComputedStyle(line).fontSize);
+  const usesCustomMarkerSize =
+    Number.isFinite(lineDefault) && maxFontSizePx > lineDefault + 0.5;
+
+  if (usesCustomMarkerSize) {
     line.style.setProperty(
       "--detail-list-marker-font-size",
       `${maxFontSizePx}px`,

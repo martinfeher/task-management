@@ -130,6 +130,7 @@ import {
   flattenNestedDetailLines,
   stripTrailingBreakFromNonEmptyLine,
   syncLineEmptyState,
+  syncListLineMarkerMetrics,
   toggleChecklistLine,
 } from "./detail-lines";
 import {
@@ -2080,14 +2081,13 @@ const FORMAT_MENU_BELOW_FIRST_SELECTED_LINE_GAP = 30;
 const FORMAT_MENU_BELOW_TRANSFORM_OFFSET_PX = 8;
 const FORMAT_MENU_ESTIMATED_HEIGHT = 44;
 
-const TASK_DETAILS_SELECTION_HORIZONTAL_PAD_PX = 3;
+const TASK_DETAILS_SELECTION_HORIZONTAL_PAD_PX = 4;
 
-type TaskDetailsSelectionSidePadRect = {
+type TaskDetailsSelectionHighlightRect = {
   left: number;
   top: number;
   width: number;
   height: number;
-  edge: "start" | "end";
 };
 
 function groupSelectionClientRectsByLine(rects: DOMRect[]) {
@@ -2110,9 +2110,9 @@ function groupSelectionClientRectsByLine(rects: DOMRect[]) {
   return groups;
 }
 
-function getEditorSelectionSidePadRects(
+function getEditorSelectionHighlightRects(
   editor: HTMLElement,
-): TaskDetailsSelectionSidePadRect[] {
+): TaskDetailsSelectionHighlightRect[] {
   if (
     editor.getAttribute("data-format-highlight-menu-open") === "true" ||
     editor.getAttribute("data-format-text-color-preview") === "true"
@@ -2138,28 +2138,22 @@ function getEditorSelectionSidePadRects(
     return [];
   }
 
-  const sidePads: TaskDetailsSelectionSidePadRect[] = [];
+  const highlights: TaskDetailsSelectionHighlightRect[] = [];
 
   for (const lineRects of groupSelectionClientRectsByLine(clientRects)) {
-    const first = lineRects[0];
-    const last = lineRects[lineRects.length - 1];
-    sidePads.push({
-      left: first.left - pad,
-      top: first.top,
-      width: pad,
-      height: first.height,
-      edge: "start",
-    });
-    sidePads.push({
-      left: last.right,
-      top: last.top,
-      width: pad,
-      height: last.height,
-      edge: "end",
+    const left = Math.min(...lineRects.map((rect) => rect.left));
+    const right = Math.max(...lineRects.map((rect) => rect.right));
+    const top = lineRects[0].top;
+    const height = Math.max(...lineRects.map((rect) => rect.height));
+    highlights.push({
+      left: left - pad,
+      top,
+      width: right - left + pad * 2,
+      height,
     });
   }
 
-  return sidePads;
+  return highlights;
 }
 
 function shouldPlaceFormatMenuBelowTitle(
@@ -2302,7 +2296,6 @@ const TASK_DETAILS_LINE_CONTROLS_GUTTER_PX = 30;
 const TASK_DETAILS_EDITOR_MIN_HEIGHT_PX = 500;
 const TASK_DETAILS_EDITOR_SHORT_CONTENT_MIN_HEIGHT_VH = 0.85;
 const TASK_DETAILS_EDITOR_MODAL_MIN_HEIGHT_PX = 88;
-const TASK_MODAL_EDITOR_SCROLL_FADE_THRESHOLD_PX = 8;
 const TASK_DETAILS_EDITOR_BOTTOM_INSET_PX = 30;
 /** Space between the modal editor and footer (8px tighter than the default editor inset). */
 const TASK_DETAILS_EDITOR_MODAL_BOTTOM_INSET_PX = 14;
@@ -2532,9 +2525,8 @@ export function TaskDetailsPanel({
   const [formatMenu, setFormatMenu] = useState<FormatMenuState | null>(null);
   const [lineControls, setLineControls] = useState<LineControlItem[]>([]);
   const [dropIndicator, setDropIndicator] = useState<DropIndicatorState | null>(null);
-  const [editorSelectionSidePadRects, setEditorSelectionSidePadRects] = useState<
-    TaskDetailsSelectionSidePadRect[]
-  >([]);
+  const [editorSelectionHighlightRects, setEditorSelectionHighlightRects] =
+    useState<TaskDetailsSelectionHighlightRect[]>([]);
   const [isImageDropActive, setIsImageDropActive] = useState(false);
   const [isDetailsBodyLoading, setIsDetailsBodyLoading] = useState(false);
   const [imageLightbox, setImageLightbox] = useState<{
@@ -2620,10 +2612,6 @@ export function TaskDetailsPanel({
   const [isModalFormatToolbarOpen, setIsModalFormatToolbarOpen] = useState(false);
   const [openModalFormatDropdown, setOpenModalFormatDropdown] =
     useState<HeaderFormatDropdown | null>(null);
-  const [modalEditorScrollFades, setModalEditorScrollFades] = useState({
-    top: false,
-    bottom: false,
-  });
   const { defaultFontSizePx, defaultLineHeight } = useTaskEditorDefaults();
   const [formatMenuFontSize, setFormatMenuFontSize] =
     useState<DetailFontSizeOption>(() => getDefaultDetailFontSizeOption());
@@ -3865,23 +3853,6 @@ export function TaskDetailsPanel({
     }, LINE_CONTROLS_DEBOUNCE_MS);
   }, [updateLineControls]);
 
-  const syncModalEditorScrollFades = useCallback(() => {
-    if (!isModalLayout) return;
-
-    const editor = editorRef.current;
-    if (!editor) return;
-
-    const { scrollTop, scrollHeight, clientHeight } = editor;
-    const threshold = TASK_MODAL_EDITOR_SCROLL_FADE_THRESHOLD_PX;
-    const canScroll = scrollHeight > clientHeight + threshold;
-
-    setModalEditorScrollFades({
-      top: canScroll && scrollTop > threshold,
-      bottom:
-        canScroll && scrollTop + clientHeight < scrollHeight - threshold,
-    });
-  }, [isModalLayout]);
-
   const syncEditorHeight = useCallback(
     (options?: { scrollActiveLineIntoView?: boolean }) => {
       const editor = editorRef.current;
@@ -3946,50 +3917,27 @@ export function TaskDetailsPanel({
         editor.scrollTop = 0;
       }
 
-      syncModalEditorScrollFades();
     },
-    [isModalLayout, syncModalEditorScrollFades, task],
+    [isModalLayout, task],
   );
 
-  const syncEditorSelectionSidePads = useCallback(() => {
+  const syncEditorSelectionHighlights = useCallback(() => {
     const editor = editorRef.current;
     if (!editor) {
-      setEditorSelectionSidePadRects([]);
+      setEditorSelectionHighlightRects([]);
       return;
     }
-    setEditorSelectionSidePadRects(getEditorSelectionSidePadRects(editor));
+    setEditorSelectionHighlightRects(getEditorSelectionHighlightRects(editor));
   }, []);
 
   useLayoutEffect(() => {
-    syncEditorSelectionSidePads();
-  }, [openFormatDropdown, syncEditorSelectionSidePads, textColorPreviewHoverActive]);
+    syncEditorSelectionHighlights();
+  }, [openFormatDropdown, syncEditorSelectionHighlights, textColorPreviewHoverActive]);
 
   const handleEditorScroll = useCallback(() => {
     updateLineControls();
-    syncModalEditorScrollFades();
-    syncEditorSelectionSidePads();
-  }, [syncEditorSelectionSidePads, syncModalEditorScrollFades, updateLineControls]);
-
-  useEffect(() => {
-    if (!isModalLayout || !task) return;
-
-    const editor = editorRef.current;
-    if (!editor) return;
-
-    syncModalEditorScrollFades();
-
-    const resizeObserver = new ResizeObserver(() => {
-      syncModalEditorScrollFades();
-    });
-    resizeObserver.observe(editor);
-
-    return () => resizeObserver.disconnect();
-  }, [
-    isDetailsBodyLoading,
-    isModalLayout,
-    syncModalEditorScrollFades,
-    task?.id,
-  ]);
+    syncEditorSelectionHighlights();
+  }, [syncEditorSelectionHighlights, updateLineControls]);
 
   const scheduleEditorHeightSync = useCallback(
     (options?: { scrollActiveLineIntoView?: boolean }) => {
@@ -4312,6 +4260,10 @@ export function TaskDetailsPanel({
       } catch {
         captureFormatSelectionFromEditor();
       }
+
+      getSelectedBlockLinesInRange(editor, selectionRange).forEach(
+        syncListLineMarkerMetrics,
+      );
 
       if (
         !options?.keepContent &&
@@ -4799,12 +4751,12 @@ export function TaskDetailsPanel({
 
       const currentBlockType = getActiveTextBlockType(editor);
       const linesInRange = getSelectedBlockLinesInRange(editor, rangeToApply);
-      const shouldPreserveListBlockType =
-        preset.blockType === "text" &&
-        linesInRange.some((line) => isListBlockLine(line));
+      const hasListLinesInRange = linesInRange.some((line) =>
+        isListBlockLine(line),
+      );
       if (
         preset.blockType !== currentBlockType &&
-        !shouldPreserveListBlockType
+        !hasListLinesInRange
       ) {
         applyBlockTypeToSelection(editor, preset.blockType, rangeToApply);
         setFormatMenuBlockType(preset.blockType);
@@ -6536,7 +6488,7 @@ export function TaskDetailsPanel({
 
       scheduleLineControlsUpdate();
       } finally {
-        syncEditorSelectionSidePads();
+        syncEditorSelectionHighlights();
       }
     }
 
@@ -6553,7 +6505,7 @@ export function TaskDetailsPanel({
     requestSave,
     scheduleFormatMenuReveal,
     scheduleLineControlsUpdate,
-    syncEditorSelectionSidePads,
+    syncEditorSelectionHighlights,
     syncFormatMenuSelectionState,
   ]);
 
@@ -9881,7 +9833,11 @@ export function TaskDetailsPanel({
         >
           <div
             ref={editorWrapperRef}
-            className="relative text-[#555555]"
+            className={`relative text-[#555555] rounded-xl border border-[var(--panel-text-task-detail-textarea-border)] ${
+              isModalLayout
+                ? "bg-[#ffffff] dark:bg-zinc-950"
+                : "bg-[var(--panel-text-task-detail-textarea-background)]"
+            }`}
             onMouseEnter={handleEditorWrapperMouseEnter}
             onMouseLeave={handleEditorWrapperMouseLeave}
             onMouseMove={handleEditorWrapperMouseMove}
@@ -9917,26 +9873,19 @@ export function TaskDetailsPanel({
                   : "contents"
               }
             >
-              {isModalLayout ? (
-                <>
-                  <div
-                    aria-hidden="true"
-                    className={`task-modal-editor-scroll-fade task-modal-editor-scroll-fade--top${
-                      modalEditorScrollFades.top
-                        ? " task-modal-editor-scroll-fade--visible"
-                        : ""
-                    }`}
-                  />
-                  <div
-                    aria-hidden="true"
-                    className={`task-modal-editor-scroll-fade task-modal-editor-scroll-fade--bottom${
-                      modalEditorScrollFades.bottom
-                        ? " task-modal-editor-scroll-fade--visible"
-                        : ""
-                    }`}
-                  />
-                </>
-              ) : null}
+            {editorSelectionHighlightRects.map((rect, index) => (
+              <div
+                key={`${rect.top}-${rect.left}-${rect.width}-${index}`}
+                aria-hidden="true"
+                className="task-details-selection-highlight pointer-events-none fixed"
+                style={{
+                  left: rect.left,
+                  top: rect.top,
+                  width: rect.width,
+                  height: rect.height,
+                }}
+              />
+            ))}
 
             <div
               ref={editorRef}
@@ -9965,27 +9914,13 @@ export function TaskDetailsPanel({
               onKeyUp={handleEditorKeyUp}
               onMouseMove={handleEditorWrapperMouseMove}
               onScroll={handleEditorScroll}
-              className={`task-details-editor w-full resize-none rounded-xl pt-[8px] pl-[25px] pr-3 pb-4! text-[#555555] outline-none transition-colors focus:border-[#7f7f7f] dark:text-zinc-300 [&_.detail-line[data-line-type=bullet]]:pl-1 [&_.detail-line[data-line-type=checklist]]:cursor-pointer [&_.detail-line[data-line-type=checklist]]:pl-1 [&_.detail-line[data-line-type=h1]]:text-[26px] [&_.detail-line[data-line-type=h1]]:font-bold [&_.detail-line[data-line-type=h1]]:leading-[36px] [&_.detail-line[data-line-type=h1]]:text-[#4B4B4B] dark:[&_.detail-line[data-line-type=h1]]:text-[#F5F5F5] [&_.detail-line[data-line-type=h2]]:text-[23px] [&_.detail-line[data-line-type=h2]]:font-semibold [&_.detail-line[data-line-type=h2]]:leading-[30px] [&_.detail-line[data-line-type=h3]]:text-[19px] [&_.detail-line[data-line-type=h3]]:font-semibold [&_.detail-line[data-line-type=h3]]:leading-[26px] [&_.detail-line[data-line-type=numbered]]:pl-1 [&_mark]:bg-yellow-200 dark:[&_mark]:bg-yellow-300/30 [&_s]:line-through [&_strike]:line-through [&_u]:underline ${
+              className={`task-details-editor task-details-editor--selection-layer relative z-[1] w-full resize-none rounded-xl border-0! bg-transparent! pt-[8px] pl-[25px] pr-3 pb-4! text-[#555555] shadow-none! outline-none transition-colors focus:border-[#7f7f7f] dark:text-zinc-300 [&_.detail-line[data-line-type=bullet]]:pl-1 [&_.detail-line[data-line-type=checklist]]:cursor-pointer [&_.detail-line[data-line-type=checklist]]:pl-1 [&_.detail-line[data-line-type=h1]]:text-[26px] [&_.detail-line[data-line-type=h1]]:font-bold [&_.detail-line[data-line-type=h1]]:leading-[36px] [&_.detail-line[data-line-type=h1]]:text-[#4B4B4B] dark:[&_.detail-line[data-line-type=h1]]:text-[#F5F5F5] [&_.detail-line[data-line-type=h2]]:text-[23px] [&_.detail-line[data-line-type=h2]]:font-semibold [&_.detail-line[data-line-type=h2]]:leading-[30px] [&_.detail-line[data-line-type=h3]]:text-[19px] [&_.detail-line[data-line-type=h3]]:font-semibold [&_.detail-line[data-line-type=h3]]:leading-[26px] [&_.detail-line[data-line-type=numbered]]:pl-1 [&_mark]:bg-yellow-200 dark:[&_mark]:bg-yellow-300/30 [&_s]:line-through [&_strike]:line-through [&_u]:underline ${
                 isModalLayout
                   ? "h-[496px]! min-h-0 shrink-0 overflow-x-hidden overflow-y-auto"
                   : "min-h-[85vh] min-h-0 overflow-auto"
               }`}
             />
             </div>
-
-            {editorSelectionSidePadRects.map((rect, index) => (
-              <div
-                key={`${rect.top}-${rect.left}-${rect.edge}-${index}`}
-                aria-hidden="true"
-                className={`task-details-selection-side-pad task-details-selection-side-pad--${rect.edge} pointer-events-none fixed`}
-                style={{
-                  left: rect.left,
-                  top: rect.top,
-                  width: rect.width,
-                  height: rect.height,
-                }}
-              />
-            ))}
 
             {dropIndicator && (
               <div

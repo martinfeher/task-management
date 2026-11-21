@@ -123,8 +123,10 @@ export function getFormatToolbarFontFamilyOptions() {
   );
 }
 
+export const MAX_DETAIL_FONT_SIZE_PX = 60;
+
 export const DETAIL_FONT_SIZE_OPTIONS = [
-  8, 9, 10, 11, 12, 14, 15, 16, 17, 18, 20, 22, 24, 26, 28, 36, 48, 72,
+  8, 9, 10, 11, 12, 14, 15, 16, 17, 18, 20, 22, 24, 26, 28, 36, 48, 60,
 ] as const;
 
 export type DetailFontSizeOption = (typeof DETAIL_FONT_SIZE_OPTIONS)[number];
@@ -143,7 +145,7 @@ export function stepDetailFontSizeOption(
 }
 
 export function detailFontSizeFromSliderValue(value: number): DetailFontSizeOption {
-  const rounded = Math.max(8, Math.min(72, Math.round(value)));
+  const rounded = Math.max(8, Math.min(MAX_DETAIL_FONT_SIZE_PX, Math.round(value)));
   return matchDetailFontSize(`${rounded}px`);
 }
 

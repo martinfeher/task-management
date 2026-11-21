@@ -590,8 +590,8 @@ export function CalendarTaskModal({
     clipSidebarBackdrop && !allowBackgroundInteraction;
 
   const dialogClassName = isHoverPreview
-    ? "calendar-task-modal relative z-10 flex h-auto min-h-0 max-h-[calc(100vh-48px)] flex-col overflow-hidden bg-[#efefef] dark:bg-zinc-950"
-    : "calendar-task-modal relative z-10 flex h-[min(var(--calendar-task-modal-height),calc(100vh-48px))] min-h-0 flex-col overflow-hidden bg-[#efefef] dark:bg-zinc-950";
+    ? "calendar-task-modal relative z-10 flex h-auto min-h-0 max-h-[calc(100vh-48px)] flex-col overflow-hidden bg-white dark:bg-zinc-950"
+    : "calendar-task-modal relative z-10 flex h-[min(var(--calendar-task-modal-height),calc(100vh-48px))] min-h-0 flex-col overflow-hidden bg-white dark:bg-zinc-950";
 
   useLayoutEffect(() => {
     dialogRef.current?.scrollTo({ top: 0 });

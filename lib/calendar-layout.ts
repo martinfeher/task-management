@@ -1,7 +1,6 @@
 import type { CSSProperties } from "react";
 import {
   appendCalendarTaskTitleColorVars,
-  desaturateHexColorByFraction,
   getCalendarTaskColorItemStyle,
 } from "@/lib/calendar-task-colors";
 import { getCalendarTaskDefaultColor } from "@/lib/calendar-task-default-color";
@@ -9,7 +8,7 @@ import { mixHexWithWhite } from "@/lib/sidebar-background-types";
 import { normalizeDueTimeMinutes } from "@/lib/task-due-time";
 import { parseRecurrenceRule } from "@/lib/task-recurrence";
 
-export const CALENDAR_TASK_FONT_CLASS = "text-[12.5px]";
+export const CALENDAR_TASK_FONT_CLASS = "calendar-task-font-size";
 export const CALENDAR_TASK_ITEM_CLASS = "calendar-task-item";
 export const CALENDAR_TASK_BACKGROUND_CLASS = "calendar-task-item-background";
 export const CALENDAR_TASK_TITLE_TEXT_CLASS = "calendar-task-item-text";
@@ -173,7 +172,7 @@ export function isCalendarTaskPast(
 }
 
 /** Month grid: recurring occurrences outside the week of “today”. */
-export const CALENDAR_MONTH_OUT_OF_WEEK_RECURRING_DESATURATE = 0.3;
+export const CALENDAR_MONTH_OUT_OF_WEEK_RECURRING_BRIGHTEN = 0.3;
 
 export function getCalendarMonthTaskItemStyleOptions(
   task: {
@@ -184,17 +183,17 @@ export function getCalendarMonthTaskItemStyleOptions(
   day: Date,
   today: Date,
   now: Date | null,
-): { past?: boolean; desaturateBy?: number } {
+): { past?: boolean; brightenBy?: number } {
   const past = now !== null && isCalendarTaskPast(day, now, task);
   const isRecurring = Boolean(parseRecurrenceRule(task.recurrenceRule));
-  const desaturateBy =
+  const brightenBy =
     isRecurring && !isCalendarDateInSameWeek(day, today)
-      ? CALENDAR_MONTH_OUT_OF_WEEK_RECURRING_DESATURATE
+      ? CALENDAR_MONTH_OUT_OF_WEEK_RECURRING_BRIGHTEN
       : undefined;
 
   return {
     ...(past ? { past: true } : {}),
-    ...(desaturateBy ? { desaturateBy } : {}),
+    ...(brightenBy ? { brightenBy } : {}),
   };
 }
 
@@ -202,7 +201,7 @@ export function getCalendarTaskItemStyle(
   _priority: number | null | undefined,
   calendarColor?: string | null,
   defaultCalendarColor?: string | null,
-  options?: { past?: boolean; desaturateBy?: number },
+  options?: { past?: boolean; brightenBy?: number },
 ): CSSProperties | undefined {
   const style =
     getCalendarTaskColorItemStyle(calendarColor) ??
@@ -211,7 +210,7 @@ export function getCalendarTaskItemStyle(
     );
   if (!style) return style;
 
-  if (!options?.past && !options?.desaturateBy) return style;
+  if (!options?.past && !options?.brightenBy) return style;
 
   const background =
     typeof style.backgroundColor === "string"
@@ -223,11 +222,8 @@ export function getCalendarTaskItemStyle(
   if (options.past) {
     nextBackground = withPastCalendarTaskBackgroundBrightness(nextBackground);
   }
-  if (options.desaturateBy && options.desaturateBy > 0) {
-    nextBackground = desaturateHexColorByFraction(
-      nextBackground,
-      options.desaturateBy,
-    );
+  if (options.brightenBy && options.brightenBy > 0) {
+    nextBackground = mixHexWithWhite(nextBackground, options.brightenBy);
   }
 
   return appendCalendarTaskTitleColorVars(

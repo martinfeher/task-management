@@ -14,6 +14,8 @@ import type { IconType } from "react-icons";
 
 export type TaskListEntityScope = "all" | "notes" | "tasks";
 
+const ENTITY_FILTER_INDICATOR_HEIGHT_TRIM_PX = 1.5;
+
 const ENTITY_SCOPE_TABS: {
   id: TaskListEntityScope;
   label: string;
@@ -99,11 +101,12 @@ export function TaskListEntityFilter({
 
     const cr = container.getBoundingClientRect();
     const br = button.getBoundingClientRect();
+    const height = Math.max(0, br.height - ENTITY_FILTER_INDICATOR_HEIGHT_TRIM_PX);
     setIndicator({
       left: br.left - cr.left,
       width: br.width,
-      height: br.height,
-      top: br.top - cr.top,
+      height,
+      top: (cr.height - height) / 2,
     });
   }, [value]);
 
