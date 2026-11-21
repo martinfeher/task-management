@@ -2363,13 +2363,16 @@ function wrapImageWithControls(image: HTMLImageElement) {
 function prepareBlockImageWrapper(wrapper: HTMLElement) {
   wrapper.contentEditable = "false";
   wrapper.classList.add("detail-image-wrapper");
-  wrapper.style.removeProperty("float");
   const inRow = wrapper.dataset.imageRow === "true";
-  wrapper.style.display = inRow ? "inline-block" : "block";
-  wrapper.style.clear = inRow ? "none" : "both";
   if (inRow) {
+    wrapper.style.removeProperty("float");
+    wrapper.style.display = "inline-block";
+    wrapper.style.clear = "none";
     wrapper.style.verticalAlign = "top";
   } else {
+    wrapper.style.float = "left";
+    wrapper.style.removeProperty("display");
+    wrapper.style.removeProperty("clear");
     wrapper.style.removeProperty("vertical-align");
     wrapper.style.removeProperty("margin-right");
   }
@@ -2378,12 +2381,41 @@ function prepareBlockImageWrapper(wrapper: HTMLElement) {
   }
 }
 
+function isAnimatedDetailImageSrc(src: string) {
+  return /\.gif(?:$|[?#])/i.test(src) || /image\/gif/i.test(src);
+}
+
+export function configureDetailImageElement(image: HTMLImageElement) {
+  image.loading = "eager";
+  image.decoding = "async";
+  const src = image.currentSrc || image.getAttribute("src") || "";
+  if (isAnimatedDetailImageSrc(src)) {
+    image.dataset.detailAnimated = "true";
+  } else {
+    delete image.dataset.detailAnimated;
+  }
+}
+
+export function refreshAnimatedDetailImages(root: ParentNode) {
+  root.querySelectorAll("img.detail-image").forEach((node) => {
+    if (!(node instanceof HTMLImageElement)) return;
+
+    configureDetailImageElement(node);
+    const src = node.getAttribute("src");
+    if (!src || !isAnimatedDetailImageSrc(src)) return;
+
+    node.src = "";
+    node.src = src;
+  });
+}
+
 function createImageWrapper(src: string) {
   const image = document.createElement("img");
   image.src = src;
   image.alt = "Embedded image";
   image.className = "detail-image";
   image.draggable = false;
+  configureDetailImageElement(image);
 
   const wrapper = document.createElement("div");
   wrapper.className = "detail-image-wrapper";
@@ -2426,6 +2458,80 @@ export function placeCaretBelowWrapper(wrapper: HTMLElement) {
   range.collapse(true);
   selection.removeAllRanges();
   selection.addRange(range);
+}
+
+/** Places the caret immediately after the image so typed text wraps beside it (floated left). */
+export function placeCaretAfterImageWrapper(wrapper: HTMLElement) {
+  const line = wrapper.parentElement;
+  const selection = window.getSelection();
+  if (!line || !selection) return;
+
+  const range = document.createRange();
+  range.setStartAfter(wrapper);
+  range.collapse(true);
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
+
+function getLineContentRightEdge(line: HTMLElement) {
+  const rect = line.getBoundingClientRect();
+  const paddingRight = parseFloat(getComputedStyle(line).paddingRight) || 0;
+  return rect.right - paddingRight;
+}
+
+/**
+ * When the pointer is in the empty space to the right of a floated image, places
+ * the caret so the user can type text that wraps beside the image.
+ */
+export function tryPlaceCaretBesideImageAtPoint(
+  editor: HTMLElement,
+  clientX: number,
+  clientY: number,
+): boolean {
+  const line = getLineElementAtPoint(editor, clientY);
+  if (!line || getLineIndex(editor, line) <= 0) return false;
+
+  const contentRight = getLineContentRightEdge(line);
+  const floatedWrappers = getLineImageWrappers(line).filter(
+    (wrapper) => wrapper.dataset.imageRow !== "true",
+  );
+  if (floatedWrappers.length === 0) return false;
+
+  const lineRect = line.getBoundingClientRect();
+
+  for (const wrapper of floatedWrappers) {
+    const rect = wrapper.getBoundingClientRect();
+    const inBesideBand =
+      clientX > rect.right + 1 &&
+      clientX <= contentRight &&
+      clientY >= rect.top - 1 &&
+      clientY <= Math.max(rect.bottom, lineRect.bottom) + 1;
+
+    if (!inBesideBand) continue;
+
+    const selection = window.getSelection();
+    if (!selection) return false;
+
+    const caretFromPoint =
+      typeof document.caretRangeFromPoint === "function"
+        ? document.caretRangeFromPoint(clientX, clientY)
+        : null;
+
+    if (
+      caretFromPoint &&
+      line.contains(caretFromPoint.startContainer) &&
+      !wrapper.contains(caretFromPoint.startContainer)
+    ) {
+      selection.removeAllRanges();
+      selection.addRange(caretFromPoint);
+    } else {
+      placeCaretAfterImageWrapper(wrapper);
+    }
+
+    return true;
+  }
+
+  return false;
 }
 
 function isDetailImageWrapper(node: Node | null): node is HTMLElement {
@@ -2848,13 +2954,16 @@ export function removeImageWrapper(editor: HTMLElement, wrapper: HTMLElement) {
 const CLIPBOARD_REVEAL_ATTR = "data-clipboard-reveal";
 
 function startClipboardRevealAnimation(wrapper: HTMLElement) {
-  wrapper.setAttribute(CLIPBOARD_REVEAL_ATTR, "true");
-
   const image = wrapper.querySelector("img.detail-image");
   if (!(image instanceof HTMLImageElement)) {
-    wrapper.removeAttribute(CLIPBOARD_REVEAL_ATTR);
     return;
   }
+
+  if (isAnimatedDetailImageSrc(image.currentSrc || image.getAttribute("src") || "")) {
+    return;
+  }
+
+  wrapper.setAttribute(CLIPBOARD_REVEAL_ATTR, "true");
 
   let cleanedUp = false;
 
@@ -2933,6 +3042,7 @@ function normalizeImageLines(editor: HTMLElement) {
       }
 
       image.draggable = false;
+      configureDetailImageElement(image);
       const wrapper = wrapImageWithControls(image);
       prepareBlockImageWrapper(wrapper);
 

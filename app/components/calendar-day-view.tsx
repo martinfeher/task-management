@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, Fragment } from "react";
+import { CalendarAllDayTaskImageThumbs } from "./calendar-task-image-thumbs";
 import { CalendarTaskTitle } from "./calendar-task-title";
 import { CalendarCurrentTimeLine } from "./calendar-current-time-line";
 import type { CalendarStartTaskOptions } from "@/lib/calendar-start-task";
@@ -747,6 +748,7 @@ export function CalendarDayView({
                     recurrenceRule={task.recurrenceRule}
                     priority={task.priority}
                   />
+                  <CalendarAllDayTaskImageThumbs imageSrcs={task.imageSrcs} />
                   <CalendarTaskCompletionCheckbox
                     task={task}
                     onToggleTask={onToggleTask}

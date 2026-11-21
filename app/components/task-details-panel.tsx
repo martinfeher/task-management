@@ -83,11 +83,13 @@ import {
   getLineImageWrappers,
   getLineIndex,
   placeCaretBelowWrapper,
+  tryPlaceCaretBesideImageAtPoint,
   getSelectedListBlockLines,
   getSelectedBlockLinesInRange,
   indentListLines,
   handleClickBelowLastLine,
   insertImagesIntoEditor,
+  refreshAnimatedDetailImages,
   insertTypedLineBelowLine,
   repairPastedEditorStructure,
   insertHtmlAtSelection,
@@ -143,6 +145,7 @@ import {
 import {
   deleteUploadedTaskImage,
   extractTaskImageFilename,
+  getClipboardImageFiles,
   getImageFilesFromDataTransfer,
   hasImageFilesInDataTransfer,
   uploadEmbeddedImagesInHtml,
@@ -1400,24 +1403,41 @@ function getDetailSelectionInlineFormatState(
 ): FormatMenuInlineFormats {
   const selection = window.getSelection();
   if (
-    !selection ||
-    selection.isCollapsed ||
+    !selection?.rangeCount ||
+    !selection.anchorNode ||
     !editor.contains(selection.anchorNode)
   ) {
     return DEFAULT_FORMAT_MENU_INLINE_FORMATS;
   }
 
-  const hasHighlight = selectionHasHighlight(editor);
+  if (selection.isCollapsed && editorSelectionIsWithinTitleLine(editor)) {
+    return DEFAULT_FORMAT_MENU_INLINE_FORMATS;
+  }
+
+  const hasHighlight = selection.isCollapsed
+    ? nodeHasHighlight(selection.anchorNode, editor)
+    : selectionHasHighlight(editor);
+
+  document.execCommand("styleWithCSS", false, "true");
+
+  const highlightColor = hasHighlight
+    ? selection.isCollapsed
+      ? (getHighlightColorFromNode(selection.anchorNode, editor) ??
+        DEFAULT_HIGHLIGHT_COLOR)
+      : getSelectionHighlightColor(editor)
+    : DEFAULT_HIGHLIGHT_COLOR;
+
+  const textColor = selection.isCollapsed
+    ? getTextColorFromNode(selection.anchorNode, editor) ?? DEFAULT_TEXT_COLOR
+    : getSelectionTextColor(editor);
 
   return {
     bold: document.queryCommandState("bold"),
     italic: document.queryCommandState("italic"),
     underline: document.queryCommandState("underline"),
     highlight: hasHighlight,
-    highlightColor: hasHighlight
-      ? getSelectionHighlightColor(editor)
-      : DEFAULT_HIGHLIGHT_COLOR,
-    textColor: getSelectionTextColor(editor),
+    highlightColor,
+    textColor,
   };
 }
 
@@ -2806,6 +2826,8 @@ export function TaskDetailsPanel({
   const formatMenuVisibleRef = useRef(false);
   /** True while the pointer is over the floating toolbar (or its portaled submenus). */
   const formatMenuPointerInsideRef = useRef(false);
+  /** Keep toolbar x/y fixed while font size changes reflow the selection. */
+  const formatMenuAnchorPositionLockedRef = useRef(false);
   const skipFormatMenuTypographySyncCountRef = useRef(0);
   const lineControlsTimerRef = useRef<number | null>(null);
   const titleSyncTimerRef = useRef<number | null>(null);
@@ -3996,6 +4018,7 @@ export function TaskDetailsPanel({
 
   function beginEditorPointerInteraction() {
     isEditorPointerDownRef.current = true;
+    formatMenuAnchorPositionLockedRef.current = false;
     setLineControlsPointerEventsEnabled(false);
     setLineControls([]);
 
@@ -4143,6 +4166,7 @@ export function TaskDetailsPanel({
     setFormatMenu(null);
     formatMenuVisibleRef.current = false;
     formatMenuPointerInsideRef.current = false;
+    formatMenuAnchorPositionLockedRef.current = false;
     if (options?.preserveToolbarDropdowns) {
       setOpenFormatDropdown(null);
     } else {
@@ -4211,7 +4235,6 @@ export function TaskDetailsPanel({
     const selection = window.getSelection();
     if (
       selection?.rangeCount &&
-      !selection.isCollapsed &&
       selection.anchorNode &&
       editor.contains(selection.anchorNode)
     ) {
@@ -4438,7 +4461,11 @@ export function TaskDetailsPanel({
       const previewRange = restoreTextColorPreviewBaseline(editor);
       if (!previewRange || previewRange.collapsed) return;
 
-      if (applyDetailFontSize(editor, size, previewRange.cloneRange())) {
+      if (
+        applyDetailFontSize(editor, size, previewRange.cloneRange(), {
+          animate: false,
+        })
+      ) {
         const styledRange = getTextColorPreviewContentRange(editor);
         if (styledRange) {
           rememberFormatSelection(editor, styledRange);
@@ -4694,6 +4721,10 @@ export function TaskDetailsPanel({
   const prepareFormatFontSizeStep = useCallback(() => {
     const editor = editorRef.current;
     if (!editor) return;
+
+    if (formatMenuVisibleRef.current) {
+      formatMenuAnchorPositionLockedRef.current = true;
+    }
 
     const saved = savedFormatSelectionRef.current;
     if (
@@ -5241,7 +5272,11 @@ export function TaskDetailsPanel({
     const keepToolbarAnchored =
       !options?.force &&
       formatMenuVisibleRef.current &&
-      formatMenuPointerInsideRef.current;
+      (formatMenuPointerInsideRef.current ||
+        formatMenuAnchorPositionLockedRef.current ||
+        openFormatDropdownRef.current === "typography" ||
+        openHeaderFormatDropdownRef.current === "size" ||
+        openModalFormatDropdownRef.current === "size");
     if (!keepToolbarAnchored) {
       setFormatMenu(getFormatMenuPositionFromRange(range, editor));
     }
@@ -5344,15 +5379,26 @@ export function TaskDetailsPanel({
       const activeLine = getActiveLineElement(editor);
       if (isCodeLine(activeLine)) return;
 
+      const selectionBeforeApply = window.getSelection();
       const savedRange =
         savedFormatSelectionRef.current?.cloneRange() ??
+        (selectionBeforeApply?.rangeCount &&
+        selectionBeforeApply.anchorNode &&
+        editor.contains(selectionBeforeApply.anchorNode)
+          ? selectionBeforeApply.getRangeAt(0).cloneRange()
+          : null) ??
         captureLiveEditorFormatSelection(editor);
+
       if (
         savedRange &&
-        !savedRange.collapsed &&
         editor.contains(savedRange.commonAncestorContainer)
       ) {
         restoreEditorSelectionRange(savedRange);
+      } else {
+        const activeLine = getActiveLineElement(editor);
+        if (activeLine && !isTitleLine(editor, activeLine)) {
+          placeCaretInLine(activeLine);
+        }
       }
 
       editor.focus({ preventScroll: true });
@@ -5360,6 +5406,7 @@ export function TaskDetailsPanel({
       if (command === "highlight") {
         applyHighlight(editor, DEFAULT_HIGHLIGHT_COLOR);
       } else {
+        document.execCommand("styleWithCSS", false, "true");
         document.execCommand(command, false);
       }
 
@@ -5787,20 +5834,21 @@ export function TaskDetailsPanel({
     (event: React.MouseEvent) => {
       if (event.button !== 0) return;
 
+      event.preventDefault();
+
       const editor = editorRef.current;
       if (!editor) return;
 
       const selection = window.getSelection();
       if (
         selection?.rangeCount &&
-        !selection.isCollapsed &&
         selection.anchorNode &&
         editor.contains(selection.anchorNode)
       ) {
         rememberFormatSelection(editor, selection.getRangeAt(0));
       }
     },
-    [],
+    [rememberFormatSelection],
   );
 
   const restoreHistorySnapshot = useCallback(
@@ -5904,6 +5952,7 @@ export function TaskDetailsPanel({
         ensureBlockLines(editor);
         ensureTitleLine(editor);
         syncEditorLineEmptyState(editor);
+        refreshAnimatedDetailImages(editor);
         detailsRef.current = normalizeDetails(editor.innerHTML);
         previousTextRef.current = editor.textContent ?? "";
         hydratedTaskIdRef.current = currentTaskId;
@@ -5970,6 +6019,7 @@ export function TaskDetailsPanel({
     ensureBlockLines(editor);
     ensureTitleLine(editor);
     syncEditorLineEmptyState(editor);
+    refreshAnimatedDetailImages(editor);
     detailsRef.current = normalizeDetails(editor.innerHTML);
     previousTextRef.current = editor.textContent ?? "";
     hydratedTaskIdRef.current = task.id;
@@ -5980,6 +6030,7 @@ export function TaskDetailsPanel({
     }
 
     requestAnimationFrame(() => {
+      refreshAnimatedDetailImages(editor);
       updateLineControls();
       syncEditorHeight();
       editor.scrollTop = 0;
@@ -6007,6 +6058,46 @@ export function TaskDetailsPanel({
     task?.isNote,
     updateLineControls,
   ]);
+
+  useEffect(() => {
+    const panel = panelRef.current;
+    if (!panel || !task?.id) return;
+
+    function handlePanelPaste(event: ClipboardEvent) {
+      if (!isReadyRef.current || !taskIdRef.current) return;
+
+      const editor = editorRef.current;
+      if (!editor) return;
+
+      const target = event.target;
+      if (target instanceof Node && editor.contains(target)) {
+        return;
+      }
+
+      const clipboardData = event.clipboardData;
+      if (!clipboardData) return;
+
+      if (!hasImageFilesInDataTransfer(clipboardData)) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      void (async () => {
+        const imageFiles = await getClipboardImageFiles(clipboardData);
+        if (imageFiles.length === 0) return;
+
+        const activeLine = getActiveLineElement(editor);
+        await insertImagesFromFiles(imageFiles, activeLine, {
+          fromClipboard: true,
+        });
+      })();
+    }
+
+    panel.addEventListener("paste", handlePanelPaste);
+    return () => {
+      panel.removeEventListener("paste", handlePanelPaste);
+    };
+  }, [task?.id]);
 
   useLayoutEffect(() => {
     if (!task) return;
@@ -6562,7 +6653,13 @@ export function TaskDetailsPanel({
         syncFormatMenuSelectionState();
       }
 
-      if (!formatMenuRef.current?.contains(document.activeElement)) {
+      if (
+        !(
+          formatMenuVisibleRef.current &&
+          formatMenuAnchorPositionLockedRef.current
+        ) &&
+        !formatMenuRef.current?.contains(document.activeElement)
+      ) {
         if (formatMenuTimerRef.current !== null) {
           window.clearTimeout(formatMenuTimerRef.current);
         }
@@ -6635,7 +6732,15 @@ export function TaskDetailsPanel({
     if (!formatMenu) return;
 
     const editor = editorRef.current;
-    const reposition = () => updateFormatMenu({ force: true });
+    const reposition = () => {
+      if (
+        formatMenuAnchorPositionLockedRef.current ||
+        formatMenuPointerInsideRef.current
+      ) {
+        return;
+      }
+      updateFormatMenu({ force: true });
+    };
 
     editor?.addEventListener("scroll", reposition, { passive: true });
     window.addEventListener("scroll", reposition, { passive: true });
@@ -6713,12 +6818,27 @@ export function TaskDetailsPanel({
 
         event.preventDefault();
         openLinkMenu();
+        return;
+      }
+
+      if (key === "b" || key === "i") {
+        const editor = editorRef.current;
+        if (!editor) return;
+
+        const isEditorTarget =
+          target === editor ||
+          (editor instanceof HTMLElement && editor.contains(target));
+        if (!isEditorTarget) return;
+        if (editorSelectionIsWithinTitleLine(editor)) return;
+
+        event.preventDefault();
+        applyFormat(key === "b" ? "bold" : "italic");
       }
     }
 
     document.addEventListener("keydown", handleShortcut, true);
     return () => document.removeEventListener("keydown", handleShortcut, true);
-  }, [handleUndo, handleRedo, openLinkMenu]);
+  }, [applyFormat, handleUndo, handleRedo, openLinkMenu]);
 
   function updateSlashCommandMenu() {
     const editor = editorRef.current;
@@ -7089,10 +7209,25 @@ export function TaskDetailsPanel({
       return;
     }
 
-    const files = getImageFilesFromDataTransfer(event.clipboardData);
-    if (files.length > 0) {
+    const clipboardData = event.clipboardData;
+    const directImageFiles = getImageFilesFromDataTransfer(clipboardData);
+    if (directImageFiles.length > 0) {
       event.preventDefault();
-      void insertImagesFromFiles(files, activeLine, { fromClipboard: true });
+      void insertImagesFromFiles(directImageFiles, activeLine, {
+        fromClipboard: true,
+      });
+      return;
+    }
+
+    if (/<img\b/i.test(html)) {
+      event.preventDefault();
+      void (async () => {
+        const imageFiles = await getClipboardImageFiles(clipboardData);
+        if (imageFiles.length === 0) return;
+        await insertImagesFromFiles(imageFiles, activeLine, {
+          fromClipboard: true,
+        });
+      })();
       return;
     }
 
@@ -7513,6 +7648,22 @@ export function TaskDetailsPanel({
         window.getSelection()?.removeAllRanges();
         editor.focus();
         placeCaretBelowWrapper(imageWrappers[imageWrappers.length - 1]);
+        clickedLineRef.current = line;
+        pendingClickLineRef.current = null;
+        updateLineControls();
+        requestAnimationFrame(() => {
+          updateLineControls();
+        });
+        return;
+      }
+
+      if (
+        !event.shiftKey &&
+        !isMultiClick &&
+        tryPlaceCaretBesideImageAtPoint(editor, event.clientX, event.clientY)
+      ) {
+        event.preventDefault();
+        editor.focus();
         clickedLineRef.current = line;
         pendingClickLineRef.current = null;
         updateLineControls();
@@ -9234,6 +9385,7 @@ export function TaskDetailsPanel({
           className={`${HEADER_QUICK_FORMAT_BUTTON_CLASS} text-[15px] font-bold ${
             formatMenuInlineFormats.bold ? FORMAT_TOOLBAR_BOLD_ITALIC_ACTIVE_CLASS : ""
           }`}
+          onMouseDown={(event) => event.preventDefault()}
           onClick={() => handleHeaderQuickFormatApply("bold")}
         >
           B
@@ -9245,6 +9397,7 @@ export function TaskDetailsPanel({
           className={`${HEADER_QUICK_FORMAT_BUTTON_CLASS} ${
             formatMenuInlineFormats.italic ? FORMAT_TOOLBAR_BOLD_ITALIC_ACTIVE_CLASS : ""
           }`}
+          onMouseDown={(event) => event.preventDefault()}
           onClick={() => handleHeaderQuickFormatApply("italic")}
         >
           <HiItalic className="size-4" aria-hidden="true" />

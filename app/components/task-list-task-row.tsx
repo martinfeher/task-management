@@ -1171,7 +1171,7 @@ export function TaskListTaskRow({
                   onOpenLabelMenu(task.id);
                 }}
               >
-                <LiaTagSolid className="size-[17px]! text-[#bfbfcd]! group-hover/add-label:text-zinc-450 dark:text-zinc-400" />
+                <LiaTagSolid className="size-[17px]! text-[#C5C5D2]! group-hover/add-label:text-zinc-450 dark:text-zinc-400" />
                 <span
                   id={`set-label-tooltip-${task.id}`}
                   role="tooltip"

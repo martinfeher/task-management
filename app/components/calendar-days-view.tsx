@@ -9,6 +9,7 @@ import {
   useState,
   Fragment,
 } from "react";
+import { CalendarAllDayTaskImageThumbs } from "./calendar-task-image-thumbs";
 import { CalendarTaskTitle } from "./calendar-task-title";
 import { CalendarPeriodNavigation } from "./calendar-period-navigation";
 import { CalendarCurrentTimeLine } from "./calendar-current-time-line";
@@ -968,6 +969,9 @@ export function CalendarMultiDayView({
                                   recurrenceRule={task.recurrenceRule}
                                   priority={task.priority}
                                 />
+                                <CalendarAllDayTaskImageThumbs
+                                  imageSrcs={task.imageSrcs}
+                                />
                                 <CalendarTaskCompletionCheckbox
                                   task={task}
                                   onToggleTask={onToggleTask}
@@ -1205,6 +1209,7 @@ export function CalendarMultiDayView({
                           height={height}
                           startMinutes={timing.dueTimeMinutes}
                           durationMinutes={timing.dueDurationMinutes}
+                          hideImageThumbs={timing.dueDurationMinutes === 120}
                           hourStart={GRID_HOUR_START}
                           hourHeightPx={hourHeightPx}
                           selected={task.id === selectedTaskId}

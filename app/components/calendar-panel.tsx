@@ -73,6 +73,7 @@ import {
   useCalendarTaskDragPreview,
 } from "./calendar-task-hover-preview";
 import { CalendarTaskColorMenuProvider } from "./calendar-task-color-menu";
+import { CalendarAllDayTaskImageThumbs } from "./calendar-task-image-thumbs";
 import { CalendarTaskTitle } from "./calendar-task-title";
 import { CalendarTaskCompletionCheckbox } from "./calendar-timed-task-block";
 import { TaskCompletionCheckbox } from "./task-completion-checkbox";
@@ -1085,6 +1086,9 @@ export function CalendarMonthView({
                           name={task.name}
                           recurrenceRule={task.recurrenceRule}
                           priority={task.priority}
+                        />
+                        <CalendarAllDayTaskImageThumbs
+                          imageSrcs={task.imageSrcs}
                         />
                         <CalendarTaskCompletionCheckbox
                           task={task}

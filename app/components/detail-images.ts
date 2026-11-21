@@ -8,32 +8,110 @@ export function isImageFile(file: File) {
 }
 
 export function hasImageFilesInDataTransfer(dataTransfer: DataTransfer) {
-  return getImageFilesFromDataTransfer(dataTransfer).length > 0;
+  if (getImageFilesFromDataTransfer(dataTransfer).length > 0) {
+    return true;
+  }
+
+  const html = dataTransfer.getData("text/html");
+  return /<img\b/i.test(html);
+}
+
+function imageFileIdentity(file: File) {
+  return `${file.name}:${file.size}:${file.lastModified}:${file.type}`;
+}
+
+function extensionForImageMime(mimeType: string) {
+  if (mimeType === "image/png") return "png";
+  if (mimeType === "image/webp") return "webp";
+  if (mimeType === "image/gif") return "gif";
+  if (mimeType === "image/svg+xml") return "svg";
+  if (mimeType === "image/jpeg") return "jpg";
+  return "png";
+}
+
+function mimeTypeFromFileName(name: string) {
+  const lower = name.toLowerCase();
+  if (lower.endsWith(".gif")) return "image/gif";
+  if (lower.endsWith(".png")) return "image/png";
+  if (lower.endsWith(".webp")) return "image/webp";
+  if (lower.endsWith(".svg")) return "image/svg+xml";
+  if (/\.jpe?g$/i.test(lower)) return "image/jpeg";
+  return null;
+}
+
+function normalizeClipboardImageFile(file: File) {
+  const mime =
+    (file.type.startsWith("image/") ? file.type : null) ??
+    mimeTypeFromFileName(file.name) ??
+    "image/png";
+
+  let name = file.name?.trim() ?? "";
+  if (!name || name === "blob" || name.toLowerCase() === "image.png") {
+    name = `pasted-image.${extensionForImageMime(mime)}`;
+  } else if (!IMAGE_FILE_NAME_PATTERN.test(name)) {
+    const stem = name.includes(".") ? name.slice(0, name.lastIndexOf(".")) : name;
+    name = `${stem || "pasted-image"}.${extensionForImageMime(mime)}`;
+  }
+
+  if (name === file.name && mime === file.type) {
+    return file;
+  }
+
+  return new File([file], name, { type: mime });
 }
 
 export function getImageFilesFromDataTransfer(dataTransfer: DataTransfer) {
+  const filesByIdentity = new Map<string, File>();
+
+  const addFile = (file: File | null) => {
+    if (!file || !isImageFile(file) || file.size > MAX_IMAGE_BYTES) return;
+
+    const normalized = normalizeClipboardImageFile(file);
+    filesByIdentity.set(imageFileIdentity(normalized), normalized);
+  };
+
+  for (const file of Array.from(dataTransfer.files ?? [])) {
+    addFile(file);
+  }
+
+  for (const item of Array.from(dataTransfer.items ?? [])) {
+    if (item.kind !== "file") continue;
+    if (item.type && !item.type.startsWith("image/")) continue;
+    addFile(item.getAsFile());
+  }
+
+  return Array.from(filesByIdentity.values());
+}
+
+export async function getClipboardImageFiles(dataTransfer: DataTransfer) {
+  const direct = getImageFilesFromDataTransfer(dataTransfer);
+  if (direct.length > 0) return direct;
+
+  const html = dataTransfer.getData("text/html");
+  if (!html.trim() || !/<img\b/i.test(html)) return [];
+
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const sources = Array.from(doc.querySelectorAll("img[src]"))
+    .map((img) => img.getAttribute("src"))
+    .filter((src): src is string => Boolean(src));
+
   const files: File[] = [];
+  const seenSources = new Set<string>();
 
-  if (dataTransfer.files?.length) {
-    for (const file of Array.from(dataTransfer.files)) {
-      if (isImageFile(file)) {
-        files.push(file);
-      }
+  for (const src of sources) {
+    if (seenSources.has(src)) continue;
+    seenSources.add(src);
+
+    try {
+      const file = await fileFromEmbeddedImageSrc(src);
+      if (!file || !isImageFile(file) || file.size > MAX_IMAGE_BYTES) continue;
+      files.push(normalizeClipboardImageFile(file));
+    } catch {
+      // Skip sources that cannot be fetched (e.g. blocked cross-origin URLs).
     }
   }
 
-  if (files.length === 0) {
-    for (const item of Array.from(dataTransfer.items)) {
-      if (item.kind !== "file") continue;
-
-      const file = item.getAsFile();
-      if (file && isImageFile(file)) {
-        files.push(file);
-      }
-    }
-  }
-
-  return files.filter((file) => file.size <= MAX_IMAGE_BYTES);
+  return files;
 }
 
 function loadImage(src: string) {
@@ -179,7 +257,11 @@ async function blobToUploadFile(blob: Blob, name: string) {
 
 async function fileFromEmbeddedImageSrc(src: string) {
   if (src.startsWith("data:")) {
-    return dataUrlToUploadFile(src, "pasted-image.png");
+    const mimeType = src.match(/data:(.*?);/)?.[1] ?? "image/png";
+    return dataUrlToUploadFile(
+      src,
+      `pasted-image.${extensionForImageMime(mimeType)}`,
+    );
   }
 
   if (src.startsWith("blob:") || src.startsWith("http://") || src.startsWith("https://")) {
@@ -189,7 +271,8 @@ async function fileFromEmbeddedImageSrc(src: string) {
     const blob = await response.blob();
     if (!blob.type.startsWith("image/") && blob.size === 0) return null;
 
-    return blobToUploadFile(blob, "pasted-image.png");
+    const mimeType = blob.type.startsWith("image/") ? blob.type : "image/png";
+    return blobToUploadFile(blob, `pasted-image.${extensionForImageMime(mimeType)}`);
   }
 
   return null;

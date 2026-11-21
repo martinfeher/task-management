@@ -9,6 +9,7 @@ import {
   useState,
   Fragment,
 } from "react";
+import { CalendarAllDayTaskImageThumbs } from "./calendar-task-image-thumbs";
 import { CalendarTaskTitle } from "./calendar-task-title";
 import { CalendarPeriodNavigation } from "./calendar-period-navigation";
 import { CalendarCurrentTimeLine } from "./calendar-current-time-line";
@@ -925,6 +926,9 @@ export function CalendarWeekView({
                                       name={task.name}
                                       recurrenceRule={task.recurrenceRule}
                                       priority={task.priority}
+                                    />
+                                    <CalendarAllDayTaskImageThumbs
+                                      imageSrcs={task.imageSrcs}
                                     />
                                     <CalendarTaskCompletionCheckbox
                                       task={task}

@@ -35,6 +35,10 @@ import {
   useCalendarTaskColorMenu,
 } from "./calendar-task-color-menu";
 import { CalendarTaskPriorityFlag } from "./calendar-task-title";
+import {
+  CalendarTaskImageThumbs,
+  getCalendarTimedTaskImageThumbLayout,
+} from "./calendar-task-image-thumbs";
 import { TaskCompletionCheckbox } from "./task-completion-checkbox";
 import type { TaskListItem } from "./todo-app";
 
@@ -445,6 +449,7 @@ type CalendarTimedTaskContentProps = {
   onToggleTask?: (taskId: string) => void;
   isCompleting?: boolean;
   isCheckAnimating?: boolean;
+  hideImageThumbs?: boolean;
 };
 
 export function CalendarTimedTaskContent({
@@ -457,6 +462,7 @@ export function CalendarTimedTaskContent({
   onToggleTask,
   isCompleting = false,
   isCheckAnimating = false,
+  hideImageThumbs = false,
 }: CalendarTimedTaskContentProps) {
   const availableHeight = height - contentPaddingTop - contentPaddingBottom;
   const { showTime, titleMaxLines } =
@@ -464,34 +470,56 @@ export function CalendarTimedTaskContent({
   const isSingleLineOnly = isCalendarTimedTaskCompactSingleLine(availableHeight);
   const timeLabel = formatCalendarTaskTimeRange(startMinutes, durationMinutes);
   const timeClassName = calendarTaskTimeRangeClassName();
+  const imageThumbLayout =
+    !hideImageThumbs && task.imageSrcs && task.imageSrcs.length > 0
+      ? getCalendarTimedTaskImageThumbLayout(availableHeight)
+      : null;
+  const titleMaxLinesAdjusted =
+    imageThumbLayout && titleMaxLines > 1
+      ? Math.max(1, titleMaxLines - 1)
+      : titleMaxLines;
 
   return (
     <div
-      className={`flex min-h-0 w-full gap-1 ${
-        isSingleLineOnly
-          ? "calendar-task-row--single-line shrink-0 items-center"
-          : "min-w-0 flex-1 items-start"
+      className={`flex min-h-0 w-full min-w-0 flex-1 flex-col gap-1 overflow-hidden ${
+        isSingleLineOnly ? "shrink-0" : ""
       }`}
     >
-      <CalendarTaskTimedTitleSection
-        title={task.name}
-        timeLabel={timeLabel}
-        timeClassName={timeClassName}
-        titleMaxLines={titleMaxLines}
-        showTimeBelow={showTime}
-        priority={task.priority}
-      />
-      <CalendarTaskCompletionCheckbox
-        task={task}
-        onToggleTask={onToggleTask}
-        isCompleting={isCompleting}
-        isCheckAnimating={isCheckAnimating}
-        className={
+      <div
+        className={`flex min-h-0 w-full gap-1 ${
           isSingleLineOnly
-            ? "calendar-task-checkbox"
-            : "calendar-task-checkbox mt-px"
-        }
-      />
+            ? "calendar-task-row--single-line shrink-0 items-center"
+            : "min-w-0 flex-1 items-start"
+        }`}
+      >
+        <CalendarTaskTimedTitleSection
+          title={task.name}
+          timeLabel={timeLabel}
+          timeClassName={timeClassName}
+          titleMaxLines={titleMaxLinesAdjusted}
+          showTimeBelow={showTime}
+          priority={task.priority}
+        />
+        <CalendarTaskCompletionCheckbox
+          task={task}
+          onToggleTask={onToggleTask}
+          isCompleting={isCompleting}
+          isCheckAnimating={isCheckAnimating}
+          className={
+            isSingleLineOnly
+              ? "calendar-task-checkbox"
+              : "calendar-task-checkbox mt-px"
+          }
+        />
+      </div>
+      {imageThumbLayout ? (
+        <CalendarTaskImageThumbs
+          srcs={task.imageSrcs ?? []}
+          thumbSizePx={imageThumbLayout.thumbSizePx}
+          maxVisible={imageThumbLayout.maxVisible}
+          className="min-w-0"
+        />
+      ) : null}
     </div>
   );
 }
@@ -826,6 +854,7 @@ type CalendarTimedTaskBlockProps = {
   isCheckAnimating?: boolean;
   isPast?: boolean;
   toDateKey: (date: Date) => string;
+  hideImageThumbs?: boolean;
 };
 
 export function CalendarTimedTaskBlock({
@@ -858,6 +887,7 @@ export function CalendarTimedTaskBlock({
   isCheckAnimating = false,
   isPast = false,
   toDateKey,
+  hideImageThumbs = false,
 }: CalendarTimedTaskBlockProps) {
   const canResize = canInteract && Boolean(onSetTaskDueTime);
   const contentPaddingTop = canResize ? RESIZE_HANDLE_PX : CALENDAR_TASK_CONTENT_PADDING_PX;
@@ -993,6 +1023,7 @@ export function CalendarTimedTaskBlock({
             onToggleTask={onToggleTask}
             isCompleting={isCompleting}
             isCheckAnimating={isCheckAnimating}
+            hideImageThumbs={hideImageThumbs}
           />
         </div>
       </div>

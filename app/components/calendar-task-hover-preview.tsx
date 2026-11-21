@@ -31,13 +31,23 @@ import {
   useCalendarTaskColorMenu,
   useCalendarTaskColorMenuActions,
 } from "./calendar-task-color-menu";
+import {
+  normalizeDueDurationMinutes,
+  normalizeDueTimeMinutes,
+} from "@/lib/task-due-time";
 import type { TaskListItem } from "./todo-app";
+import {
+  formatCalendarTaskTimeRange,
+  getDefaultTaskDurationMinutes,
+} from "./calendar-timed-task-block";
 
 export const CALENDAR_TASK_HOVER_PREVIEW_WIDTH_PX = 280;
 const PREVIEW_WIDTH = CALENDAR_TASK_HOVER_PREVIEW_WIDTH_PX;
 const PREVIEW_ESTIMATED_HEIGHT = 240;
 const PREVIEW_TITLE_CLASS =
   "line-clamp-2 text-[15px] font-semibold leading-5 text-[#3C3C3E]";
+const PREVIEW_TIME_CLASS =
+  "shrink-0 pt-px text-[12px] font-medium tabular-nums leading-5 text-[#8a8a96] dark:text-[#78789f]";
 const PREVIEW_SUBTITLE_CLASS =
   "text-[13.5px] leading-[16px] text-[#78789f] dark:text-[#78789f]";
 /** Horizontal space between task block edge and hover preview (was 12px; −7px). */
@@ -192,6 +202,16 @@ async function loadTaskDetailsForPreview(task: TaskListItem): Promise<string> {
   return details;
 }
 
+function getCalendarHoverPreviewTimeLabel(task: TaskListItem) {
+  const start = normalizeDueTimeMinutes(task.dueTimeMinutes);
+  if (start === null) return null;
+
+  const duration =
+    normalizeDueDurationMinutes(task.dueDurationMinutes) ??
+    getDefaultTaskDurationMinutes(task);
+  return formatCalendarTaskTimeRange(start, duration);
+}
+
 function getTaskPreviewDescriptionLines(
   details: string,
   taskName: string,
@@ -263,6 +283,7 @@ function PreviewMetaRow({
 }
 
 export function CalendarTaskHoverPreviewCard({ task }: { task: TaskListItem }) {
+  const timeLabel = getCalendarHoverPreviewTimeLabel(task);
   const descriptionLines = getTaskPreviewDescriptionLines(
     task.details,
     task.name,
@@ -271,7 +292,12 @@ export function CalendarTaskHoverPreviewCard({ task }: { task: TaskListItem }) {
   return (
     <div className="flex flex-col gap-2.5 px-[15px] py-[10px]">
       <div className="flex flex-col gap-1">
-        <p className={PREVIEW_TITLE_CLASS}>{task.name}</p>
+        <div className="flex min-w-0 items-start gap-2">
+          <p className={`${PREVIEW_TITLE_CLASS} min-w-0 flex-1`}>{task.name}</p>
+          {timeLabel ? (
+            <span className={PREVIEW_TIME_CLASS}>{timeLabel}</span>
+          ) : null}
+        </div>
 
         {descriptionLines.length > 0 ? (
           <div className="flex flex-col gap-0.5">
@@ -537,7 +563,16 @@ export function CalendarTaskHoverPreviewProvider({
               role="tooltip"
               aria-label={preview.task.name}
             >
-              <CalendarTaskHoverPreviewCard task={preview.task} />
+              <CalendarTaskHoverPreviewCard
+                task={
+                  preview.scheduleOverride?.dueTimeMinutes !== undefined
+                    ? {
+                        ...preview.task,
+                        dueTimeMinutes: preview.scheduleOverride.dueTimeMinutes,
+                      }
+                    : preview.task
+                }
+              />
             </div>,
             document.body,
           )

@@ -16,6 +16,11 @@ import {
 import {
   resetDetailLineHeightOnLines,
 } from "./detail-line-height";
+import {
+  playDetailFontSizeTransition,
+  snapshotTextFontSizesInRange,
+  shouldAnimateDetailFontSize,
+} from "./detail-font-size-animation";
 import { sanitizePastedHtml as sanitizePastedHtmlCore } from "./detail-paste";
 
 export const PASTE_BATCH_ATTR = "data-paste-batch";
@@ -1239,10 +1244,16 @@ export function applyDetailTextColor(
   return applyStyleToSelection(editor, { color }, range);
 }
 
+export type ApplyDetailFontSizeOptions = {
+  /** Live toolbar previews should not animate; committed applies default to true. */
+  animate?: boolean;
+};
+
 export function applyDetailFontSize(
   editor: HTMLElement,
   size: DetailFontSizeOption,
   savedRange?: Range | null,
+  options?: ApplyDetailFontSizeOptions,
 ) {
   const range = resolveApplyRange(editor, savedRange);
   if (!range) return false;
@@ -1251,6 +1262,13 @@ export function applyDetailFontSize(
   restoreSelectionRange(range);
 
   if (!canApplyDetailFont(editor, range)) return false;
+
+  const rangeForAnimation = range.cloneRange();
+  const shouldAnimate =
+    options?.animate !== false && shouldAnimateDetailFontSize();
+  const fontSizesBefore = shouldAnimate
+    ? snapshotTextFontSizesInRange(editor, rangeForAnimation)
+    : null;
 
   let applied = false;
 
@@ -1268,6 +1286,9 @@ export function applyDetailFontSize(
 
   if (applied) {
     syncListLineMarkerMetricsForRange(editor, range);
+    if (fontSizesBefore) {
+      playDetailFontSizeTransition(editor, rangeForAnimation, fontSizesBefore);
+    }
   }
 
   return applied;
